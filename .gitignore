@@ -1,0 +1,22 @@
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+
+# Java / Spring Boot
+backend/target/
+backend/.classpath
+backend/.project
+backend/.settings/
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# IDE and OS files
+.idea/
+.vscode/
+*.iml
+Thumbs.db
+.DS_Store
