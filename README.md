@@ -12,14 +12,21 @@ Nền tảng quản lý đề tài, nhóm sinh viên, tiến độ, chấm đi�
 ## Chạy cục bộ
 
 1. Import `database/ql_de_tai_sinh_vien_schema.sql` vào MySQL 8.4+.
-2. Chạy backend:
+2. Đặt biến môi trường backend (không ghi mật khẩu thật vào Git):
+
+   ```powershell
+   $env:DB_USERNAME = "ql_de_tai_app"
+   $env:DB_PASSWORD = "your-local-password"
+   ```
+
+3. Chạy backend:
 
    ```powershell
    cd backend
-   mvn spring-boot:run
+   .\mvnw.cmd spring-boot:run
    ```
 
-3. Chạy frontend:
+4. Chạy frontend:
 
    ```powershell
    cd frontend
@@ -28,3 +35,12 @@ Nền tảng quản lý đề tài, nhóm sinh viên, tiến độ, chấm đi�
    ```
 
 Backend nhận cấu hình database qua `DB_URL`, `DB_USERNAME`, và `DB_PASSWORD`; không đưa mật khẩu thật vào Git.
+
+Để tạo dữ liệu demo gồm admin, giảng viên, sinh viên, nhiệm vụ trưởng khoa và một đợt KLTN hợp lệ:
+
+```powershell
+$env:DEMO_DATA_ENABLED = "true"
+$env:DEMO_PASSWORD = "a-demo-password-with-at-least-8-characters"
+```
+
+Tài liệu hợp đồng Backend 1 nằm tại `docs/backend-1-api.md`.

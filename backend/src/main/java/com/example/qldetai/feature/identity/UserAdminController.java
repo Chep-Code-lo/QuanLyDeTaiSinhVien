@@ -1,0 +1,69 @@
+package com.example.qldetai.feature.identity;
+
+import com.example.qldetai.common.api.ApiResponse;
+import com.example.qldetai.common.api.PageResponse;
+import com.example.qldetai.feature.identity.IdentityDtos.CreateUserRequest;
+import com.example.qldetai.feature.identity.IdentityDtos.UpdateUserRolesRequest;
+import com.example.qldetai.feature.identity.IdentityDtos.UpdateUserStatusRequest;
+import com.example.qldetai.feature.identity.IdentityDtos.UserResponse;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import java.net.URI;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@Validated
+@RestController
+@RequestMapping("/api/v1/admin/users")
+@PreAuthorize("hasRole('ADMIN')")
+public class UserAdminController {
+
+    private final UserAdminService service;
+
+    public UserAdminController(UserAdminService service) {
+        this.service = service;
+    }
+
+    @GetMapping
+    public ApiResponse<PageResponse<UserResponse>> list(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        return ApiResponse.success(service.list(search, page, size));
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<UserResponse> get(@PathVariable Long id) {
+        return ApiResponse.success(service.get(id));
+    }
+
+    @PostMapping
+    public ResponseEntity<ApiResponse<UserResponse>> create(@Valid @RequestBody CreateUserRequest request) {
+        UserResponse created = service.create(request);
+        return ResponseEntity.created(URI.create("/api/v1/admin/users/" + created.id()))
+                .body(ApiResponse.success("User account created.", created));
+    }
+
+    @PatchMapping("/{id}/status")
+    public ApiResponse<UserResponse> updateStatus(
+            @PathVariable Long id, @Valid @RequestBody UpdateUserStatusRequest request) {
+        return ApiResponse.success("User status updated.", service.updateStatus(id, request));
+    }
+
+    @PutMapping("/{id}/roles")
+    public ApiResponse<UserResponse> updateRoles(
+            @PathVariable Long id, @Valid @RequestBody UpdateUserRolesRequest request) {
+        return ApiResponse.success("User roles updated.", service.updateRoles(id, request));
+    }
+}
