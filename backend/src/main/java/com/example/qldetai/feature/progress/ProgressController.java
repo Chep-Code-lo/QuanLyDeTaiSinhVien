@@ -1,0 +1,22 @@
+package com.example.qldetai.feature.progress;
+
+import com.example.qldetai.common.api.ApiResponse;
+import com.example.qldetai.feature.progress.ProgressDtos.*;
+import com.example.qldetai.security.UserPrincipal;
+import jakarta.validation.Valid;
+import java.net.URI;
+import java.util.List;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+@RestController @RequestMapping("/api/v1")
+public class ProgressController {
+ private final ProgressService service;
+ public ProgressController(ProgressService service) { this.service=service; }
+ @PostMapping("/milestones") @PreAuthorize("hasAnyRole('ADMIN','LECTURER')") public ResponseEntity<ApiResponse<MilestoneResponse>> create(@Valid @RequestBody CreateMilestoneRequest request,@AuthenticationPrincipal UserPrincipal principal){MilestoneResponse r=service.create(request,principal.id());return ResponseEntity.created(URI.create("/api/v1/milestones/"+r.id())).body(ApiResponse.success("Milestone created.",r));}
+ @GetMapping("/project-assignments/{assignmentId}/milestones") public ApiResponse<List<MilestoneResponse>> list(@PathVariable Long assignmentId,@AuthenticationPrincipal UserPrincipal principal){return ApiResponse.success(service.list(assignmentId,principal.id()));}
+ @PostMapping("/milestones/{id}/submissions") @PreAuthorize("hasRole('STUDENT')") public ResponseEntity<ApiResponse<SubmissionResponse>> submit(@PathVariable Long id,@Valid @RequestBody SubmitReportRequest request,@AuthenticationPrincipal UserPrincipal principal){SubmissionResponse r=service.submit(id,request,principal.id());return ResponseEntity.created(URI.create("/api/v1/report-submissions/"+r.id())).body(ApiResponse.success("Report submitted.",r));}
+ @PostMapping("/report-submissions/{id}/feedback") @PreAuthorize("hasAnyRole('ADMIN','LECTURER')") public ApiResponse<SubmissionResponse> feedback(@PathVariable Long id,@Valid @RequestBody FeedbackRequest request,@AuthenticationPrincipal UserPrincipal principal){return ApiResponse.success("Feedback saved.",service.feedback(id,request,principal.id()));}
+}

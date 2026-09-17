@@ -1,0 +1,1 @@
+package com.example.qldetai.feature.evaluation; import java.util.*; import org.springframework.data.jpa.repository.JpaRepository; public interface CommitteeMemberRepository extends JpaRepository<CommitteeMember,Long>{List<CommitteeMember> findByCommitteeId(Long committeeId);}

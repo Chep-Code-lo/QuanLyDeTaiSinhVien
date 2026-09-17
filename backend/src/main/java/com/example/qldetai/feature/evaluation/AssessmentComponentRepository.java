@@ -1,0 +1,1 @@
+package com.example.qldetai.feature.evaluation; import java.util.*; import org.springframework.data.jpa.repository.JpaRepository; public interface AssessmentComponentRepository extends JpaRepository<AssessmentComponent,Long>{ List<AssessmentComponent> findByPeriodId(Long periodId); }

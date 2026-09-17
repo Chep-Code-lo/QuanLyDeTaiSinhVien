@@ -1,0 +1,1 @@
+package com.example.qldetai.feature.evaluation; import java.util.*; import org.springframework.data.jpa.repository.JpaRepository; public interface GradeChangeRequestRepository extends JpaRepository<GradeChangeRequest,Long>{boolean existsBySheetIdAndStatusIn(Long sheetId,Collection<GradeChangeStatus> statuses);}

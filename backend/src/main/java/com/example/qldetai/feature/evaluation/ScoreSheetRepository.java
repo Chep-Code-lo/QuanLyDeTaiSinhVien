@@ -1,0 +1,1 @@
+package com.example.qldetai.feature.evaluation; import java.util.*; import org.springframework.data.jpa.repository.JpaRepository; public interface ScoreSheetRepository extends JpaRepository<ScoreSheet,Long>{Optional<ScoreSheet> findByEvaluationId(Long evaluationId); List<ScoreSheet> findByEvaluation_Assignment_Id(Long assignmentId);}
