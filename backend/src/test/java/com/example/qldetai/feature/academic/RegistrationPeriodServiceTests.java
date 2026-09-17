@@ -12,37 +12,46 @@ import com.example.qldetai.feature.identity.RoleRepository;
 import com.example.qldetai.feature.identity.User;
 import com.example.qldetai.feature.identity.UserRepository;
 import com.example.qldetai.feature.identity.UserStatus;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.TestConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @Transactional
 class RegistrationPeriodServiceTests {
 
-    @Autowired
-    private RegistrationPeriodService service;
+    private final RegistrationPeriodService registrationPeriodService;
+    private final FacultyRepository facultyRepository;
+    private final SemesterRepository semesterRepository;
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final Clock clock;
 
-    @Autowired
-    private FacultyRepository facultyRepository;
-
-    @Autowired
-    private SemesterRepository semesterRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    RegistrationPeriodServiceTests(
+            RegistrationPeriodService registrationPeriodService,
+            FacultyRepository facultyRepository,
+            SemesterRepository semesterRepository,
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            Clock clock) {
+        this.registrationPeriodService = registrationPeriodService;
+        this.facultyRepository = facultyRepository;
+        this.semesterRepository = semesterRepository;
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.clock = clock;
+    }
 
     private Faculty faculty;
     private Semester semester;
@@ -64,7 +73,7 @@ class RegistrationPeriodServiceTests {
         semester = semesterRepository.save(semester);
 
         Role role = roleRepository.findByCode(RoleCode.ADMIN).orElseThrow();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         admin = new User();
         admin.setEmail("period-" + System.nanoTime() + "@test.local");
         admin.setPasswordHash(passwordEncoder.encode("TestPassword123!"));
@@ -90,9 +99,9 @@ class RegistrationPeriodServiceTests {
                 null,
                 null);
 
-        RegistrationPeriodResponse created = service.create(request, admin.getId());
+        RegistrationPeriodResponse created = registrationPeriodService.create(request, admin.getId());
 
-        assertThatThrownBy(() -> service.changeStatus(
+        assertThatThrownBy(() -> registrationPeriodService.changeStatus(
                         created.id(), new ChangePeriodStatusRequest(created.version(), RegistrationPeriodStatus.ACTIVE)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Review deadline");
@@ -112,7 +121,7 @@ class RegistrationPeriodServiceTests {
                 null,
                 null);
 
-        assertThatThrownBy(() -> service.create(request, admin.getId()))
+        assertThatThrownBy(() -> registrationPeriodService.create(request, admin.getId()))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Required order");
     }

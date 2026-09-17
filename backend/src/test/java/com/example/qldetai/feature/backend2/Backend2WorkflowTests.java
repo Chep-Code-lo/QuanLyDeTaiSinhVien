@@ -60,65 +60,73 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.TestConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @Transactional
 class Backend2WorkflowTests {
 
-    @Autowired
-    private TopicService topicService;
+    private final TopicService topicService;
+    private final GroupService groupService;
+    private final RegistrationService registrationService;
+    private final ProjectAssignmentService projectAssignmentService;
+    private final FacultyRepository facultyRepository;
+    private final DepartmentRepository departmentRepository;
+    private final SemesterRepository semesterRepository;
+    private final RegistrationPeriodRepository registrationPeriodRepository;
+    private final RoleRepository roleRepository;
+    private final UserRepository userRepository;
+    private final StudentRepository studentRepository;
+    private final LecturerRepository lecturerRepository;
+    private final GroupMemberRepository groupMemberRepository;
+    private final StudentGroupRepository studentGroupRepository;
+    private final TopicRegistrationRepository topicRegistrationRepository;
+    private final ProjectAssignmentRepository projectAssignmentRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final Clock clock;
 
-    @Autowired
-    private GroupService groupService;
-
-    @Autowired
-    private RegistrationService registrationService;
-
-    @Autowired
-    private ProjectAssignmentService projectAssignmentService;
-
-    @Autowired
-    private FacultyRepository facultyRepository;
-
-    @Autowired
-    private DepartmentRepository departmentRepository;
-
-    @Autowired
-    private SemesterRepository semesterRepository;
-
-    @Autowired
-    private RegistrationPeriodRepository periodRepository;
-
-    @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private StudentRepository studentRepository;
-
-    @Autowired
-    private LecturerRepository lecturerRepository;
-
-    @Autowired
-    private GroupMemberRepository groupMemberRepository;
-
-    @Autowired
-    private StudentGroupRepository groupRepository;
-
-    @Autowired
-    private TopicRegistrationRepository registrationRepository;
-
-    @Autowired
-    private ProjectAssignmentRepository assignmentRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    Backend2WorkflowTests(
+            TopicService topicService,
+            GroupService groupService,
+            RegistrationService registrationService,
+            ProjectAssignmentService projectAssignmentService,
+            FacultyRepository facultyRepository,
+            DepartmentRepository departmentRepository,
+            SemesterRepository semesterRepository,
+            RegistrationPeriodRepository registrationPeriodRepository,
+            RoleRepository roleRepository,
+            UserRepository userRepository,
+            StudentRepository studentRepository,
+            LecturerRepository lecturerRepository,
+            GroupMemberRepository groupMemberRepository,
+            StudentGroupRepository studentGroupRepository,
+            TopicRegistrationRepository topicRegistrationRepository,
+            ProjectAssignmentRepository projectAssignmentRepository,
+            PasswordEncoder passwordEncoder,
+            Clock clock) {
+        this.topicService = topicService;
+        this.groupService = groupService;
+        this.registrationService = registrationService;
+        this.projectAssignmentService = projectAssignmentService;
+        this.facultyRepository = facultyRepository;
+        this.departmentRepository = departmentRepository;
+        this.semesterRepository = semesterRepository;
+        this.registrationPeriodRepository = registrationPeriodRepository;
+        this.roleRepository = roleRepository;
+        this.userRepository = userRepository;
+        this.studentRepository = studentRepository;
+        this.lecturerRepository = lecturerRepository;
+        this.groupMemberRepository = groupMemberRepository;
+        this.studentGroupRepository = studentGroupRepository;
+        this.topicRegistrationRepository = topicRegistrationRepository;
+        this.projectAssignmentRepository = projectAssignmentRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.clock = clock;
+    }
 
     private Faculty faculty;
     private Department department;
@@ -271,10 +279,12 @@ class Backend2WorkflowTests {
                 admin.getId());
 
         assertThat(created.status()).isEqualTo(AssignmentStatus.IN_PROGRESS);
-        assertThat(assignmentRepository.existsByGroupId(firstGroup.id())).isTrue();
-        assertThat(groupRepository.findById(firstGroup.id()).orElseThrow().getStatus()).isEqualTo(GroupStatus.LOCKED);
+        assertThat(projectAssignmentRepository.existsByGroupId(firstGroup.id())).isTrue();
+        assertThat(studentGroupRepository.findById(firstGroup.id()).orElseThrow().getStatus())
+                .isEqualTo(GroupStatus.LOCKED);
 
-        TopicRegistration rejectedRegistration = registrationRepository.findById(pendingRegistration.id()).orElseThrow();
+        TopicRegistration rejectedRegistration =
+                topicRegistrationRepository.findById(pendingRegistration.id()).orElseThrow();
         assertThat(rejectedRegistration.getStatus()).isEqualTo(RegistrationStatus.REJECTED);
 
         ProjectAssignmentResponse completed = projectAssignmentService.updateStatus(
@@ -283,7 +293,8 @@ class Backend2WorkflowTests {
                 admin.getId());
 
         assertThat(completed.status()).isEqualTo(AssignmentStatus.COMPLETED);
-        assertThat(groupRepository.findById(firstGroup.id()).orElseThrow().getStatus()).isEqualTo(GroupStatus.CLOSED);
+        assertThat(studentGroupRepository.findById(firstGroup.id()).orElseThrow().getStatus())
+                .isEqualTo(GroupStatus.CLOSED);
     }
 
     private TopicResponse createPublishedTopic(String code) {
@@ -365,7 +376,7 @@ class Backend2WorkflowTests {
         entity.setStatus(RegistrationPeriodStatus.ACTIVE);
         entity.setCreatedBy(admin);
         entity.setCreatedAt(now.minusHours(3));
-        return periodRepository.save(entity);
+        return registrationPeriodRepository.save(entity);
     }
 
     private Lecturer createLecturer(String baseCode, String fullName) {
@@ -408,7 +419,7 @@ class Backend2WorkflowTests {
     }
 
     private LocalDateTime nowUtc() {
-        return LocalDateTime.now(Clock.systemUTC());
+        return LocalDateTime.now(clock);
     }
 
     private String unique(String base) {

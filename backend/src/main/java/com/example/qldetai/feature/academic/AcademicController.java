@@ -26,22 +26,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class AcademicController {
 
-    private final AcademicCatalogService service;
+    private final AcademicCatalogService academicCatalogService;
 
-    public AcademicController(AcademicCatalogService service) {
-        this.service = service;
+    public AcademicController(AcademicCatalogService academicCatalogService) {
+        this.academicCatalogService = academicCatalogService;
     }
 
     @GetMapping("/faculties")
     public ApiResponse<List<FacultyResponse>> faculties() {
-        return ApiResponse.success(service.faculties());
+        return ApiResponse.success(academicCatalogService.faculties());
     }
 
     @PostMapping("/faculties")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<FacultyResponse>> createFaculty(
             @Valid @RequestBody CreateFacultyRequest request) {
-        FacultyResponse created = service.createFaculty(request);
+        FacultyResponse created = academicCatalogService.createFaculty(request);
         return ResponseEntity.created(URI.create("/api/v1/faculties/" + created.id()))
                 .body(ApiResponse.success("Faculty created.", created));
     }
@@ -50,19 +50,19 @@ public class AcademicController {
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<FacultyResponse> updateFaculty(
             @PathVariable Long id, @Valid @RequestBody UpdateCatalogRequest request) {
-        return ApiResponse.success("Faculty updated.", service.updateFaculty(id, request));
+        return ApiResponse.success("Faculty updated.", academicCatalogService.updateFaculty(id, request));
     }
 
     @GetMapping("/departments")
     public ApiResponse<List<DepartmentResponse>> departments(@RequestParam(required = false) Long facultyId) {
-        return ApiResponse.success(service.departments(facultyId));
+        return ApiResponse.success(academicCatalogService.departments(facultyId));
     }
 
     @PostMapping("/departments")
     @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageFaculty(#request.facultyId, authentication)")
     public ResponseEntity<ApiResponse<DepartmentResponse>> createDepartment(
             @Valid @RequestBody CreateDepartmentRequest request) {
-        DepartmentResponse created = service.createDepartment(request);
+        DepartmentResponse created = academicCatalogService.createDepartment(request);
         return ResponseEntity.created(URI.create("/api/v1/departments/" + created.id()))
                 .body(ApiResponse.success("Department created.", created));
     }
@@ -71,19 +71,19 @@ public class AcademicController {
     @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageDepartment(#id, authentication)")
     public ApiResponse<DepartmentResponse> updateDepartment(
             @PathVariable Long id, @Valid @RequestBody UpdateCatalogRequest request) {
-        return ApiResponse.success("Department updated.", service.updateDepartment(id, request));
+        return ApiResponse.success("Department updated.", academicCatalogService.updateDepartment(id, request));
     }
 
     @GetMapping("/semesters")
     public ApiResponse<List<SemesterResponse>> semesters() {
-        return ApiResponse.success(service.semesters());
+        return ApiResponse.success(academicCatalogService.semesters());
     }
 
     @PostMapping("/semesters")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<SemesterResponse>> createSemester(
             @Valid @RequestBody CreateSemesterRequest request) {
-        SemesterResponse created = service.createSemester(request);
+        SemesterResponse created = academicCatalogService.createSemester(request);
         return ResponseEntity.created(URI.create("/api/v1/semesters/" + created.id()))
                 .body(ApiResponse.success("Semester created.", created));
     }

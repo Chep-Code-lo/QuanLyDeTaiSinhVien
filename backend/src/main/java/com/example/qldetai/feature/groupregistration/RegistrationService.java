@@ -23,7 +23,6 @@ import com.example.qldetai.feature.topic.VisibilityType;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -34,53 +33,31 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RegistrationService {
 
-    private final TopicRegistrationRepository registrationRepository;
+    private final TopicRegistrationRepository topicRegistrationRepository;
     private final TopicRepository topicRepository;
-    private final StudentGroupRepository groupRepository;
-    private final GroupMemberRepository memberRepository;
-    private final ProjectAssignmentRepository assignmentRepository;
+    private final StudentGroupRepository studentGroupRepository;
+    private final GroupMemberRepository groupMemberRepository;
+    private final ProjectAssignmentRepository projectAssignmentRepository;
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final Clock clock;
 
-    @Autowired
     public RegistrationService(
-            TopicRegistrationRepository registrationRepository,
+            TopicRegistrationRepository topicRegistrationRepository,
             TopicRepository topicRepository,
-            StudentGroupRepository groupRepository,
-            GroupMemberRepository memberRepository,
-            ProjectAssignmentRepository assignmentRepository,
-            StudentRepository studentRepository,
-            UserRepository userRepository,
-            NotificationService notificationService) {
-        this(
-                registrationRepository,
-                topicRepository,
-                groupRepository,
-                memberRepository,
-                assignmentRepository,
-                studentRepository,
-                userRepository,
-                notificationService,
-                Clock.systemUTC());
-    }
-
-    RegistrationService(
-            TopicRegistrationRepository registrationRepository,
-            TopicRepository topicRepository,
-            StudentGroupRepository groupRepository,
-            GroupMemberRepository memberRepository,
-            ProjectAssignmentRepository assignmentRepository,
+            StudentGroupRepository studentGroupRepository,
+            GroupMemberRepository groupMemberRepository,
+            ProjectAssignmentRepository projectAssignmentRepository,
             StudentRepository studentRepository,
             UserRepository userRepository,
             NotificationService notificationService,
             Clock clock) {
-        this.registrationRepository = registrationRepository;
+        this.topicRegistrationRepository = topicRegistrationRepository;
         this.topicRepository = topicRepository;
-        this.groupRepository = groupRepository;
-        this.memberRepository = memberRepository;
-        this.assignmentRepository = assignmentRepository;
+        this.studentGroupRepository = studentGroupRepository;
+        this.groupMemberRepository = groupMemberRepository;
+        this.projectAssignmentRepository = projectAssignmentRepository;
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
@@ -92,13 +69,13 @@ public class RegistrationService {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("registeredAt").descending());
         Page<TopicRegistration> registrations;
         if (periodId != null && status != null) {
-            registrations = registrationRepository.findByPeriodIdAndStatus(periodId, status, pageable);
+            registrations = topicRegistrationRepository.findByPeriodIdAndStatus(periodId, status, pageable);
         } else if (periodId != null) {
-            registrations = registrationRepository.findByPeriodId(periodId, pageable);
+            registrations = topicRegistrationRepository.findByPeriodId(periodId, pageable);
         } else if (status != null) {
-            registrations = registrationRepository.findByStatus(status, pageable);
+            registrations = topicRegistrationRepository.findByStatus(status, pageable);
         } else {
-            registrations = registrationRepository.findAll(pageable);
+            registrations = topicRegistrationRepository.findAll(pageable);
         }
         return PageResponse.from(registrations.map(this::toResponse));
     }
@@ -116,10 +93,10 @@ public class RegistrationService {
         Topic topic = requireTopic(request.topicId());
         ensureLeader(group.getId(), actor.getId());
         ensureGroupReady(group);
-        if (assignmentRepository.existsByGroupId(group.getId())) {
+        if (projectAssignmentRepository.existsByGroupId(group.getId())) {
             throw new BusinessRuleException("This group already has a project assignment.");
         }
-        if (registrationRepository.existsByGroupIdAndStatusIn(
+        if (topicRegistrationRepository.existsByGroupIdAndStatusIn(
                 group.getId(), List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED))) {
             throw new ConflictException("This group already has a pending or approved topic registration.");
         }
@@ -142,7 +119,7 @@ public class RegistrationService {
         registration.setMotivation(normalizeNullable(request.motivation()));
         registration.setStatus(RegistrationStatus.PENDING);
         registration.setRegisteredAt(LocalDateTime.now(clock));
-        return toResponse(registrationRepository.save(registration));
+        return toResponse(topicRegistrationRepository.save(registration));
     }
 
     @Transactional
@@ -198,7 +175,7 @@ public class RegistrationService {
     }
 
     private void ensureLeader(Long groupId, Long studentId) {
-        GroupMember membership = memberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(groupId, studentId)
+        GroupMember membership = groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(groupId, studentId)
                 .orElseThrow(() -> new AccessDeniedException("Only active group members can manage topic registration."));
         if (membership.getMemberRole() != GroupMemberRole.LEADER) {
             throw new AccessDeniedException("Only the group leader can manage topic registration.");
@@ -228,7 +205,7 @@ public class RegistrationService {
     }
 
     private StudentGroup requireGroup(Long id) {
-        return groupRepository.findById(id)
+        return studentGroupRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Student group was not found."));
     }
 
@@ -238,7 +215,7 @@ public class RegistrationService {
     }
 
     private TopicRegistration requireRegistration(Long id) {
-        return registrationRepository.findById(id)
+        return topicRegistrationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Topic registration was not found."));
     }
 
@@ -253,7 +230,7 @@ public class RegistrationService {
     }
 
     private void notifyGroup(TopicRegistration registration, String message) {
-        memberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(registration.getGroup().getId())
+        groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(registration.getGroup().getId())
                 .forEach(member -> notificationService.publish(
                         member.getStudent().getUser().getId(),
                         "topic-registration-" + registration.getId() + "-" + registration.getStatus() + "-" + member.getStudent().getId(),

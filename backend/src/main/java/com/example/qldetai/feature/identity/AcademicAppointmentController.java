@@ -25,22 +25,22 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("hasRole('ADMIN')")
 public class AcademicAppointmentController {
 
-    private final AcademicAppointmentService service;
+    private final AcademicAppointmentService academicAppointmentService;
 
-    public AcademicAppointmentController(AcademicAppointmentService service) {
-        this.service = service;
+    public AcademicAppointmentController(AcademicAppointmentService academicAppointmentService) {
+        this.academicAppointmentService = academicAppointmentService;
     }
 
     @GetMapping
     public ApiResponse<List<AppointmentResponse>> list(@RequestParam(required = false) Long lecturerId) {
-        return ApiResponse.success(service.list(lecturerId));
+        return ApiResponse.success(academicAppointmentService.list(lecturerId));
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<AppointmentResponse>> create(
             @Valid @RequestBody CreateAppointmentRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        AppointmentResponse created = service.create(request, principal.id());
+        AppointmentResponse created = academicAppointmentService.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/admin/academic-appointments/" + created.id()))
                 .body(ApiResponse.success("Academic appointment created.", created));
     }
@@ -48,6 +48,6 @@ public class AcademicAppointmentController {
     @PatchMapping("/{id}/end")
     public ApiResponse<AppointmentResponse> end(
             @PathVariable Long id, @Valid @RequestBody EndAppointmentRequest request) {
-        return ApiResponse.success("Academic appointment ended.", service.end(id, request));
+        return ApiResponse.success("Academic appointment ended.", academicAppointmentService.end(id, request));
     }
 }

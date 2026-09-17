@@ -18,10 +18,10 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("hasRole('ADMIN')")
 public class AuditController {
 
-    private final AuditQueryService service;
+    private final AuditQueryService auditQueryService;
 
-    public AuditController(AuditQueryService service) {
-        this.service = service;
+    public AuditController(AuditQueryService auditQueryService) {
+        this.auditQueryService = auditQueryService;
     }
 
     @GetMapping
@@ -29,6 +29,6 @@ public class AuditController {
             @RequestParam(required = false) String entityType,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(service.list(entityType, page, size));
+        return ApiResponse.success(auditQueryService.list(entityType, page, size));
     }
 }

@@ -6,7 +6,6 @@ import com.example.qldetai.feature.communication.AuditOutcome;
 import com.example.qldetai.feature.identity.UserRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,12 +17,7 @@ public class AuditLogWriter {
     private final UserRepository userRepository;
     private final Clock clock;
 
-    @Autowired
-    public AuditLogWriter(AuditLogRepository auditLogRepository, UserRepository userRepository) {
-        this(auditLogRepository, userRepository, Clock.systemUTC());
-    }
-
-    AuditLogWriter(AuditLogRepository auditLogRepository, UserRepository userRepository, Clock clock) {
+    public AuditLogWriter(AuditLogRepository auditLogRepository, UserRepository userRepository, Clock clock) {
         this.auditLogRepository = auditLogRepository;
         this.userRepository = userRepository;
         this.clock = clock;

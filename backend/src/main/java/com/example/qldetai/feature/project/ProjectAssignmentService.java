@@ -21,7 +21,6 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.Map;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -37,39 +36,23 @@ public class ProjectAssignmentService {
             AssignmentStatus.COMPLETED, EnumSet.noneOf(AssignmentStatus.class),
             AssignmentStatus.CANCELLED, EnumSet.noneOf(AssignmentStatus.class));
 
-    private final ProjectAssignmentRepository assignmentRepository;
-    private final TopicRegistrationRepository registrationRepository;
-    private final GroupMemberRepository memberRepository;
+    private final ProjectAssignmentRepository projectAssignmentRepository;
+    private final TopicRegistrationRepository topicRegistrationRepository;
+    private final GroupMemberRepository groupMemberRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final Clock clock;
 
-    @Autowired
     public ProjectAssignmentService(
-            ProjectAssignmentRepository assignmentRepository,
-            TopicRegistrationRepository registrationRepository,
-            GroupMemberRepository memberRepository,
-            UserRepository userRepository,
-            NotificationService notificationService) {
-        this(
-                assignmentRepository,
-                registrationRepository,
-                memberRepository,
-                userRepository,
-                notificationService,
-                Clock.systemUTC());
-    }
-
-    ProjectAssignmentService(
-            ProjectAssignmentRepository assignmentRepository,
-            TopicRegistrationRepository registrationRepository,
-            GroupMemberRepository memberRepository,
+            ProjectAssignmentRepository projectAssignmentRepository,
+            TopicRegistrationRepository topicRegistrationRepository,
+            GroupMemberRepository groupMemberRepository,
             UserRepository userRepository,
             NotificationService notificationService,
             Clock clock) {
-        this.assignmentRepository = assignmentRepository;
-        this.registrationRepository = registrationRepository;
-        this.memberRepository = memberRepository;
+        this.projectAssignmentRepository = projectAssignmentRepository;
+        this.topicRegistrationRepository = topicRegistrationRepository;
+        this.groupMemberRepository = groupMemberRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
         this.clock = clock;
@@ -80,13 +63,13 @@ public class ProjectAssignmentService {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("assignedAt").descending());
         Page<ProjectAssignment> assignments;
         if (periodId != null && status != null) {
-            assignments = assignmentRepository.findByPeriodIdAndStatus(periodId, status, pageable);
+            assignments = projectAssignmentRepository.findByPeriodIdAndStatus(periodId, status, pageable);
         } else if (periodId != null) {
-            assignments = assignmentRepository.findByPeriodId(periodId, pageable);
+            assignments = projectAssignmentRepository.findByPeriodId(periodId, pageable);
         } else if (status != null) {
-            assignments = assignmentRepository.findByStatus(status, pageable);
+            assignments = projectAssignmentRepository.findByStatus(status, pageable);
         } else {
-            assignments = assignmentRepository.findAll(pageable);
+            assignments = projectAssignmentRepository.findAll(pageable);
         }
         return PageResponse.from(assignments.map(this::toResponse));
     }
@@ -104,13 +87,13 @@ public class ProjectAssignmentService {
         if (registration.getStatus() != RegistrationStatus.APPROVED) {
             throw new BusinessRuleException("Only approved topic registrations can become project assignments.");
         }
-        if (assignmentRepository.existsByRegistrationId(registration.getId())) {
+        if (projectAssignmentRepository.existsByRegistrationId(registration.getId())) {
             throw new ConflictException("This topic registration already has a project assignment.");
         }
-        if (assignmentRepository.existsByGroupId(registration.getGroup().getId())) {
+        if (projectAssignmentRepository.existsByGroupId(registration.getGroup().getId())) {
             throw new ConflictException("This student group already has a project assignment.");
         }
-        if (assignmentRepository.existsByTopicId(registration.getTopic().getId())) {
+        if (projectAssignmentRepository.existsByTopicId(registration.getTopic().getId())) {
             throw new ConflictException("This topic already has a project assignment.");
         }
 
@@ -123,10 +106,10 @@ public class ProjectAssignmentService {
         assignment.setAssignedBy(actor);
         assignment.setAssignedAt(now);
         assignment.setStatus(AssignmentStatus.IN_PROGRESS);
-        assignment = assignmentRepository.save(assignment);
+        assignment = projectAssignmentRepository.save(assignment);
 
         registration.getGroup().setStatus(GroupStatus.LOCKED);
-        registrationRepository.findByTopicIdAndStatus(registration.getTopic().getId(), RegistrationStatus.PENDING)
+        topicRegistrationRepository.findByTopicIdAndStatus(registration.getTopic().getId(), RegistrationStatus.PENDING)
                 .stream()
                 .filter(candidate -> !candidate.getId().equals(registration.getId()))
                 .forEach(candidate -> {
@@ -155,7 +138,7 @@ public class ProjectAssignmentService {
         if (request.status() == AssignmentStatus.COMPLETED) {
             assignment.getGroup().setStatus(GroupStatus.CLOSED);
         } else if (request.status() == AssignmentStatus.CANCELLED) {
-            long activeMembers = memberRepository.countByGroupIdAndLeftAtIsNull(assignment.getGroup().getId());
+            long activeMembers = groupMemberRepository.countByGroupIdAndLeftAtIsNull(assignment.getGroup().getId());
             assignment.getGroup().setStatus(activeMembers >= 2 ? GroupStatus.ACTIVE : GroupStatus.FORMING);
         }
 
@@ -166,12 +149,12 @@ public class ProjectAssignmentService {
     }
 
     private TopicRegistration requireRegistration(Long id) {
-        return registrationRepository.findById(id)
+        return topicRegistrationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Topic registration was not found."));
     }
 
     private ProjectAssignment requireAssignment(Long id) {
-        return assignmentRepository.findById(id)
+        return projectAssignmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Project assignment was not found."));
     }
 
@@ -194,7 +177,7 @@ public class ProjectAssignmentService {
     }
 
     private void notifyGroup(ProjectAssignment assignment, String message) {
-        memberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(assignment.getGroup().getId())
+        groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(assignment.getGroup().getId())
                 .forEach(member -> notificationService.publish(
                         member.getStudent().getUser().getId(),
                         "project-assignment-" + assignment.getId() + "-" + assignment.getStatus() + "-" + member.getStudent().getId(),

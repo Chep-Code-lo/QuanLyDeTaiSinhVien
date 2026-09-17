@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -36,28 +35,19 @@ public class RegistrationPeriodService {
             RegistrationPeriodStatus.CANCELLED,
             EnumSet.noneOf(RegistrationPeriodStatus.class));
 
-    private final RegistrationPeriodRepository periodRepository;
+    private final RegistrationPeriodRepository registrationPeriodRepository;
     private final FacultyRepository facultyRepository;
     private final SemesterRepository semesterRepository;
     private final UserRepository userRepository;
     private final Clock clock;
 
-    @Autowired
     public RegistrationPeriodService(
-            RegistrationPeriodRepository periodRepository,
-            FacultyRepository facultyRepository,
-            SemesterRepository semesterRepository,
-            UserRepository userRepository) {
-        this(periodRepository, facultyRepository, semesterRepository, userRepository, Clock.systemUTC());
-    }
-
-    RegistrationPeriodService(
-            RegistrationPeriodRepository periodRepository,
+            RegistrationPeriodRepository registrationPeriodRepository,
             FacultyRepository facultyRepository,
             SemesterRepository semesterRepository,
             UserRepository userRepository,
             Clock clock) {
-        this.periodRepository = periodRepository;
+        this.registrationPeriodRepository = registrationPeriodRepository;
         this.facultyRepository = facultyRepository;
         this.semesterRepository = semesterRepository;
         this.userRepository = userRepository;
@@ -68,8 +58,8 @@ public class RegistrationPeriodService {
     public PageResponse<RegistrationPeriodResponse> list(Long facultyId, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<RegistrationPeriodResponse> periods = (facultyId == null
-                ? periodRepository.findAll(pageable)
-                : periodRepository.findByFacultyId(facultyId, pageable)).map(this::toResponse);
+                ? registrationPeriodRepository.findAll(pageable)
+                : registrationPeriodRepository.findByFacultyId(facultyId, pageable)).map(this::toResponse);
         return PageResponse.from(periods);
     }
 
@@ -103,7 +93,7 @@ public class RegistrationPeriodService {
         period.setStatus(RegistrationPeriodStatus.DRAFT);
         period.setCreatedBy(creator);
         period.setCreatedAt(LocalDateTime.now(clock));
-        return toResponse(periodRepository.save(period));
+        return toResponse(registrationPeriodRepository.save(period));
     }
 
     @Transactional
@@ -225,7 +215,7 @@ public class RegistrationPeriodService {
     }
 
     private RegistrationPeriod requirePeriod(Long id) {
-        return periodRepository.findById(id)
+        return registrationPeriodRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Registration period was not found."));
     }
 

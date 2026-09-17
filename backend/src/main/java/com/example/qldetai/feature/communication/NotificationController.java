@@ -21,10 +21,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/notifications")
 public class NotificationController {
 
-    private final NotificationService service;
+    private final NotificationService notificationService;
 
-    public NotificationController(NotificationService service) {
-        this.service = service;
+    public NotificationController(NotificationService notificationService) {
+        this.notificationService = notificationService;
     }
 
     @GetMapping
@@ -32,17 +32,17 @@ public class NotificationController {
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(service.list(principal.id(), page, size));
+        return ApiResponse.success(notificationService.list(principal.id(), page, size));
     }
 
     @GetMapping("/unread-count")
     public ApiResponse<UnreadCountResponse> unreadCount(@AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success(service.unreadCount(principal.id()));
+        return ApiResponse.success(notificationService.unreadCount(principal.id()));
     }
 
     @PatchMapping("/{id}/read")
     public ApiResponse<NotificationResponse> markRead(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Notification marked as read.", service.markRead(id, principal.id()));
+        return ApiResponse.success("Notification marked as read.", notificationService.markRead(id, principal.id()));
     }
 }

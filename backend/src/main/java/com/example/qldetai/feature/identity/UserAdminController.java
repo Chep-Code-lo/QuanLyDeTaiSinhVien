@@ -29,10 +29,10 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("hasRole('ADMIN')")
 public class UserAdminController {
 
-    private final UserAdminService service;
+    private final UserAdminService userAdminService;
 
-    public UserAdminController(UserAdminService service) {
-        this.service = service;
+    public UserAdminController(UserAdminService userAdminService) {
+        this.userAdminService = userAdminService;
     }
 
     @GetMapping
@@ -40,17 +40,17 @@ public class UserAdminController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(service.list(search, page, size));
+        return ApiResponse.success(userAdminService.list(search, page, size));
     }
 
     @GetMapping("/{id}")
     public ApiResponse<UserResponse> get(@PathVariable Long id) {
-        return ApiResponse.success(service.get(id));
+        return ApiResponse.success(userAdminService.get(id));
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<UserResponse>> create(@Valid @RequestBody CreateUserRequest request) {
-        UserResponse created = service.create(request);
+        UserResponse created = userAdminService.create(request);
         return ResponseEntity.created(URI.create("/api/v1/admin/users/" + created.id()))
                 .body(ApiResponse.success("User account created.", created));
     }
@@ -58,12 +58,12 @@ public class UserAdminController {
     @PatchMapping("/{id}/status")
     public ApiResponse<UserResponse> updateStatus(
             @PathVariable Long id, @Valid @RequestBody UpdateUserStatusRequest request) {
-        return ApiResponse.success("User status updated.", service.updateStatus(id, request));
+        return ApiResponse.success("User status updated.", userAdminService.updateStatus(id, request));
     }
 
     @PutMapping("/{id}/roles")
     public ApiResponse<UserResponse> updateRoles(
             @PathVariable Long id, @Valid @RequestBody UpdateUserRolesRequest request) {
-        return ApiResponse.success("User roles updated.", service.updateRoles(id, request));
+        return ApiResponse.success("User roles updated.", userAdminService.updateRoles(id, request));
     }
 }

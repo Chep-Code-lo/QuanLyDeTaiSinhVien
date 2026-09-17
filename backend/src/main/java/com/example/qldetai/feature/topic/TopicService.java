@@ -33,7 +33,6 @@ import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -50,44 +49,20 @@ public class TopicService {
     private final TopicRepository topicRepository;
     private final TopicSupervisorRepository topicSupervisorRepository;
     private final TopicReviewRepository topicReviewRepository;
-    private final RegistrationPeriodRepository periodRepository;
-    private final StudentGroupRepository groupRepository;
+    private final RegistrationPeriodRepository registrationPeriodRepository;
+    private final StudentGroupRepository studentGroupRepository;
     private final StudentRepository studentRepository;
     private final LecturerRepository lecturerRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final Clock clock;
 
-    @Autowired
     public TopicService(
             TopicRepository topicRepository,
             TopicSupervisorRepository topicSupervisorRepository,
             TopicReviewRepository topicReviewRepository,
-            RegistrationPeriodRepository periodRepository,
-            StudentGroupRepository groupRepository,
-            StudentRepository studentRepository,
-            LecturerRepository lecturerRepository,
-            UserRepository userRepository,
-            NotificationService notificationService) {
-        this(
-                topicRepository,
-                topicSupervisorRepository,
-                topicReviewRepository,
-                periodRepository,
-                groupRepository,
-                studentRepository,
-                lecturerRepository,
-                userRepository,
-                notificationService,
-                Clock.systemUTC());
-    }
-
-    TopicService(
-            TopicRepository topicRepository,
-            TopicSupervisorRepository topicSupervisorRepository,
-            TopicReviewRepository topicReviewRepository,
-            RegistrationPeriodRepository periodRepository,
-            StudentGroupRepository groupRepository,
+            RegistrationPeriodRepository registrationPeriodRepository,
+            StudentGroupRepository studentGroupRepository,
             StudentRepository studentRepository,
             LecturerRepository lecturerRepository,
             UserRepository userRepository,
@@ -96,8 +71,8 @@ public class TopicService {
         this.topicRepository = topicRepository;
         this.topicSupervisorRepository = topicSupervisorRepository;
         this.topicReviewRepository = topicReviewRepository;
-        this.periodRepository = periodRepository;
-        this.groupRepository = groupRepository;
+        this.registrationPeriodRepository = registrationPeriodRepository;
+        this.studentGroupRepository = studentGroupRepository;
         this.studentRepository = studentRepository;
         this.lecturerRepository = lecturerRepository;
         this.userRepository = userRepository;
@@ -352,7 +327,7 @@ public class TopicService {
         if (reservedGroupId == null) {
             throw new BusinessRuleException("Reserved topics must specify a target group.");
         }
-        StudentGroup group = groupRepository.findById(reservedGroupId)
+        StudentGroup group = studentGroupRepository.findById(reservedGroupId)
                 .orElseThrow(() -> new ResourceNotFoundException("Reserved group was not found."));
         if (!group.getPeriod().getId().equals(period.getId())) {
             throw new BusinessRuleException("Reserved group must belong to the same registration period.");
@@ -385,7 +360,7 @@ public class TopicService {
     }
 
     private RegistrationPeriod requirePeriod(Long id) {
-        RegistrationPeriod period = periodRepository.findById(id)
+        RegistrationPeriod period = registrationPeriodRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Registration period was not found."));
         if (period.getStatus() != RegistrationPeriodStatus.ACTIVE) {
             throw new BusinessRuleException("Topics can only be managed in an active registration period.");

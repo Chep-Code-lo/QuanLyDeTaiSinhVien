@@ -8,7 +8,6 @@ import com.example.qldetai.feature.identity.User;
 import com.example.qldetai.feature.identity.UserRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -21,12 +20,7 @@ public class NotificationService {
     private final UserRepository userRepository;
     private final Clock clock;
 
-    @Autowired
-    public NotificationService(NotificationRepository notificationRepository, UserRepository userRepository) {
-        this(notificationRepository, userRepository, Clock.systemUTC());
-    }
-
-    NotificationService(
+    public NotificationService(
             NotificationRepository notificationRepository,
             UserRepository userRepository,
             Clock clock) {

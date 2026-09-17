@@ -5,40 +5,31 @@ import com.example.qldetai.feature.identity.PositionCode;
 import com.example.qldetai.security.UserPrincipal;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
 @Component("academicAuthorization")
 public class AcademicAuthorization {
 
-    private final AcademicAppointmentRepository appointmentRepository;
+    private final AcademicAppointmentRepository academicAppointmentRepository;
     private final DepartmentRepository departmentRepository;
-    private final RegistrationPeriodRepository periodRepository;
+    private final RegistrationPeriodRepository registrationPeriodRepository;
     private final Clock clock;
 
-    @Autowired
     public AcademicAuthorization(
-            AcademicAppointmentRepository appointmentRepository,
+            AcademicAppointmentRepository academicAppointmentRepository,
             DepartmentRepository departmentRepository,
-            RegistrationPeriodRepository periodRepository) {
-        this(appointmentRepository, departmentRepository, periodRepository, Clock.systemUTC());
-    }
-
-    AcademicAuthorization(
-            AcademicAppointmentRepository appointmentRepository,
-            DepartmentRepository departmentRepository,
-            RegistrationPeriodRepository periodRepository,
+            RegistrationPeriodRepository registrationPeriodRepository,
             Clock clock) {
-        this.appointmentRepository = appointmentRepository;
+        this.academicAppointmentRepository = academicAppointmentRepository;
         this.departmentRepository = departmentRepository;
-        this.periodRepository = periodRepository;
+        this.registrationPeriodRepository = registrationPeriodRepository;
         this.clock = clock;
     }
 
     public boolean canManageFaculty(Long facultyId, Authentication authentication) {
         UserPrincipal principal = principal(authentication);
-        return principal != null && appointmentRepository.hasActiveFacultyAppointment(
+        return principal != null && academicAppointmentRepository.hasActiveFacultyAppointment(
                 principal.id(), PositionCode.DEAN, facultyId, LocalDateTime.now(clock));
     }
 
@@ -48,18 +39,18 @@ public class AcademicAuthorization {
             return false;
         }
         LocalDateTime now = LocalDateTime.now(clock);
-        if (appointmentRepository.hasActiveDepartmentAppointment(
+        if (academicAppointmentRepository.hasActiveDepartmentAppointment(
                 principal.id(), PositionCode.DEPARTMENT_HEAD, departmentId, now)) {
             return true;
         }
         return departmentRepository.findById(departmentId)
-                .map(department -> appointmentRepository.hasActiveFacultyAppointment(
+                .map(department -> academicAppointmentRepository.hasActiveFacultyAppointment(
                         principal.id(), PositionCode.DEAN, department.getFaculty().getId(), now))
                 .orElse(false);
     }
 
     public boolean canManagePeriod(Long periodId, Authentication authentication) {
-        return periodRepository.findById(periodId)
+        return registrationPeriodRepository.findById(periodId)
                 .map(period -> canManageFaculty(period.getFaculty().getId(), authentication))
                 .orElse(false);
     }

@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AcademicAppointmentService {
 
-    private final AcademicAppointmentRepository appointmentRepository;
+    private final AcademicAppointmentRepository academicAppointmentRepository;
     private final LecturerRepository lecturerRepository;
     private final FacultyRepository facultyRepository;
     private final DepartmentRepository departmentRepository;
@@ -25,13 +25,13 @@ public class AcademicAppointmentService {
     private final IdentityMapper identityMapper;
 
     public AcademicAppointmentService(
-            AcademicAppointmentRepository appointmentRepository,
+            AcademicAppointmentRepository academicAppointmentRepository,
             LecturerRepository lecturerRepository,
             FacultyRepository facultyRepository,
             DepartmentRepository departmentRepository,
             UserRepository userRepository,
             IdentityMapper identityMapper) {
-        this.appointmentRepository = appointmentRepository;
+        this.academicAppointmentRepository = academicAppointmentRepository;
         this.lecturerRepository = lecturerRepository;
         this.facultyRepository = facultyRepository;
         this.departmentRepository = departmentRepository;
@@ -41,7 +41,7 @@ public class AcademicAppointmentService {
 
     @Transactional(readOnly = true)
     public List<AppointmentResponse> list(Long lecturerId) {
-        return appointmentRepository.findForAdministration(lecturerId).stream()
+        return academicAppointmentRepository.findForAdministration(lecturerId).stream()
                 .map(identityMapper::toAppointment)
                 .toList();
     }
@@ -67,13 +67,13 @@ public class AcademicAppointmentService {
         appointment.setEndsAt(request.endsAt());
         appointment.setAssignedBy(userRepository.findById(assignedById)
                 .orElseThrow(() -> new ResourceNotFoundException("Assigning user was not found.")));
-        return identityMapper.toAppointment(appointmentRepository.save(appointment));
+        return identityMapper.toAppointment(academicAppointmentRepository.save(appointment));
     }
 
     @Transactional
     @BusinessAudit(action = "ACADEMIC_APPOINTMENT_END", entityType = "ACADEMIC_APPOINTMENT", entityIdArgument = 0)
     public AppointmentResponse end(Long id, EndAppointmentRequest request) {
-        AcademicAppointment appointment = appointmentRepository.findById(id)
+        AcademicAppointment appointment = academicAppointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Academic appointment was not found."));
         if (!request.endsAt().isAfter(appointment.getStartsAt())) {
             throw new BusinessRuleException("The appointment end must be after its start.");

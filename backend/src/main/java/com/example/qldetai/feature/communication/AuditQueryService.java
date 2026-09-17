@@ -11,18 +11,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuditQueryService {
 
-    private final AuditLogRepository repository;
+    private final AuditLogRepository auditLogRepository;
 
-    public AuditQueryService(AuditLogRepository repository) {
-        this.repository = repository;
+    public AuditQueryService(AuditLogRepository auditLogRepository) {
+        this.auditLogRepository = auditLogRepository;
     }
 
     @Transactional(readOnly = true)
     public PageResponse<AuditLogResponse> list(String entityType, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<AuditLogResponse> logs = (entityType == null || entityType.isBlank()
-                ? repository.findAll(pageable)
-                : repository.findByEntityTypeIgnoreCase(entityType.trim(), pageable)).map(this::toResponse);
+                ? auditLogRepository.findAll(pageable)
+                : auditLogRepository.findByEntityTypeIgnoreCase(entityType.trim(), pageable)).map(this::toResponse);
         return PageResponse.from(logs);
     }
 

@@ -46,12 +46,12 @@ public class DemoDataInitializer implements ApplicationRunner {
     private final FacultyRepository facultyRepository;
     private final DepartmentRepository departmentRepository;
     private final SemesterRepository semesterRepository;
-    private final RegistrationPeriodRepository periodRepository;
+    private final RegistrationPeriodRepository registrationPeriodRepository;
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final LecturerRepository lecturerRepository;
     private final StudentRepository studentRepository;
-    private final AcademicAppointmentRepository appointmentRepository;
+    private final AcademicAppointmentRepository academicAppointmentRepository;
     private final NotificationService notificationService;
     private final PasswordEncoder passwordEncoder;
 
@@ -60,24 +60,24 @@ public class DemoDataInitializer implements ApplicationRunner {
             FacultyRepository facultyRepository,
             DepartmentRepository departmentRepository,
             SemesterRepository semesterRepository,
-            RegistrationPeriodRepository periodRepository,
+            RegistrationPeriodRepository registrationPeriodRepository,
             RoleRepository roleRepository,
             UserRepository userRepository,
             LecturerRepository lecturerRepository,
             StudentRepository studentRepository,
-            AcademicAppointmentRepository appointmentRepository,
+            AcademicAppointmentRepository academicAppointmentRepository,
             NotificationService notificationService,
             PasswordEncoder passwordEncoder) {
         this.demoPassword = demoPassword;
         this.facultyRepository = facultyRepository;
         this.departmentRepository = departmentRepository;
         this.semesterRepository = semesterRepository;
-        this.periodRepository = periodRepository;
+        this.registrationPeriodRepository = registrationPeriodRepository;
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.lecturerRepository = lecturerRepository;
         this.studentRepository = studentRepository;
-        this.appointmentRepository = appointmentRepository;
+        this.academicAppointmentRepository = academicAppointmentRepository;
         this.notificationService = notificationService;
         this.passwordEncoder = passwordEncoder;
     }
@@ -137,7 +137,7 @@ public class DemoDataInitializer implements ApplicationRunner {
             return studentRepository.save(created);
         });
 
-        if (!appointmentRepository.hasActiveFacultyAppointment(
+        if (!academicAppointmentRepository.hasActiveFacultyAppointment(
                 lecturerUser.getId(), PositionCode.DEAN, faculty.getId(), LocalDateTime.now())) {
             AcademicAppointment appointment = new AcademicAppointment();
             appointment.setLecturer(lecturer);
@@ -145,10 +145,11 @@ public class DemoDataInitializer implements ApplicationRunner {
             appointment.setPositionCode(PositionCode.DEAN);
             appointment.setStartsAt(LocalDateTime.of(2026, Month.SEPTEMBER, 1, 0, 0));
             appointment.setAssignedBy(admin);
-            appointmentRepository.save(appointment);
+            academicAppointmentRepository.save(appointment);
         }
 
-        if (!periodRepository.existsByFacultyIdAndNameIgnoreCase(faculty.getId(), "Đợt KLTN demo 2026-2027")) {
+        if (!registrationPeriodRepository.existsByFacultyIdAndNameIgnoreCase(
+                faculty.getId(), "Đợt KLTN demo 2026-2027")) {
             RegistrationPeriod period = new RegistrationPeriod();
             period.setFaculty(faculty);
             period.setSemester(semester);
@@ -163,7 +164,7 @@ public class DemoDataInitializer implements ApplicationRunner {
             period.setStatus(RegistrationPeriodStatus.ACTIVE);
             period.setCreatedBy(admin);
             period.setCreatedAt(LocalDateTime.now());
-            periodRepository.save(period);
+            registrationPeriodRepository.save(period);
         }
 
         notificationService.publish(

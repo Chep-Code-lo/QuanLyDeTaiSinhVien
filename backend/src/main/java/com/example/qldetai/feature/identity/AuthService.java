@@ -11,7 +11,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -34,19 +33,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
-    @Autowired
     public AuthService(
-            AuthenticationManager authenticationManager,
-            SessionAuthenticationStrategy sessionAuthenticationStrategy,
-            SecurityContextRepository securityContextRepository,
-            UserRepository userRepository,
-            IdentityMapper identityMapper,
-            PasswordEncoder passwordEncoder) {
-        this(authenticationManager, sessionAuthenticationStrategy, securityContextRepository,
-                userRepository, identityMapper, passwordEncoder, Clock.systemUTC());
-    }
-
-    AuthService(
             AuthenticationManager authenticationManager,
             SessionAuthenticationStrategy sessionAuthenticationStrategy,
             SecurityContextRepository securityContextRepository,

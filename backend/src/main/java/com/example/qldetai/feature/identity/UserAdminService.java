@@ -18,7 +18,6 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -38,20 +37,7 @@ public class UserAdminService {
     private final IdentityMapper identityMapper;
     private final Clock clock;
 
-    @Autowired
     public UserAdminService(
-            UserRepository userRepository,
-            RoleRepository roleRepository,
-            StudentRepository studentRepository,
-            LecturerRepository lecturerRepository,
-            DepartmentRepository departmentRepository,
-            PasswordEncoder passwordEncoder,
-            IdentityMapper identityMapper) {
-        this(userRepository, roleRepository, studentRepository, lecturerRepository,
-                departmentRepository, passwordEncoder, identityMapper, Clock.systemUTC());
-    }
-
-    UserAdminService(
             UserRepository userRepository,
             RoleRepository roleRepository,
             StudentRepository studentRepository,

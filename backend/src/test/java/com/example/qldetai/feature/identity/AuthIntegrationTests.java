@@ -6,36 +6,45 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.TestConstructor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @AutoConfigureMockMvc
 @Transactional
 class AuthIntegrationTests {
 
-    @Autowired
-    private MockMvc mockMvc;
+    private final MockMvc mockMvc;
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final Clock clock;
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    AuthIntegrationTests(
+            MockMvc mockMvc,
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            Clock clock) {
+        this.mockMvc = mockMvc;
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.clock = clock;
+    }
 
     @BeforeEach
     void createAdmin() {
@@ -43,7 +52,7 @@ class AuthIntegrationTests {
             return;
         }
         Role adminRole = roleRepository.findByCode(RoleCode.ADMIN).orElseThrow();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         User user = new User();
         user.setEmail("admin@test.local");
         user.setPasswordHash(passwordEncoder.encode("TestPassword123!"));
@@ -108,7 +117,7 @@ class AuthIntegrationTests {
 
         User user = userRepository.findByEmailIgnoreCase("admin@test.local").orElseThrow();
         Role studentRole = roleRepository.findByCode(RoleCode.STUDENT).orElseThrow();
-        user.replaceRoles(Set.of(studentRole), LocalDateTime.now());
+        user.replaceRoles(Set.of(studentRole), LocalDateTime.now(clock));
         userRepository.saveAndFlush(user);
 
         mockMvc.perform(get("/api/v1/admin/users").session(session))
