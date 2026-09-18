@@ -5,6 +5,15 @@ import java.util.List;
 
 public final class ProgressDtos {
  private ProgressDtos() { }
+ public record StoredFileResponse(
+         Long id,
+         String storageKey,
+         String originalName,
+         String mimeType,
+         long sizeBytes,
+         String sha256,
+         LocalDateTime uploadedAt,
+         StoredFileStatus status) { }
  public record CreateMilestoneRequest(@NotNull Long assignmentId, @NotBlank @Size(max=200) String title, @NotNull MilestoneType milestoneType, @NotBlank String description, @NotNull @Future LocalDateTime dueAt) { }
  public record SubmitReportRequest(@NotNull Long fileId, @Size(max=5000) String note) { }
  public record FeedbackRequest(@NotBlank @Size(max=5000) String content, @NotNull Boolean accepted) { }

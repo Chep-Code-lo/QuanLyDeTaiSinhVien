@@ -43,4 +43,8 @@ $env:DEMO_DATA_ENABLED = "true"
 $env:DEMO_PASSWORD = "a-demo-password-with-at-least-8-characters"
 ```
 
-Tài liệu hợp đồng Backend 1 nằm tại `docs/backend-1-api.md`.
+Tài liệu hợp đồng các phần backend:
+
+- `docs/backend-1-api.md`
+- `docs/backend-2-api.md`
+- `docs/backend-3-api.md`

@@ -17,6 +17,8 @@ Backend 2 hiện xử lý 3 mảng:
 - Quản lý nhóm sinh viên và đăng ký đề tài.
 - Giao đề tài chính thức cho nhóm.
 
+Các API về tiến độ, báo cáo, hội đồng, lịch, đánh giá và kết quả được tách riêng tại [docs/backend-3-api.md](./backend-3-api.md).
+
 ## Phụ thuộc xác thực
 
 Backend 2 dùng chung cơ chế session và CSRF của backend1.
@@ -680,7 +682,7 @@ Flow chuẩn khi demo hoặc tích hợp:
 
 ```powershell
 cd backend
-.\mvnw.cmd test
+mvn test
 ```
 
 Tại thời điểm dựng tài liệu này, backend đã pass toàn bộ test hiện có, bao gồm test flow của backend2.

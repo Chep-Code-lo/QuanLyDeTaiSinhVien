@@ -2,9 +2,12 @@ package com.example.qldetai.feature.identity;
 
 import com.example.qldetai.feature.identity.IdentityDtos.AppointmentResponse;
 import com.example.qldetai.feature.identity.IdentityDtos.CurrentUserResponse;
+import com.example.qldetai.feature.identity.IdentityDtos.LecturerDirectoryResponse;
 import com.example.qldetai.feature.identity.IdentityDtos.LecturerProfileResponse;
 import com.example.qldetai.feature.identity.IdentityDtos.StudentProfileResponse;
 import com.example.qldetai.feature.identity.IdentityDtos.UserResponse;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
@@ -14,10 +17,18 @@ public class IdentityMapper {
 
     private final StudentRepository studentRepository;
     private final LecturerRepository lecturerRepository;
+    private final AcademicAppointmentRepository academicAppointmentRepository;
+    private final Clock clock;
 
-    public IdentityMapper(StudentRepository studentRepository, LecturerRepository lecturerRepository) {
+    public IdentityMapper(
+            StudentRepository studentRepository,
+            LecturerRepository lecturerRepository,
+            AcademicAppointmentRepository academicAppointmentRepository,
+            Clock clock) {
         this.studentRepository = studentRepository;
         this.lecturerRepository = lecturerRepository;
+        this.academicAppointmentRepository = academicAppointmentRepository;
+        this.clock = clock;
     }
 
     public CurrentUserResponse toCurrentUser(User user) {
@@ -27,7 +38,10 @@ public class IdentityMapper {
                 user.getEmail(),
                 roleCodes(user),
                 studentRepository.findByUserId(user.getId()).map(this::toStudent).orElse(null),
-                lecturerRepository.findByUserId(user.getId()).map(this::toLecturer).orElse(null));
+                lecturerRepository.findByUserId(user.getId()).map(this::toLecturer).orElse(null),
+                academicAppointmentRepository.findActiveByUserId(user.getId(), LocalDateTime.now(clock)).stream()
+                        .map(this::toAppointment)
+                        .toList());
     }
 
     public UserResponse toUser(User user) {
@@ -57,6 +71,20 @@ public class IdentityMapper {
                 appointment.getPositionCode(),
                 appointment.getStartsAt(),
                 appointment.getEndsAt());
+    }
+
+    public LecturerDirectoryResponse toLecturerDirectory(Lecturer lecturer) {
+        return new LecturerDirectoryResponse(
+                lecturer.getId(),
+                lecturer.getUser().getId(),
+                lecturer.getLecturerCode(),
+                lecturer.getUser().getFullName(),
+                lecturer.getAcademicDegree(),
+                lecturer.getSpecialization(),
+                lecturer.getDepartment().getFaculty().getId(),
+                lecturer.getDepartment().getFaculty().getName(),
+                lecturer.getDepartment().getId(),
+                lecturer.getDepartment().getName());
     }
 
     private Set<RoleCode> roleCodes(User user) {

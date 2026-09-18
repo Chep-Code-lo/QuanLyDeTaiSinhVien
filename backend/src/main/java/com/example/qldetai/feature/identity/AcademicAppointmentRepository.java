@@ -46,4 +46,17 @@ public interface AcademicAppointmentRepository extends JpaRepository<AcademicApp
             @Param("position") PositionCode position,
             @Param("departmentId") Long departmentId,
             @Param("now") LocalDateTime now);
+
+    @Query("""
+            select a from AcademicAppointment a
+            join fetch a.lecturer l
+            join fetch l.user
+            join fetch a.faculty
+            left join fetch a.department
+            where l.user.id = :userId
+              and a.startsAt <= :now
+              and (a.endsAt is null or a.endsAt > :now)
+            order by a.startsAt desc
+            """)
+    List<AcademicAppointment> findActiveByUserId(@Param("userId") Long userId, @Param("now") LocalDateTime now);
 }

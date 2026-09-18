@@ -28,7 +28,8 @@ public final class IdentityDtos {
             String username,
             Set<RoleCode> roles,
             StudentProfileResponse student,
-            LecturerProfileResponse lecturer) {
+            LecturerProfileResponse lecturer,
+            java.util.List<AppointmentResponse> activeAppointments) {
     }
 
     public record LoginResponse(CurrentUserResponse user) {
@@ -84,6 +85,19 @@ public final class IdentityDtos {
 
     public record LecturerProfileResponse(
             Long id, String lecturerCode, String academicDegree, String specialization, Long departmentId) {
+    }
+
+    public record LecturerDirectoryResponse(
+            Long id,
+            Long userId,
+            String lecturerCode,
+            String fullName,
+            String academicDegree,
+            String specialization,
+            Long facultyId,
+            String facultyName,
+            Long departmentId,
+            String departmentName) {
     }
 
     public record CreateAppointmentRequest(
