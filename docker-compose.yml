@@ -17,7 +17,11 @@ services:
       - ./database/ql_de_tai_sinh_vien_schema.sql:/docker-entrypoint-initdb.d/00-ql_de_tai_sinh_vien_schema.sql:ro
       - ./docker/mysql/init/01-create-app-user.sh:/docker-entrypoint-initdb.d/01-create-app-user.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      test:
+        [
+          "CMD-SHELL",
+          "mysql -h localhost -u$$MYSQL_APP_USER -p$$MYSQL_APP_PASSWORD --silent --skip-column-names -e 'SELECT 1 FROM ql_de_tai_sinh_vien.roles LIMIT 1'",
+        ]
       interval: 10s
       timeout: 5s
       retries: 12
