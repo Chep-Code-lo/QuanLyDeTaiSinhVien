@@ -1,0 +1,12 @@
+target/
+.git/
+.github/
+.idea/
+.vscode/
+.classpath
+.project
+.settings/
+HELP.md
+.env
+.env.*
+!.env.example
