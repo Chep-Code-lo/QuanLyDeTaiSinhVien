@@ -3,7 +3,9 @@ import { navigationItems } from '../config/navigation'
 import { useAuth } from '../context/AuthContext'
 import { AppLogo } from './AppLogo'
 
-export function Sidebar() {
+type SidebarProps = { collapsed: boolean; onToggle: () => void; onNavigate: () => void }
+
+export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   const { user, hasAnyRole, hasAppointment, canAccessAcademicManagement } = useAuth()
 
   const filteredItems = navigationItems.filter((item) => {
@@ -32,6 +34,7 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <AppLogo />
+      <button className="sidebar__collapse" type="button" onClick={onToggle} aria-label={collapsed ? 'Mở rộng thanh điều hướng' : 'Thu gọn thanh điều hướng'}>{collapsed ? '›' : '‹'}</button>
       <p className="sidebar__label">Menu chính</p>
       <nav className="sidebar__nav" aria-label="Điều hướng chính">
         {filteredItems.map((item) => (
@@ -42,6 +45,8 @@ export function Sidebar() {
             }
             end={item.to === '/'}
             to={item.to}
+            onClick={onNavigate}
+            title={collapsed ? item.label : undefined}
           >
             <span className="sidebar__icon" aria-hidden="true">
               {item.icon}
