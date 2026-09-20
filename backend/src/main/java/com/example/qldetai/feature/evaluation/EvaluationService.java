@@ -30,9 +30,11 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -165,6 +167,13 @@ public class EvaluationService {
             throw new BusinessRuleException("A locked assessment component cannot receive a new rubric.");
         }
 
+        Set<Integer> sortOrders = new HashSet<>();
+        for (CriterionRequest criterion : request.criteria()) {
+            if (!sortOrders.add(criterion.sortOrder())) {
+                throw new BusinessRuleException("Each rubric criterion must have a different sort order.");
+            }
+        }
+
         Rubric rubric = new Rubric();
         rubric.setComponent(component);
         rubric.setName(request.name().trim());
@@ -265,6 +274,10 @@ public class EvaluationService {
                 .anyMatch(supervisor -> supervisor.getLecturer().getId().equals(lecturer.getId()))) {
             throw new BusinessRuleException("A supervisor cannot evaluate their own topic.");
         }
+        if (evaluations.existsByAssignmentIdAndComponentIdAndLecturerIdAndStatus(
+                assignment.getId(), component.getId(), lecturer.getId(), EvaluationStatus.ACTIVE)) {
+            throw new ConflictException("This lecturer is already assigned to this assessment component.");
+        }
         if (evaluations.countByAssignmentIdAndComponentIdAndStatus(
                         assignment.getId(), component.getId(), EvaluationStatus.ACTIVE)
                 >= component.getExpectedEvaluators()) {
@@ -286,6 +299,10 @@ public class EvaluationService {
                     .orElseThrow(() -> new ResourceNotFoundException("Defense session was not found."));
             if (!defense.getAssignment().getId().equals(assignment.getId())) {
                 throw new BusinessRuleException("The defense session does not belong to the selected project assignment.");
+            }
+            if (!defense.getPeriod().getId().equals(assignment.getPeriod().getId())
+                    || !defense.getCommittee().getPeriod().getId().equals(assignment.getPeriod().getId())) {
+                throw new BusinessRuleException("The defense session, committee and assignment must belong to the same registration period.");
             }
             boolean memberOfCommittee = committeeMembers.findByCommitteeId(defense.getCommittee().getId()).stream()
                     .anyMatch(member -> member.getLecturer().getId().equals(lecturer.getId()));
@@ -319,6 +336,9 @@ public class EvaluationService {
         if (!evaluation.getLecturer().getUser().getId().equals(actorId)) {
             throw new AccessDeniedException("Only the assigned evaluator can score this sheet.");
         }
+        if (evaluation.getStatus() != EvaluationStatus.ACTIVE) {
+            throw new BusinessRuleException("A cancelled evaluation assignment cannot receive scores.");
+        }
 
         ScoreSheet sheet = sheets.findByEvaluationId(evaluationId).orElseGet(() -> {
             ScoreSheet freshSheet = new ScoreSheet();
@@ -326,8 +346,8 @@ public class EvaluationService {
             freshSheet.setRubric(evaluation.getRubric());
             return freshSheet;
         });
-        if (sheet.getStatus() == ScoreSheetStatus.LOCKED) {
-            throw new BusinessRuleException("A locked score sheet cannot be edited.");
+        if (sheet.getStatus() != ScoreSheetStatus.DRAFT) {
+            throw new BusinessRuleException("Only a DRAFT score sheet can be edited. Request approval to reopen it first.");
         }
         if (sheet.getId() != null && sheet.getVersion() != request.version()) {
             throw new ConflictException("The score sheet was changed. Reload and try again.");
@@ -337,22 +357,28 @@ public class EvaluationService {
         criteria.findByRubricIdOrderBySortOrder(evaluation.getRubric().getId())
                 .forEach(criterion -> allowedCriteria.put(criterion.getId(), criterion));
 
-        if (request.scores().size() != allowedCriteria.size()) {
+        if (allowedCriteria.isEmpty() || request.scores().size() != allowedCriteria.size()) {
             throw new BusinessRuleException("Every rubric criterion must receive a score.");
         }
+        Set<Long> scoredCriteria = new HashSet<>();
         for (ScoreRequest score : request.scores()) {
             RubricCriterion criterion = allowedCriteria.get(score.criterionId());
-            if (criterion == null || score.score().compareTo(criterion.getMaxScore()) > 0) {
+            if (!scoredCriteria.add(score.criterionId())) {
+                throw new BusinessRuleException("Each rubric criterion must receive exactly one score.");
+            }
+            if (criterion == null || score.score() == null || score.score().signum() < 0
+                    || score.score().compareTo(criterion.getMaxScore()) > 0) {
                 throw new BusinessRuleException("A score must be between zero and its criterion maximum.");
             }
         }
 
+        // MySQL only allows changing score details while the sheet is DRAFT.
         sheet.setOverallComment(request.overallComment());
-        sheet.setStatus(request.submit() ? ScoreSheetStatus.SUBMITTED : ScoreSheetStatus.DRAFT);
-        sheet.setSubmittedAt(request.submit() ? LocalDateTime.now(clock) : null);
-        sheet = sheets.save(sheet);
+        sheet = sheets.saveAndFlush(sheet);
 
         details.deleteBySheetId(sheet.getId());
+        // Delete old rows before inserting the same (sheet, criterion) pairs.
+        details.flush();
         for (ScoreRequest score : request.scores()) {
             RubricCriterion criterion = allowedCriteria.get(score.criterionId());
             ScoreDetail detail = new ScoreDetail();
@@ -363,7 +389,14 @@ public class EvaluationService {
             detail.setComment(score.comment());
             details.save(detail);
         }
+        details.flush();
 
+        // Submit only after all criteria have been stored successfully.
+        sheet.setStatus(request.submit() ? ScoreSheetStatus.SUBMITTED : ScoreSheetStatus.DRAFT);
+        sheet.setSubmittedAt(request.submit() ? LocalDateTime.now(clock) : null);
+        sheets.flush();
+
+        // The sheet and request share one transaction: a failed save rolls both back.
         gradeChangeRequests.findFirstBySheetIdAndStatusOrderByCreatedAtDesc(sheet.getId(), GradeChangeStatus.APPROVED)
                 .filter(requestedChange -> requestedChange.getAppliedAt() == null)
                 .ifPresent(requestedChange -> {

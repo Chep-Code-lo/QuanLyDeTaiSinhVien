@@ -4,6 +4,10 @@ import com.example.qldetai.common.api.ApiResponse;
 import com.example.qldetai.feature.progress.ProgressDtos.StoredFileResponse;
 import com.example.qldetai.security.UserPrincipal;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -35,7 +39,23 @@ public class StoredFileController {
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<StoredFileResponse> get(@PathVariable Long id) {
-        return ApiResponse.success(storedFileService.get(id));
+    public ApiResponse<StoredFileResponse> get(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(storedFileService.get(id, principal.id()));
+    }
+
+    @GetMapping("/{id}/content")
+    public ResponseEntity<Resource> download(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        StoredFileService.FileDownload download = storedFileService.download(id, principal.id());
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentLength(download.sizeBytes())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(download.originalName(), StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .body(download.resource());
     }
 }

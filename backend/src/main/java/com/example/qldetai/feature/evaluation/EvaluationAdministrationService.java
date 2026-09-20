@@ -220,8 +220,21 @@ public class EvaluationAdministrationService {
             int page,
             int size,
             Long actorId) {
-        manager(actorId);
         Specification<ResultVersion> specification = (root, query, builder) -> builder.conjunction();
+        if (!isManager(actorId)) {
+            Student student = students.findByUserId(actorId)
+                    .orElseThrow(() -> new AccessDeniedException("You cannot view results."));
+            List<Long> groupIds = groupMembers.findByStudentIdAndLeftAtIsNullOrderByJoinedAtDesc(student.getId())
+                    .stream()
+                    .map(member -> member.getGroup().getId())
+                    .toList();
+            // Lọc ngay trong truy vấn: sinh viên chỉ thấy điểm đã công bố của nhóm mình.
+            specification = specification.and((root, query, builder) -> groupIds.isEmpty()
+                    ? builder.disjunction()
+                    : builder.and(
+                            root.join("assignment").join("group").get("id").in(groupIds),
+                            builder.equal(root.get("status"), ResultStatus.PUBLISHED)));
+        }
         if (periodId != null) {
             specification = specification.and(
                     (root, query, builder) -> builder.equal(root.join("assignment").join("period").get("id"), periodId));
@@ -364,7 +377,7 @@ public class EvaluationAdministrationService {
         if (!sheet.getEvaluation().getLecturer().getUser().getId().equals(actorId)) {
             throw new AccessDeniedException("Only the evaluator can request a score change.");
         }
-        if (sheet.getStatus() != ScoreSheetStatus.LOCKED
+        if ((sheet.getStatus() != ScoreSheetStatus.LOCKED && sheet.getStatus() != ScoreSheetStatus.SUBMITTED)
                 || changes.existsBySheetIdAndStatusIn(sheetId, List.of(GradeChangeStatus.PENDING, GradeChangeStatus.APPROVED))) {
             throw new BusinessRuleException("This score sheet cannot receive another change request.");
         }
@@ -385,14 +398,22 @@ public class EvaluationAdministrationService {
         if (changeRequest.getStatus() != GradeChangeStatus.PENDING) {
             throw new BusinessRuleException("Only a pending request may be reviewed.");
         }
+        if (Boolean.TRUE.equals(request.approved())
+                && changeRequest.getSheet().getStatus() != ScoreSheetStatus.LOCKED
+                && changeRequest.getSheet().getStatus() != ScoreSheetStatus.SUBMITTED) {
+            throw new BusinessRuleException("Only a submitted or locked score sheet may be reopened.");
+        }
 
         changeRequest.setReviewedBy(user(actorId));
         changeRequest.setReviewedAt(LocalDateTime.now(clock));
         changeRequest.setReviewComment(request.comment());
         if (Boolean.TRUE.equals(request.approved())) {
             changeRequest.setStatus(GradeChangeStatus.APPROVED);
+            // The MySQL trigger must see APPROVED before changing the sheet to DRAFT.
+            changes.flush();
             changeRequest.getSheet().setStatus(ScoreSheetStatus.DRAFT);
             changeRequest.getSheet().setSubmittedAt(null);
+            sheets.flush();
         } else {
             changeRequest.setStatus(GradeChangeStatus.REJECTED);
         }
