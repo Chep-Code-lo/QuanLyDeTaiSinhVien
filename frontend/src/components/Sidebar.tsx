@@ -56,7 +56,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
         ))}
       </nav>
       <div className="sidebar__footer">
-        <div className="font-semibold text-xs text-white">HCMUTE</div>
+        <div className="font-semibold text-xs text-white">HCM-UTE</div>
         <div className="text-xs mt-1">Student Project Management</div>
       </div>
     </aside>
