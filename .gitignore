@@ -8,8 +8,6 @@ backend/target/
 backend/.classpath
 backend/.project
 backend/.settings/
-backend/data/uploads/
-data/uploads/
 
 # Node / Vite
 frontend/node_modules/

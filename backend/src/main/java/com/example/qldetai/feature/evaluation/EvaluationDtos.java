@@ -1,6 +1,5 @@
 package com.example.qldetai.feature.evaluation;
 
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Future;
@@ -48,7 +47,7 @@ public final class EvaluationDtos {
     public record CreateRubricRequest(
             @NotNull Long componentId,
             @NotBlank String name,
-            @NotEmpty List<@NotNull @Valid CriterionRequest> criteria) {
+            @NotEmpty List<CriterionRequest> criteria) {
     }
 
     public record CreateEvaluationRequest(
@@ -66,9 +65,9 @@ public final class EvaluationDtos {
     }
 
     public record SaveSheetRequest(
-            @NotNull @Min(0) Integer version,
+            @NotNull Integer version,
             String overallComment,
-            @NotEmpty List<@NotNull @Valid ScoreRequest> scores,
+            @NotEmpty List<ScoreRequest> scores,
             boolean submit) {
     }
 

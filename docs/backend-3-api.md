@@ -86,8 +86,7 @@ Response phân trang:
 | Method | Path | Quyền | Mô tả |
 |---|---|---|---|
 | POST | `/files` | Đã đăng nhập | Upload file và nhận `fileId` |
-| GET | `/files/{id}` | Người có quyền đọc file | Lấy metadata file đã upload |
-| GET | `/files/{id}/content` | Người có quyền đọc file | Tải nội dung file dưới dạng attachment |
+| GET | `/files/{id}` | Đã đăng nhập | Lấy metadata file đã upload |
 | POST | `/milestones` | `ADMIN`, `LECTURER` | Tạo mốc tiến độ cho assignment |
 | GET | `/project-assignments/{assignmentId}/milestones` | Đã đăng nhập | Danh sách milestone của assignment |
 | POST | `/milestones/{id}/submissions` | `STUDENT` | Nộp báo cáo vào milestone |
@@ -126,13 +125,9 @@ Response mẫu:
 
 Lưu ý:
 
-- `POST /files` và `GET /files/{id}` trả metadata JSON. Muốn tải nội dung, gọi `GET /files/{id}/content`; endpoint này trả file nhị phân với `Content-Disposition: attachment`.
+- API này chỉ trả metadata, chưa trả file nhị phân để download.
 - Frontend phải upload file trước, sau đó lấy `data.id` để truyền vào `POST /milestones/{id}/submissions`.
-- File mới upload chỉ người upload và admin đọc được. Khi file đã được nộp làm báo cáo, thành viên đang ở nhóm, GVHD và người chấm được phân công active cho đề tài có thể đọc file.
-- Backend chặn file rỗng, tên không hợp lệ và file vượt dung lượng. Dung lượng tối đa mặc định 10 MB; dùng `FILE_MAX_SIZE` và `FILE_MAX_REQUEST_SIZE` để cấu hình. Giới hạn request cần lớn hơn giới hạn file để chứa multipart header.
-- Mặc định file lưu trong `./data/uploads`, tính từ thư mục chạy backend; folder này đã được Git bỏ qua. Có thể đổi bằng `FILE_STORAGE_ROOT`. Khi deploy cần trỏ vào thư mục lưu trữ bền vững.
-- Nếu đã upload bằng cấu hình cũ dùng thư mục tạm JVM, đặt `FILE_STORAGE_ROOT` trỏ về thư mục cũ để tiếp tục đọc dữ liệu đó. Việc đổi cấu hình không tự di chuyển file cũ.
-- File lỗi trong lúc lưu hoặc transaction rollback sẽ được dọn khỏi ổ đĩa. MIME trong metadata là loại do request khai báo đã được chuẩn hóa; nội dung tải xuống dùng `application/octet-stream`, không tự mở HTML/script trong trình duyệt.
+- Có thể đổi thư mục lưu file bằng biến môi trường `FILE_STORAGE_ROOT`. Nếu không cấu hình, backend dùng thư mục tạm của JVM.
 
 ### POST `/milestones`
 
@@ -287,9 +282,8 @@ Request mẫu cho chấm hội đồng:
 Rule:
 
 - Giảng viên hướng dẫn của đề tài không được chấm chính đề tài đó.
-- Không gán cùng một giảng viên active hai lần cho cùng đề tài và thành phần.
 - `REVIEW`: `defenseId` phải là `null`, backend gán `evaluatorRole = REVIEWER`.
-- `COMMITTEE`: `defenseId` là bắt buộc, phải cùng đề tài/đợt và giảng viên phải là thành viên của hội đồng trong defense đó; backend gán `evaluatorRole = COMMITTEE_MEMBER`.
+- `COMMITTEE`: `defenseId` là bắt buộc và giảng viên phải là thành viên của hội đồng trong defense đó; backend gán `evaluatorRole = COMMITTEE_MEMBER`.
 - `OTHER`: không nhận `defenseId`.
 
 ### PUT `/evaluation-assignments/{id}/score-sheet`
@@ -319,11 +313,9 @@ Request mẫu lưu nháp:
 Lưu ý:
 
 - Mỗi tiêu chí trong rubric phải có điểm.
-- Mỗi tiêu chí phải xuất hiện đúng một lần, điểm từ 0 đến `maxScore`.
+- Điểm từng tiêu chí không được vượt `maxScore`.
 - `submit = true` sẽ chuyển phiếu sang `SUBMITTED`.
 - Sau khi kết quả được finalize, backend khóa phiếu chấm thành `LOCKED`.
-- Chỉ phiếu `DRAFT` được sửa. Phiếu `SUBMITTED` hoặc `LOCKED` phải qua duyệt yêu cầu đổi điểm trước. Phân công `CANCELLED` không được ghi phiếu.
-- Khi chạy schema MySQL, điểm phản biện bắt buộc phải được nộp đủ trước khi nộp điểm hội đồng (trigger `tr_score_sheet_update`).
 
 ### 2.3. Hội đồng, defense và kết quả
 
@@ -335,7 +327,7 @@ Lưu ý:
 | POST | `/defense-sessions` | `ADMIN`, `LECTURER` | Xếp lịch bảo vệ |
 | GET | `/defense-sessions` | Đã đăng nhập | Danh sách buổi bảo vệ |
 | POST | `/project-assignments/{id}/results/finalize` | `ADMIN`, `LECTURER` | Chốt kết quả |
-| GET | `/results` | `ADMIN`, `LECTURER`, `STUDENT` | Danh sách kết quả; sinh viên chỉ nhận điểm đã công bố của nhóm mình |
+| GET | `/results` | `ADMIN`, `LECTURER` | Danh sách kết quả |
 | GET | `/results/{id}` | Đã đăng nhập | Chi tiết kết quả |
 | POST | `/results/{id}/publish` | `ADMIN`, `LECTURER` | Công bố kết quả |
 
@@ -393,8 +385,6 @@ Quyền xem:
 - `ADMIN`, `LECTURER`: xem mọi kết quả.
 - `STUDENT`: chỉ xem được khi kết quả đã `PUBLISHED` và sinh viên thuộc nhóm của assignment đó.
 
-`GET /results` áp dụng cùng điều kiện với sinh viên ngay trong truy vấn database. Truyền `assignmentId` của nhóm khác hoặc `status=FINALIZED` không vượt qua được điều kiện này: danh sách trả về rỗng.
-
 ### 2.4. Yêu cầu đổi điểm
 
 | Method | Path | Quyền | Mô tả |
@@ -416,10 +406,9 @@ Request mẫu:
 
 Flow thực tế:
 
-1. Giảng viên chỉ tạo được yêu cầu cho phiếu của mình khi phiếu đang `SUBMITTED` hoặc `LOCKED`; không có yêu cầu `PENDING`/`APPROVED` khác của cùng phiếu.
+1. Giảng viên chỉ tạo được yêu cầu khi phiếu chấm đang `LOCKED`.
 2. Nếu duyệt `approved = true`, backend chuyển request sang `APPROVED` và mở lại `score-sheet` về `DRAFT`.
 3. Lần lưu phiếu tiếp theo của evaluator sẽ tự động đổi request sang `APPLIED` và ghi `appliedAt`.
-4. Nếu điểm không hợp lệ, `version` cũ hoặc transaction lỗi, yêu cầu không được đánh dấu `APPLIED`.
 
 ## 3. Danh sách field response chính
 
@@ -585,4 +574,4 @@ cd backend
 mvn test
 ```
 
-Các test dùng H2 độc lập với MySQL thật. Xem hướng dẫn thực hành và các tình huống cần kiểm tra trong [backend-3-implementation-guide.md](./backend-3-implementation-guide.md). Kết quả H2 không thay thế việc chạy thử trên MySQL với các trigger trong schema của nhóm.
+Tại thời điểm dựng tài liệu này, backend đã pass toàn bộ test hiện có, bao gồm test workflow cho upload file, `/auth/me`, lecturer directory và luồng đánh giá/đổi điểm.

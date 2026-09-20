@@ -47,7 +47,7 @@ public class EvaluationReadController {
     }
 
     @GetMapping("/results")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER','STUDENT')")
+    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
     public ApiResponse<PageResponse<ResultDetailResponse>> results(
             @RequestParam(required = false) Long periodId,
             @RequestParam(required = false) Long assignmentId,

@@ -10,7 +10,4 @@ public interface EvaluationAssignmentRepository
     List<EvaluationAssignment> findByLecturerIdAndStatus(Long lecturerId, EvaluationStatus status);
 
     long countByAssignmentIdAndComponentIdAndStatus(Long assignmentId, Long componentId, EvaluationStatus status);
-
-    boolean existsByAssignmentIdAndComponentIdAndLecturerIdAndStatus(
-            Long assignmentId, Long componentId, Long lecturerId, EvaluationStatus status);
 }
