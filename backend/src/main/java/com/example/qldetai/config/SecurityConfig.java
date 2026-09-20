@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -43,16 +44,25 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final ObjectMapper objectMapper;
-    private final List<String> allowedOrigins;
+    private final List<String> allowedOriginPatterns;
+    private final String csrfCookieSameSite;
+    private final boolean csrfCookieSecure;
+    private final String csrfCookieDomain;
 
     public SecurityConfig(
             ObjectMapper objectMapper,
-            @Value("${app.cors.allowed-origins}") String allowedOrigins) {
+            @Value("${app.cors.allowed-origins}") String allowedOrigins,
+            @Value("${app.security.csrf.cookie.same-site}") String csrfCookieSameSite,
+            @Value("${app.security.csrf.cookie.secure}") boolean csrfCookieSecure,
+            @Value("${app.security.csrf.cookie.domain:}") String csrfCookieDomain) {
         this.objectMapper = objectMapper;
-        this.allowedOrigins = Arrays.stream(allowedOrigins.split(","))
+        this.allowedOriginPatterns = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(origin -> !origin.isBlank())
                 .toList();
+        this.csrfCookieSameSite = csrfCookieSameSite;
+        this.csrfCookieSecure = csrfCookieSecure;
+        this.csrfCookieDomain = csrfCookieDomain;
     }
 
     @Bean
@@ -61,11 +71,21 @@ public class SecurityConfig {
             SecurityContextRepository securityContextRepository,
             com.example.qldetai.security.CurrentUserRefreshFilter currentUserRefreshFilter) throws Exception {
         CookieCsrfTokenRepository csrfRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        csrfRepository.setCookiePath("/");
+        csrfRepository.setCookieCustomizer((ResponseCookie.ResponseCookieBuilder builder) -> {
+            builder.path("/");
+            builder.sameSite(csrfCookieSameSite);
+            builder.secure(csrfCookieSecure);
+            if (StringUtils.hasText(csrfCookieDomain)) {
+                builder.domain(csrfCookieDomain);
+            }
+        });
         SpaCsrfTokenRequestHandler csrfTokenRequestHandler = new SpaCsrfTokenRequestHandler();
 
         return http
                 .csrf(csrf -> csrf
+                        .ignoringRequestMatchers(request ->
+                                HttpMethod.POST.matches(request.getMethod())
+                                        && "/api/v1/auth/login".equals(request.getServletPath()))
                         .csrfTokenRepository(csrfRepository)
                         .csrfTokenRequestHandler(csrfTokenRequestHandler))
                 .cors(Customizer.withDefaults())
@@ -123,7 +143,7 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedOriginPatterns(allowedOriginPatterns);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN", "X-Request-Id"));
         configuration.setExposedHeaders(List.of("Location", "X-Request-Id"));
@@ -153,7 +173,11 @@ public class SecurityConfig {
         public String resolveCsrfTokenValue(HttpServletRequest request, CsrfToken csrfToken) {
             String headerValue = request.getHeader(csrfToken.getHeaderName());
             if (StringUtils.hasText(headerValue)) {
-                return plain.resolveCsrfTokenValue(request, csrfToken);
+                String resolvedHeader = plain.resolveCsrfTokenValue(request, csrfToken);
+                if (StringUtils.hasText(resolvedHeader) && resolvedHeader.equals(csrfToken.getToken())) {
+                    return resolvedHeader;
+                }
+                return xor.resolveCsrfTokenValue(request, csrfToken);
             }
             return xor.resolveCsrfTokenValue(request, csrfToken);
         }

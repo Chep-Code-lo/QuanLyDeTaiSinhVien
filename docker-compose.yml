@@ -39,9 +39,13 @@ services:
       DB_URL: jdbc:mysql://mysql:3306/ql_de_tai_sinh_vien?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC
       DB_USERNAME: ${MYSQL_APP_USER:-ql_de_tai_app}
       DB_PASSWORD: ${MYSQL_APP_PASSWORD:-change-me-local}
-      CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-5173},http://127.0.0.1:${FRONTEND_PORT:-5173}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:${FRONTEND_PORT:-5173},http://127.0.0.1:${FRONTEND_PORT:-5173},https://*.trycloudflare.com}
       FILE_STORAGE_ROOT: /data/files
-      SESSION_COOKIE_SECURE: "false"
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      SESSION_COOKIE_SAME_SITE: ${SESSION_COOKIE_SAME_SITE:-lax}
+      CSRF_COOKIE_SECURE: ${CSRF_COOKIE_SECURE:-false}
+      CSRF_COOKIE_SAME_SITE: ${CSRF_COOKIE_SAME_SITE:-lax}
+      CSRF_COOKIE_DOMAIN: ${CSRF_COOKIE_DOMAIN:-}
       DEMO_DATA_ENABLED: ${DEMO_DATA_ENABLED:-false}
       DEMO_PASSWORD: ${DEMO_PASSWORD:-}
     ports:

@@ -5,6 +5,8 @@ import './student-portal.css';
 const API = import.meta.env.VITE_API_URL || '';
 const AuthContext = createContext(null);
 const sampleUser = { id: 'SV22110123', fullName: 'Nguyễn Thị Ngọc Quí', email: 'qui.nguyen@student.hcmute.edu.vn', role: 'STUDENT', activeAppointments: [] };
+let csrfToken = null;
+let csrfTokenPromise = null;
 let topics = [
   { id: 1, code: 'MH-2026-014', name: 'Ứng dụng quản lý chi tiêu cá nhân trên nền tảng web', lecturer: 'ThS. Nguyễn Văn An', type: 'Môn học', slots: '2/3', tags: ['React', 'Node.js'], description: 'Xây dựng hệ thống giúp người dùng theo dõi và quản lý chi tiêu hằng ngày.' },
   { id: 2, code: 'NCKH-2026-07', name: 'Ứng dụng học sâu trong nhận dạng biển số xe', lecturer: 'TS. Trần Thị B', type: 'NCKH', slots: '1/3', tags: ['Python', 'AI'], description: 'Nghiên cứu và triển khai mô hình nhận dạng biển số xe trong điều kiện thực tế.' },
@@ -16,13 +18,74 @@ const milestoneSeed = [
   { id: 3, title: 'Nộp báo cáo cuối kỳ', dueDate: '18/11/2026', status: 'UPCOMING', note: 'Nộp báo cáo hoàn chỉnh và mã nguồn.' }
 ];
 
-async function api(path, options = {}) {
-  const method = (options.method || 'GET').toUpperCase();
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && path !== '/api/v1/auth/csrf') {
-    await fetch(`${API}/api/v1/auth/csrf`, { credentials: 'include' });
+async function fetchCsrfToken(forceRefresh = false) {
+  if (csrfToken && !forceRefresh) {
+    return csrfToken;
   }
-  const response = await fetch(`${API}${path}`, { ...options, credentials: 'include', headers: { ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...options.headers } });
-  if (!response.ok) throw new Error((await response.json().catch(() => null))?.message || 'Không thể kết nối máy chủ');
+
+  if (!csrfTokenPromise || forceRefresh) {
+    csrfTokenPromise = fetch(`${API}/api/v1/auth/csrf`, { credentials: 'include' })
+      .then(async response => {
+        if (!response.ok) {
+          throw new Error('Không thể lấy CSRF token');
+        }
+
+        const payload = await response.json().catch(() => null);
+        csrfToken = payload?.data ?? payload;
+        return csrfToken;
+      })
+      .finally(() => {
+        csrfTokenPromise = null;
+      });
+  }
+
+  return csrfTokenPromise;
+}
+
+function clearCsrfToken() {
+  csrfToken = null;
+  csrfTokenPromise = null;
+}
+
+function getCookie(name) {
+  return document.cookie
+    .split('; ')
+    .find(item => item.startsWith(`${name}=`))
+    ?.slice(name.length + 1) || null;
+}
+
+async function api(path, options = {}, retryOnCsrfFailure = true) {
+  const method = (options.method || 'GET').toUpperCase();
+  const isMutatingRequest = !['GET', 'HEAD', 'OPTIONS'].includes(method) && path !== '/api/v1/auth/csrf';
+  const headers = { ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...options.headers };
+
+  if (isMutatingRequest) {
+    const csrf = await fetchCsrfToken(path === '/api/v1/auth/login' && retryOnCsrfFailure);
+    const cookieToken = getCookie('XSRF-TOKEN');
+    headers[csrf.headerName || 'X-XSRF-TOKEN'] = cookieToken || csrf.token;
+  }
+
+  const response = await fetch(`${API}${path}`, { ...options, credentials: 'include', headers });
+
+  if (response.status === 401) {
+    clearCsrfToken();
+  }
+
+  if (!response.ok) {
+    const errorPayload = await response.json().catch(() => null);
+
+    if (response.status === 403) {
+      clearCsrfToken();
+
+      if (isMutatingRequest && retryOnCsrfFailure) {
+        await fetchCsrfToken(true);
+        return api(path, options, false);
+      }
+    }
+
+    throw new Error(errorPayload?.message || 'Không thể kết nối máy chủ');
+  }
+
   const payload = response.status === 204 ? null : await response.json();
   return payload?.data ?? payload;
 }

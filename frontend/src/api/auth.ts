@@ -1,4 +1,4 @@
-import { apiClient } from './client'
+import { apiClient, clearCsrfToken, fetchCsrfToken } from './client'
 import type { ApiResponse } from '../types/api'
 import type { CurrentUser } from '../types/domain'
 
@@ -13,13 +13,15 @@ export type LoginResponse = {
 
 export const authApi = {
   getCsrf: async () => {
-    const response = await apiClient.get<ApiResponse<{ headerName: string; parameterName: string; token: string }>>('/auth/csrf')
-    return response.data.data
+    return fetchCsrfToken(true)
   },
   login: async (payload: LoginPayload) => {
-    // Spring Security requires the CSRF cookie/header pair even for session login.
-    await authApi.getCsrf()
-    const response = await apiClient.post<ApiResponse<LoginResponse>>('/auth/login', payload)
+    const csrf = await fetchCsrfToken(true)
+    const response = await apiClient.post<ApiResponse<LoginResponse>>('/auth/login', payload, {
+      headers: {
+        [csrf.headerName]: csrf.token,
+      },
+    })
     return response.data.data
   },
   getCurrentUser: async () => {
@@ -28,6 +30,7 @@ export const authApi = {
   },
   logout: async () => {
     const response = await apiClient.post<ApiResponse<void>>('/auth/logout')
+    clearCsrfToken()
     return response.data
   },
   changePassword: async (payload: { currentPassword: string; newPassword: string }) => {

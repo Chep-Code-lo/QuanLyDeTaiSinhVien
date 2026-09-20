@@ -12,6 +12,8 @@ npm run dev
 
 Vite chạy mặc định tại `http://localhost:5173`. Các lời gọi đến `/api` được chuyển tiếp đến Spring Boot ở `http://localhost:8080` khi chạy development.
 
+Nếu cần đổi cổng backend vì `8080` đang bận, đặt `BACKEND_PORT` trong `.env` ở thư mục gốc repo; Vite dev proxy sẽ tự trỏ sang cổng mới đó.
+
 ## Cấu hình API
 
 Tạo file `.env.local` nếu backend dùng địa chỉ khác:

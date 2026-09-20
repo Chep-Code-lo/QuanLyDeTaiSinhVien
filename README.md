@@ -11,13 +11,20 @@ Nền tảng quản lý đề tài, nhóm sinh viên, tiến độ, chấm đi�
 
 ## Chạy cục bộ
 
-1. Import `database/ql_de_tai_sinh_vien_schema.sql` vào MySQL 8.4+.
-2. Đặt biến môi trường backend (không ghi mật khẩu thật vào Git):
+1. Khởi động MySQL local.
+
+   Cách nhanh nhất là dùng MySQL đã có trong `docker compose`, service này mặc định expose ra `localhost:3307`.
+
+2. Tạo `backend/.env` hoặc `.env` ở thư mục gốc repo từ `backend/.env.example`, rồi chỉnh lại nếu bạn không dùng cấu hình MySQL mặc định:
 
    ```powershell
-   $env:DB_USERNAME = "ql_de_tai_app"
-   $env:DB_PASSWORD = "your-local-password"
+   DB_URL=jdbc:mysql://localhost:3307/ql_de_tai_sinh_vien?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC
+   DB_USERNAME=ql_de_tai_app
+   DB_PASSWORD=change-me-local
+   BACKEND_PORT=8080
    ```
+
+   Nếu máy bạn đang có tiến trình khác chiếm `8080`, chỉ cần đổi `BACKEND_PORT`, ví dụ `8081`.
 
 3. Chạy backend:
 
@@ -34,7 +41,19 @@ Nền tảng quản lý đề tài, nhóm sinh viên, tiến độ, chấm đi�
    npm run dev
    ```
 
-Backend nhận cấu hình database qua `DB_URL`, `DB_USERNAME`, và `DB_PASSWORD`; không đưa mật khẩu thật vào Git.
+Backend nhận cấu hình database qua `DB_URL`, `DB_USERNAME`, và `DB_PASSWORD`; có thể đặt trực tiếp trong shell, trong `backend/.env`, hoặc trong `.env` ở thư mục gốc repo. Frontend dev proxy cũng tự đọc `BACKEND_PORT` từ `.env` gốc nếu bạn đổi cổng backend.
+
+Nếu deploy frontend và backend khác origin hoặc khác domain, cần cấu hình thêm:
+
+```env
+CORS_ALLOWED_ORIGINS=https://ten-mien-frontend-cua-ban
+SESSION_COOKIE_SECURE=true
+SESSION_COOKIE_SAME_SITE=none
+CSRF_COOKIE_SECURE=true
+CSRF_COOKIE_SAME_SITE=none
+```
+
+Nếu dùng chung một domain và reverse proxy `/api/*` về backend thì không cần chuyển `same-site` sang `none`.
 
 Để tạo dữ liệu demo gồm admin, giảng viên, sinh viên, nhiệm vụ trưởng khoa và một đợt KLTN hợp lệ:
 
