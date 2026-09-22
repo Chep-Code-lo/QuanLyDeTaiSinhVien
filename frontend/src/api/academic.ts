@@ -51,8 +51,8 @@ export const academicApi = {
     const response = await apiClient.put<ApiResponse<RegistrationPeriodResponse>>(`/registration-periods/${id}`, payload)
     return response.data.data
   },
-  changeRegistrationPeriodStatus: async (id: number, status: string) => {
-    const response = await apiClient.patch<ApiResponse<RegistrationPeriodResponse>>(`/registration-periods/${id}/status`, { status })
+  changeRegistrationPeriodStatus: async (id: number, payload: { status: string; version: number }) => {
+    const response = await apiClient.patch<ApiResponse<RegistrationPeriodResponse>>(`/registration-periods/${id}/status`, payload)
     return response.data.data
   },
   getProjectAssignments: async (periodId?: number, page = 0, size = 20) => {

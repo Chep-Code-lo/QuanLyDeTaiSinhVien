@@ -2,7 +2,6 @@ import axios from 'axios'
 import type { InternalAxiosRequestConfig } from 'axios'
 import type { ApiResponse } from '../types/api'
 
-const ACCESS_TOKEN_KEY = 'ql-de-tai.access-token'
 type CsrfResponse = { headerName: string; parameterName: string; token: string }
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
@@ -70,11 +69,6 @@ export function clearCsrfToken(): void {
 }
 
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  const token = window.localStorage.getItem(ACCESS_TOKEN_KEY)
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-
   if (isMutatingRequest(config.method) && !hasRequestHeader(config, 'X-XSRF-TOKEN')) {
     if (!csrfToken) {
       const tokenResponse = await fetchCsrfToken()
@@ -109,7 +103,8 @@ apiClient.interceptors.response.use(
 )
 
 export const tokenStorage = {
-  clear: () => window.localStorage.removeItem(ACCESS_TOKEN_KEY),
-  get: () => window.localStorage.getItem(ACCESS_TOKEN_KEY),
-  set: (token: string) => window.localStorage.setItem(ACCESS_TOKEN_KEY, token),
+  // Kept as a compatibility no-op: authentication is session-cookie based, never JWT based.
+  clear: () => undefined,
+  get: () => null,
+  set: (_token: string) => undefined,
 }

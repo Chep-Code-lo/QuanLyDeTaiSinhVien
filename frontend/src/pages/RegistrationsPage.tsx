@@ -1,20 +1,24 @@
-import { ModulePlaceholder } from '../components/ModulePlaceholder'
+import { useEffect, useState } from 'react'
+import { groupApi } from '../api/groups'
+import { registrationApi } from '../api/registrations'
+import { topicApi } from '../api/topics'
 import { PageHeader } from '../components/PageHeader'
+import { StatusBadge } from '../components/StatusBadge'
+import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
+import type { StudentGroupResponse, TopicRegistrationResponse, TopicResponse } from '../types/domain'
 
+const messageOf = (error: any) => error.response?.data?.message || 'Không thể thực hiện thao tác. Vui lòng thử lại.'
 export function RegistrationsPage() {
-  return (
-    <>
-      <PageHeader title="Đăng ký đề tài" description="Theo dõi nguyện vọng đăng ký và quyết định phê duyệt của giảng viên hoặc bộ môn." />
-      <ModulePlaceholder
-        title="Hồ sơ đăng ký"
-        description="Luồng gửi và duyệt đăng ký sẽ được mở khi các endpoint nghiệp vụ đã sẵn sàng."
-        actionLabel="Đăng ký đề tài"
-        items={[
-          'Danh sách nguyện vọng theo từng đợt đăng ký.',
-          'Trạng thái chờ duyệt, đã duyệt hoặc cần bổ sung thông tin.',
-          'Lịch sử phản hồi từ giảng viên hướng dẫn.',
-        ]}
-      />
-    </>
-  )
+  const { hasAnyRole, hasRole } = useAuth(); const { showError, showSuccess } = useToast(); const student = hasRole('STUDENT'); const reviewer = hasAnyRole(['LECTURER', 'ADMIN'])
+  const [items, setItems] = useState<TopicRegistrationResponse[]>([]); const [groups, setGroups] = useState<StudentGroupResponse[]>([]); const [topics, setTopics] = useState<TopicResponse[]>([]); const [groupId, setGroupId] = useState(''); const [topicId, setTopicId] = useState(''); const [motivation, setMotivation] = useState(''); const [loading, setLoading] = useState(true)
+  const load = async () => { setLoading(true); try { const xs = await registrationApi.list({ size: 100 }); setItems(xs.content); if (student) setGroups(await groupApi.mine()); setTopics((await topicApi.list({ status: 'PUBLISHED', size: 100 })).content) } catch (error) { showError(messageOf(error)) } finally { setLoading(false) } }
+  useEffect(() => { load() }, [])
+  const register = async (e: React.FormEvent) => { e.preventDefault(); if (!groupId || !topicId) return showError('Chọn nhóm và đề tài để đăng ký.'); try { await registrationApi.create({ groupId: Number(groupId), topicId: Number(topicId), motivation: motivation.trim() || undefined }); setGroupId(''); setTopicId(''); setMotivation(''); showSuccess('Đã gửi đăng ký đề tài.'); await load() } catch (error) { showError(messageOf(error)) } }
+  const review = async (item: TopicRegistrationResponse, status: 'APPROVED' | 'REJECTED') => { const decisionReason = status === 'REJECTED' ? window.prompt('Lý do từ chối (bắt buộc):') : undefined; if (status === 'REJECTED' && !decisionReason?.trim()) return; try { const updated = await registrationApi.review(item.id, { version: item.version, status, decisionReason: decisionReason?.trim() }); setItems((xs) => xs.map((x) => x.id === item.id ? updated : x)); showSuccess(status === 'APPROVED' ? 'Đã duyệt đăng ký.' : 'Đã từ chối đăng ký.') } catch (error) { showError(messageOf(error)) } }
+  const withdraw = async (item: TopicRegistrationResponse) => { const decisionReason = window.prompt('Lý do rút đăng ký:'); if (!decisionReason?.trim()) return; try { const updated = await registrationApi.withdraw(item.id, { version: item.version, decisionReason: decisionReason.trim() }); setItems((xs) => xs.map((x) => x.id === item.id ? updated : x)); showSuccess('Đã rút đăng ký.') } catch (error) { showError(messageOf(error)) } }
+  return <><PageHeader title="Đăng ký đề tài" description="Nhóm trưởng đăng ký một đề tài đã công bố; giảng viên hoặc quản trị viên xét duyệt hồ sơ." />
+    {student && <section className="page-card"><h2 className="section-title">Gửi đăng ký đề tài</h2><form className="stack-form" onSubmit={register}><select className="form-select" value={groupId} onChange={(e) => setGroupId(e.target.value)} required><option value="">Chọn nhóm của bạn</option>{groups.map((g) => <option key={g.id} value={g.id}>{g.name} - {g.periodName} ({g.status})</option>)}</select><select className="form-select" value={topicId} onChange={(e) => setTopicId(e.target.value)} required><option value="">Chọn đề tài đã công bố</option>{topics.map((topic) => <option key={topic.id} value={topic.id}>{topic.code} - {topic.title}</option>)}</select><textarea className="form-input" value={motivation} onChange={(e) => setMotivation(e.target.value)} placeholder="Lý do/kinh nghiệm phù hợp với đề tài (không bắt buộc)" /><button className="btn btn-primary">Gửi đăng ký</button></form></section>}
+    <section className="page-card"><h2 className="section-title">Danh sách hồ sơ</h2>{loading ? <div className="content-state"><span className="spinner" /><p>Đang tải đăng ký...</p></div> : <div className="table-container"><table className="data-table"><thead><tr><th>Nhóm</th><th>Đề tài</th><th>Người đăng ký</th><th>Trạng thái</th><th>Phản hồi</th><th>Thao tác</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td>{item.groupName}<span className="table-subtext">{item.periodName}</span></td><td><strong>{item.topicCode}</strong><span className="table-subtext">{item.topicTitle}</span></td><td>{item.registeredByName}</td><td><StatusBadge status={item.status} /></td><td>{item.decisionReason || '—'}</td><td>{reviewer && item.status === 'PENDING' && <><button className="btn btn-primary btn-sm" onClick={() => review(item, 'APPROVED')}>Duyệt</button> <button className="btn btn-secondary btn-sm" onClick={() => review(item, 'REJECTED')}>Từ chối</button></>}{student && item.status === 'PENDING' && <button className="btn btn-secondary btn-sm" onClick={() => withdraw(item)}>Rút</button>}</td></tr>)}</tbody></table></div>}</section>
+  </>
 }

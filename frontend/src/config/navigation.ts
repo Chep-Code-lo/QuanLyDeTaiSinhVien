@@ -11,7 +11,7 @@ export type NavigationItem = {
 }
 
 export const navigationItems: NavigationItem[] = [
-  { icon: '⌂', label: 'Tổng quan', to: '/' },
+  { icon: '⌂', label: 'Tổng quan', to: '/dashboard' },
   { icon: '◫', label: 'Đề tài & Dự án', to: '/topics' },
   { icon: '◉', label: 'Nhóm đề tài', to: '/groups' },
   { icon: '✓', label: 'Đăng ký đề tài', to: '/registrations' },

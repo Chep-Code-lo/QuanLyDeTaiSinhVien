@@ -265,25 +265,45 @@ export interface RegistrationPeriodResponse {
   facultyId: number
   facultyName: string
   semesterId: number
-  semesterName: string
+  academicYear: string
+  semesterNo: number
   name: string
+  projectType: ProjectType
   status: 'DRAFT' | 'ACTIVE' | 'CLOSED' | string
-  startsAt: string
-  endsAt: string
+  proposalStartAt: string
+  proposalEndAt: string
+  registrationStartAt: string
+  registrationEndAt: string
+  reviewDeadlineAt?: string
+  defenseDate?: string
+  version: number
 }
 
+export type ProjectType = 'COURSE' | 'RESEARCH' | 'SPECIALIZED' | 'GRADUATION'
 export interface CreateRegistrationPeriodRequest {
   facultyId: number
   semesterId: number
   name: string
-  startsAt: string
-  endsAt: string
+  projectType: ProjectType
+  proposalStartAt: string
+  proposalEndAt: string
+  registrationStartAt: string
+  registrationEndAt: string
+  reviewDeadlineAt?: string | null
+  defenseDate?: string | null
 }
 
 export interface UpdateRegistrationPeriodRequest {
+  version: number
+  semesterId: number
   name: string
-  startsAt: string
-  endsAt: string
+  projectType: ProjectType
+  proposalStartAt: string
+  proposalEndAt: string
+  registrationStartAt: string
+  registrationEndAt: string
+  reviewDeadlineAt?: string | null
+  defenseDate?: string | null
 }
 
 export interface CreateAppointmentRequest {
@@ -305,6 +325,61 @@ export interface ProjectAssignmentResponse {
   topicCode: string
   topicTitle: string
   status: 'ASSIGNED' | 'IN_PROGRESS' | 'SUBMITTED' | 'COMPLETED' | 'CANCELLED' | string
+}
+
+export interface NotificationResponse {
+  id: number
+  title: string
+  content: string
+  targetPath?: string
+  readAt?: string
+  createdAt: string
+}
+
+export interface GroupMemberResponse {
+  studentId: number
+  userId: number
+  studentCode: string
+  fullName: string
+  className: string
+  cohort: string
+  slotNo: number
+  memberRole: 'LEADER' | 'MEMBER'
+  joinedAt: string
+}
+
+export interface StudentGroupResponse {
+  id: number
+  periodId: number
+  periodName: string
+  name: string
+  status: 'FORMING' | 'ACTIVE' | 'LOCKED' | 'CLOSED' | string
+  createdBy: number
+  creatorName: string
+  createdAt: string
+  version: number
+  members: GroupMemberResponse[]
+}
+
+export interface TopicRegistrationResponse {
+  id: number
+  periodId: number
+  periodName: string
+  groupId: number
+  groupName: string
+  topicId: number
+  topicCode: string
+  topicTitle: string
+  registeredBy: number
+  registeredByName: string
+  motivation?: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN' | string
+  registeredAt: string
+  reviewedBy?: number
+  reviewedByName?: string
+  reviewedAt?: string
+  decisionReason?: string
+  version: number
 }
 
 export type TopicStatus = 'DRAFT' | 'PENDING' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'WITHDRAWN' | string
