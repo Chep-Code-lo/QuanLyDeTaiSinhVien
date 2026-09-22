@@ -4,7 +4,12 @@ import { AppLogo } from '../components/AppLogo'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 
-export function LoginPage() {
+type LoginFormProps = {
+  onSuccess?: () => void
+  onClose?: () => void
+}
+
+export function LoginForm({ onSuccess, onClose }: LoginFormProps) {
   const { login } = useAuth()
   const { showSuccess, showError } = useToast()
   const navigate = useNavigate()
@@ -24,7 +29,8 @@ export function LoginPage() {
       setSubmitting(true)
       await login(username.trim(), password)
       showSuccess('Đăng nhập hệ thống thành công!')
-      navigate('/')
+      if (onSuccess) onSuccess()
+      else navigate('/dashboard')
     } catch (err: any) {
       showError(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.')
     } finally {
@@ -33,8 +39,8 @@ export function LoginPage() {
   }
 
   return (
-    <main className="login-page">
       <section className="login-card" aria-labelledby="login-title">
+        {onClose && <button className="login-card__close" type="button" aria-label="Đóng đăng nhập" onClick={onClose}>×</button>}
         <AppLogo />
         <h1 id="login-title">Đăng nhập hệ thống</h1>
         <p>Hệ thống quản lý đề tài của sinh viên Trường Đại học Công Nghệ Kỹ Thuật Thành phố Hồ Chí Minh.</p>
@@ -72,6 +78,9 @@ export function LoginPage() {
           </button>
         </form>
       </section>
-    </main>
   )
+}
+
+export function LoginPage() {
+  return <main className="login-page"><LoginForm /></main>
 }

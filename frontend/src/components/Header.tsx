@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 
@@ -7,7 +7,6 @@ type HeaderProps = { onMenuClick: () => void }
 
 export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuth()
-  const navigate = useNavigate()
   const { showSuccess } = useToast()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -21,13 +20,21 @@ export function Header({ onMenuClick }: HeaderProps) {
   const handleLogout = async () => {
     await logout()
     showSuccess('Đã đăng xuất thành công')
-    navigate('/login')
+    window.location.assign('/')
   }
 
   const getInitials = (name?: string) => {
     if (!name) return 'U'
     const parts = name.trim().split(' ')
     return parts[parts.length - 1].substring(0, 2).toUpperCase()
+  }
+
+  const getRoleLabel = () => {
+    if (user?.roles?.includes('ADMIN')) return 'Quản trị viên'
+    if (user?.activeAppointments?.[0]?.positionCode === 'DEAN') return 'Giảng viên · Trưởng khoa'
+    if (user?.activeAppointments?.[0]?.positionCode === 'DEPARTMENT_HEAD') return 'Giảng viên · Trưởng bộ môn'
+    if (user?.roles?.includes('LECTURER')) return 'Giảng viên'
+    return 'Sinh viên'
   }
 
   return (
@@ -44,7 +51,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             <div className="account-menu" ref={menuRef}>
             <button className="topbar__account" type="button" onClick={() => setMenuOpen((value) => !value)} aria-expanded={menuOpen}>
               <span className="topbar__avatar">{getInitials(user.fullName)}</span>
-              <span className="topbar__account-copy"><strong>{user.fullName}</strong><small>{user.activeAppointments?.[0]?.positionCode === 'DEAN' ? 'Giảng viên · Trưởng khoa' : user.roles?.includes('LECTURER') ? 'Giảng viên' : 'Sinh viên'}</small></span><span aria-hidden="true">⌄</span>
+              <span className="topbar__account-copy"><strong>{user.fullName}</strong><small>{getRoleLabel()}</small></span><span aria-hidden="true">⌄</span>
             </button>
             {menuOpen && <div className="account-menu__dropdown"><Link to="/account" onClick={() => setMenuOpen(false)}>Hồ sơ & cài đặt <span>›</span></Link><button type="button" onClick={handleLogout}>Đăng xuất <span>↗</span></button></div>}
             </div>

@@ -33,8 +33,13 @@ export const AcademicManagementPage: React.FC = () => {
     facultyId: 0,
     semesterId: 0,
     name: '',
-    startsAt: '',
-    endsAt: '',
+    projectType: 'COURSE',
+    proposalStartAt: '',
+    proposalEndAt: '',
+    registrationStartAt: '',
+    registrationEndAt: '',
+    reviewDeadlineAt: null,
+    defenseDate: null,
   })
 
   // Load catalogs
@@ -76,20 +81,14 @@ export const AcademicManagementPage: React.FC = () => {
 
   const handleCreatePeriod = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newPeriod.name.trim() || !newPeriod.startsAt || !newPeriod.endsAt) {
-      showError('Vui lòng điền đầy đủ thông tin đợt đăng ký')
+    if (!newPeriod.name.trim() || !newPeriod.proposalStartAt || !newPeriod.proposalEndAt || !newPeriod.registrationStartAt || !newPeriod.registrationEndAt) {
+      showError('Hãy nhập đủ hai giai đoạn: đề xuất đề tài và đăng ký đề tài.')
       return
     }
 
     try {
       setSubmittingPeriod(true)
-      const created = await academicApi.createRegistrationPeriod({
-        facultyId: Number(newPeriod.facultyId),
-        semesterId: Number(newPeriod.semesterId),
-        name: newPeriod.name.trim(),
-        startsAt: new Date(newPeriod.startsAt).toISOString(),
-        endsAt: new Date(newPeriod.endsAt).toISOString(),
-      })
+      const created = await academicApi.createRegistrationPeriod({ ...newPeriod, name: newPeriod.name.trim(), proposalStartAt: new Date(newPeriod.proposalStartAt).toISOString(), proposalEndAt: new Date(newPeriod.proposalEndAt).toISOString(), registrationStartAt: new Date(newPeriod.registrationStartAt).toISOString(), registrationEndAt: new Date(newPeriod.registrationEndAt).toISOString(), reviewDeadlineAt: newPeriod.reviewDeadlineAt ? new Date(newPeriod.reviewDeadlineAt).toISOString() : null })
       showSuccess('Tạo Đợt đăng ký thành công (DRAFT)!')
       setPeriods((prev) => [created, ...prev])
       setIsPeriodModalOpen(false)
@@ -97,8 +96,7 @@ export const AcademicManagementPage: React.FC = () => {
         facultyId: faculties[0]?.id || 0,
         semesterId: semesters[0]?.id || 0,
         name: '',
-        startsAt: '',
-        endsAt: '',
+        projectType: 'COURSE', proposalStartAt: '', proposalEndAt: '', registrationStartAt: '', registrationEndAt: '', reviewDeadlineAt: null, defenseDate: null,
       })
     } catch (err: any) {
       showError('Lỗi tạo đợt đăng ký: ' + (err.response?.data?.message || err.message))
@@ -107,10 +105,10 @@ export const AcademicManagementPage: React.FC = () => {
     }
   }
 
-  const handleChangePeriodStatus = async (id: number, currentStatus: string) => {
+  const handleChangePeriodStatus = async (id: number, currentStatus: string, version: number) => {
     const nextStatus = currentStatus === 'DRAFT' ? 'ACTIVE' : currentStatus === 'ACTIVE' ? 'CLOSED' : 'DRAFT'
     try {
-      const updated = await academicApi.changeRegistrationPeriodStatus(id, nextStatus)
+      const updated = await academicApi.changeRegistrationPeriodStatus(id, { status: nextStatus, version })
       showSuccess(`Đã cập nhật trạng thái đợt đăng ký sang ${nextStatus}!`)
       setPeriods((prev) => prev.map((p) => (p.id === id ? updated : p)))
     } catch (err: any) {
@@ -217,9 +215,9 @@ export const AcademicManagementPage: React.FC = () => {
                       <td>{idx + 1}</td>
                       <td className="font-semibold text-primary">{p.name}</td>
                       <td>{p.facultyName}</td>
-                      <td>{p.semesterName}</td>
-                      <td className="text-xs">{new Date(p.startsAt).toLocaleString('vi-VN')}</td>
-                      <td className="text-xs">{new Date(p.endsAt).toLocaleString('vi-VN')}</td>
+                      <td>HK {p.semesterNo} · {p.academicYear}</td>
+                      <td className="text-xs">Đề xuất: {new Date(p.proposalStartAt).toLocaleString('vi-VN')}<br />Đăng ký: {new Date(p.registrationStartAt).toLocaleString('vi-VN')}</td>
+                      <td className="text-xs">Đề xuất: {new Date(p.proposalEndAt).toLocaleString('vi-VN')}<br />Đăng ký: {new Date(p.registrationEndAt).toLocaleString('vi-VN')}</td>
                       <td>
                         <StatusBadge status={p.status} />
                       </td>
@@ -228,7 +226,7 @@ export const AcademicManagementPage: React.FC = () => {
                           <button
                             type="button"
                             className="btn btn-outline btn-sm"
-                            onClick={() => handleChangePeriodStatus(p.id, p.status)}
+                            onClick={() => handleChangePeriodStatus(p.id, p.status, p.version)}
                           >
                             Chuyển trạng thái
                           </button>
@@ -354,36 +352,48 @@ export const AcademicManagementPage: React.FC = () => {
                     >
                       {semesters.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.name} - {s.academicYear}
+                          Học kỳ {s.semesterNo} - {s.academicYear}
                         </option>
                       ))}
                     </select>
                   </div>
                 </div>
 
+                <div className="form-group">
+                  <label className="form-label">Loại đợt <span className="text-red">*</span></label>
+                  <select className="form-select" value={newPeriod.projectType} onChange={(e) => setNewPeriod({ ...newPeriod, projectType: e.target.value as CreateRegistrationPeriodRequest['projectType'] })}>
+                    <option value="COURSE">Môn học</option><option value="RESEARCH">Nghiên cứu khoa học</option><option value="SPECIALIZED">Tiểu luận chuyên ngành</option><option value="GRADUATION">Khóa luận tốt nghiệp</option>
+                  </select>
+                </div>
                 <div className="grid-cols-2">
                   <div className="form-group">
-                    <label className="form-label">Thời gian Bắt đầu <span className="text-red">*</span></label>
+                    <label className="form-label">Mở đề xuất đề tài <span className="text-red">*</span></label>
                     <input
                       type="datetime-local"
                       className="form-input"
-                      value={newPeriod.startsAt}
-                      onChange={(e) => setNewPeriod({ ...newPeriod, startsAt: e.target.value })}
+                      value={newPeriod.proposalStartAt}
+                      onChange={(e) => setNewPeriod({ ...newPeriod, proposalStartAt: e.target.value })}
                       required
                     />
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Thời gian Kết thúc <span className="text-red">*</span></label>
+                    <label className="form-label">Đóng đề xuất đề tài <span className="text-red">*</span></label>
                     <input
                       type="datetime-local"
                       className="form-input"
-                      value={newPeriod.endsAt}
-                      onChange={(e) => setNewPeriod({ ...newPeriod, endsAt: e.target.value })}
+                      value={newPeriod.proposalEndAt}
+                      onChange={(e) => setNewPeriod({ ...newPeriod, proposalEndAt: e.target.value })}
                       required
                     />
                   </div>
                 </div>
+                <div className="grid-cols-2">
+                  <div className="form-group"><label className="form-label">Mở đăng ký của SV <span className="text-red">*</span></label><input type="datetime-local" className="form-input" value={newPeriod.registrationStartAt} onChange={(e) => setNewPeriod({ ...newPeriod, registrationStartAt: e.target.value })} required /></div>
+                  <div className="form-group"><label className="form-label">Đóng đăng ký của SV <span className="text-red">*</span></label><input type="datetime-local" className="form-input" value={newPeriod.registrationEndAt} onChange={(e) => setNewPeriod({ ...newPeriod, registrationEndAt: e.target.value })} required /></div>
+                </div>
+                {(newPeriod.projectType === 'SPECIALIZED' || newPeriod.projectType === 'GRADUATION') && <div className="form-group"><label className="form-label">Hạn GVPB nộp điểm <span className="text-red">*</span></label><input type="datetime-local" className="form-input" value={newPeriod.reviewDeadlineAt || ''} onChange={(e) => setNewPeriod({ ...newPeriod, reviewDeadlineAt: e.target.value || null })} required /></div>}
+                {newPeriod.projectType === 'GRADUATION' && <div className="form-group"><label className="form-label">Ngày báo cáo hội đồng <span className="text-red">*</span></label><input type="date" className="form-input" value={newPeriod.defenseDate || ''} onChange={(e) => setNewPeriod({ ...newPeriod, defenseDate: e.target.value || null })} required /></div>}
               </div>
 
               <div className="modal-footer flex gap-3 justify-end">
