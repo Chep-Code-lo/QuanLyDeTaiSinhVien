@@ -1,8 +1,8 @@
 package com.example.qldetai.security;
 
-import com.example.qldetai.feature.identity.RoleCode;
-import com.example.qldetai.feature.identity.User;
-import com.example.qldetai.feature.identity.UserStatus;
+import com.example.qldetai.feature.identity.domain.RoleCode;
+import com.example.qldetai.feature.identity.domain.User;
+import com.example.qldetai.feature.identity.domain.UserStatus;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;

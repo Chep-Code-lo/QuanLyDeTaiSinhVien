@@ -1,1 +1,0 @@
-package com.example.qldetai.feature.evaluation; import java.util.*; import org.springframework.data.jpa.repository.JpaRepository; public interface RubricCriterionRepository extends JpaRepository<RubricCriterion,Long>{List<RubricCriterion> findByRubricIdOrderBySortOrder(Long rubricId);}

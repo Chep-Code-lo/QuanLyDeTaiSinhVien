@@ -1,3 +1,0 @@
-package com.example.qldetai.feature.evaluation;
-import jakarta.persistence.*; import java.time.LocalDateTime; import lombok.*;
-@Entity @Table(name="rubrics") @Getter @Setter @NoArgsConstructor public class Rubric { @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id; @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="component_id") private AssessmentComponent component; @Column(nullable=false) private String name; @Column(name="version_no",nullable=false) private int versionNo; @Column(nullable=false) private String status="DRAFT"; @Column(name="created_at",nullable=false) private LocalDateTime createdAt; }

@@ -1,9 +1,9 @@
 package com.example.qldetai.aspect;
 
-import com.example.qldetai.feature.communication.AuditLog;
-import com.example.qldetai.feature.communication.AuditLogRepository;
-import com.example.qldetai.feature.communication.AuditOutcome;
-import com.example.qldetai.feature.identity.UserRepository;
+import com.example.qldetai.feature.communication.domain.AuditLog;
+import com.example.qldetai.feature.communication.repository.AuditLogRepository;
+import com.example.qldetai.feature.communication.domain.AuditOutcome;
+import com.example.qldetai.feature.identity.repository.UserRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;

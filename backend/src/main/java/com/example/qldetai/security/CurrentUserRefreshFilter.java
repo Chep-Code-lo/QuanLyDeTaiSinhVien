@@ -1,7 +1,7 @@
 package com.example.qldetai.security;
 
 import com.example.qldetai.common.api.ApiResponse;
-import com.example.qldetai.feature.identity.UserRepository;
+import com.example.qldetai.feature.identity.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

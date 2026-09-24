@@ -1,9 +1,9 @@
 package com.example.qldetai.security;
 
-import com.example.qldetai.feature.identity.LecturerRepository;
-import com.example.qldetai.feature.identity.StudentRepository;
-import com.example.qldetai.feature.identity.User;
-import com.example.qldetai.feature.identity.UserRepository;
+import com.example.qldetai.feature.identity.repository.LecturerRepository;
+import com.example.qldetai.feature.identity.repository.StudentRepository;
+import com.example.qldetai.feature.identity.domain.User;
+import com.example.qldetai.feature.identity.repository.UserRepository;
 import java.util.Locale;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;

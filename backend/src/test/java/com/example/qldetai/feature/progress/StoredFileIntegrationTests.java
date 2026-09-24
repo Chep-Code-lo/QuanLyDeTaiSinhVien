@@ -8,12 +8,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.qldetai.feature.identity.Role;
-import com.example.qldetai.feature.identity.RoleCode;
-import com.example.qldetai.feature.identity.RoleRepository;
-import com.example.qldetai.feature.identity.User;
-import com.example.qldetai.feature.identity.UserRepository;
-import com.example.qldetai.feature.identity.UserStatus;
+import com.example.qldetai.feature.identity.domain.Role;
+import com.example.qldetai.feature.identity.domain.RoleCode;
+import com.example.qldetai.feature.identity.repository.RoleRepository;
+import com.example.qldetai.feature.identity.domain.User;
+import com.example.qldetai.feature.identity.repository.UserRepository;
+import com.example.qldetai.feature.identity.domain.UserStatus;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.LocalDateTime;

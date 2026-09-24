@@ -6,10 +6,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.qldetai.feature.academic.Department;
-import com.example.qldetai.feature.academic.DepartmentRepository;
-import com.example.qldetai.feature.academic.Faculty;
-import com.example.qldetai.feature.academic.FacultyRepository;
+import com.example.qldetai.feature.academic.domain.Department;
+import com.example.qldetai.feature.academic.repository.DepartmentRepository;
+import com.example.qldetai.feature.academic.domain.Faculty;
+import com.example.qldetai.feature.academic.repository.FacultyRepository;
+import com.example.qldetai.feature.identity.domain.AcademicAppointment;
+import com.example.qldetai.feature.identity.domain.Lecturer;
+import com.example.qldetai.feature.identity.domain.PositionCode;
+import com.example.qldetai.feature.identity.domain.Role;
+import com.example.qldetai.feature.identity.domain.RoleCode;
+import com.example.qldetai.feature.identity.domain.User;
+import com.example.qldetai.feature.identity.domain.UserStatus;
+import com.example.qldetai.feature.identity.repository.AcademicAppointmentRepository;
+import com.example.qldetai.feature.identity.repository.LecturerRepository;
+import com.example.qldetai.feature.identity.repository.RoleRepository;
+import com.example.qldetai.feature.identity.repository.UserRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Set;

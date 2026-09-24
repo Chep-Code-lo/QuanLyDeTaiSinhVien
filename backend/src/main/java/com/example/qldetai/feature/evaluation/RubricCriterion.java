@@ -1,3 +1,0 @@
-package com.example.qldetai.feature.evaluation;
-import jakarta.persistence.*; import java.math.BigDecimal; import lombok.*;
-@Entity @Table(name="rubric_criteria") @Getter @Setter @NoArgsConstructor public class RubricCriterion { @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id; @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="rubric_id") private Rubric rubric; @Column(nullable=false) private String name; @Column(nullable=false,columnDefinition="TEXT") private String description; @Column(name="max_score",nullable=false,precision=5,scale=2) private BigDecimal maxScore; @Column(name="sort_order",nullable=false) private int sortOrder; }

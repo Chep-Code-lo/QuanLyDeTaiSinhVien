@@ -1,7 +1,7 @@
 package com.example.qldetai.aspect;
 
 import com.example.qldetai.config.RequestIdFilter;
-import com.example.qldetai.feature.communication.AuditOutcome;
+import com.example.qldetai.feature.communication.domain.AuditOutcome;
 import com.example.qldetai.security.UserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
