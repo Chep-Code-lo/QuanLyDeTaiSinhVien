@@ -11,48 +11,29 @@ import com.example.qldetai.feature.identity.dto.IdentityDtos.LecturerDirectoryRe
 import com.example.qldetai.feature.identity.dto.IdentityDtos.LecturerProfileResponse;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.StudentProfileResponse;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UserResponse;
-import com.example.qldetai.feature.identity.repository.AcademicAppointmentRepository;
-import com.example.qldetai.feature.identity.repository.LecturerRepository;
-import com.example.qldetai.feature.identity.repository.StudentRepository;
-import java.time.Clock;
-import java.time.LocalDateTime;
+
+import org.springframework.stereotype.Component;
+
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.stereotype.Component;
 
 @Component
 public class IdentityMapper {
 
-    private final StudentRepository studentRepository;
-    private final LecturerRepository lecturerRepository;
-    private final AcademicAppointmentRepository academicAppointmentRepository;
-    private final Clock clock;
-
-    public IdentityMapper(
-            StudentRepository studentRepository,
-            LecturerRepository lecturerRepository,
-            AcademicAppointmentRepository academicAppointmentRepository,
-            Clock clock) {
-        this.studentRepository = studentRepository;
-        this.lecturerRepository = lecturerRepository;
-        this.academicAppointmentRepository = academicAppointmentRepository;
-        this.clock = clock;
-    }
-
-    public CurrentUserResponse toCurrentUser(User user) {
+    public CurrentUserResponse toCurrentUser(
+            User user, Student student, Lecturer lecturer, List<AcademicAppointment> appointments) {
         return new CurrentUserResponse(
                 user.getId(),
                 user.getFullName(),
                 user.getEmail(),
                 roleCodes(user),
-                studentRepository.findByUserId(user.getId()).map(this::toStudent).orElse(null),
-                lecturerRepository.findByUserId(user.getId()).map(this::toLecturer).orElse(null),
-                academicAppointmentRepository.findActiveByUserId(user.getId(), LocalDateTime.now(clock)).stream()
-                        .map(this::toAppointment)
-                        .toList());
+                student == null ? null : toStudent(student),
+                lecturer == null ? null : toLecturer(lecturer),
+                appointments.stream().map(this::toAppointment).toList());
     }
 
-    public UserResponse toUser(User user) {
+    public UserResponse toUser(User user, Student student, Lecturer lecturer) {
         return new UserResponse(
                 user.getId(),
                 user.getEmail(),
@@ -60,8 +41,8 @@ public class IdentityMapper {
                 user.getPhone(),
                 user.getStatus(),
                 roleCodes(user),
-                studentRepository.findByUserId(user.getId()).map(this::toStudent).orElse(null),
-                lecturerRepository.findByUserId(user.getId()).map(this::toLecturer).orElse(null),
+                student == null ? null : toStudent(student),
+                lecturer == null ? null : toLecturer(lecturer),
                 user.getLastLoginAt(),
                 user.getCreatedAt(),
                 user.getVersion());

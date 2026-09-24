@@ -1,0 +1,465 @@
+package com.example.qldetai.feature.evaluation.service;
+
+import com.example.qldetai.aspect.BusinessAudit;
+import com.example.qldetai.common.api.PageResponse;
+import com.example.qldetai.exception.BusinessRuleException;
+import com.example.qldetai.exception.ResourceNotFoundException;
+import com.example.qldetai.feature.communication.service.NotificationService;
+import com.example.qldetai.feature.evaluation.domain.AssessmentComponent;
+import com.example.qldetai.feature.evaluation.domain.EvaluationAssignment;
+import com.example.qldetai.feature.evaluation.domain.EvaluationStatus;
+import com.example.qldetai.feature.evaluation.domain.ResultInput;
+import com.example.qldetai.feature.evaluation.domain.ResultMember;
+import com.example.qldetai.feature.evaluation.domain.ResultStatus;
+import com.example.qldetai.feature.evaluation.domain.ResultVersion;
+import com.example.qldetai.feature.evaluation.domain.ScoreDetail;
+import com.example.qldetai.feature.evaluation.domain.ScoreSheet;
+import com.example.qldetai.feature.evaluation.domain.ScoreSheetStatus;
+import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultDetailResponse;
+import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultInputResponse;
+import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultMemberResponse;
+import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultResponse;
+import com.example.qldetai.feature.evaluation.repository.EvaluationAssignmentRepository;
+import com.example.qldetai.feature.evaluation.repository.ResultInputRepository;
+import com.example.qldetai.feature.evaluation.repository.ResultMemberRepository;
+import com.example.qldetai.feature.evaluation.repository.ResultVersionRepository;
+import com.example.qldetai.feature.evaluation.repository.RubricCriterionRepository;
+import com.example.qldetai.feature.evaluation.repository.ScoreDetailRepository;
+import com.example.qldetai.feature.evaluation.repository.ScoreSheetRepository;
+import com.example.qldetai.feature.groupregistration.repository.GroupMemberRepository;
+import com.example.qldetai.feature.identity.domain.Student;
+import com.example.qldetai.feature.identity.repository.StudentRepository;
+import com.example.qldetai.feature.project.domain.ProjectAssignment;
+import com.example.qldetai.feature.project.repository.ProjectAssignmentRepository;
+
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+@Service
+public class EvaluationResultService {
+
+    private final StudentRepository students;
+    private final ProjectAssignmentRepository assignments;
+    private final ScoreSheetRepository sheets;
+    private final ScoreDetailRepository details;
+    private final RubricCriterionRepository criteria;
+    private final EvaluationAssignmentRepository evaluations;
+    private final ResultVersionRepository results;
+    private final ResultInputRepository resultInputs;
+    private final ResultMemberRepository resultMembers;
+    private final GroupMemberRepository groupMembers;
+    private final NotificationService notifications;
+    private final ObjectMapper objectMapper;
+    private final Clock clock;
+    private final EvaluationActorAccess actorAccess;
+
+    public EvaluationResultService(
+            StudentRepository students,
+            ProjectAssignmentRepository assignments,
+            ScoreSheetRepository sheets,
+            ScoreDetailRepository details,
+            RubricCriterionRepository criteria,
+            EvaluationAssignmentRepository evaluations,
+            ResultVersionRepository results,
+            ResultInputRepository resultInputs,
+            ResultMemberRepository resultMembers,
+            GroupMemberRepository groupMembers,
+            NotificationService notifications,
+            ObjectMapper objectMapper,
+            Clock clock,
+            EvaluationActorAccess actorAccess) {
+        this.students = students;
+        this.assignments = assignments;
+        this.sheets = sheets;
+        this.details = details;
+        this.criteria = criteria;
+        this.evaluations = evaluations;
+        this.results = results;
+        this.resultInputs = resultInputs;
+        this.resultMembers = resultMembers;
+        this.groupMembers = groupMembers;
+        this.notifications = notifications;
+        this.objectMapper = objectMapper;
+        this.clock = clock;
+        this.actorAccess = actorAccess;
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<ResultDetailResponse> listResults(
+            Long periodId,
+            Long assignmentId,
+            ResultStatus status,
+            int page,
+            int size,
+            Long actorId) {
+        actorAccess.manager(actorId);
+        Specification<ResultVersion> specification =
+                (root, query, builder) -> builder.conjunction();
+        if (periodId != null) {
+            specification =
+                    specification.and(
+                            (root, query, builder) ->
+                                    builder.equal(
+                                            root.join("assignment").join("period").get("id"),
+                                            periodId));
+        }
+        if (assignmentId != null) {
+            specification =
+                    specification.and(
+                            (root, query, builder) ->
+                                    builder.equal(root.join("assignment").get("id"), assignmentId));
+        }
+        if (status != null) {
+            specification =
+                    specification.and(
+                            (root, query, builder) -> builder.equal(root.get("status"), status));
+        }
+        return PageResponse.from(
+                results.findAll(
+                                specification,
+                                PageRequest.of(
+                                        page,
+                                        size,
+                                        Sort.by("finalizedAt")
+                                                .descending()
+                                                .and(Sort.by("id").descending())))
+                        .map(this::resultDetail));
+    }
+
+    @Transactional(readOnly = true)
+    public ResultDetailResponse getResult(Long resultId, Long actorId) {
+        ResultVersion resultVersion =
+                results.findById(resultId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Result was not found."));
+        if (!actorAccess.isManager(actorId)) {
+            Student student =
+                    students.findByUserId(actorId)
+                            .orElseThrow(
+                                    () ->
+                                            new AccessDeniedException(
+                                                    "You cannot view this result."));
+            if (resultVersion.getStatus() != ResultStatus.PUBLISHED
+                    || !resultMembers.existsByResultIdAndStudentId(
+                            resultVersion.getId(), student.getId())) {
+                throw new AccessDeniedException("You cannot view this result.");
+            }
+        }
+        return resultDetail(resultVersion);
+    }
+
+    @Transactional
+    @BusinessAudit(action = "RESULT_FINALIZE", entityType = "RESULT_VERSION", entityIdArgument = 0)
+    public ResultResponse finalizeResult(Long assignmentId, Long actorId) {
+        actorAccess.manager(actorId);
+        ProjectAssignment assignment = assignment(assignmentId);
+        if (results.findByAssignmentIdAndStatus(assignmentId, ResultStatus.FINALIZED).isPresent()) {
+            throw new BusinessRuleException(
+                    "A finalized result is already awaiting publication or supersession.");
+        }
+
+        List<EvaluationAssignment> activeEvaluations =
+                evaluations.findByAssignmentIdAndStatus(assignmentId, EvaluationStatus.ACTIVE);
+        if (activeEvaluations.isEmpty()) {
+            throw new BusinessRuleException("This assignment has no evaluation assignments.");
+        }
+
+        Map<Long, List<EvaluationAssignment>> byComponent =
+                activeEvaluations.stream()
+                        .collect(
+                                java.util.stream.Collectors.groupingBy(
+                                        evaluation -> evaluation.getComponent().getId()));
+        Map<Long, ScoreSheet> sourceSheets = new LinkedHashMap<>();
+        List<BigDecimal> componentAverages = new java.util.ArrayList<>();
+        for (List<EvaluationAssignment> componentEvaluations : byComponent.values()) {
+            AssessmentComponent component = componentEvaluations.getFirst().getComponent();
+            if (componentEvaluations.size() != component.getExpectedEvaluators()) {
+                throw new BusinessRuleException(
+                        "Cannot finalize while a required evaluator assignment is missing.");
+            }
+            List<BigDecimal> componentScores = new java.util.ArrayList<>();
+            for (EvaluationAssignment evaluation : componentEvaluations) {
+                ScoreSheet sheet =
+                        sheets.findByEvaluationId(evaluation.getId())
+                                .orElseThrow(
+                                        () ->
+                                                new BusinessRuleException(
+                                                        "Cannot finalize while a required score"
+                                                            + " sheet is missing."));
+                if (sheet.getStatus() != ScoreSheetStatus.SUBMITTED
+                        && sheet.getStatus() != ScoreSheetStatus.LOCKED) {
+                    throw new BusinessRuleException(
+                            "Cannot finalize while a required score sheet is missing.");
+                }
+                BigDecimal score = scoreTotal(sheet);
+                sourceSheets.put(evaluation.getId(), sheet);
+                componentScores.add(score);
+            }
+            componentAverages.add(
+                    componentScores.stream()
+                            .reduce(BigDecimal.ZERO, BigDecimal::add)
+                            .divide(
+                                    BigDecimal.valueOf(componentScores.size()),
+                                    2,
+                                    RoundingMode.HALF_UP));
+        }
+
+        BigDecimal finalScore =
+                componentAverages.stream()
+                        .reduce(BigDecimal.ZERO, BigDecimal::add)
+                        .divide(
+                                BigDecimal.valueOf(componentAverages.size()),
+                                2,
+                                RoundingMode.HALF_UP);
+
+        ResultVersion resultVersion = new ResultVersion();
+        resultVersion.setAssignment(assignment);
+        resultVersion.setVersionNo((int) results.countByAssignmentId(assignmentId) + 1);
+        resultVersion.setFinalScore(finalScore);
+        resultVersion.setFinalizedBy(actorAccess.user(actorId));
+        resultVersion.setFinalizedAt(LocalDateTime.now(clock));
+        sourceSheets
+                .values()
+                .forEach(
+                        sheet -> {
+                            if (sheet.getStatus() == ScoreSheetStatus.SUBMITTED) {
+                                sheet.setStatus(ScoreSheetStatus.LOCKED);
+                            }
+                        });
+        sheets.saveAll(sourceSheets.values());
+        // The snapshot triggers require the source sheet to already be LOCKED.
+        sheets.flush();
+        resultVersion = results.saveAndFlush(resultVersion);
+        snapshotInputs(resultVersion, activeEvaluations, sourceSheets);
+        snapshotMembers(resultVersion, assignment);
+        return result(resultVersion);
+    }
+
+    @Transactional
+    @BusinessAudit(action = "RESULT_PUBLISH", entityType = "RESULT_VERSION", entityIdArgument = 0)
+    public ResultResponse publish(Long resultId, Long actorId) {
+        actorAccess.manager(actorId);
+        ResultVersion resultVersion =
+                results.findById(resultId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Result was not found."));
+        if (resultVersion.getStatus() != ResultStatus.FINALIZED) {
+            throw new BusinessRuleException("Only a finalized result can be published.");
+        }
+
+        results.findByAssignmentIdAndStatus(
+                        resultVersion.getAssignment().getId(), ResultStatus.PUBLISHED)
+                .filter(previous -> !previous.getId().equals(resultVersion.getId()))
+                .ifPresent(
+                        previous -> {
+                            previous.setStatus(ResultStatus.SUPERSEDED);
+                            results.saveAndFlush(previous);
+                        });
+
+        resultVersion.setStatus(ResultStatus.PUBLISHED);
+        resultVersion.setPublishedBy(actorAccess.user(actorId));
+        resultVersion.setPublishedAt(LocalDateTime.now(clock));
+        groupMembers
+                .findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(
+                        resultVersion.getAssignment().getGroup().getId())
+                .forEach(
+                        member ->
+                                notifications.publish(
+                                        member.getStudent().getUser().getId(),
+                                        "result-published-" + resultVersion.getId(),
+                                        "Kết quả đề tài",
+                                        "Kết quả đánh giá của nhóm đã được công bố.",
+                                        "/results/" + resultVersion.getId()));
+        return result(resultVersion);
+    }
+
+    private void snapshotInputs(
+            ResultVersion resultVersion,
+            List<EvaluationAssignment> activeEvaluations,
+            Map<Long, ScoreSheet> sourceSheets) {
+        List<ResultInput> inputs =
+                activeEvaluations.stream()
+                        .map(
+                                evaluation -> {
+                                    ScoreSheet sheet = sourceSheets.get(evaluation.getId());
+                                    ResultInput input = new ResultInput();
+                                    input.setResult(resultVersion);
+                                    input.setSheet(sheet);
+                                    input.setComponent(evaluation.getComponent());
+                                    input.setSheetVersion(sheet.getVersion());
+                                    input.setScoreSnapshot(scoreTotal(sheet));
+                                    input.setRubricSnapshot(rubricSnapshot(sheet));
+                                    return input;
+                                })
+                        .toList();
+        resultInputs.saveAllAndFlush(inputs);
+    }
+
+    private void snapshotMembers(ResultVersion resultVersion, ProjectAssignment assignment) {
+        List<ResultMember> members =
+                groupMembers
+                        .findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(assignment.getGroup().getId())
+                        .stream()
+                        .map(
+                                groupMember -> {
+                                    ResultMember member = new ResultMember();
+                                    member.setResult(resultVersion);
+                                    member.setStudent(groupMember.getStudent());
+                                    member.setStudentCodeSnapshot(
+                                            groupMember.getStudent().getStudentCode());
+                                    member.setFullNameSnapshot(
+                                            groupMember.getStudent().getUser().getFullName());
+                                    return member;
+                                })
+                        .toList();
+        if (members.isEmpty()) {
+            throw new BusinessRuleException(
+                    "Cannot finalize a result for a group with no active members.");
+        }
+        resultMembers.saveAllAndFlush(members);
+    }
+
+    private BigDecimal scoreTotal(ScoreSheet sheet) {
+        List<ScoreDetail> scoreDetails = details.findBySheetId(sheet.getId());
+        List<com.example.qldetai.feature.evaluation.domain.RubricCriterion> requiredCriteria =
+                sheet.getRubric() == null
+                        ? List.of()
+                        : criteria.findByRubricIdOrderBySortOrder(sheet.getRubric().getId());
+        Set<Long> requiredCriterionIds =
+                requiredCriteria.stream()
+                        .map(com.example.qldetai.feature.evaluation.domain.RubricCriterion::getId)
+                        .collect(java.util.stream.Collectors.toSet());
+        Set<Long> scoredCriterionIds =
+                scoreDetails.stream()
+                        .map(detail -> detail.getCriterion().getId())
+                        .collect(java.util.stream.Collectors.toSet());
+        if (requiredCriteria.isEmpty()
+                || scoreDetails.size() != requiredCriteria.size()
+                || !scoredCriterionIds.equals(requiredCriterionIds)) {
+            throw new BusinessRuleException(
+                    "A score sheet must contain every rubric criterion before finalization.");
+        }
+        BigDecimal maximum =
+                requiredCriteria.stream()
+                        .map(
+                                com.example.qldetai.feature.evaluation.domain.RubricCriterion
+                                        ::getMaxScore)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (maximum.compareTo(BigDecimal.TEN) != 0) {
+            throw new BusinessRuleException(
+                    "A score sheet rubric must total exactly 10 points before finalization.");
+        }
+        return scoreDetails.stream()
+                .map(ScoreDetail::getScore)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private String rubricSnapshot(ScoreSheet sheet) {
+        List<Map<String, Object>> criteriaSnapshot =
+                details.findBySheetId(sheet.getId()).stream()
+                        .sorted(
+                                Comparator.comparingInt(
+                                        detail -> detail.getCriterion().getSortOrder()))
+                        .map(
+                                detail -> {
+                                    Map<String, Object> item = new LinkedHashMap<>();
+                                    item.put("criterionId", detail.getCriterion().getId());
+                                    item.put("name", detail.getCriterion().getName());
+                                    item.put("description", detail.getCriterion().getDescription());
+                                    item.put("maxScore", detail.getMaxScore());
+                                    item.put("score", detail.getScore());
+                                    item.put("comment", detail.getComment());
+                                    item.put("sortOrder", detail.getCriterion().getSortOrder());
+                                    return item;
+                                })
+                        .toList();
+        try {
+            return objectMapper.writeValueAsString(criteriaSnapshot);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException(
+                    "Unable to serialize the immutable rubric snapshot.", exception);
+        }
+    }
+
+    private ProjectAssignment assignment(Long assignmentId) {
+        return assignments
+                .findById(assignmentId)
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Project assignment was not found."));
+    }
+
+    private ResultResponse result(ResultVersion resultVersion) {
+        return new ResultResponse(
+                resultVersion.getId(),
+                resultVersion.getAssignment().getId(),
+                resultVersion.getVersionNo(),
+                resultVersion.getFinalScore(),
+                resultVersion.getStatus());
+    }
+
+    private ResultDetailResponse resultDetail(ResultVersion resultVersion) {
+        ProjectAssignment assignment = resultVersion.getAssignment();
+        return new ResultDetailResponse(
+                resultVersion.getId(),
+                assignment.getId(),
+                assignment.getGroup().getId(),
+                assignment.getGroup().getName(),
+                assignment.getTopic().getId(),
+                assignment.getTopic().getCode(),
+                assignment.getTopic().getTitle(),
+                assignment.getPeriod().getId(),
+                assignment.getPeriod().getName(),
+                resultVersion.getVersionNo(),
+                resultVersion.getFinalScore(),
+                resultVersion.getStatus(),
+                resultVersion.getFinalizedBy() == null
+                        ? null
+                        : resultVersion.getFinalizedBy().getId(),
+                resultVersion.getFinalizedBy() == null
+                        ? null
+                        : resultVersion.getFinalizedBy().getFullName(),
+                resultVersion.getFinalizedAt(),
+                resultVersion.getPublishedBy() == null
+                        ? null
+                        : resultVersion.getPublishedBy().getId(),
+                resultVersion.getPublishedBy() == null
+                        ? null
+                        : resultVersion.getPublishedBy().getFullName(),
+                resultVersion.getPublishedAt(),
+                resultInputs.findByResultIdOrderByIdAsc(resultVersion.getId()).stream()
+                        .map(
+                                input ->
+                                        new ResultInputResponse(
+                                                input.getId(),
+                                                input.getSheet().getId(),
+                                                input.getComponent().getId(),
+                                                input.getComponent().getCode(),
+                                                input.getSheetVersion(),
+                                                input.getScoreSnapshot(),
+                                                input.getRubricSnapshot()))
+                        .toList(),
+                resultMembers.findByResultIdOrderByIdAsc(resultVersion.getId()).stream()
+                        .map(
+                                member ->
+                                        new ResultMemberResponse(
+                                                member.getStudent().getId(),
+                                                member.getStudentCodeSnapshot(),
+                                                member.getFullNameSnapshot()))
+                        .toList());
+    }
+}

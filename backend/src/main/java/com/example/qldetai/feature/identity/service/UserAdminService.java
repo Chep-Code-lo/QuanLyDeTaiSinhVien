@@ -19,22 +19,23 @@ import com.example.qldetai.feature.identity.dto.IdentityDtos.StudentProfileInput
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserRolesRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserStatusRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UserResponse;
-import com.example.qldetai.feature.identity.mapper.IdentityMapper;
 import com.example.qldetai.feature.identity.repository.LecturerRepository;
 import com.example.qldetai.feature.identity.repository.RoleRepository;
 import com.example.qldetai.feature.identity.repository.StudentRepository;
 import com.example.qldetai.feature.identity.repository.UserRepository;
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.Set;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 
 @Service
 public class UserAdminService {
@@ -45,7 +46,7 @@ public class UserAdminService {
     private final LecturerRepository lecturerRepository;
     private final DepartmentRepository departmentRepository;
     private final PasswordEncoder passwordEncoder;
-    private final IdentityMapper identityMapper;
+    private final UserProfileService userProfileService;
     private final Clock clock;
 
     public UserAdminService(
@@ -55,7 +56,7 @@ public class UserAdminService {
             LecturerRepository lecturerRepository,
             DepartmentRepository departmentRepository,
             PasswordEncoder passwordEncoder,
-            IdentityMapper identityMapper,
+            UserProfileService userProfileService,
             Clock clock) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -63,7 +64,7 @@ public class UserAdminService {
         this.lecturerRepository = lecturerRepository;
         this.departmentRepository = departmentRepository;
         this.passwordEncoder = passwordEncoder;
-        this.identityMapper = identityMapper;
+        this.userProfileService = userProfileService;
         this.clock = clock;
     }
 
@@ -71,16 +72,18 @@ public class UserAdminService {
     public PageResponse<UserResponse> list(String search, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         String query = search == null ? "" : search.trim();
-        Page<UserResponse> users = query.isBlank()
-                ? userRepository.findAll(pageable).map(identityMapper::toUser)
-                : userRepository.findByEmailContainingIgnoreCaseOrFullNameContainingIgnoreCase(query, query, pageable)
-                        .map(identityMapper::toUser);
-        return PageResponse.from(users);
+        Page<User> users =
+                query.isBlank()
+                        ? userRepository.findAll(pageable)
+                        : userRepository
+                                .findByEmailContainingIgnoreCaseOrFullNameContainingIgnoreCase(
+                                        query, query, pageable);
+        return PageResponse.from(userProfileService.toUsers(users));
     }
 
     @Transactional(readOnly = true)
     public UserResponse get(Long id) {
-        return identityMapper.toUser(requireUser(id));
+        return userProfileService.toUser(requireUser(id));
     }
 
     @Transactional
@@ -110,7 +113,7 @@ public class UserAdminService {
         if (request.lecturer() != null) {
             lecturerRepository.save(createLecturer(user, request.lecturer()));
         }
-        return identityMapper.toUser(user);
+        return userProfileService.toUser(user);
     }
 
     @Transactional
@@ -119,29 +122,36 @@ public class UserAdminService {
         User user = requireUser(id);
         user.setStatus(request.status());
         user.setUpdatedAt(LocalDateTime.now(clock));
-        return identityMapper.toUser(user);
+        return userProfileService.toUser(user);
     }
 
     @Transactional
     @BusinessAudit(action = "USER_ROLES_UPDATE", entityType = "USER", entityIdArgument = 0)
     public UserResponse updateRoles(Long id, UpdateUserRolesRequest request) {
         User user = requireUser(id);
-        if (studentRepository.findByUserId(id).isPresent() && !request.roles().contains(RoleCode.STUDENT)) {
-            throw new BusinessRuleException("Remove the student profile before removing the STUDENT role.");
+        if (studentRepository.findByUserId(id).isPresent()
+                && !request.roles().contains(RoleCode.STUDENT)) {
+            throw new BusinessRuleException(
+                    "Remove the student profile before removing the STUDENT role.");
         }
-        if (lecturerRepository.findByUserId(id).isPresent() && !request.roles().contains(RoleCode.LECTURER)) {
-            throw new BusinessRuleException("Remove the lecturer profile before removing the LECTURER role.");
+        if (lecturerRepository.findByUserId(id).isPresent()
+                && !request.roles().contains(RoleCode.LECTURER)) {
+            throw new BusinessRuleException(
+                    "Remove the lecturer profile before removing the LECTURER role.");
         }
-        if (request.roles().contains(RoleCode.STUDENT) && studentRepository.findByUserId(id).isEmpty()) {
+        if (request.roles().contains(RoleCode.STUDENT)
+                && studentRepository.findByUserId(id).isEmpty()) {
             throw new BusinessRuleException("A student profile is required for the STUDENT role.");
         }
-        if (request.roles().contains(RoleCode.LECTURER) && lecturerRepository.findByUserId(id).isEmpty()) {
-            throw new BusinessRuleException("A lecturer profile is required for the LECTURER role.");
+        if (request.roles().contains(RoleCode.LECTURER)
+                && lecturerRepository.findByUserId(id).isEmpty()) {
+            throw new BusinessRuleException(
+                    "A lecturer profile is required for the LECTURER role.");
         }
         LocalDateTime now = LocalDateTime.now(clock);
         user.replaceRoles(requireRoles(request.roles()), now);
         user.setUpdatedAt(now);
-        return identityMapper.toUser(user);
+        return userProfileService.toUser(user);
     }
 
     private Student createStudent(User user, StudentProfileInput input) {
@@ -173,10 +183,12 @@ public class UserAdminService {
     private void validateProfiles(
             Set<RoleCode> roles, StudentProfileInput student, LecturerProfileInput lecturer) {
         if (roles.contains(RoleCode.STUDENT) != (student != null)) {
-            throw new BusinessRuleException("The STUDENT role and student profile must be supplied together.");
+            throw new BusinessRuleException(
+                    "The STUDENT role and student profile must be supplied together.");
         }
         if (roles.contains(RoleCode.LECTURER) != (lecturer != null)) {
-            throw new BusinessRuleException("The LECTURER role and lecturer profile must be supplied together.");
+            throw new BusinessRuleException(
+                    "The LECTURER role and lecturer profile must be supplied together.");
         }
     }
 
@@ -189,12 +201,14 @@ public class UserAdminService {
     }
 
     private User requireUser(Long id) {
-        return userRepository.findById(id)
+        return userRepository
+                .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User account was not found."));
     }
 
     private Department requireDepartment(Long id) {
-        return departmentRepository.findById(id)
+        return departmentRepository
+                .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Department was not found."));
     }
 

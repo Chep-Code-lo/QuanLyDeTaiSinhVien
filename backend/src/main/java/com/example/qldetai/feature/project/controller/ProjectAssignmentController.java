@@ -8,10 +8,11 @@ import com.example.qldetai.feature.project.dto.ProjectDtos.ProjectAssignmentResp
 import com.example.qldetai.feature.project.dto.ProjectDtos.UpdateAssignmentStatusRequest;
 import com.example.qldetai.feature.project.service.ProjectAssignmentService;
 import com.example.qldetai.security.UserPrincipal;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import java.net.URI;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
 
 @Validated
 @RestController
@@ -51,17 +54,22 @@ public class ProjectAssignmentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageRegistration(#request.registrationId, authentication)")
+    @PreAuthorize(
+            "hasRole('ADMIN') or"
+                + " @registrationAuthorization.canManageRegistration(#request.registrationId,"
+                + " authentication)")
     public ResponseEntity<ApiResponse<ProjectAssignmentResponse>> create(
             @Valid @RequestBody CreateAssignmentRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        ProjectAssignmentResponse created = projectAssignmentService.create(request, principal.id());
+        ProjectAssignmentResponse created =
+                projectAssignmentService.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/project-assignments/" + created.id()))
                 .body(ApiResponse.success("Project assignment created.", created));
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageAssignment(#id, authentication)")
+    @PreAuthorize(
+            "hasRole('ADMIN') or @projectAuthorization.canManageAssignment(#id, authentication)")
     public ApiResponse<ProjectAssignmentResponse> updateStatus(
             @PathVariable Long id,
             @Valid @RequestBody UpdateAssignmentStatusRequest request,

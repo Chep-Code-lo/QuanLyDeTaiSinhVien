@@ -1285,7 +1285,7 @@ Nếu cần tìm nhanh “rule này ở file nào”, xem bảng sau:
 
 File test:
 
-- [`Backend2WorkflowTests.java`](../backend/src/test/java/com/example/qldetai/feature/backend2/Backend2WorkflowTests.java)
+- [`ProjectLifecycleIntegrationTests.java`](../backend/src/test/java/com/example/qldetai/workflow/ProjectLifecycleIntegrationTests.java)
 
 Các luồng được cover:
 
@@ -1307,7 +1307,7 @@ Nếu bạn muốn đọc để hiểu nhanh backend2, nên đi theo thứ tự:
 2. Đọc `GroupController` -> `GroupService`.
 3. Đọc `RegistrationController` -> `RegistrationService`.
 4. Đọc `ProjectAssignmentController` -> `ProjectAssignmentService`.
-5. Đọc file test `Backend2WorkflowTests.java` để nhìn luồng end-to-end.
+5. Đọc file test `ProjectLifecycleIntegrationTests.java` để nhìn luồng end-to-end.
 
 Nếu bạn muốn chuẩn bị cho phần báo cáo hoặc thuyết trình, chỉ cần bám 4 flow sau:
 

@@ -2,13 +2,17 @@ package com.example.qldetai.feature.identity.repository;
 
 import com.example.qldetai.feature.identity.domain.Lecturer;
 import com.example.qldetai.feature.identity.domain.UserStatus;
-import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 
 public interface LecturerRepository extends JpaRepository<Lecturer, Long> {
 
@@ -17,10 +21,14 @@ public interface LecturerRepository extends JpaRepository<Lecturer, Long> {
 
     Optional<Lecturer> findByUserId(Long userId);
 
+    @EntityGraph(attributePaths = {"user", "department"})
+    List<Lecturer> findByUserIdIn(Collection<Long> userIds);
+
     boolean existsByLecturerCodeIgnoreCase(String lecturerCode);
 
     @EntityGraph(attributePaths = {"user", "department", "department.faculty"})
-    @Query("""
+    @Query(
+            """
             select l from Lecturer l
             join l.user u
             join l.department d

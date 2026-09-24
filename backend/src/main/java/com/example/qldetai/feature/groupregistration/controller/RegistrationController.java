@@ -9,10 +9,11 @@ import com.example.qldetai.feature.groupregistration.dto.GroupRegistrationDtos.T
 import com.example.qldetai.feature.groupregistration.dto.GroupRegistrationDtos.WithdrawTopicRegistrationRequest;
 import com.example.qldetai.feature.groupregistration.service.RegistrationService;
 import com.example.qldetai.security.UserPrincipal;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import java.net.URI;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,6 +26,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
 
 @Validated
 @RestController
@@ -62,12 +65,16 @@ public class RegistrationController {
     }
 
     @PatchMapping("/{id}/review")
-    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageRegistration(#id, authentication)")
+    @PreAuthorize(
+            "hasRole('ADMIN') or @registrationAuthorization.canManageRegistration(#id,"
+                + " authentication)")
     public ApiResponse<TopicRegistrationResponse> review(
             @PathVariable Long id,
             @Valid @RequestBody ReviewTopicRegistrationRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Topic registration reviewed.", registrationService.review(id, request, principal.id()));
+        return ApiResponse.success(
+                "Topic registration reviewed.",
+                registrationService.review(id, request, principal.id()));
     }
 
     @PatchMapping("/{id}/withdraw")
@@ -76,6 +83,8 @@ public class RegistrationController {
             @PathVariable Long id,
             @Valid @RequestBody WithdrawTopicRegistrationRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Topic registration withdrawn.", registrationService.withdraw(id, request, principal.id()));
+        return ApiResponse.success(
+                "Topic registration withdrawn.",
+                registrationService.withdraw(id, request, principal.id()));
     }
 }

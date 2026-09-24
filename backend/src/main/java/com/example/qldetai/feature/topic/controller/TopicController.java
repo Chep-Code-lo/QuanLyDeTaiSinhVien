@@ -12,10 +12,11 @@ import com.example.qldetai.feature.topic.dto.TopicDtos.UpdateTopicRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.WithdrawTopicRequest;
 import com.example.qldetai.feature.topic.service.TopicService;
 import com.example.qldetai.security.UserPrincipal;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import java.net.URI;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,6 +30,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
 
 @Validated
 @RestController
@@ -71,34 +74,39 @@ public class TopicController {
             @PathVariable Long id,
             @Valid @RequestBody UpdateTopicRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Topic updated.", topicService.update(id, request, principal.id()));
+        return ApiResponse.success(
+                "Topic updated.", topicService.update(id, request, principal.id()));
     }
 
     @PutMapping("/{id}/supervisors")
-    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageTopic(#id, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @topicAuthorization.canManageTopic(#id, authentication)")
     public ApiResponse<TopicResponse> assignSupervisors(
             @PathVariable Long id,
             @Valid @RequestBody AssignSupervisorsRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Topic supervisors assigned.", topicService.assignSupervisors(id, request, principal.id()));
+        return ApiResponse.success(
+                "Topic supervisors assigned.",
+                topicService.assignSupervisors(id, request, principal.id()));
     }
 
     @PatchMapping("/{id}/review")
-    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageTopic(#id, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @topicAuthorization.canManageTopic(#id, authentication)")
     public ApiResponse<TopicResponse> review(
             @PathVariable Long id,
             @Valid @RequestBody ReviewTopicRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Topic review recorded.", topicService.review(id, request, principal.id()));
+        return ApiResponse.success(
+                "Topic review recorded.", topicService.review(id, request, principal.id()));
     }
 
     @PatchMapping("/{id}/publish")
-    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageTopic(#id, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @topicAuthorization.canManageTopic(#id, authentication)")
     public ApiResponse<TopicResponse> publish(
             @PathVariable Long id,
             @Valid @RequestBody PublishTopicRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Topic published.", topicService.publish(id, request, principal.id()));
+        return ApiResponse.success(
+                "Topic published.", topicService.publish(id, request, principal.id()));
     }
 
     @PatchMapping("/{id}/withdraw")
@@ -107,6 +115,7 @@ public class TopicController {
             @PathVariable Long id,
             @Valid @RequestBody WithdrawTopicRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Topic withdrawn.", topicService.withdraw(id, request, principal.id()));
+        return ApiResponse.success(
+                "Topic withdrawn.", topicService.withdraw(id, request, principal.id()));
     }
 }
