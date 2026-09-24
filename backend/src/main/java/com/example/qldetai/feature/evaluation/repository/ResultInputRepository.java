@@ -1,0 +1,16 @@
+package com.example.qldetai.feature.evaluation.repository;
+
+import com.example.qldetai.feature.evaluation.domain.ResultInput;
+import java.util.List;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface ResultInputRepository extends JpaRepository<ResultInput, Long> {
+
+    List<ResultInput> findByResultIdOrderByIdAsc(Long resultId);
+
+    /**
+     * A source score sheet becomes immutable as soon as a result version has
+     * captured it. This includes finalized, published, and superseded results.
+     */
+    boolean existsBySheetId(Long sheetId);
+}

@@ -26,7 +26,7 @@ public final class EvaluationDtos {
             @NotBlank @Size(max = 30) String code,
             @NotBlank @Size(max = 150) String name,
             @NotNull AssessmentComponentType componentType,
-            @Min(1) @Max(5) int expectedEvaluators) {
+            @Min(1) @Max(10) int expectedEvaluators) {
     }
 
     public record AssessmentComponentResponse(

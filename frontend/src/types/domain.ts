@@ -167,6 +167,7 @@ export interface RubricResponse {
 // Evaluation Assignments
 export type EvaluationStatus = 'ACTIVE' | 'CANCELLED'
 export type ScoreSheetStatus = 'DRAFT' | 'SUBMITTED' | 'LOCKED'
+export type DefenseStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED'
 
 export interface CreateEvaluationRequest {
   assignmentId: number
@@ -228,14 +229,21 @@ export interface ScoreSheetResponse {
 
 export interface DefenseSessionResponse {
   id: number
-  periodId: number
+  assignmentId: number
+  groupId: number
+  groupName: string
+  topicId: number
+  topicCode: string
+  topicTitle: string
   committeeId: number
   committeeName: string
-  assignmentId: number
-  topicTitle: string
-  scheduledAt: string
+  periodId: number
+  periodName: string
   location: string
-  status: string
+  startsAt: string
+  endsAt: string
+  status: DefenseStatus
+  version: number
 }
 
 // Academic Catalog & Periods
@@ -276,6 +284,11 @@ export interface RegistrationPeriodResponse {
   registrationEndAt: string
   reviewDeadlineAt?: string
   defenseDate?: string
+  minGroupMembers: number
+  maxGroupMembers: number
+  invitationExpiryHours: number
+  minCommitteeMembers: number
+  maxCommitteeMembers: number
   version: number
 }
 
@@ -291,6 +304,11 @@ export interface CreateRegistrationPeriodRequest {
   registrationEndAt: string
   reviewDeadlineAt?: string | null
   defenseDate?: string | null
+  minGroupMembers: number
+  maxGroupMembers: number
+  invitationExpiryHours: number
+  minCommitteeMembers: number
+  maxCommitteeMembers: number
 }
 
 export interface UpdateRegistrationPeriodRequest {
@@ -304,6 +322,11 @@ export interface UpdateRegistrationPeriodRequest {
   registrationEndAt: string
   reviewDeadlineAt?: string | null
   defenseDate?: string | null
+  minGroupMembers?: number
+  maxGroupMembers?: number
+  invitationExpiryHours?: number
+  minCommitteeMembers?: number
+  maxCommitteeMembers?: number
 }
 
 export interface CreateAppointmentRequest {
@@ -336,6 +359,24 @@ export interface NotificationResponse {
   createdAt: string
 }
 
+export type AnnouncementStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+
+export interface AnnouncementResponse {
+  id: number
+  facultyId: number
+  facultyName: string
+  title: string
+  content: string
+  attachmentFileId?: number
+  attachmentName?: string
+  attachmentPath?: string
+  createdBy: number
+  createdByName: string
+  status: AnnouncementStatus
+  createdAt: string
+  publishedAt?: string
+}
+
 export interface GroupMemberResponse {
   studentId: number
   userId: number
@@ -359,6 +400,25 @@ export interface StudentGroupResponse {
   createdAt: string
   version: number
   members: GroupMemberResponse[]
+}
+
+export type GroupInvitationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED'
+
+export interface GroupInvitationResponse {
+  id: number
+  groupId: number
+  groupName: string
+  periodId: number
+  periodName: string
+  invitedStudentId: number
+  invitedStudentCode: string
+  invitedStudentName: string
+  invitedByStudentId: number
+  invitedByName: string
+  status: GroupInvitationStatus
+  createdAt: string
+  expiresAt: string
+  respondedAt?: string
 }
 
 export interface TopicRegistrationResponse {

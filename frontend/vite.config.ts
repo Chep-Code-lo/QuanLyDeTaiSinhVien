@@ -15,6 +15,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
+      // Let devices on the same Wi-Fi use the development server as well.
+      host: true,
       port: Number.isNaN(frontendPort) ? 5173 : frontendPort,
       proxy: {
         '/api': {
@@ -22,6 +24,9 @@ export default defineConfig(({ mode }) => {
           target: `http://localhost:${backendPort}`,
         },
       },
+    },
+    preview: {
+      host: true,
     },
   }
 })

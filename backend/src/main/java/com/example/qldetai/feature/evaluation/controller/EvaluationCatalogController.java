@@ -44,7 +44,7 @@ public class EvaluationCatalogController {
     }
 
     @PostMapping("/assessment-components")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManagePeriod(#request.periodId, authentication)")
     public ResponseEntity<ApiResponse<AssessmentComponentResponse>> createComponent(
             @Valid @RequestBody CreateAssessmentComponentRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -54,7 +54,7 @@ public class EvaluationCatalogController {
     }
 
     @PatchMapping("/assessment-components/{id}/lock")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageAssessmentComponent(#id, authentication)")
     public ApiResponse<AssessmentComponentResponse> lockComponent(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -67,7 +67,7 @@ public class EvaluationCatalogController {
     }
 
     @PatchMapping("/rubrics/{id}/lock")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageRubric(#id, authentication)")
     public ApiResponse<RubricResponse> lockRubric(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal principal) {

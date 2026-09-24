@@ -24,7 +24,7 @@ public final class EvaluationAdminDtos {
 
     public record AddCommitteeMemberRequest(
             @NotNull Long lecturerId,
-            @Min(1) @Max(5) int slotNo,
+            @Min(1) @Max(10) int slotNo,
             @NotNull CommitteeRole role) {
     }
 
@@ -93,6 +93,22 @@ public final class EvaluationAdminDtos {
             ResultStatus status) {
     }
 
+    public record ResultInputResponse(
+            Long id,
+            Long sheetId,
+            Long componentId,
+            String componentCode,
+            int sheetVersion,
+            BigDecimal scoreSnapshot,
+            String rubricSnapshot) {
+    }
+
+    public record ResultMemberResponse(
+            Long studentId,
+            String studentCodeSnapshot,
+            String fullNameSnapshot) {
+    }
+
     public record ResultDetailResponse(
             Long id,
             Long assignmentId,
@@ -111,7 +127,9 @@ public final class EvaluationAdminDtos {
             LocalDateTime finalizedAt,
             Long publishedBy,
             String publishedByName,
-            LocalDateTime publishedAt) {
+            LocalDateTime publishedAt,
+            List<ResultInputResponse> inputs,
+            List<ResultMemberResponse> members) {
     }
 
     public record GradeChangeRequestResponse(

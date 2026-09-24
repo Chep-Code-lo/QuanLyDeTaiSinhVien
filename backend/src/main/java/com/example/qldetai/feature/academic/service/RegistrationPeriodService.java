@@ -33,6 +33,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RegistrationPeriodService {
 
+    private static final int DEFAULT_MIN_GROUP_MEMBERS = 1;
+    private static final int DEFAULT_MAX_GROUP_MEMBERS = 3;
+    private static final int DEFAULT_INVITATION_EXPIRY_HOURS = 72;
+    private static final int DEFAULT_MIN_COMMITTEE_MEMBERS = 3;
+    private static final int DEFAULT_MAX_COMMITTEE_MEMBERS = 5;
+
     private static final Map<RegistrationPeriodStatus, Set<RegistrationPeriodStatus>> TRANSITIONS = Map.of(
             RegistrationPeriodStatus.DRAFT,
             EnumSet.of(RegistrationPeriodStatus.ACTIVE, RegistrationPeriodStatus.CANCELLED),
@@ -92,12 +98,14 @@ public class RegistrationPeriodService {
                 request.reviewDeadlineAt(),
                 request.defenseDate(),
                 RegistrationPeriodStatus.DRAFT);
+        PeriodRules rules = rulesForCreate(request);
+        validateRules(rules);
 
         RegistrationPeriod period = new RegistrationPeriod();
         period.setFaculty(faculty);
         period.setSemester(semester);
         apply(period, request.name(), request.projectType(), request.proposalStartAt(), request.proposalEndAt(),
-                request.registrationStartAt(), request.registrationEndAt(), request.reviewDeadlineAt(), request.defenseDate());
+                request.registrationStartAt(), request.registrationEndAt(), request.reviewDeadlineAt(), request.defenseDate(), rules);
         period.setStatus(RegistrationPeriodStatus.DRAFT);
         period.setCreatedBy(creator);
         period.setCreatedAt(LocalDateTime.now(clock));
@@ -122,9 +130,11 @@ public class RegistrationPeriodService {
                 request.reviewDeadlineAt(),
                 request.defenseDate(),
                 period.getStatus());
+        PeriodRules rules = rulesForUpdate(period, request);
+        validateRules(rules);
         period.setSemester(semester);
         apply(period, request.name(), request.projectType(), request.proposalStartAt(), request.proposalEndAt(),
-                request.registrationStartAt(), request.registrationEndAt(), request.reviewDeadlineAt(), request.defenseDate());
+                request.registrationStartAt(), request.registrationEndAt(), request.reviewDeadlineAt(), request.defenseDate(), rules);
         return toResponse(period);
     }
 
@@ -146,6 +156,7 @@ public class RegistrationPeriodService {
                 period.getReviewDeadlineAt(),
                 period.getDefenseDate(),
                 request.status());
+        validateRules(rulesFor(period));
         period.setStatus(request.status());
         return toResponse(period);
     }
@@ -159,7 +170,8 @@ public class RegistrationPeriodService {
             LocalDateTime registrationStartAt,
             LocalDateTime registrationEndAt,
             LocalDateTime reviewDeadlineAt,
-            java.time.LocalDate defenseDate) {
+            java.time.LocalDate defenseDate,
+            PeriodRules rules) {
         period.setName(name.trim());
         period.setProjectType(projectType);
         period.setProposalStartAt(proposalStartAt);
@@ -168,6 +180,11 @@ public class RegistrationPeriodService {
         period.setRegistrationEndAt(registrationEndAt);
         period.setReviewDeadlineAt(reviewDeadlineAt);
         period.setDefenseDate(defenseDate);
+        period.setMinGroupMembers(rules.minGroupMembers());
+        period.setMaxGroupMembers(rules.maxGroupMembers());
+        period.setInvitationExpiryHours(rules.invitationExpiryHours());
+        period.setMinCommitteeMembers(rules.minCommitteeMembers());
+        period.setMaxCommitteeMembers(rules.maxCommitteeMembers());
     }
 
     private void validateSchedule(
@@ -227,6 +244,63 @@ public class RegistrationPeriodService {
                 .orElseThrow(() -> new ResourceNotFoundException("Registration period was not found."));
     }
 
+    private PeriodRules rulesForCreate(CreateRegistrationPeriodRequest request) {
+        return new PeriodRules(
+                orDefault(request.minGroupMembers(), DEFAULT_MIN_GROUP_MEMBERS),
+                orDefault(request.maxGroupMembers(), DEFAULT_MAX_GROUP_MEMBERS),
+                orDefault(request.invitationExpiryHours(), DEFAULT_INVITATION_EXPIRY_HOURS),
+                orDefault(request.minCommitteeMembers(), DEFAULT_MIN_COMMITTEE_MEMBERS),
+                orDefault(request.maxCommitteeMembers(), DEFAULT_MAX_COMMITTEE_MEMBERS));
+    }
+
+    private PeriodRules rulesForUpdate(RegistrationPeriod period, UpdateRegistrationPeriodRequest request) {
+        return new PeriodRules(
+                request.minGroupMembers() == null ? period.getMinGroupMembers() : request.minGroupMembers(),
+                request.maxGroupMembers() == null ? period.getMaxGroupMembers() : request.maxGroupMembers(),
+                request.invitationExpiryHours() == null
+                        ? period.getInvitationExpiryHours()
+                        : request.invitationExpiryHours(),
+                request.minCommitteeMembers() == null
+                        ? period.getMinCommitteeMembers()
+                        : request.minCommitteeMembers(),
+                request.maxCommitteeMembers() == null
+                        ? period.getMaxCommitteeMembers()
+                        : request.maxCommitteeMembers());
+    }
+
+    private PeriodRules rulesFor(RegistrationPeriod period) {
+        return new PeriodRules(
+                period.getMinGroupMembers(),
+                period.getMaxGroupMembers(),
+                period.getInvitationExpiryHours(),
+                period.getMinCommitteeMembers(),
+                period.getMaxCommitteeMembers());
+    }
+
+    private void validateRules(PeriodRules rules) {
+        if (rules.minGroupMembers() < 1 || rules.minGroupMembers() > 10
+                || rules.maxGroupMembers() < 1 || rules.maxGroupMembers() > 10) {
+            throw new BusinessRuleException("Group size limits must be between 1 and 10.");
+        }
+        if (rules.invitationExpiryHours() < 1 || rules.invitationExpiryHours() > 720) {
+            throw new BusinessRuleException("Invitation expiry must be between 1 and 720 hours.");
+        }
+        if (rules.minCommitteeMembers() < 1 || rules.minCommitteeMembers() > 10
+                || rules.maxCommitteeMembers() < 1 || rules.maxCommitteeMembers() > 10) {
+            throw new BusinessRuleException("Committee size limits must be between 1 and 10.");
+        }
+        if (rules.minGroupMembers() > rules.maxGroupMembers()) {
+            throw new BusinessRuleException("Minimum group size cannot exceed maximum group size.");
+        }
+        if (rules.minCommitteeMembers() > rules.maxCommitteeMembers()) {
+            throw new BusinessRuleException("Minimum committee size cannot exceed maximum committee size.");
+        }
+    }
+
+    private int orDefault(Integer value, int defaultValue) {
+        return value == null ? defaultValue : value;
+    }
+
     private RegistrationPeriodResponse toResponse(RegistrationPeriod period) {
         return new RegistrationPeriodResponse(
                 period.getId(),
@@ -243,9 +317,22 @@ public class RegistrationPeriodService {
                 period.getRegistrationEndAt(),
                 period.getReviewDeadlineAt(),
                 period.getDefenseDate(),
+                period.getMinGroupMembers(),
+                period.getMaxGroupMembers(),
+                period.getInvitationExpiryHours(),
+                period.getMinCommitteeMembers(),
+                period.getMaxCommitteeMembers(),
                 period.getStatus(),
                 period.getCreatedBy().getId(),
                 period.getCreatedAt(),
                 period.getVersion());
+    }
+
+    private record PeriodRules(
+            int minGroupMembers,
+            int maxGroupMembers,
+            int invitationExpiryHours,
+            int minCommitteeMembers,
+            int maxCommitteeMembers) {
     }
 }

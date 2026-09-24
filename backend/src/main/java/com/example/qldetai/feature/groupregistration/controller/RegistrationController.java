@@ -62,7 +62,7 @@ public class RegistrationController {
     }
 
     @PatchMapping("/{id}/review")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageRegistration(#id, authentication)")
     public ApiResponse<TopicRegistrationResponse> review(
             @PathVariable Long id,
             @Valid @RequestBody ReviewTopicRegistrationRequest request,

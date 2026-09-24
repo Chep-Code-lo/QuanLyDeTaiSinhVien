@@ -1,6 +1,7 @@
 package com.example.qldetai.feature.groupregistration.dto;
 
 import com.example.qldetai.feature.groupregistration.domain.GroupMemberRole;
+import com.example.qldetai.feature.groupregistration.domain.GroupInvitationStatus;
 import com.example.qldetai.feature.groupregistration.domain.GroupStatus;
 import com.example.qldetai.feature.groupregistration.domain.RegistrationStatus;
 import jakarta.validation.constraints.NotBlank;
@@ -20,6 +21,29 @@ public final class GroupRegistrationDtos {
     }
 
     public record AddGroupMemberRequest(@NotBlank @Size(max = 20) String studentCode) {
+    }
+
+    public record CreateGroupInvitationRequest(
+            @NotNull Long groupId,
+            @NotBlank @Size(max = 20) String studentCode,
+            @NotNull LocalDateTime expiresAt) {
+    }
+
+    public record GroupInvitationResponse(
+            Long id,
+            Long groupId,
+            String groupName,
+            Long periodId,
+            String periodName,
+            Long invitedStudentId,
+            String invitedStudentCode,
+            String invitedStudentName,
+            Long invitedByStudentId,
+            String invitedByName,
+            GroupInvitationStatus status,
+            LocalDateTime createdAt,
+            LocalDateTime expiresAt,
+            LocalDateTime respondedAt) {
     }
 
     public record GroupMemberResponse(

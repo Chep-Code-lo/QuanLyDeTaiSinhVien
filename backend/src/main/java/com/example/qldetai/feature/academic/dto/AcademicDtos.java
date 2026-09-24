@@ -59,7 +59,42 @@ public final class AcademicDtos {
             @NotNull LocalDateTime registrationStartAt,
             @NotNull LocalDateTime registrationEndAt,
             LocalDateTime reviewDeadlineAt,
-            LocalDate defenseDate) {
+            LocalDate defenseDate,
+            @Min(1) @Max(10) Integer minGroupMembers,
+            @Min(1) @Max(10) Integer maxGroupMembers,
+            @Min(1) @Max(720) Integer invitationExpiryHours,
+            @Min(1) @Max(10) Integer minCommitteeMembers,
+            @Min(1) @Max(10) Integer maxCommitteeMembers) {
+
+        /** Backward-compatible request shape; the service supplies the period-rule defaults. */
+        public CreateRegistrationPeriodRequest(
+                Long facultyId,
+                Long semesterId,
+                String name,
+                ProjectType projectType,
+                LocalDateTime proposalStartAt,
+                LocalDateTime proposalEndAt,
+                LocalDateTime registrationStartAt,
+                LocalDateTime registrationEndAt,
+                LocalDateTime reviewDeadlineAt,
+                LocalDate defenseDate) {
+            this(
+                    facultyId,
+                    semesterId,
+                    name,
+                    projectType,
+                    proposalStartAt,
+                    proposalEndAt,
+                    registrationStartAt,
+                    registrationEndAt,
+                    reviewDeadlineAt,
+                    defenseDate,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
     }
 
     public record UpdateRegistrationPeriodRequest(
@@ -72,7 +107,42 @@ public final class AcademicDtos {
             @NotNull LocalDateTime registrationStartAt,
             @NotNull LocalDateTime registrationEndAt,
             LocalDateTime reviewDeadlineAt,
-            LocalDate defenseDate) {
+            LocalDate defenseDate,
+            @Min(1) @Max(10) Integer minGroupMembers,
+            @Min(1) @Max(10) Integer maxGroupMembers,
+            @Min(1) @Max(720) Integer invitationExpiryHours,
+            @Min(1) @Max(10) Integer minCommitteeMembers,
+            @Min(1) @Max(10) Integer maxCommitteeMembers) {
+
+        /** Backward-compatible request shape; omitted rule values keep the stored configuration. */
+        public UpdateRegistrationPeriodRequest(
+                Integer version,
+                Long semesterId,
+                String name,
+                ProjectType projectType,
+                LocalDateTime proposalStartAt,
+                LocalDateTime proposalEndAt,
+                LocalDateTime registrationStartAt,
+                LocalDateTime registrationEndAt,
+                LocalDateTime reviewDeadlineAt,
+                LocalDate defenseDate) {
+            this(
+                    version,
+                    semesterId,
+                    name,
+                    projectType,
+                    proposalStartAt,
+                    proposalEndAt,
+                    registrationStartAt,
+                    registrationEndAt,
+                    reviewDeadlineAt,
+                    defenseDate,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
     }
 
     public record ChangePeriodStatusRequest(
@@ -95,6 +165,11 @@ public final class AcademicDtos {
             LocalDateTime registrationEndAt,
             LocalDateTime reviewDeadlineAt,
             LocalDate defenseDate,
+            int minGroupMembers,
+            int maxGroupMembers,
+            int invitationExpiryHours,
+            int minCommitteeMembers,
+            int maxCommitteeMembers,
             RegistrationPeriodStatus status,
             Long createdBy,
             LocalDateTime createdAt,

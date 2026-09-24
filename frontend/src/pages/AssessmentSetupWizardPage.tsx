@@ -13,6 +13,9 @@ import type {
   RubricResponse,
 } from '../types/domain'
 
+const MIN_EXPECTED_EVALUATORS = 1
+const MAX_EXPECTED_EVALUATORS = 10
+
 export const AssessmentSetupWizardPage: React.FC = () => {
   const { showSuccess, showError } = useToast()
 
@@ -97,6 +100,14 @@ export const AssessmentSetupWizardPage: React.FC = () => {
     e.preventDefault()
     if (!selectedPeriodId) {
       showError('Vui lòng chọn đợt đăng ký')
+      return
+    }
+    if (
+      !Number.isInteger(newExpectedEvaluators) ||
+      newExpectedEvaluators < MIN_EXPECTED_EVALUATORS ||
+      newExpectedEvaluators > MAX_EXPECTED_EVALUATORS
+    ) {
+      showError(`Số lượng Evaluator dự kiến phải từ ${MIN_EXPECTED_EVALUATORS} đến ${MAX_EXPECTED_EVALUATORS}`)
       return
     }
     try {
@@ -328,11 +339,14 @@ export const AssessmentSetupWizardPage: React.FC = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Số lượng Evaluator dự kiến (1 - 5) <span className="text-red">*</span></label>
+                <label className="form-label">
+                  Số lượng Evaluator dự kiến ({MIN_EXPECTED_EVALUATORS} - {MAX_EXPECTED_EVALUATORS}){' '}
+                  <span className="text-red">*</span>
+                </label>
                 <input
                   type="number"
-                  min={1}
-                  max={5}
+                  min={MIN_EXPECTED_EVALUATORS}
+                  max={MAX_EXPECTED_EVALUATORS}
                   className="form-input"
                   value={newExpectedEvaluators}
                   onChange={(e) => setNewExpectedEvaluators(Number(e.target.value))}

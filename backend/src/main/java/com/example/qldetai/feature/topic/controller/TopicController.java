@@ -75,7 +75,7 @@ public class TopicController {
     }
 
     @PutMapping("/{id}/supervisors")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageTopic(#id, authentication)")
     public ApiResponse<TopicResponse> assignSupervisors(
             @PathVariable Long id,
             @Valid @RequestBody AssignSupervisorsRequest request,
@@ -84,7 +84,7 @@ public class TopicController {
     }
 
     @PatchMapping("/{id}/review")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageTopic(#id, authentication)")
     public ApiResponse<TopicResponse> review(
             @PathVariable Long id,
             @Valid @RequestBody ReviewTopicRequest request,
@@ -93,7 +93,7 @@ public class TopicController {
     }
 
     @PatchMapping("/{id}/publish")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageTopic(#id, authentication)")
     public ApiResponse<TopicResponse> publish(
             @PathVariable Long id,
             @Valid @RequestBody PublishTopicRequest request,

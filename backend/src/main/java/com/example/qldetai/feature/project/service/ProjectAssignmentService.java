@@ -29,6 +29,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -87,11 +88,23 @@ public class ProjectAssignmentService {
     public ProjectAssignmentResponse create(CreateAssignmentRequest request, Long actorId) {
         User actor = requireManager(actorId);
         TopicRegistration registration = requireRegistration(request.registrationId());
+        return createForApprovedRegistration(registration, actor);
+    }
+
+    /**
+     * Completes the approval workflow.  It deliberately joins the caller's transaction so an
+     * approved registration can never be committed without its project assignment.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ProjectAssignmentResponse createForApprovedRegistration(TopicRegistration registration, User actor) {
         if (registration.getStatus() != RegistrationStatus.APPROVED) {
             throw new BusinessRuleException("Only approved topic registrations can become project assignments.");
         }
-        if (projectAssignmentRepository.existsByRegistrationId(registration.getId())) {
-            throw new ConflictException("This topic registration already has a project assignment.");
+        ProjectAssignment existing = projectAssignmentRepository.findByRegistrationId(registration.getId()).orElse(null);
+        if (existing != null) {
+            // The endpoint used to be a separate manual step. Keeping retries idempotent avoids
+            // breaking clients which still issue that old follow-up request.
+            return toResponse(existing);
         }
         if (projectAssignmentRepository.existsByGroupId(registration.getGroup().getId())) {
             throw new ConflictException("This student group already has a project assignment.");
@@ -142,7 +155,9 @@ public class ProjectAssignmentService {
             assignment.getGroup().setStatus(GroupStatus.CLOSED);
         } else if (request.status() == AssignmentStatus.CANCELLED) {
             long activeMembers = groupMemberRepository.countByGroupIdAndLeftAtIsNull(assignment.getGroup().getId());
-            assignment.getGroup().setStatus(activeMembers >= 2 ? GroupStatus.ACTIVE : GroupStatus.FORMING);
+            assignment.getGroup().setStatus(activeMembers >= assignment.getPeriod().getMinGroupMembers()
+                    ? GroupStatus.ACTIVE
+                    : GroupStatus.FORMING);
         }
 
         notifyGroup(assignment, request.status() == AssignmentStatus.COMPLETED

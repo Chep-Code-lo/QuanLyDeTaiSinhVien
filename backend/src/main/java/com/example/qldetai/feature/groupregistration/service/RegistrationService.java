@@ -25,6 +25,7 @@ import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.StudentRepository;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.project.repository.ProjectAssignmentRepository;
+import com.example.qldetai.feature.project.service.ProjectAssignmentService;
 import com.example.qldetai.feature.topic.domain.Topic;
 import com.example.qldetai.feature.topic.domain.TopicStatus;
 import com.example.qldetai.feature.topic.domain.VisibilityType;
@@ -47,6 +48,7 @@ public class RegistrationService {
     private final StudentGroupRepository studentGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final ProjectAssignmentRepository projectAssignmentRepository;
+    private final ProjectAssignmentService projectAssignmentService;
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
@@ -58,6 +60,7 @@ public class RegistrationService {
             StudentGroupRepository studentGroupRepository,
             GroupMemberRepository groupMemberRepository,
             ProjectAssignmentRepository projectAssignmentRepository,
+            ProjectAssignmentService projectAssignmentService,
             StudentRepository studentRepository,
             UserRepository userRepository,
             NotificationService notificationService,
@@ -67,6 +70,7 @@ public class RegistrationService {
         this.studentGroupRepository = studentGroupRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.projectAssignmentRepository = projectAssignmentRepository;
+        this.projectAssignmentService = projectAssignmentService;
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
@@ -104,6 +108,9 @@ public class RegistrationService {
         ensureGroupReady(group);
         if (projectAssignmentRepository.existsByGroupId(group.getId())) {
             throw new BusinessRuleException("This group already has a project assignment.");
+        }
+        if (projectAssignmentRepository.existsByTopicId(topic.getId())) {
+            throw new ConflictException("This topic already has a project assignment.");
         }
         if (topicRegistrationRepository.existsByGroupIdAndStatusIn(
                 group.getId(), List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED))) {
@@ -152,9 +159,13 @@ public class RegistrationService {
         registration.setReviewedBy(actor);
         registration.setReviewedAt(LocalDateTime.now(clock));
         registration.setDecisionReason(normalizeNullable(request.decisionReason()));
-        notifyGroup(registration, request.status() == RegistrationStatus.APPROVED
-                ? "Đăng ký đề tài đã được duyệt."
-                : "Đăng ký đề tài đã bị từ chối.");
+        if (request.status() == RegistrationStatus.APPROVED) {
+            // This call joins the current transaction. If assignment creation fails, the review
+            // decision is rolled back as well, preserving the one-step approval invariant.
+            projectAssignmentService.createForApprovedRegistration(registration, actor);
+        } else {
+            notifyGroup(registration, "Đăng ký đề tài đã bị từ chối.");
+        }
         return toResponse(registration);
     }
 

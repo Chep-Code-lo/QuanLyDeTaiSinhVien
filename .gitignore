@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Local database snapshots created before manual migrations
+ql_de_tai_sinh_vien-backup-*.sql
+
 # Java / Spring Boot
 backend/target/
 backend/.classpath

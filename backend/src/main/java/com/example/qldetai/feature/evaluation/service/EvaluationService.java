@@ -43,6 +43,7 @@ import com.example.qldetai.feature.evaluation.repository.EvaluationAssignmentRep
 import com.example.qldetai.feature.evaluation.repository.GradeChangeRequestRepository;
 import com.example.qldetai.feature.evaluation.repository.RubricCriterionRepository;
 import com.example.qldetai.feature.evaluation.repository.RubricRepository;
+import com.example.qldetai.feature.evaluation.repository.ResultInputRepository;
 import com.example.qldetai.feature.evaluation.repository.ScoreDetailRepository;
 import com.example.qldetai.feature.evaluation.repository.ScoreSheetRepository;
 import java.math.BigDecimal;
@@ -50,9 +51,11 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -73,6 +76,7 @@ public class EvaluationService {
     private final ScoreSheetRepository sheets;
     private final ScoreDetailRepository details;
     private final GradeChangeRequestRepository gradeChangeRequests;
+    private final ResultInputRepository resultInputs;
     private final ProjectAssignmentRepository assignments;
     private final RegistrationPeriodRepository registrationPeriods;
     private final DefenseSessionRepository defenses;
@@ -90,6 +94,7 @@ public class EvaluationService {
             ScoreSheetRepository sheets,
             ScoreDetailRepository details,
             GradeChangeRequestRepository gradeChangeRequests,
+            ResultInputRepository resultInputs,
             ProjectAssignmentRepository assignments,
             RegistrationPeriodRepository registrationPeriods,
             DefenseSessionRepository defenses,
@@ -105,6 +110,7 @@ public class EvaluationService {
         this.sheets = sheets;
         this.details = details;
         this.gradeChangeRequests = gradeChangeRequests;
+        this.resultInputs = resultInputs;
         this.assignments = assignments;
         this.registrationPeriods = registrationPeriods;
         this.defenses = defenses;
@@ -137,8 +143,10 @@ public class EvaluationService {
         if (components.existsByPeriodIdAndCodeIgnoreCase(period.getId(), code)) {
             throw new ConflictException("This registration period already has an assessment component with that code.");
         }
-        if (request.componentType() == AssessmentComponentType.COMMITTEE && request.expectedEvaluators() < 3) {
-            throw new BusinessRuleException("A committee component requires three to five evaluators.");
+        if (request.componentType() == AssessmentComponentType.COMMITTEE
+                && (request.expectedEvaluators() < period.getMinCommitteeMembers()
+                        || request.expectedEvaluators() > period.getMaxCommitteeMembers())) {
+            throw new BusinessRuleException("A committee component must use the evaluator range configured for its registration period.");
         }
 
         AssessmentComponent component = new AssessmentComponent();
@@ -299,6 +307,7 @@ public class EvaluationService {
             }
             evaluatorRole = "REVIEWER";
         } else if (component.getComponentType() == AssessmentComponentType.COMMITTEE) {
+            ensureReviewCompleteBeforeCommittee(assignment);
             if (request.defenseId() == null) {
                 throw new BusinessRuleException("A committee evaluation requires a defense session.");
             }
@@ -346,8 +355,12 @@ public class EvaluationService {
             freshSheet.setRubric(evaluation.getRubric());
             return freshSheet;
         });
-        if (sheet.getStatus() == ScoreSheetStatus.LOCKED) {
-            throw new BusinessRuleException("A locked score sheet cannot be edited.");
+        if (sheet.getId() != null && resultInputs.existsBySheetId(sheet.getId())) {
+            throw new BusinessRuleException(
+                    "Cannot reopen or edit a score sheet captured by a result version; finalized and published evidence is immutable.");
+        }
+        if (sheet.getStatus() != ScoreSheetStatus.DRAFT) {
+            throw new BusinessRuleException("Only a draft score sheet can be edited. Request an approved grade change to reopen it.");
         }
         if (sheet.getId() != null && sheet.getVersion() != request.version()) {
             throw new ConflictException("The score sheet was changed. Reload and try again.");
@@ -360,17 +373,25 @@ public class EvaluationService {
         if (request.scores().size() != allowedCriteria.size()) {
             throw new BusinessRuleException("Every rubric criterion must receive a score.");
         }
+        Set<Long> submittedCriterionIds = new HashSet<>();
         for (ScoreRequest score : request.scores()) {
             RubricCriterion criterion = allowedCriteria.get(score.criterionId());
-            if (criterion == null || score.score().compareTo(criterion.getMaxScore()) > 0) {
+            if (criterion == null
+                    || !submittedCriterionIds.add(score.criterionId())
+                    || score.score().compareTo(criterion.getMaxScore()) > 0) {
                 throw new BusinessRuleException("A score must be between zero and its criterion maximum.");
             }
         }
+        if (!submittedCriterionIds.equals(allowedCriteria.keySet())) {
+            throw new BusinessRuleException("Every rubric criterion must receive exactly one score.");
+        }
 
+        // MySQL enforces DRAFT -> details -> SUBMITTED. Persist a new sheet in DRAFT first
+        // rather than trying to insert a submitted sheet before its score details exist.
         sheet.setOverallComment(request.overallComment());
-        sheet.setStatus(request.submit() ? ScoreSheetStatus.SUBMITTED : ScoreSheetStatus.DRAFT);
-        sheet.setSubmittedAt(request.submit() ? LocalDateTime.now(clock) : null);
-        sheet = sheets.save(sheet);
+        sheet.setStatus(ScoreSheetStatus.DRAFT);
+        sheet.setSubmittedAt(null);
+        sheet = sheets.saveAndFlush(sheet);
 
         details.deleteBySheetId(sheet.getId());
         for (ScoreRequest score : request.scores()) {
@@ -383,6 +404,13 @@ public class EvaluationService {
             detail.setComment(score.comment());
             details.save(detail);
         }
+        details.flush();
+
+        if (request.submit()) {
+            sheet.setStatus(ScoreSheetStatus.SUBMITTED);
+            sheet.setSubmittedAt(LocalDateTime.now(clock));
+            sheet = sheets.saveAndFlush(sheet);
+        }
 
         gradeChangeRequests.findFirstBySheetIdAndStatusOrderByCreatedAtDesc(sheet.getId(), GradeChangeStatus.APPROVED)
                 .filter(requestedChange -> requestedChange.getAppliedAt() == null)
@@ -392,6 +420,52 @@ public class EvaluationService {
                 });
 
         return sheet(sheet);
+    }
+
+    private void ensureReviewCompleteBeforeCommittee(ProjectAssignment assignment) {
+        List<AssessmentComponent> reviewComponents = components.findByPeriodIdOrderByCodeAsc(assignment.getPeriod().getId())
+                .stream()
+                .filter(component -> component.getComponentType() == AssessmentComponentType.REVIEW)
+                .toList();
+        if (reviewComponents.isEmpty()) {
+            return;
+        }
+        for (AssessmentComponent reviewComponent : reviewComponents) {
+            if (!STATUS_LOCKED.equals(reviewComponent.getStatus())) {
+                throw new BusinessRuleException("Lock every review component before assigning committee evaluators.");
+            }
+            List<EvaluationAssignment> reviewerAssignments = evaluations.findByAssignmentIdAndComponentIdAndStatus(
+                    assignment.getId(), reviewComponent.getId(), EvaluationStatus.ACTIVE);
+            if (reviewerAssignments.size() != reviewComponent.getExpectedEvaluators()
+                    || reviewerAssignments.stream().anyMatch(evaluation -> !hasCompletedScoreSheet(evaluation))) {
+                throw new BusinessRuleException(
+                        "Complete every reviewer assignment and submitted review score before committee evaluation.");
+            }
+        }
+    }
+
+    private boolean hasCompletedScoreSheet(EvaluationAssignment evaluation) {
+        return sheets.findByEvaluationId(evaluation.getId())
+                .filter(sheet -> sheet.getStatus() == ScoreSheetStatus.SUBMITTED
+                        || sheet.getStatus() == ScoreSheetStatus.LOCKED)
+                .filter(this::hasCompleteScoreDetails)
+                .isPresent();
+    }
+
+    private boolean hasCompleteScoreDetails(ScoreSheet sheet) {
+        if (sheet.getRubric() == null) {
+            return false;
+        }
+        Set<Long> requiredCriterionIds = criteria.findByRubricIdOrderBySortOrder(sheet.getRubric().getId()).stream()
+                .map(RubricCriterion::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        List<ScoreDetail> scoreDetails = details.findBySheetId(sheet.getId());
+        Set<Long> scoredCriterionIds = scoreDetails.stream()
+                .map(detail -> detail.getCriterion().getId())
+                .collect(java.util.stream.Collectors.toSet());
+        return !requiredCriterionIds.isEmpty()
+                && scoreDetails.size() == requiredCriterionIds.size()
+                && scoredCriterionIds.equals(requiredCriterionIds);
     }
 
     @Transactional(readOnly = true)

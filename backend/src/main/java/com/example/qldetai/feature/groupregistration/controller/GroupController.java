@@ -2,7 +2,6 @@ package com.example.qldetai.feature.groupregistration.controller;
 
 import com.example.qldetai.common.api.ApiResponse;
 import com.example.qldetai.common.api.PageResponse;
-import com.example.qldetai.feature.groupregistration.dto.GroupRegistrationDtos.AddGroupMemberRequest;
 import com.example.qldetai.feature.groupregistration.dto.GroupRegistrationDtos.CreateGroupRequest;
 import com.example.qldetai.feature.groupregistration.dto.GroupRegistrationDtos.StudentGroupResponse;
 import com.example.qldetai.feature.groupregistration.service.GroupService;
@@ -63,15 +62,6 @@ public class GroupController {
         StudentGroupResponse created = groupService.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/groups/" + created.id()))
                 .body(ApiResponse.success("Student group created.", created));
-    }
-
-    @PostMapping("/{id}/members")
-    @PreAuthorize("hasRole('STUDENT')")
-    public ApiResponse<StudentGroupResponse> addMember(
-            @PathVariable Long id,
-            @Valid @RequestBody AddGroupMemberRequest request,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Group member added.", groupService.addMember(id, request, principal.id()));
     }
 
     @DeleteMapping("/{id}/members/{studentId}")

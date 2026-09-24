@@ -284,7 +284,7 @@ export const EvaluatorAssignmentPage: React.FC = () => {
                   <option value="">-- Chọn Defense Session --</option>
                   {defenses.map((d) => (
                     <option key={d.id} value={d.id}>
-                      Hội đồng: {d.committeeName} - Đề tài: {d.topicTitle} ({new Date(d.scheduledAt).toLocaleString('vi-VN')})
+                      Hội đồng: {d.committeeName} - Đề tài: {d.topicTitle} ({new Date(d.startsAt).toLocaleString('vi-VN')})
                     </option>
                   ))}
                 </select>

@@ -22,6 +22,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label }) => {
         return 'badge badge-success'
       case 'REVISION_REQUIRED':
       case 'CANCELLED':
+      case 'EXPIRED':
       case 'REJECTED':
       case 'CLOSED':
         return 'badge badge-danger'
@@ -49,6 +50,12 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label }) => {
         return 'Hoạt động'
       case 'CANCELLED':
         return 'Đã hủy'
+      case 'EXPIRED':
+        return 'Hết hạn'
+      case 'PUBLISHED':
+        return 'Đã công bố'
+      case 'ARCHIVED':
+        return 'Đã lưu trữ'
       case 'CLOSED':
         return 'Đóng'
       case 'REVIEW':

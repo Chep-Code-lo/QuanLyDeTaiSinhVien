@@ -95,6 +95,17 @@ Repo đã có sẵn cấu hình `docker-compose.yml` để chạy đồng thời
 
 4. API backend vẫn có thể truy cập trực tiếp tại `http://localhost:8080/api/v1`.
 
+### Truy cập từ máy khác cùng Wi-Fi
+
+Frontend Docker mặc định lắng nghe trên tất cả địa chỉ mạng của máy chủ, còn
+MySQL và API vẫn chỉ mở nội bộ. Xem địa chỉ IPv4 của Wi-Fi bằng
+`ipconfig`, rồi mở `http://<dia-chi-ip-wifi>:5173` từ máy còn lại. Ví dụ,
+với IP `172.16.31.83`, dùng `http://172.16.31.83:5173`.
+
+Trên Windows, cho phép kết nối TCP vào cổng `5173` trên mạng **Private** nếu
+Windows Firewall chưa hỏi khi khởi động Docker. Không dùng Wi-Fi công cộng;
+nếu mạng đang là **Public**, hãy chuyển nó sang **Private** trước.
+
 Ghi chú:
 
 - MySQL được expose ra host qua cổng `3307` mặc định để tránh đụng MySQL cục bộ.
@@ -103,3 +114,26 @@ Ghi chú:
 - File upload của backend được lưu trong volume `backend_files`.
 - Frontend container reverse proxy `/api/*` sang backend nên không cần chỉnh `VITE_API_BASE_URL` khi chạy compose.
 - Nếu muốn import lại schema từ đầu, chạy `docker compose down -v` rồi `docker compose up --build`.
+
+### Nâng cấp MySQL đang dùng volume cũ
+
+MySQL chỉ chạy file trong `docker-entrypoint-initdb.d` khi volume còn trống;
+`spring.jpa.hibernate.ddl-auto=none` cũng không tự thay đổi schema. Vì vậy, nếu
+đã có volume `mysql_data`, hãy áp migration thủ công **một lần** trước khi chạy
+backend có các luật đợt đăng ký mới.
+
+```powershell
+# Khuyến nghị sao lưu trước khi thay đổi schema.
+docker compose exec -T mysql sh -c 'exec mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction --databases ql_de_tai_sinh_vien' > ql_de_tai_sinh_vien-backup.sql
+
+docker compose stop backend
+Get-Content -Raw database/migrations/V20260924__complete_feature_rules.sql |
+  docker compose exec -T mysql sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" ql_de_tai_sinh_vien'
+docker compose up -d --build backend
+```
+
+Migration này bổ sung cấu hình kích thước nhóm, thời hạn lời mời và kích thước
+hội đồng cho từng đợt đăng ký. Không chạy lại file sau khi lệnh đã thành công;
+các ràng buộc `CHECK` trong đó được thay thế theo tên. Với môi trường phát triển
+không cần giữ dữ liệu, `docker compose down -v` rồi khởi động lại vẫn là cách
+tạo schema mới từ đầu.

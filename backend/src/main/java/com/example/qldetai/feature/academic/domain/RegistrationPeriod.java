@@ -63,6 +63,22 @@ public class RegistrationPeriod {
     @Column(name = "defense_date")
     private LocalDate defenseDate;
 
+    /** Rules which vary by registration period rather than being global constants. */
+    @Column(name = "min_group_members", nullable = false)
+    private int minGroupMembers = 1;
+
+    @Column(name = "max_group_members", nullable = false)
+    private int maxGroupMembers = 3;
+
+    @Column(name = "invitation_expiry_hours", nullable = false)
+    private int invitationExpiryHours = 72;
+
+    @Column(name = "min_committee_members", nullable = false)
+    private int minCommitteeMembers = 3;
+
+    @Column(name = "max_committee_members", nullable = false)
+    private int maxCommitteeMembers = 5;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private RegistrationPeriodStatus status = RegistrationPeriodStatus.DRAFT;

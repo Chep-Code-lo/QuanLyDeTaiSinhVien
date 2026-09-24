@@ -16,9 +16,9 @@ import org.springframework.web.bind.annotation.*;
 public class EvaluationController {
  private final EvaluationService service;
  public EvaluationController(EvaluationService service) { this.service = service; }
- @PostMapping("/rubrics") @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+ @PostMapping("/rubrics") @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageAssessmentComponent(#request.componentId, authentication)")
  public ResponseEntity<ApiResponse<RubricResponse>> rubric(@Valid @RequestBody CreateRubricRequest request, @AuthenticationPrincipal UserPrincipal principal) { RubricResponse result=service.createRubric(request,principal.id()); return ResponseEntity.created(URI.create("/api/v1/rubrics/"+result.id())).body(ApiResponse.success("Rubric created.",result)); }
- @PostMapping("/evaluation-assignments") @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+ @PostMapping("/evaluation-assignments") @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageAssignment(#request.assignmentId, authentication)")
  public ResponseEntity<ApiResponse<Long>> assign(@Valid @RequestBody CreateEvaluationRequest request, @AuthenticationPrincipal UserPrincipal principal) { Long id=service.assign(request,principal.id()); return ResponseEntity.created(URI.create("/api/v1/evaluation-assignments/"+id)).body(ApiResponse.success("Evaluator assigned.",id)); }
  @GetMapping("/evaluation-assignments/{id}/score-sheet") @PreAuthorize("hasRole('LECTURER')")
  public ApiResponse<ScoreSheetResponse> mine(@PathVariable Long id,@AuthenticationPrincipal UserPrincipal principal) { return ApiResponse.success(service.mySheet(id,principal.id())); }

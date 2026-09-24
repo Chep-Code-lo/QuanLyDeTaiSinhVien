@@ -51,7 +51,7 @@ public class ProjectAssignmentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageRegistration(#request.registrationId, authentication)")
     public ResponseEntity<ApiResponse<ProjectAssignmentResponse>> create(
             @Valid @RequestBody CreateAssignmentRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -61,7 +61,7 @@ public class ProjectAssignmentController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageAssignment(#id, authentication)")
     public ApiResponse<ProjectAssignmentResponse> updateStatus(
             @PathVariable Long id,
             @Valid @RequestBody UpdateAssignmentStatusRequest request,

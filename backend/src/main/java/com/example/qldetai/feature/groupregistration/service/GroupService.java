@@ -124,6 +124,7 @@ public class GroupService {
         leader.setMemberRole(GroupMemberRole.LEADER);
         leader.setJoinedAt(now);
         groupMemberRepository.save(leader);
+        refreshGroupStatus(group);
 
         return toResponse(group);
     }
@@ -147,15 +148,15 @@ public class GroupService {
         }
         List<GroupMember> activeMembers =
                 groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(groupId);
-        if (activeMembers.size() >= 3) {
-            throw new BusinessRuleException("A student group can contain at most three active members.");
+        if (activeMembers.size() >= period.getMaxGroupMembers()) {
+            throw new BusinessRuleException("The group has reached its configured maximum number of members.");
         }
 
         GroupMember groupMember = new GroupMember();
         groupMember.setGroup(group);
         groupMember.setPeriod(period);
         groupMember.setStudent(member);
-        groupMember.setSlotNo(nextAvailableSlot(activeMembers));
+        groupMember.setSlotNo(nextAvailableSlot(activeMembers, period.getMaxGroupMembers()));
         groupMember.setMemberRole(GroupMemberRole.MEMBER);
         groupMember.setJoinedAt(LocalDateTime.now(clock));
         groupMemberRepository.save(groupMember);
@@ -241,18 +242,20 @@ public class GroupService {
 
     private void refreshGroupStatus(StudentGroup group) {
         long activeMembers = groupMemberRepository.countByGroupIdAndLeftAtIsNull(group.getId());
-        group.setStatus(activeMembers >= 2 ? GroupStatus.ACTIVE : GroupStatus.FORMING);
+        group.setStatus(activeMembers >= group.getPeriod().getMinGroupMembers()
+                ? GroupStatus.ACTIVE
+                : GroupStatus.FORMING);
     }
 
-    private int nextAvailableSlot(List<GroupMember> activeMembers) {
-        for (int slot = 1; slot <= 3; slot++) {
+    private int nextAvailableSlot(List<GroupMember> activeMembers, int maxGroupMembers) {
+        for (int slot = 1; slot <= maxGroupMembers; slot++) {
             int candidate = slot;
             boolean used = activeMembers.stream().anyMatch(member -> member.getSlotNo() == candidate);
             if (!used) {
                 return candidate;
             }
         }
-        throw new BusinessRuleException("A student group can contain at most three active members.");
+        throw new BusinessRuleException("The group has reached its configured maximum number of members.");
     }
 
     private StudentGroupResponse toResponse(StudentGroup group) {

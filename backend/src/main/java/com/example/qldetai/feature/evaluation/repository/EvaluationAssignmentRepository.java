@@ -12,4 +12,9 @@ public interface EvaluationAssignmentRepository
     List<EvaluationAssignment> findByLecturerIdAndStatus(Long lecturerId, EvaluationStatus status);
 
     long countByAssignmentIdAndComponentIdAndStatus(Long assignmentId, Long componentId, EvaluationStatus status);
+
+    List<EvaluationAssignment> findByAssignmentIdAndComponentIdAndStatus(
+            Long assignmentId, Long componentId, EvaluationStatus status);
+
+    List<EvaluationAssignment> findByAssignmentIdAndStatus(Long assignmentId, EvaluationStatus status);
 }

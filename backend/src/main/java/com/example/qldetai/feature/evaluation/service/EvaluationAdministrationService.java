@@ -1,5 +1,7 @@
 package com.example.qldetai.feature.evaluation.service;
 
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.example.qldetai.aspect.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.exception.BusinessRuleException;
@@ -22,6 +24,8 @@ import com.example.qldetai.feature.topic.repository.TopicSupervisorRepository;
 import com.example.qldetai.feature.evaluation.domain.CommitteeMember;
 import com.example.qldetai.feature.evaluation.domain.CommitteeRole;
 import com.example.qldetai.feature.evaluation.domain.CommitteeStatus;
+import com.example.qldetai.feature.evaluation.domain.AssessmentComponent;
+import com.example.qldetai.feature.evaluation.domain.AssessmentComponentType;
 import com.example.qldetai.feature.evaluation.domain.DefenseSession;
 import com.example.qldetai.feature.evaluation.domain.EvaluationAssignment;
 import com.example.qldetai.feature.evaluation.domain.EvaluationCommittee;
@@ -29,6 +33,8 @@ import com.example.qldetai.feature.evaluation.domain.EvaluationStatus;
 import com.example.qldetai.feature.evaluation.domain.GradeChangeRequest;
 import com.example.qldetai.feature.evaluation.domain.GradeChangeStatus;
 import com.example.qldetai.feature.evaluation.domain.ResultStatus;
+import com.example.qldetai.feature.evaluation.domain.ResultInput;
+import com.example.qldetai.feature.evaluation.domain.ResultMember;
 import com.example.qldetai.feature.evaluation.domain.ResultVersion;
 import com.example.qldetai.feature.evaluation.domain.ScoreDetail;
 import com.example.qldetai.feature.evaluation.domain.ScoreSheet;
@@ -42,23 +48,31 @@ import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.DefenseSes
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.EvaluationCommitteeResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.GradeChangeRequestResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultDetailResponse;
+import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultInputResponse;
+import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultMemberResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ReviewGradeChangeRequest;
 import com.example.qldetai.feature.evaluation.repository.CommitteeMemberRepository;
+import com.example.qldetai.feature.evaluation.repository.AssessmentComponentRepository;
 import com.example.qldetai.feature.evaluation.repository.DefenseSessionRepository;
 import com.example.qldetai.feature.evaluation.repository.EvaluationAssignmentRepository;
 import com.example.qldetai.feature.evaluation.repository.EvaluationCommitteeRepository;
 import com.example.qldetai.feature.evaluation.repository.GradeChangeRequestRepository;
 import com.example.qldetai.feature.evaluation.repository.ResultVersionRepository;
+import com.example.qldetai.feature.evaluation.repository.ResultInputRepository;
+import com.example.qldetai.feature.evaluation.repository.ResultMemberRepository;
 import com.example.qldetai.feature.evaluation.repository.ScoreDetailRepository;
 import com.example.qldetai.feature.evaluation.repository.ScoreSheetRepository;
+import com.example.qldetai.feature.evaluation.repository.RubricCriterionRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -71,6 +85,7 @@ public class EvaluationAdministrationService {
 
     private final EvaluationCommitteeRepository committees;
     private final CommitteeMemberRepository committeeMembers;
+    private final AssessmentComponentRepository components;
     private final DefenseSessionRepository defenses;
     private final RegistrationPeriodRepository periods;
     private final LecturerRepository lecturers;
@@ -80,16 +95,21 @@ public class EvaluationAdministrationService {
     private final TopicSupervisorRepository supervisors;
     private final ScoreSheetRepository sheets;
     private final ScoreDetailRepository details;
+    private final RubricCriterionRepository criteria;
     private final EvaluationAssignmentRepository evaluations;
     private final ResultVersionRepository results;
+    private final ResultInputRepository resultInputs;
+    private final ResultMemberRepository resultMembers;
     private final GradeChangeRequestRepository changes;
     private final GroupMemberRepository groupMembers;
     private final NotificationService notifications;
+    private final ObjectMapper objectMapper;
     private final Clock clock;
 
     public EvaluationAdministrationService(
             EvaluationCommitteeRepository committees,
             CommitteeMemberRepository committeeMembers,
+            AssessmentComponentRepository components,
             DefenseSessionRepository defenses,
             RegistrationPeriodRepository periods,
             LecturerRepository lecturers,
@@ -99,14 +119,19 @@ public class EvaluationAdministrationService {
             TopicSupervisorRepository supervisors,
             ScoreSheetRepository sheets,
             ScoreDetailRepository details,
+            RubricCriterionRepository criteria,
             EvaluationAssignmentRepository evaluations,
             ResultVersionRepository results,
+            ResultInputRepository resultInputs,
+            ResultMemberRepository resultMembers,
             GradeChangeRequestRepository changes,
             GroupMemberRepository groupMembers,
             NotificationService notifications,
+            ObjectMapper objectMapper,
             Clock clock) {
         this.committees = committees;
         this.committeeMembers = committeeMembers;
+        this.components = components;
         this.defenses = defenses;
         this.periods = periods;
         this.lecturers = lecturers;
@@ -116,11 +141,15 @@ public class EvaluationAdministrationService {
         this.supervisors = supervisors;
         this.sheets = sheets;
         this.details = details;
+        this.criteria = criteria;
         this.evaluations = evaluations;
         this.results = results;
+        this.resultInputs = resultInputs;
+        this.resultMembers = resultMembers;
         this.changes = changes;
         this.groupMembers = groupMembers;
         this.notifications = notifications;
+        this.objectMapper = objectMapper;
         this.clock = clock;
     }
 
@@ -161,8 +190,12 @@ public class EvaluationAdministrationService {
         if (committee.getStatus() != CommitteeStatus.DRAFT) {
             throw new BusinessRuleException("Only a draft committee can be changed.");
         }
-        if (committeeMembers.findByCommitteeId(committeeId).size() >= 5) {
-            throw new BusinessRuleException("A committee has at most five members.");
+        int maxMembers = committee.getPeriod().getMaxCommitteeMembers();
+        if (request.slotNo() > maxMembers) {
+            throw new BusinessRuleException("Committee member slot exceeds this registration period's configured maximum.");
+        }
+        if (committeeMembers.findByCommitteeId(committeeId).size() >= maxMembers) {
+            throw new BusinessRuleException("This committee has reached the configured maximum number of members.");
         }
         if (committeeMembers.findByCommitteeId(committeeId).stream().anyMatch(member ->
                 member.getSlotNo() == request.slotNo()
@@ -207,12 +240,18 @@ public class EvaluationAdministrationService {
 
         ProjectAssignment assignment = assignment(request.assignmentId());
         EvaluationCommittee committee = committee(request.committeeId());
+        if (!assignment.getPeriod().getId().equals(committee.getPeriod().getId())) {
+            throw new BusinessRuleException("The committee and project assignment must belong to the same registration period.");
+        }
         List<CommitteeMember> members = committeeMembers.findByCommitteeId(committee.getId());
-        if (members.size() < 3
-                || members.size() > 5
+        int minMembers = assignment.getPeriod().getMinCommitteeMembers();
+        int maxMembers = assignment.getPeriod().getMaxCommitteeMembers();
+        if (members.size() < minMembers
+                || members.size() > maxMembers
                 || members.stream().noneMatch(member -> member.getCommitteeRole() == CommitteeRole.CHAIR)
                 || members.stream().noneMatch(member -> member.getCommitteeRole() == CommitteeRole.SECRETARY)) {
-            throw new BusinessRuleException("A committee needs 3-5 members, one chair and one secretary.");
+            throw new BusinessRuleException(
+                    "A committee needs the configured number of members, one chair and one secretary.");
         }
         if (defenses.hasCommitteeConflict(committee.getId(), request.startsAt(), request.endsAt())) {
             throw new ConflictException("The committee already has a defense in this time range.");
@@ -222,6 +261,7 @@ public class EvaluationAdministrationService {
                         member.getLecturer().getId().equals(supervisor.getLecturer().getId())))) {
             throw new BusinessRuleException("A topic supervisor cannot be on its defense committee.");
         }
+        ensureReviewCompleteBeforeCommittee(assignment);
 
         DefenseSession defense = new DefenseSession();
         defense.setAssignment(assignment);
@@ -232,6 +272,49 @@ public class EvaluationAdministrationService {
         defense.setEndsAt(request.endsAt());
         committee.setStatus(CommitteeStatus.CONFIRMED);
         return defenses.save(defense).getId();
+    }
+
+    private void ensureReviewCompleteBeforeCommittee(ProjectAssignment assignment) {
+        List<AssessmentComponent> reviewComponents = components.findByPeriodIdOrderByCodeAsc(assignment.getPeriod().getId())
+                .stream()
+                .filter(component -> component.getComponentType() == AssessmentComponentType.REVIEW)
+                .toList();
+        for (AssessmentComponent reviewComponent : reviewComponents) {
+            if (!"LOCKED".equals(reviewComponent.getStatus())) {
+                throw new BusinessRuleException("Lock every review component before scheduling a defense.");
+            }
+            List<EvaluationAssignment> reviewerAssignments = evaluations.findByAssignmentIdAndComponentIdAndStatus(
+                    assignment.getId(), reviewComponent.getId(), EvaluationStatus.ACTIVE);
+            if (reviewerAssignments.size() != reviewComponent.getExpectedEvaluators()
+                    || reviewerAssignments.stream().anyMatch(evaluation -> !hasCompletedReviewSheet(evaluation))) {
+                throw new BusinessRuleException(
+                        "Complete every reviewer assignment and submitted review score before scheduling a defense.");
+            }
+        }
+    }
+
+    private boolean hasCompletedReviewSheet(EvaluationAssignment evaluation) {
+        return sheets.findByEvaluationId(evaluation.getId())
+                .filter(sheet -> sheet.getStatus() == ScoreSheetStatus.SUBMITTED
+                        || sheet.getStatus() == ScoreSheetStatus.LOCKED)
+                .filter(this::hasCompleteScoreDetails)
+                .isPresent();
+    }
+
+    private boolean hasCompleteScoreDetails(ScoreSheet sheet) {
+        if (sheet.getRubric() == null) {
+            return false;
+        }
+        Set<Long> requiredCriterionIds = criteria.findByRubricIdOrderBySortOrder(sheet.getRubric().getId()).stream()
+                .map(com.example.qldetai.feature.evaluation.domain.RubricCriterion::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        List<ScoreDetail> scoreDetails = details.findBySheetId(sheet.getId());
+        Set<Long> scoredCriterionIds = scoreDetails.stream()
+                .map(detail -> detail.getCriterion().getId())
+                .collect(java.util.stream.Collectors.toSet());
+        return !requiredCriterionIds.isEmpty()
+                && scoreDetails.size() == requiredCriterionIds.size()
+                && scoredCriterionIds.equals(requiredCriterionIds);
     }
 
     @Transactional(readOnly = true)
@@ -269,10 +352,7 @@ public class EvaluationAdministrationService {
             Student student = students.findByUserId(actorId)
                     .orElseThrow(() -> new AccessDeniedException("You cannot view this result."));
             if (resultVersion.getStatus() != ResultStatus.PUBLISHED
-                    || groupMembers.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(
-                                    resultVersion.getAssignment().getGroup().getId())
-                            .stream()
-                            .noneMatch(member -> member.getStudent().getId().equals(student.getId()))) {
+                    || !resultMembers.existsByResultIdAndStudentId(resultVersion.getId(), student.getId())) {
                 throw new AccessDeniedException("You cannot view this result.");
             }
         }
@@ -284,43 +364,44 @@ public class EvaluationAdministrationService {
     public ResultResponse finalizeResult(Long assignmentId, Long actorId) {
         manager(actorId);
         ProjectAssignment assignment = assignment(assignmentId);
-        if (results.findByAssignmentIdAndStatus(assignmentId, ResultStatus.PUBLISHED).isPresent()) {
-            throw new BusinessRuleException("A published result cannot be finalized again.");
+        if (results.findByAssignmentIdAndStatus(assignmentId, ResultStatus.FINALIZED).isPresent()) {
+            throw new BusinessRuleException("A finalized result is already awaiting publication or supersession.");
         }
 
-        List<EvaluationAssignment> activeEvaluations = evaluations.findAll().stream()
-                .filter(evaluation -> evaluation.getAssignment().getId().equals(assignmentId)
-                        && evaluation.getStatus() == EvaluationStatus.ACTIVE)
-                .toList();
+        List<EvaluationAssignment> activeEvaluations = evaluations.findByAssignmentIdAndStatus(
+                assignmentId, EvaluationStatus.ACTIVE);
         if (activeEvaluations.isEmpty()) {
             throw new BusinessRuleException("This assignment has no evaluation assignments.");
         }
 
-        Map<Long, Long> submittedCounts = activeEvaluations.stream()
-                .filter(evaluation -> sheets.findByEvaluationId(evaluation.getId())
-                        .map(sheet -> sheet.getStatus() == ScoreSheetStatus.SUBMITTED)
-                        .orElse(false))
-                .collect(java.util.stream.Collectors.groupingBy(
-                        evaluation -> evaluation.getComponent().getId(),
-                        java.util.stream.Collectors.counting()));
-
-        for (EvaluationAssignment evaluation : activeEvaluations) {
-            if (submittedCounts.getOrDefault(evaluation.getComponent().getId(), 0L)
-                    < evaluation.getComponent().getExpectedEvaluators()) {
-                throw new BusinessRuleException("Cannot finalize while a required score sheet is missing.");
+        Map<Long, List<EvaluationAssignment>> byComponent = activeEvaluations.stream()
+                .collect(java.util.stream.Collectors.groupingBy(evaluation -> evaluation.getComponent().getId()));
+        Map<Long, ScoreSheet> sourceSheets = new LinkedHashMap<>();
+        List<BigDecimal> componentAverages = new java.util.ArrayList<>();
+        for (List<EvaluationAssignment> componentEvaluations : byComponent.values()) {
+            AssessmentComponent component = componentEvaluations.getFirst().getComponent();
+            if (componentEvaluations.size() != component.getExpectedEvaluators()) {
+                throw new BusinessRuleException("Cannot finalize while a required evaluator assignment is missing.");
             }
+            List<BigDecimal> componentScores = new java.util.ArrayList<>();
+            for (EvaluationAssignment evaluation : componentEvaluations) {
+                ScoreSheet sheet = sheets.findByEvaluationId(evaluation.getId())
+                        .orElseThrow(() -> new BusinessRuleException("Cannot finalize while a required score sheet is missing."));
+                if (sheet.getStatus() != ScoreSheetStatus.SUBMITTED && sheet.getStatus() != ScoreSheetStatus.LOCKED) {
+                    throw new BusinessRuleException("Cannot finalize while a required score sheet is missing.");
+                }
+                BigDecimal score = scoreTotal(sheet);
+                sourceSheets.put(evaluation.getId(), sheet);
+                componentScores.add(score);
+            }
+            componentAverages.add(componentScores.stream()
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .divide(BigDecimal.valueOf(componentScores.size()), 2, RoundingMode.HALF_UP));
         }
 
-        List<BigDecimal> totals = activeEvaluations.stream()
-                .map(evaluation -> sheets.findByEvaluationId(evaluation.getId()).orElseThrow())
-                .map(sheet -> details.findBySheetId(sheet.getId()).stream()
-                        .map(ScoreDetail::getScore)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add))
-                .toList();
-
-        BigDecimal finalScore = totals.stream()
+        BigDecimal finalScore = componentAverages.stream()
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .divide(BigDecimal.valueOf(totals.size()), 2, RoundingMode.HALF_UP);
+                .divide(BigDecimal.valueOf(componentAverages.size()), 2, RoundingMode.HALF_UP);
 
         ResultVersion resultVersion = new ResultVersion();
         resultVersion.setAssignment(assignment);
@@ -328,9 +409,17 @@ public class EvaluationAdministrationService {
         resultVersion.setFinalScore(finalScore);
         resultVersion.setFinalizedBy(user(actorId));
         resultVersion.setFinalizedAt(LocalDateTime.now(clock));
-        activeEvaluations.forEach(evaluation ->
-                sheets.findByEvaluationId(evaluation.getId()).ifPresent(sheet -> sheet.setStatus(ScoreSheetStatus.LOCKED)));
-        resultVersion = results.save(resultVersion);
+        sourceSheets.values().forEach(sheet -> {
+            if (sheet.getStatus() == ScoreSheetStatus.SUBMITTED) {
+                sheet.setStatus(ScoreSheetStatus.LOCKED);
+            }
+        });
+        sheets.saveAll(sourceSheets.values());
+        // The snapshot triggers require the source sheet to already be LOCKED.
+        sheets.flush();
+        resultVersion = results.saveAndFlush(resultVersion);
+        snapshotInputs(resultVersion, activeEvaluations, sourceSheets);
+        snapshotMembers(resultVersion, assignment);
         return result(resultVersion);
     }
 
@@ -344,6 +433,13 @@ public class EvaluationAdministrationService {
             throw new BusinessRuleException("Only a finalized result can be published.");
         }
 
+        results.findByAssignmentIdAndStatus(resultVersion.getAssignment().getId(), ResultStatus.PUBLISHED)
+                .filter(previous -> !previous.getId().equals(resultVersion.getId()))
+                .ifPresent(previous -> {
+                    previous.setStatus(ResultStatus.SUPERSEDED);
+                    results.saveAndFlush(previous);
+                });
+
         resultVersion.setStatus(ResultStatus.PUBLISHED);
         resultVersion.setPublishedBy(user(actorId));
         resultVersion.setPublishedAt(LocalDateTime.now(clock));
@@ -355,6 +451,91 @@ public class EvaluationAdministrationService {
                         "Kết quả đánh giá của nhóm đã được công bố.",
                         "/results/" + resultVersion.getId()));
         return result(resultVersion);
+    }
+
+    private void snapshotInputs(
+            ResultVersion resultVersion,
+            List<EvaluationAssignment> activeEvaluations,
+            Map<Long, ScoreSheet> sourceSheets) {
+        List<ResultInput> inputs = activeEvaluations.stream().map(evaluation -> {
+            ScoreSheet sheet = sourceSheets.get(evaluation.getId());
+            ResultInput input = new ResultInput();
+            input.setResult(resultVersion);
+            input.setSheet(sheet);
+            input.setComponent(evaluation.getComponent());
+            input.setSheetVersion(sheet.getVersion());
+            input.setScoreSnapshot(scoreTotal(sheet));
+            input.setRubricSnapshot(rubricSnapshot(sheet));
+            return input;
+        }).toList();
+        resultInputs.saveAllAndFlush(inputs);
+    }
+
+    private void snapshotMembers(ResultVersion resultVersion, ProjectAssignment assignment) {
+        List<ResultMember> members = groupMembers.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(assignment.getGroup().getId())
+                .stream()
+                .map(groupMember -> {
+                    ResultMember member = new ResultMember();
+                    member.setResult(resultVersion);
+                    member.setStudent(groupMember.getStudent());
+                    member.setStudentCodeSnapshot(groupMember.getStudent().getStudentCode());
+                    member.setFullNameSnapshot(groupMember.getStudent().getUser().getFullName());
+                    return member;
+                })
+                .toList();
+        if (members.isEmpty()) {
+            throw new BusinessRuleException("Cannot finalize a result for a group with no active members.");
+        }
+        resultMembers.saveAllAndFlush(members);
+    }
+
+    private BigDecimal scoreTotal(ScoreSheet sheet) {
+        List<ScoreDetail> scoreDetails = details.findBySheetId(sheet.getId());
+        List<com.example.qldetai.feature.evaluation.domain.RubricCriterion> requiredCriteria = sheet.getRubric() == null
+                ? List.of()
+                : criteria.findByRubricIdOrderBySortOrder(sheet.getRubric().getId());
+        Set<Long> requiredCriterionIds = requiredCriteria.stream()
+                .map(com.example.qldetai.feature.evaluation.domain.RubricCriterion::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<Long> scoredCriterionIds = scoreDetails.stream()
+                .map(detail -> detail.getCriterion().getId())
+                .collect(java.util.stream.Collectors.toSet());
+        if (requiredCriteria.isEmpty()
+                || scoreDetails.size() != requiredCriteria.size()
+                || !scoredCriterionIds.equals(requiredCriterionIds)) {
+            throw new BusinessRuleException("A score sheet must contain every rubric criterion before finalization.");
+        }
+        BigDecimal maximum = requiredCriteria.stream()
+                .map(com.example.qldetai.feature.evaluation.domain.RubricCriterion::getMaxScore)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (maximum.compareTo(BigDecimal.TEN) != 0) {
+            throw new BusinessRuleException("A score sheet rubric must total exactly 10 points before finalization.");
+        }
+        return scoreDetails.stream()
+                .map(ScoreDetail::getScore)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private String rubricSnapshot(ScoreSheet sheet) {
+        List<Map<String, Object>> criteriaSnapshot = details.findBySheetId(sheet.getId()).stream()
+                .sorted(Comparator.comparingInt(detail -> detail.getCriterion().getSortOrder()))
+                .map(detail -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("criterionId", detail.getCriterion().getId());
+                    item.put("name", detail.getCriterion().getName());
+                    item.put("description", detail.getCriterion().getDescription());
+                    item.put("maxScore", detail.getMaxScore());
+                    item.put("score", detail.getScore());
+                    item.put("comment", detail.getComment());
+                    item.put("sortOrder", detail.getCriterion().getSortOrder());
+                    return item;
+                })
+                .toList();
+        try {
+            return objectMapper.writeValueAsString(criteriaSnapshot);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("Unable to serialize the immutable rubric snapshot.", exception);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -386,7 +567,8 @@ public class EvaluationAdministrationService {
         if (!sheet.getEvaluation().getLecturer().getUser().getId().equals(actorId)) {
             throw new AccessDeniedException("Only the evaluator can request a score change.");
         }
-        if (sheet.getStatus() != ScoreSheetStatus.LOCKED
+        ensureScoreSheetCanBeChanged(sheet);
+        if ((sheet.getStatus() != ScoreSheetStatus.SUBMITTED && sheet.getStatus() != ScoreSheetStatus.LOCKED)
                 || changes.existsBySheetIdAndStatusIn(sheetId, List.of(GradeChangeStatus.PENDING, GradeChangeStatus.APPROVED))) {
             throw new BusinessRuleException("This score sheet cannot receive another change request.");
         }
@@ -408,15 +590,31 @@ public class EvaluationAdministrationService {
             throw new BusinessRuleException("Only a pending request may be reviewed.");
         }
 
+        if (Boolean.TRUE.equals(request.approved())) {
+            // A final result holds immutable evidence. Re-check here because a
+            // request can be submitted before finalization but reviewed later.
+            ensureScoreSheetCanBeChanged(changeRequest.getSheet());
+        }
         changeRequest.setReviewedBy(user(actorId));
         changeRequest.setReviewedAt(LocalDateTime.now(clock));
         changeRequest.setReviewComment(request.comment());
         if (Boolean.TRUE.equals(request.approved())) {
             changeRequest.setStatus(GradeChangeStatus.APPROVED);
+            // MySQL's score-sheet trigger checks the approved request while reopening the
+            // sheet, so flush this state transition before changing LOCKED -> DRAFT.
+            changes.saveAndFlush(changeRequest);
             changeRequest.getSheet().setStatus(ScoreSheetStatus.DRAFT);
             changeRequest.getSheet().setSubmittedAt(null);
+            sheets.saveAndFlush(changeRequest.getSheet());
         } else {
             changeRequest.setStatus(GradeChangeStatus.REJECTED);
+        }
+    }
+
+    private void ensureScoreSheetCanBeChanged(ScoreSheet sheet) {
+        if (sheet.getId() != null && resultInputs.existsBySheetId(sheet.getId())) {
+            throw new BusinessRuleException(
+                    "Cannot reopen or edit a score sheet captured by a result version; finalized and published evidence is immutable.");
         }
     }
 
@@ -524,7 +722,23 @@ public class EvaluationAdministrationService {
                 resultVersion.getFinalizedAt(),
                 resultVersion.getPublishedBy() == null ? null : resultVersion.getPublishedBy().getId(),
                 resultVersion.getPublishedBy() == null ? null : resultVersion.getPublishedBy().getFullName(),
-                resultVersion.getPublishedAt());
+                resultVersion.getPublishedAt(),
+                resultInputs.findByResultIdOrderByIdAsc(resultVersion.getId()).stream()
+                        .map(input -> new ResultInputResponse(
+                                input.getId(),
+                                input.getSheet().getId(),
+                                input.getComponent().getId(),
+                                input.getComponent().getCode(),
+                                input.getSheetVersion(),
+                                input.getScoreSnapshot(),
+                                input.getRubricSnapshot()))
+                        .toList(),
+                resultMembers.findByResultIdOrderByIdAsc(resultVersion.getId()).stream()
+                        .map(member -> new ResultMemberResponse(
+                                member.getStudent().getId(),
+                                member.getStudentCodeSnapshot(),
+                                member.getFullNameSnapshot()))
+                        .toList());
     }
 
     private GradeChangeRequestResponse gradeChange(GradeChangeRequest changeRequest) {

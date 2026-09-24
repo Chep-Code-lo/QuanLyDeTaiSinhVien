@@ -1,6 +1,6 @@
 import { apiClient } from './client'
 import type { ApiResponse, PageResponse } from '../types/api'
-import type { StudentGroupResponse } from '../types/domain'
+import type { GroupInvitationResponse, StudentGroupResponse } from '../types/domain'
 
 export const groupApi = {
   list: async (params: { periodId?: number; page?: number; size?: number } = {}) =>
@@ -8,8 +8,18 @@ export const groupApi = {
   mine: async () => (await apiClient.get<ApiResponse<StudentGroupResponse[]>>('/groups/mine')).data.data,
   create: async (payload: { periodId: number; name: string }) =>
     (await apiClient.post<ApiResponse<StudentGroupResponse>>('/groups', payload)).data.data,
-  addMember: async (groupId: number, studentCode: string) =>
-    (await apiClient.post<ApiResponse<StudentGroupResponse>>(`/groups/${groupId}/members`, { studentCode })).data.data,
   removeMember: async (groupId: number, studentId: number) =>
     (await apiClient.delete<ApiResponse<StudentGroupResponse>>(`/groups/${groupId}/members/${studentId}`)).data.data,
+  invite: async (payload: { groupId: number; studentCode: string; expiresAt: string }) =>
+    (await apiClient.post<ApiResponse<GroupInvitationResponse>>('/group-invitations', payload)).data.data,
+  myInvitations: async (page = 0, size = 100) =>
+    (await apiClient.get<ApiResponse<PageResponse<GroupInvitationResponse>>>('/group-invitations/mine', { params: { page, size } })).data.data,
+  invitationsForGroup: async (groupId: number) =>
+    (await apiClient.get<ApiResponse<GroupInvitationResponse[]>>(`/group-invitations/groups/${groupId}`)).data.data,
+  acceptInvitation: async (id: number) =>
+    (await apiClient.patch<ApiResponse<GroupInvitationResponse>>(`/group-invitations/${id}/accept`)).data.data,
+  rejectInvitation: async (id: number) =>
+    (await apiClient.patch<ApiResponse<GroupInvitationResponse>>(`/group-invitations/${id}/reject`)).data.data,
+  cancelInvitation: async (id: number) =>
+    (await apiClient.patch<ApiResponse<GroupInvitationResponse>>(`/group-invitations/${id}/cancel`)).data.data,
 }

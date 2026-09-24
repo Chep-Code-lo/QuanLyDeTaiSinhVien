@@ -11,6 +11,14 @@ import type {
   SemesterResponse,
 } from '../types/domain'
 
+const DEFAULT_PERIOD_RULES = {
+  minGroupMembers: 1,
+  maxGroupMembers: 3,
+  invitationExpiryHours: 72,
+  minCommitteeMembers: 3,
+  maxCommitteeMembers: 5,
+} as const
+
 export const AcademicManagementPage: React.FC = () => {
   const { user, hasRole, hasAppointment } = useAuth()
   const { showSuccess, showError } = useToast()
@@ -40,6 +48,7 @@ export const AcademicManagementPage: React.FC = () => {
     registrationEndAt: '',
     reviewDeadlineAt: null,
     defenseDate: null,
+    ...DEFAULT_PERIOD_RULES,
   })
 
   // Load catalogs
@@ -85,6 +94,14 @@ export const AcademicManagementPage: React.FC = () => {
       showError('Hãy nhập đủ hai giai đoạn: đề xuất đề tài và đăng ký đề tài.')
       return
     }
+    if (newPeriod.minGroupMembers > newPeriod.maxGroupMembers) {
+      showError('Số thành viên tối thiểu của nhóm không được lớn hơn số tối đa.')
+      return
+    }
+    if (newPeriod.minCommitteeMembers > newPeriod.maxCommitteeMembers) {
+      showError('Số thành viên tối thiểu của hội đồng không được lớn hơn số tối đa.')
+      return
+    }
 
     try {
       setSubmittingPeriod(true)
@@ -97,6 +114,7 @@ export const AcademicManagementPage: React.FC = () => {
         semesterId: semesters[0]?.id || 0,
         name: '',
         projectType: 'COURSE', proposalStartAt: '', proposalEndAt: '', registrationStartAt: '', registrationEndAt: '', reviewDeadlineAt: null, defenseDate: null,
+        ...DEFAULT_PERIOD_RULES,
       })
     } catch (err: any) {
       showError('Lỗi tạo đợt đăng ký: ' + (err.response?.data?.message || err.message))
@@ -205,6 +223,7 @@ export const AcademicManagementPage: React.FC = () => {
                     <th>Học kỳ</th>
                     <th>Thời gian bắt đầu</th>
                     <th>Thời gian kết thúc</th>
+                    <th>Quy tắc áp dụng</th>
                     <th>Trạng thái</th>
                     <th>Thao tác</th>
                   </tr>
@@ -218,6 +237,11 @@ export const AcademicManagementPage: React.FC = () => {
                       <td>HK {p.semesterNo} · {p.academicYear}</td>
                       <td className="text-xs">Đề xuất: {new Date(p.proposalStartAt).toLocaleString('vi-VN')}<br />Đăng ký: {new Date(p.registrationStartAt).toLocaleString('vi-VN')}</td>
                       <td className="text-xs">Đề xuất: {new Date(p.proposalEndAt).toLocaleString('vi-VN')}<br />Đăng ký: {new Date(p.registrationEndAt).toLocaleString('vi-VN')}</td>
+                      <td className="text-xs">
+                        Nhóm: {p.minGroupMembers}–{p.maxGroupMembers} SV<br />
+                        Lời mời: {p.invitationExpiryHours} giờ<br />
+                        Hội đồng: {p.minCommitteeMembers}–{p.maxCommitteeMembers} GV
+                      </td>
                       <td>
                         <StatusBadge status={p.status} />
                       </td>
@@ -391,6 +415,24 @@ export const AcademicManagementPage: React.FC = () => {
                 <div className="grid-cols-2">
                   <div className="form-group"><label className="form-label">Mở đăng ký của SV <span className="text-red">*</span></label><input type="datetime-local" className="form-input" value={newPeriod.registrationStartAt} onChange={(e) => setNewPeriod({ ...newPeriod, registrationStartAt: e.target.value })} required /></div>
                   <div className="form-group"><label className="form-label">Đóng đăng ký của SV <span className="text-red">*</span></label><input type="datetime-local" className="form-input" value={newPeriod.registrationEndAt} onChange={(e) => setNewPeriod({ ...newPeriod, registrationEndAt: e.target.value })} required /></div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Quy tắc nhóm thực hiện</label>
+                  <div className="grid-cols-2">
+                    <div className="form-group"><label className="form-label">Số thành viên tối thiểu <span className="text-red">*</span></label><input type="number" min="1" max="10" step="1" className="form-input" value={newPeriod.minGroupMembers} onChange={(e) => setNewPeriod({ ...newPeriod, minGroupMembers: Number(e.target.value) })} required /></div>
+                    <div className="form-group"><label className="form-label">Số thành viên tối đa <span className="text-red">*</span></label><input type="number" min="1" max="10" step="1" className="form-input" value={newPeriod.maxGroupMembers} onChange={(e) => setNewPeriod({ ...newPeriod, maxGroupMembers: Number(e.target.value) })} required /></div>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Thời hạn lời mời tham gia nhóm (giờ) <span className="text-red">*</span></label>
+                  <input type="number" min="1" max="720" step="1" className="form-input" value={newPeriod.invitationExpiryHours} onChange={(e) => setNewPeriod({ ...newPeriod, invitationExpiryHours: Number(e.target.value) })} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Quy tắc hội đồng</label>
+                  <div className="grid-cols-2">
+                    <div className="form-group"><label className="form-label">Số thành viên tối thiểu <span className="text-red">*</span></label><input type="number" min="1" max="10" step="1" className="form-input" value={newPeriod.minCommitteeMembers} onChange={(e) => setNewPeriod({ ...newPeriod, minCommitteeMembers: Number(e.target.value) })} required /></div>
+                    <div className="form-group"><label className="form-label">Số thành viên tối đa <span className="text-red">*</span></label><input type="number" min="1" max="10" step="1" className="form-input" value={newPeriod.maxCommitteeMembers} onChange={(e) => setNewPeriod({ ...newPeriod, maxCommitteeMembers: Number(e.target.value) })} required /></div>
+                  </div>
                 </div>
                 {(newPeriod.projectType === 'SPECIALIZED' || newPeriod.projectType === 'GRADUATION') && <div className="form-group"><label className="form-label">Hạn GVPB nộp điểm <span className="text-red">*</span></label><input type="datetime-local" className="form-input" value={newPeriod.reviewDeadlineAt || ''} onChange={(e) => setNewPeriod({ ...newPeriod, reviewDeadlineAt: e.target.value || null })} required /></div>}
                 {newPeriod.projectType === 'GRADUATION' && <div className="form-group"><label className="form-label">Ngày báo cáo hội đồng <span className="text-red">*</span></label><input type="date" className="form-input" value={newPeriod.defenseDate || ''} onChange={(e) => setNewPeriod({ ...newPeriod, defenseDate: e.target.value || null })} required /></div>}

@@ -1,8 +1,10 @@
 package com.example.qldetai.feature.backend2;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.qldetai.common.api.PageResponse;
+import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.feature.academic.domain.Department;
 import com.example.qldetai.feature.academic.repository.DepartmentRepository;
 import com.example.qldetai.feature.academic.domain.Faculty;
@@ -48,6 +50,7 @@ import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CreateGrad
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.DefenseSessionResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.EvaluationCommitteeResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.GradeChangeRequestResponse;
+import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultDetailResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ReviewGradeChangeRequest;
 import com.example.qldetai.feature.evaluation.dto.EvaluationDtos.AssessmentComponentResponse;
@@ -293,6 +296,11 @@ class Backend2WorkflowTests {
         assertThat(reviewed.status()).isEqualTo(RegistrationStatus.APPROVED);
         assertThat(reviewed.reviewedBy()).isEqualTo(admin.getId());
         assertThat(reviewed.decisionReason()).isNull();
+        assertThat(projectAssignmentRepository.findByRegistrationId(reviewed.id()))
+                .isPresent()
+                .get()
+                .extracting(project -> project.getStatus())
+                .isEqualTo(AssignmentStatus.IN_PROGRESS);
     }
 
     @Test
@@ -304,14 +312,15 @@ class Backend2WorkflowTests {
         TopicRegistrationResponse approvedRegistration = registrationService.create(
                 new CreateTopicRegistrationRequest(firstGroup.id(), topic.id(), "Nhóm A đăng ký."),
                 leaderStudent.getUser().getId());
-        approvedRegistration = registrationService.review(
-                approvedRegistration.id(),
-                new ReviewTopicRegistrationRequest(approvedRegistration.version(), RegistrationStatus.APPROVED, null),
-                admin.getId());
 
         TopicRegistrationResponse pendingRegistration = registrationService.create(
                 new CreateTopicRegistrationRequest(secondGroup.id(), topic.id(), "Nhóm B đăng ký."),
                 thirdStudent.getUser().getId());
+
+        approvedRegistration = registrationService.review(
+                approvedRegistration.id(),
+                new ReviewTopicRegistrationRequest(approvedRegistration.version(), RegistrationStatus.APPROVED, null),
+                admin.getId());
 
         ProjectAssignmentResponse created = projectAssignmentService.create(
                 new CreateAssignmentRequest(approvedRegistration.id()),
@@ -429,7 +438,53 @@ class Backend2WorkflowTests {
     }
 
     @Test
-    void approvedGradeChangeBecomesAppliedAfterEvaluatorResubmits() {
+    void defenseCannotBeScheduledUntilEveryReviewSheetIsSubmitted() {
+        ProjectAssignmentResponse assignment = createAssignedProject("dt-review-gate-01", leaderStudent, secondStudent);
+        LockedCatalog reviewCatalog = createLockedCatalog(
+                "review-gate-01",
+                "Phản biện bắt buộc",
+                AssessmentComponentType.REVIEW,
+                1);
+        evaluationService.assign(
+                new CreateEvaluationRequest(
+                        assignment.id(),
+                        reviewCatalog.rubric().id(),
+                        lecturerThree.getId(),
+                        null,
+                        nowUtc().plusDays(4)),
+                admin.getId());
+
+        Long committeeId = evaluationAdministrationService.createCommittee(
+                new CreateCommitteeRequest(period.getId(), "Hội đồng kiểm tra phản biện"),
+                admin.getId());
+        evaluationAdministrationService.addMember(
+                committeeId,
+                new AddCommitteeMemberRequest(lecturerThree.getId(), 1, CommitteeRole.CHAIR),
+                admin.getId());
+        evaluationAdministrationService.addMember(
+                committeeId,
+                new AddCommitteeMemberRequest(lecturerFour.getId(), 2, CommitteeRole.SECRETARY),
+                admin.getId());
+        evaluationAdministrationService.addMember(
+                committeeId,
+                new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER),
+                admin.getId());
+
+        LocalDateTime startsAt = nowUtc().plusDays(5);
+        assertThatThrownBy(() -> evaluationAdministrationService.schedule(
+                        new CreateDefenseRequest(
+                                assignment.id(),
+                                committeeId,
+                                "Phòng A102",
+                                startsAt,
+                                startsAt.plusHours(1)),
+                        admin.getId()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Complete every reviewer assignment");
+    }
+
+    @Test
+    void gradeChangeCannotReopenAScoreSheetUsedByAFinalizedResult() {
         ProjectAssignmentResponse assignment = createAssignedProject("dt-grade-change-01", leaderStudent, secondStudent);
         LockedCatalog catalog = createLockedCatalog(
                 "pb-01",
@@ -455,32 +510,37 @@ class Backend2WorkflowTests {
                         true),
                 lecturerThree.getUser().getId());
 
-        ResultResponse finalized = evaluationAdministrationService.finalizeResult(assignment.id(), admin.getId());
+        // The request is valid while the sheet is still submitted; finalization
+        // may happen before an administrator decides whether to approve it.
         Long changeId = evaluationAdministrationService.requestChange(
                 submittedSheet.id(),
                 new CreateGradeChangeRequest("Cần chỉnh lại nhận xét và điểm."),
                 lecturerThree.getUser().getId());
-        evaluationAdministrationService.reviewChange(
-                changeId,
-                new ReviewGradeChangeRequest(true, "Cho phép sửa lại phiếu chấm."),
-                admin.getId());
+        ResultResponse finalized = evaluationAdministrationService.finalizeResult(assignment.id(), admin.getId());
 
-        ScoreSheetResponse reopenedSheet = evaluationService.mySheet(evaluationId, lecturerThree.getUser().getId());
-        PageResponse<GradeChangeRequestResponse> approvedChanges = evaluationAdministrationService.listChanges(
-                GradeChangeStatus.APPROVED,
-                submittedSheet.id(),
-                0,
-                10,
-                admin.getId());
-
-        ScoreSheetResponse resubmittedSheet = evaluationService.saveSheet(
-                evaluationId,
-                new SaveSheetRequest(
-                        reopenedSheet.version(),
-                        "Bản chấm đã chỉnh sửa",
-                        scoreRequests(catalog.rubric(), new BigDecimal("5.50"), new BigDecimal("4.00")),
-                        true),
-                lecturerThree.getUser().getId());
+        assertThatThrownBy(() -> evaluationAdministrationService.reviewChange(
+                        changeId,
+                        new ReviewGradeChangeRequest(true, "Cho phép sửa lại phiếu chấm."),
+                        admin.getId()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("captured by a result version");
+        ResultResponse published = evaluationAdministrationService.publish(finalized.id(), admin.getId());
+        assertThatThrownBy(() -> evaluationAdministrationService.requestChange(
+                        submittedSheet.id(),
+                        new CreateGradeChangeRequest("Không được mở lại sau khi chốt."),
+                        lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("captured by a result version");
+        assertThatThrownBy(() -> evaluationService.saveSheet(
+                        evaluationId,
+                        new SaveSheetRequest(
+                                submittedSheet.version(),
+                                "Không được sửa nguồn điểm đã chốt",
+                                scoreRequests(catalog.rubric(), new BigDecimal("5.50"), new BigDecimal("4.00")),
+                                true),
+                        lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("captured by a result version");
 
         PageResponse<GradeChangeRequestResponse> allChanges = evaluationAdministrationService.listChanges(
                 null,
@@ -490,18 +550,94 @@ class Backend2WorkflowTests {
                 admin.getId());
 
         assertThat(finalized.status().name()).isEqualTo("FINALIZED");
-        assertThat(reopenedSheet.status()).isEqualTo(ScoreSheetStatus.DRAFT);
-        assertThat(approvedChanges.content()).singleElement().satisfies(change -> {
-            assertThat(change.id()).isEqualTo(changeId);
-            assertThat(change.status()).isEqualTo(GradeChangeStatus.APPROVED);
-            assertThat(change.appliedAt()).isNull();
-        });
-        assertThat(resubmittedSheet.status()).isEqualTo(ScoreSheetStatus.SUBMITTED);
+        assertThat(published.status().name()).isEqualTo("PUBLISHED");
         assertThat(allChanges.content()).singleElement().satisfies(change -> {
             assertThat(change.id()).isEqualTo(changeId);
-            assertThat(change.status()).isEqualTo(GradeChangeStatus.APPLIED);
-            assertThat(change.appliedAt()).isNotNull();
+            assertThat(change.status()).isEqualTo(GradeChangeStatus.PENDING);
+            assertThat(change.appliedAt()).isNull();
+            assertThat(change.reviewedAt()).isNull();
         });
+    }
+
+    @Test
+    void finalResultAveragesEachComponentBeforeAveragingTheComponentsAndKeepsSnapshots() {
+        ProjectAssignmentResponse assignment = createAssignedProject("dt-result-formula-01", leaderStudent, secondStudent);
+        LockedCatalog singleEvaluatorComponent = createLockedCatalog(
+                "other-formula-01",
+                "Điểm thành phần một người chấm",
+                AssessmentComponentType.OTHER,
+                1);
+        LockedCatalog twoEvaluatorComponent = createLockedCatalog(
+                "review-formula-01",
+                "Điểm thành phần hai người chấm",
+                AssessmentComponentType.REVIEW,
+                2);
+
+        Long singleEvaluator = evaluationService.assign(
+                new CreateEvaluationRequest(
+                        assignment.id(),
+                        singleEvaluatorComponent.rubric().id(),
+                        lecturerThree.getId(),
+                        null,
+                        nowUtc().plusDays(4)),
+                admin.getId());
+        Long firstReviewer = evaluationService.assign(
+                new CreateEvaluationRequest(
+                        assignment.id(),
+                        twoEvaluatorComponent.rubric().id(),
+                        lecturerFour.getId(),
+                        null,
+                        nowUtc().plusDays(4)),
+                admin.getId());
+        Long secondReviewer = evaluationService.assign(
+                new CreateEvaluationRequest(
+                        assignment.id(),
+                        twoEvaluatorComponent.rubric().id(),
+                        lecturerFive.getId(),
+                        null,
+                        nowUtc().plusDays(4)),
+                admin.getId());
+
+        evaluationService.saveSheet(
+                singleEvaluator,
+                new SaveSheetRequest(
+                        0,
+                        "8 điểm",
+                        scoreRequests(singleEvaluatorComponent.rubric(), new BigDecimal("6.00"), new BigDecimal("2.00")),
+                        true),
+                lecturerThree.getUser().getId());
+        evaluationService.saveSheet(
+                firstReviewer,
+                new SaveSheetRequest(
+                        0,
+                        "2 điểm",
+                        scoreRequests(twoEvaluatorComponent.rubric(), new BigDecimal("2.00"), BigDecimal.ZERO),
+                        true),
+                lecturerFour.getUser().getId());
+        evaluationService.saveSheet(
+                secondReviewer,
+                new SaveSheetRequest(
+                        0,
+                        "10 điểm",
+                        scoreRequests(twoEvaluatorComponent.rubric(), new BigDecimal("6.00"), new BigDecimal("4.00")),
+                        true),
+                lecturerFive.getUser().getId());
+
+        ResultResponse finalized = evaluationAdministrationService.finalizeResult(assignment.id(), admin.getId());
+        ResultDetailResponse detail = evaluationAdministrationService.getResult(finalized.id(), admin.getId());
+
+        // (8 + average(2, 10)) / 2 = 7.00.  A mean across all three sheets would be 6.67.
+        assertThat(finalized.finalScore()).isEqualByComparingTo("7.00");
+        assertThat(detail.inputs()).hasSize(3);
+        assertThat(detail.inputs()).allSatisfy(input -> {
+            assertThat(input.sheetVersion()).isPositive();
+            assertThat(input.rubricSnapshot()).isNotBlank();
+        });
+        assertThat(detail.members())
+                .extracting(member -> member.studentId())
+                .containsExactlyInAnyOrder(leaderStudent.getId(), secondStudent.getId());
+        assertThat(evaluationService.mySheet(singleEvaluator, lecturerThree.getUser().getId()).status())
+                .isEqualTo(ScoreSheetStatus.LOCKED);
     }
 
     private TopicResponse createPublishedTopic(String code) {
