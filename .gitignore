@@ -3,7 +3,7 @@
 .env.*
 !.env.example
 
-# Local database snapshots created before manual migrations
+# Local database backups
 ql_de_tai_sinh_vien-backup-*.sql
 
 # Java / Spring Boot

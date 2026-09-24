@@ -46,8 +46,10 @@ services:
       CSRF_COOKIE_SECURE: ${CSRF_COOKIE_SECURE:-false}
       CSRF_COOKIE_SAME_SITE: ${CSRF_COOKIE_SAME_SITE:-lax}
       CSRF_COOKIE_DOMAIN: ${CSRF_COOKIE_DOMAIN:-}
-      DEMO_DATA_ENABLED: ${DEMO_DATA_ENABLED:-false}
-      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+      # Local-development defaults. Override these to false/a private password
+      # before using this compose file outside a demo environment.
+      DEMO_DATA_ENABLED: ${DEMO_DATA_ENABLED:-true}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-Demo@123}
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
     volumes:

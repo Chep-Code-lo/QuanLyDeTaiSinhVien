@@ -88,6 +88,7 @@ public class DemoDataInitializer implements ApplicationRunner {
         if (demoPassword == null || demoPassword.length() < 8) {
             throw new IllegalStateException("DEMO_PASSWORD must contain at least 8 characters when demo data is enabled.");
         }
+        LocalDateTime now = LocalDateTime.now();
 
         Faculty faculty = facultyRepository.findByCodeIgnoreCase("CNTT").orElseGet(() -> {
             Faculty created = new Faculty();
@@ -155,15 +156,21 @@ public class DemoDataInitializer implements ApplicationRunner {
             period.setSemester(semester);
             period.setName("Đợt KLTN demo 2026-2027");
             period.setProjectType(ProjectType.GRADUATION);
-            period.setProposalStartAt(LocalDateTime.of(2026, Month.SEPTEMBER, 15, 0, 0));
-            period.setProposalEndAt(LocalDateTime.of(2026, Month.SEPTEMBER, 30, 23, 59));
-            period.setRegistrationStartAt(LocalDateTime.of(2026, Month.OCTOBER, 1, 0, 0));
-            period.setRegistrationEndAt(LocalDateTime.of(2026, Month.OCTOBER, 15, 23, 59));
-            period.setReviewDeadlineAt(LocalDateTime.of(2027, Month.JANUARY, 10, 23, 59));
-            period.setDefenseDate(LocalDate.of(2027, Month.JANUARY, 20));
+            // Keep the fresh demo usable immediately, including the student-group flow.
+            period.setProposalStartAt(now.minusDays(14));
+            period.setProposalEndAt(now.minusDays(1));
+            period.setRegistrationStartAt(now.minusHours(1));
+            period.setRegistrationEndAt(now.plusDays(30));
+            period.setReviewDeadlineAt(now.plusDays(45));
+            period.setDefenseDate(now.plusDays(60).toLocalDate());
+            period.setMinGroupMembers(1);
+            period.setMaxGroupMembers(3);
+            period.setInvitationExpiryHours(72);
+            period.setMinCommitteeMembers(3);
+            period.setMaxCommitteeMembers(5);
             period.setStatus(RegistrationPeriodStatus.ACTIVE);
             period.setCreatedBy(admin);
-            period.setCreatedAt(LocalDateTime.now());
+            period.setCreatedAt(now);
             registrationPeriodRepository.save(period);
         }
 

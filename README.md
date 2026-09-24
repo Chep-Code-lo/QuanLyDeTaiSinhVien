@@ -55,12 +55,20 @@ CSRF_COOKIE_SAME_SITE=none
 
 Nếu dùng chung một domain và reverse proxy `/api/*` về backend thì không cần chuyển `same-site` sang `none`.
 
-Để tạo dữ liệu demo gồm admin, giảng viên, sinh viên, nhiệm vụ trưởng khoa và một đợt KLTN hợp lệ:
+Khi chạy local không dùng Docker, có thể bật dữ liệu demo gồm admin, giảng viên, sinh viên, nhiệm vụ trưởng khoa và một đợt KLTN đang mở:
 
 ```powershell
 $env:DEMO_DATA_ENABLED = "true"
-$env:DEMO_PASSWORD = "a-demo-password-with-at-least-8-characters"
+$env:DEMO_PASSWORD = "Demo@123"
 ```
+
+Tài khoản demo:
+
+| Vai trò | Tài khoản | Mật khẩu |
+| --- | --- | --- |
+| Quản trị | `admin@demo.local` | `Demo@123` |
+| Giảng viên / trưởng khoa | `lecturer@demo.local` | `Demo@123` |
+| Sinh viên | `student@demo.local` | `Demo@123` |
 
 Tài liệu hợp đồng các phần backend:
 
@@ -81,8 +89,8 @@ Repo đã có sẵn cấu hình `docker-compose.yml` để chạy đồng thời
    FRONTEND_PORT=5173
    BACKEND_PORT=8080
    MYSQL_PORT=3307
-   DEMO_DATA_ENABLED=false
-   DEMO_PASSWORD=
+   DEMO_DATA_ENABLED=true
+   DEMO_PASSWORD=Demo@123
    ```
 
 2. Khởi động toàn bộ stack:
@@ -115,25 +123,15 @@ Ghi chú:
 - Frontend container reverse proxy `/api/*` sang backend nên không cần chỉnh `VITE_API_BASE_URL` khi chạy compose.
 - Nếu muốn import lại schema từ đầu, chạy `docker compose down -v` rồi `docker compose up --build`.
 
-### Nâng cấp MySQL đang dùng volume cũ
+### Reset dữ liệu demo
 
-MySQL chỉ chạy file trong `docker-entrypoint-initdb.d` khi volume còn trống;
-`spring.jpa.hibernate.ddl-auto=none` cũng không tự thay đổi schema. Vì vậy, nếu
-đã có volume `mysql_data`, hãy áp migration thủ công **một lần** trước khi chạy
-backend có các luật đợt đăng ký mới.
+Khi không cần giữ dữ liệu local, reset toàn bộ dữ liệu Docker rồi khởi tạo lại
+schema và tài khoản demo bằng hai lệnh:
 
 ```powershell
-# Khuyến nghị sao lưu trước khi thay đổi schema.
-docker compose exec -T mysql sh -c 'exec mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction --databases ql_de_tai_sinh_vien' > ql_de_tai_sinh_vien-backup.sql
-
-docker compose stop backend
-Get-Content -Raw database/migrations/V20260924__complete_feature_rules.sql |
-  docker compose exec -T mysql sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" ql_de_tai_sinh_vien'
-docker compose up -d --build backend
+docker compose down -v
+docker compose up --build -d
 ```
 
-Migration này bổ sung cấu hình kích thước nhóm, thời hạn lời mời và kích thước
-hội đồng cho từng đợt đăng ký. Không chạy lại file sau khi lệnh đã thành công;
-các ràng buộc `CHECK` trong đó được thay thế theo tên. Với môi trường phát triển
-không cần giữ dữ liệu, `docker compose down -v` rồi khởi động lại vẫn là cách
-tạo schema mới từ đầu.
+Lệnh reset xóa cả dữ liệu MySQL lẫn file upload trong volume Docker. Chỉ dùng
+cho môi trường phát triển/demo.
