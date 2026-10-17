@@ -440,9 +440,12 @@ public class EmailNotificationSettingsService {
             topicDerivedFromAssignment = true;
         }
         if (group != null && topic != null && !groupDerivedFromTopic && !topicDerivedFromAssignment) {
-            boolean related = assignment
-                    .map(value -> value.getTopic().getId().equals(topic.getId()))
-                    .orElseGet(() -> topicRegistrationRepository.existsByGroupIdAndTopicId(group.getId(), topic.getId()));
+            boolean related;
+            if (assignment.isPresent()) {
+                related = assignment.get().getTopic().getId().equals(topic.getId());
+            } else {
+                related = topicRegistrationRepository.existsByGroupIdAndTopicId(group.getId(), topic.getId());
+            }
             if (!related) {
                 throw new BusinessRuleException("The group is not related to the requested topic.");
             }
