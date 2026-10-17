@@ -24,6 +24,15 @@ public interface LecturerRepository extends JpaRepository<Lecturer, Long> {
     @EntityGraph(attributePaths = {"user", "department"})
     List<Lecturer> findByUserIdIn(Collection<Long> userIds);
 
+    @Query("""
+            select l from Lecturer l
+            join fetch l.user
+            where l.department.faculty.id = :facultyId
+              and l.user.status = com.example.qldetai.feature.identity.domain.UserStatus.ACTIVE
+            order by l.user.fullName asc
+            """)
+    List<Lecturer> findActiveByFacultyId(@Param("facultyId") Long facultyId);
+
     boolean existsByLecturerCodeIgnoreCase(String lecturerCode);
 
     @EntityGraph(attributePaths = {"user", "department", "department.faculty"})

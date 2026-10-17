@@ -1,5 +1,6 @@
 package com.example.qldetai.feature.academic;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.qldetai.exception.BusinessRuleException;
@@ -13,6 +14,12 @@ import com.example.qldetai.feature.academic.dto.AcademicDtos.RegistrationPeriodR
 import com.example.qldetai.feature.academic.repository.FacultyRepository;
 import com.example.qldetai.feature.academic.repository.SemesterRepository;
 import com.example.qldetai.feature.academic.service.RegistrationPeriodService;
+import com.example.qldetai.feature.communication.email.EmailNotificationEventType;
+import com.example.qldetai.feature.communication.email.EmailNotificationSettingsService;
+import com.example.qldetai.feature.communication.email.EmailNotificationDtos.UpdateNotificationSettingRequest;
+import com.example.qldetai.feature.communication.email.EmailOutboxRepository;
+import com.example.qldetai.feature.communication.email.EmailRecipientGroup;
+import com.example.qldetai.feature.communication.email.NotificationScopeType;
 import com.example.qldetai.feature.identity.domain.Role;
 import com.example.qldetai.feature.identity.domain.RoleCode;
 import com.example.qldetai.feature.identity.repository.RoleRepository;
@@ -40,6 +47,8 @@ class RegistrationPeriodServiceTests {
     private final SemesterRepository semesterRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final EmailNotificationSettingsService emailNotificationSettingsService;
+    private final EmailOutboxRepository emailOutboxRepository;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
@@ -49,6 +58,8 @@ class RegistrationPeriodServiceTests {
             SemesterRepository semesterRepository,
             UserRepository userRepository,
             RoleRepository roleRepository,
+            EmailNotificationSettingsService emailNotificationSettingsService,
+            EmailOutboxRepository emailOutboxRepository,
             PasswordEncoder passwordEncoder,
             Clock clock) {
         this.registrationPeriodService = registrationPeriodService;
@@ -56,6 +67,8 @@ class RegistrationPeriodServiceTests {
         this.semesterRepository = semesterRepository;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
+        this.emailNotificationSettingsService = emailNotificationSettingsService;
+        this.emailOutboxRepository = emailOutboxRepository;
         this.passwordEncoder = passwordEncoder;
         this.clock = clock;
     }
@@ -131,5 +144,48 @@ class RegistrationPeriodServiceTests {
         assertThatThrownBy(() -> registrationPeriodService.create(request, admin.getId()))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Required order");
+    }
+
+    @Test
+    void registrationOpenedQueuesExactlyOneAdminEmailWhenDraftBecomesActive() {
+        emailNotificationSettingsService.update(
+                admin.getId(),
+                EmailNotificationEventType.REGISTRATION_OPENED,
+                new UpdateNotificationSettingRequest(
+                        NotificationScopeType.SYSTEM,
+                        0L,
+                        true,
+                        "Thông báo hệ thống",
+                        null,
+                        null,
+                        "Đợt {{periodName}} đã mở",
+                        "<p>Chào {{studentName}}, {{periodName}}</p>",
+                        Set.of(EmailRecipientGroup.ADMINS),
+                        null));
+
+        RegistrationPeriodResponse created = registrationPeriodService.create(new CreateRegistrationPeriodRequest(
+                faculty.getId(),
+                semester.getId(),
+                "Course draft",
+                ProjectType.COURSE,
+                LocalDateTime.of(2027, 2, 1, 0, 0),
+                LocalDateTime.of(2027, 2, 10, 0, 0),
+                LocalDateTime.of(2027, 2, 10, 0, 0),
+                LocalDateTime.of(2027, 2, 20, 0, 0),
+                null,
+                null), admin.getId());
+
+        RegistrationPeriodResponse activated = registrationPeriodService.changeStatus(
+                created.id(),
+                new ChangePeriodStatusRequest(created.version(), RegistrationPeriodStatus.ACTIVE),
+                admin.getId());
+
+        assertThat(activated.status()).isEqualTo(RegistrationPeriodStatus.ACTIVE);
+        assertThat(emailOutboxRepository.findAll())
+                .singleElement()
+                .satisfies(outbox -> {
+                    assertThat(outbox.getEventType()).isEqualTo(EmailNotificationEventType.REGISTRATION_OPENED);
+                    assertThat(outbox.getRecipientUser().getId()).isEqualTo(admin.getId());
+                });
     }
 }

@@ -70,8 +70,10 @@ public class RegistrationPeriodController {
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManagePeriod(#id, authentication)")
     public ApiResponse<RegistrationPeriodResponse> changeStatus(
-            @PathVariable Long id, @Valid @RequestBody ChangePeriodStatusRequest request) {
+            @PathVariable Long id,
+            @Valid @RequestBody ChangePeriodStatusRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Registration period status updated.", registrationPeriodService.changeStatus(id, request));
+                "Registration period status updated.", registrationPeriodService.changeStatus(id, request, principal.id()));
     }
 }

@@ -6,6 +6,7 @@ import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ConflictException;
 import com.example.qldetai.exception.ResourceNotFoundException;
 import com.example.qldetai.feature.communication.service.NotificationService;
+import com.example.qldetai.feature.communication.email.EmailNotificationEventService;
 import com.example.qldetai.feature.groupregistration.domain.GroupStatus;
 import com.example.qldetai.feature.groupregistration.domain.RegistrationStatus;
 import com.example.qldetai.feature.groupregistration.domain.TopicRegistration;
@@ -45,6 +46,7 @@ public class ProjectAssignmentService {
     private final GroupMemberRepository groupMemberRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
 
     public ProjectAssignmentService(
@@ -53,12 +55,14 @@ public class ProjectAssignmentService {
             GroupMemberRepository groupMemberRepository,
             UserRepository userRepository,
             NotificationService notificationService,
+            EmailNotificationEventService emailNotificationEventService,
             Clock clock) {
         this.projectAssignmentRepository = projectAssignmentRepository;
         this.topicRegistrationRepository = topicRegistrationRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.emailNotificationEventService = emailNotificationEventService;
         this.clock = clock;
     }
 
@@ -136,6 +140,7 @@ public class ProjectAssignmentService {
                 });
 
         notifyGroup(assignment, "Đề tài đã được giao cho nhóm.");
+        emailNotificationEventService.taskAssigned(assignment, actor);
         return toResponse(assignment);
     }
 

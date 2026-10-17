@@ -22,4 +22,6 @@ public interface ProjectAssignmentRepository extends JpaRepository<ProjectAssign
     boolean existsByGroupId(Long groupId);
 
     boolean existsByTopicId(Long topicId);
+
+    java.util.Optional<ProjectAssignment> findByGroupId(Long groupId);
 }

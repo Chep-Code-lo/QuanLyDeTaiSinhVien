@@ -10,6 +10,7 @@ import com.example.qldetai.feature.academic.domain.RegistrationPeriod;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriodStatus;
 import com.example.qldetai.feature.academic.repository.RegistrationPeriodRepository;
 import com.example.qldetai.feature.communication.service.NotificationService;
+import com.example.qldetai.feature.communication.email.EmailNotificationEventService;
 import com.example.qldetai.feature.groupregistration.domain.StudentGroup;
 import com.example.qldetai.feature.groupregistration.repository.StudentGroupRepository;
 import com.example.qldetai.feature.identity.domain.Lecturer;
@@ -22,6 +23,7 @@ import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.topic.domain.ProposalSource;
 import com.example.qldetai.feature.topic.domain.Topic;
 import com.example.qldetai.feature.topic.domain.TopicReview;
+import com.example.qldetai.feature.topic.domain.TopicReviewDecision;
 import com.example.qldetai.feature.topic.domain.TopicStatus;
 import com.example.qldetai.feature.topic.domain.TopicSupervisor;
 import com.example.qldetai.feature.topic.domain.VisibilityType;
@@ -64,6 +66,7 @@ public class TopicService {
     private final LecturerRepository lecturerRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
 
     public TopicService(
@@ -76,6 +79,7 @@ public class TopicService {
             LecturerRepository lecturerRepository,
             UserRepository userRepository,
             NotificationService notificationService,
+            EmailNotificationEventService emailNotificationEventService,
             Clock clock) {
         this.topicRepository = topicRepository;
         this.topicSupervisorRepository = topicSupervisorRepository;
@@ -86,6 +90,7 @@ public class TopicService {
         this.lecturerRepository = lecturerRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.emailNotificationEventService = emailNotificationEventService;
         this.clock = clock;
     }
 
@@ -232,6 +237,11 @@ public class TopicService {
                 "Đề tài đã được phản hồi",
                 "Đề tài " + topic.getCode() + " vừa được cập nhật trạng thái " + topic.getStatus() + ".",
                 "/topics/" + topic.getId());
+
+        if (review.getDecision() == TopicReviewDecision.APPROVED
+                || review.getDecision() == TopicReviewDecision.REJECTED) {
+            emailNotificationEventService.topicDecision(topic, review);
+        }
 
         return toResponse(topic);
     }

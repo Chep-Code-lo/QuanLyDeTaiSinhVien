@@ -6,6 +6,7 @@ import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ConflictException;
 import com.example.qldetai.exception.ResourceNotFoundException;
 import com.example.qldetai.feature.communication.service.NotificationService;
+import com.example.qldetai.feature.communication.email.EmailNotificationEventService;
 import com.example.qldetai.feature.groupregistration.domain.GroupMember;
 import com.example.qldetai.feature.groupregistration.domain.GroupMemberRole;
 import com.example.qldetai.feature.groupregistration.domain.GroupStatus;
@@ -52,6 +53,7 @@ public class RegistrationService {
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
 
     public RegistrationService(
@@ -64,6 +66,7 @@ public class RegistrationService {
             StudentRepository studentRepository,
             UserRepository userRepository,
             NotificationService notificationService,
+            EmailNotificationEventService emailNotificationEventService,
             Clock clock) {
         this.topicRegistrationRepository = topicRegistrationRepository;
         this.topicRepository = topicRepository;
@@ -74,6 +77,7 @@ public class RegistrationService {
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.emailNotificationEventService = emailNotificationEventService;
         this.clock = clock;
     }
 
@@ -166,6 +170,7 @@ public class RegistrationService {
         } else {
             notifyGroup(registration, "Đăng ký đề tài đã bị từ chối.");
         }
+        emailNotificationEventService.topicRegistrationDecision(registration, actor);
         return toResponse(registration);
     }
 

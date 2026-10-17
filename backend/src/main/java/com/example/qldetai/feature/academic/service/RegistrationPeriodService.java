@@ -17,6 +17,7 @@ import com.example.qldetai.feature.academic.dto.AcademicDtos.UpdateRegistrationP
 import com.example.qldetai.feature.academic.repository.FacultyRepository;
 import com.example.qldetai.feature.academic.repository.RegistrationPeriodRepository;
 import com.example.qldetai.feature.academic.repository.SemesterRepository;
+import com.example.qldetai.feature.communication.email.EmailNotificationEventService;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 import java.time.Clock;
@@ -53,6 +54,7 @@ public class RegistrationPeriodService {
     private final FacultyRepository facultyRepository;
     private final SemesterRepository semesterRepository;
     private final UserRepository userRepository;
+    private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
 
     public RegistrationPeriodService(
@@ -60,11 +62,13 @@ public class RegistrationPeriodService {
             FacultyRepository facultyRepository,
             SemesterRepository semesterRepository,
             UserRepository userRepository,
+            EmailNotificationEventService emailNotificationEventService,
             Clock clock) {
         this.registrationPeriodRepository = registrationPeriodRepository;
         this.facultyRepository = facultyRepository;
         this.semesterRepository = semesterRepository;
         this.userRepository = userRepository;
+        this.emailNotificationEventService = emailNotificationEventService;
         this.clock = clock;
     }
 
@@ -141,6 +145,12 @@ public class RegistrationPeriodService {
     @Transactional
     @BusinessAudit(action = "REGISTRATION_PERIOD_STATUS_CHANGE", entityType = "REGISTRATION_PERIOD", entityIdArgument = 0)
     public RegistrationPeriodResponse changeStatus(Long id, ChangePeriodStatusRequest request) {
+        return changeStatus(id, request, null);
+    }
+
+    @Transactional
+    @BusinessAudit(action = "REGISTRATION_PERIOD_STATUS_CHANGE", entityType = "REGISTRATION_PERIOD", entityIdArgument = 0)
+    public RegistrationPeriodResponse changeStatus(Long id, ChangePeriodStatusRequest request, Long actorId) {
         RegistrationPeriod period = requirePeriod(id);
         verifyVersion(period, request.version());
         if (!TRANSITIONS.get(period.getStatus()).contains(request.status())) {
@@ -157,7 +167,15 @@ public class RegistrationPeriodService {
                 period.getDefenseDate(),
                 request.status());
         validateRules(rulesFor(period));
+        RegistrationPeriodStatus previousStatus = period.getStatus();
         period.setStatus(request.status());
+        if (previousStatus == RegistrationPeriodStatus.DRAFT && request.status() == RegistrationPeriodStatus.ACTIVE) {
+            User actor = actorId == null
+                    ? period.getCreatedBy()
+                    : userRepository.findById(actorId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Activating user was not found."));
+            emailNotificationEventService.registrationOpened(period, actor);
+        }
         return toResponse(period);
     }
 

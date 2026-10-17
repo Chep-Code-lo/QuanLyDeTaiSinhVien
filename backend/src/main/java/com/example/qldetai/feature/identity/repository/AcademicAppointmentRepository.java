@@ -50,6 +50,15 @@ public interface AcademicAppointmentRepository extends JpaRepository<AcademicApp
             @Param("now") LocalDateTime now);
 
     @Query("""
+            select distinct a.faculty.id from AcademicAppointment a
+            where a.lecturer.user.id = :userId
+              and a.positionCode = com.example.qldetai.feature.identity.domain.PositionCode.DEAN
+              and a.startsAt <= :now
+              and (a.endsAt is null or a.endsAt > :now)
+            """)
+    List<Long> findActiveDeanFacultyIds(@Param("userId") Long userId, @Param("now") LocalDateTime now);
+
+    @Query("""
             select a from AcademicAppointment a
             join fetch a.lecturer l
             join fetch l.user

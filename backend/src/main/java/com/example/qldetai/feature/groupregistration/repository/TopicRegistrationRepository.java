@@ -18,5 +18,7 @@ public interface TopicRegistrationRepository extends JpaRepository<TopicRegistra
 
     boolean existsByGroupIdAndStatusIn(Long groupId, Collection<RegistrationStatus> statuses);
 
+    boolean existsByGroupIdAndTopicId(Long groupId, Long topicId);
+
     List<TopicRegistration> findByTopicIdAndStatus(Long topicId, RegistrationStatus status);
 }
