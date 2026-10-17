@@ -1018,7 +1018,7 @@ class ProjectLifecycleIntegrationTests {
     }
 
     private String unique(String base) {
-        return base + "-" + System.nanoTime();
+        return base + "-" + Long.toUnsignedString(System.nanoTime(), 36);
     }
 
     private record LockedCatalog(AssessmentComponentResponse component, RubricResponse rubric) {}
