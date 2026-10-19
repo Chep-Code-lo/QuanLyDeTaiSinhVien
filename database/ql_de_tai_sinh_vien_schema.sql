@@ -183,7 +183,7 @@ CREATE TABLE `registration_periods` (
   CONSTRAINT `ck_registration_periods_09` CHECK (version >= 0),
   CONSTRAINT `ck_registration_periods_10` CHECK (min_group_members BETWEEN 1 AND 10 AND max_group_members BETWEEN min_group_members AND 10),
   CONSTRAINT `ck_registration_periods_11` CHECK (invitation_expiry_hours BETWEEN 1 AND 720),
-  CONSTRAINT `ck_registration_periods_12` CHECK (min_committee_members BETWEEN 1 AND 10 AND max_committee_members BETWEEN min_committee_members AND 10),
+  CONSTRAINT `ck_registration_periods_12` CHECK (min_committee_members BETWEEN 3 AND 5 AND max_committee_members BETWEEN min_committee_members AND 5),
   KEY `ix_registration_periods_01` (`created_by`),
   KEY `ix_registration_periods_02` (`faculty_id`),
   KEY `ix_registration_periods_03` (`semester_id`)
@@ -478,14 +478,14 @@ CREATE TABLE `committee_members` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'PK; tự tăng; số dương',
   `committee_id` BIGINT NOT NULL COMMENT 'FK evaluation_committees.id',
   `lecturer_id` BIGINT NOT NULL COMMENT 'FK lecturers.id',
-  `slot_no` TINYINT NOT NULL COMMENT 'Vị trí 1–10; giới hạn thực tế do đợt đăng ký cấu hình',
+  `slot_no` TINYINT NOT NULL COMMENT 'Vị trí 1–5; giới hạn thực tế do đợt đăng ký cấu hình',
   `committee_role` VARCHAR(20) NOT NULL COMMENT 'CHAIR, SECRETARY, MEMBER',
   `unique_office` VARCHAR(20) GENERATED ALWAYS AS (CASE WHEN committee_role IN ('CHAIR','SECRETARY') THEN committee_role ELSE NULL END) STORED COMMENT 'CHAIR hoặc SECRETARY; MEMBER cho NULL',
   PRIMARY KEY (`id`),
   CONSTRAINT `uq_committee_members_01` UNIQUE (`committee_id`, `slot_no`),
   CONSTRAINT `uq_committee_members_02` UNIQUE (`committee_id`, `lecturer_id`),
   CONSTRAINT `uq_committee_members_03` UNIQUE (`committee_id`, `unique_office`),
-  CONSTRAINT `ck_committee_members_01` CHECK (slot_no BETWEEN 1 AND 10),
+  CONSTRAINT `ck_committee_members_01` CHECK (slot_no BETWEEN 1 AND 5),
   CONSTRAINT `ck_committee_members_02` CHECK (`committee_role` IN ('CHAIR', 'SECRETARY', 'MEMBER')),
   KEY `ix_committee_members_01` (`lecturer_id`)
 ) ENGINE=InnoDB COMMENT='Thành viên hội đồng';

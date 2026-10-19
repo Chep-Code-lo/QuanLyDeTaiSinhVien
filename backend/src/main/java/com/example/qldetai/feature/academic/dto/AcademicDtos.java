@@ -63,8 +63,8 @@ public final class AcademicDtos {
             @Min(1) @Max(10) Integer minGroupMembers,
             @Min(1) @Max(10) Integer maxGroupMembers,
             @Min(1) @Max(720) Integer invitationExpiryHours,
-            @Min(1) @Max(10) Integer minCommitteeMembers,
-            @Min(1) @Max(10) Integer maxCommitteeMembers) {
+            @Min(3) @Max(5) Integer minCommitteeMembers,
+            @Min(3) @Max(5) Integer maxCommitteeMembers) {
 
         /** Backward-compatible request shape; the service supplies the period-rule defaults. */
         public CreateRegistrationPeriodRequest(
@@ -111,8 +111,8 @@ public final class AcademicDtos {
             @Min(1) @Max(10) Integer minGroupMembers,
             @Min(1) @Max(10) Integer maxGroupMembers,
             @Min(1) @Max(720) Integer invitationExpiryHours,
-            @Min(1) @Max(10) Integer minCommitteeMembers,
-            @Min(1) @Max(10) Integer maxCommitteeMembers) {
+            @Min(3) @Max(5) Integer minCommitteeMembers,
+            @Min(3) @Max(5) Integer maxCommitteeMembers) {
 
         /** Backward-compatible request shape; omitted rule values keep the stored configuration. */
         public UpdateRegistrationPeriodRequest(

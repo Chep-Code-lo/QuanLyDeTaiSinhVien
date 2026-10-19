@@ -5,6 +5,7 @@ import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ConflictException;
 import com.example.qldetai.exception.ResourceNotFoundException;
+import com.example.qldetai.feature.academic.domain.RegistrationPeriodStatus;
 import com.example.qldetai.feature.communication.service.NotificationService;
 import com.example.qldetai.feature.communication.email.EmailNotificationEventService;
 import com.example.qldetai.feature.groupregistration.domain.GroupMember;
@@ -190,6 +191,9 @@ public class RegistrationService {
     }
 
     private void ensureGroupReady(StudentGroup group) {
+        if (group.getPeriod().getStatus() != RegistrationPeriodStatus.ACTIVE) {
+            throw new BusinessRuleException("Topics can only be registered in an active registration period.");
+        }
         if (group.getStatus() != GroupStatus.ACTIVE) {
             throw new BusinessRuleException("Only active student groups can register a topic.");
         }

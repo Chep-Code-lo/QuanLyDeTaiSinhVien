@@ -2,12 +2,15 @@ package com.example.qldetai.feature.evaluation.repository;
 
 import com.example.qldetai.feature.evaluation.domain.DefenseSession;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 
 public interface DefenseSessionRepository
         extends JpaRepository<DefenseSession, Long>, JpaSpecificationExecutor<DefenseSession> {
+
+    Optional<DefenseSession> findByAssignmentId(Long assignmentId);
 
     @Query("""
             select count(d) > 0 from DefenseSession d

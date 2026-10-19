@@ -235,6 +235,34 @@ class GroupInvitationServiceIntegrationTests {
                 .hasMessageContaining("configured invitation lifetime");
     }
 
+    @Test
+    void acceptingInvitationRechecksMembershipAcrossPeriods() {
+        StudentGroupResponse group = createGroup();
+        GroupInvitationResponse invitation = createInvitation(group, now().plusMinutes(30));
+        RegistrationPeriod other = new RegistrationPeriod();
+        other.setFaculty(faculty);
+        other.setSemester(period.getSemester());
+        other.setName("Other concurrent period");
+        other.setProjectType(ProjectType.COURSE);
+        other.setProposalStartAt(period.getProposalStartAt());
+        other.setProposalEndAt(period.getProposalEndAt());
+        other.setRegistrationStartAt(period.getRegistrationStartAt());
+        other.setRegistrationEndAt(period.getRegistrationEndAt());
+        other.setStatus(RegistrationPeriodStatus.ACTIVE);
+        other.setCreatedBy(leader.getUser());
+        other.setCreatedAt(now());
+        other = periodRepository.saveAndFlush(other);
+        StudentGroupResponse concurrent = groupService.create(
+                new CreateGroupRequest(other.getId(), "Concurrent group"), invitee.getUser().getId());
+        assertThatThrownBy(() -> invitationService.accept(invitation.id(), invitee.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("active group");
+        assertThat(groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(group.id(), invitee.getId()))
+                .isEmpty();
+        studentGroupRepository.findById(concurrent.id()).orElseThrow().setStatus(GroupStatus.CLOSED);
+        assertThat(invitationService.accept(invitation.id(), invitee.getUser().getId()).status())
+                .isEqualTo(GroupInvitationStatus.ACCEPTED);
+    }
+
     private StudentGroupResponse createGroup() {
         return groupService.create(
                 new CreateGroupRequest(period.getId(), "Nhóm mời " + System.nanoTime()), leader.getUser().getId());

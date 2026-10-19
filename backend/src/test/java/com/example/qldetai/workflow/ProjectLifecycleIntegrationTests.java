@@ -123,6 +123,10 @@ import java.util.Set;
 @Transactional
 class ProjectLifecycleIntegrationTests {
 
+    @Autowired private com.example.qldetai.feature.evaluation.repository.EvaluationAssignmentRepository evaluationRepository;
+    @Autowired private com.example.qldetai.feature.evaluation.repository.ResultVersionRepository resultRepository;
+    @Autowired private AcademicAppointmentRepository appointments;
+
     private final TopicService topicService;
     private final GroupService groupService;
     private final RegistrationService registrationService;
@@ -854,6 +858,170 @@ class ProjectLifecycleIntegrationTests {
                         admin.getId());
         return topicService.publish(
                 assigned.id(), new PublishTopicRequest(assigned.version()), admin.getId());
+    }
+
+    @Test
+    void scoringRejectsExpiredDeadlinesAndCancelledEvaluations() {
+        var project = createAssignedProject("deadline", leaderStudent, secondStudent);
+        var catalog = createLockedCatalog("deadline", "Deadline", AssessmentComponentType.OTHER, 1);
+        Long evaluationId = evaluationService.assign(new CreateEvaluationRequest(project.id(),
+                catalog.rubric().id(), lecturerThree.getId(), null, nowUtc().plusDays(1)), admin.getId());
+        var evaluation = evaluationRepository.findById(evaluationId).orElseThrow();
+        evaluation.setDeadlineAt(nowUtc().minusSeconds(1));
+        var request = new SaveSheetRequest(0, "Test", scoreRequests(catalog.rubric(),
+                new BigDecimal("6"), new BigDecimal("4")), true);
+        assertThatThrownBy(() -> evaluationService.saveSheet(evaluationId, request, lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("deadline");
+        evaluation.setDeadlineAt(nowUtc().plusDays(1));
+        evaluation.setStatus(com.example.qldetai.feature.evaluation.domain.EvaluationStatus.CANCELLED);
+        assertThatThrownBy(() -> evaluationService.saveSheet(evaluationId, request, lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("active evaluation");
+    }
+
+    @Test
+    void reviewScoringHonorsPeriodDeadlineAndRejectsAssignmentsBeyondIt() {
+        var project = createAssignedProject("review-deadline", leaderStudent, secondStudent);
+        var catalog = createLockedCatalog("review-deadline", "Review", AssessmentComponentType.REVIEW, 1);
+        assertThatThrownBy(() -> evaluationService.assign(new CreateEvaluationRequest(project.id(),
+                catalog.rubric().id(), lecturerThree.getId(), null, period.getReviewDeadlineAt().plusDays(1)), admin.getId()))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("cannot exceed");
+        Long id = evaluationService.assign(new CreateEvaluationRequest(project.id(), catalog.rubric().id(),
+                lecturerThree.getId(), null, nowUtc().plusDays(1)), admin.getId());
+        period.setReviewDeadlineAt(nowUtc().minusSeconds(1));
+        assertThatThrownBy(() -> evaluationService.saveSheet(id, new SaveSheetRequest(0, "Late",
+                scoreRequests(catalog.rubric(), new BigDecimal("6"), new BigDecimal("4")), true),
+                lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("review deadline");
+    }
+
+    @Test
+    void studentCannotCreateOrJoinAnotherPeriodWhileTheirGroupIsOpen() {
+        var group = createActiveGroup("Existing", leaderStudent, secondStudent);
+        studentGroupRepository.findById(group.id()).orElseThrow().setStatus(GroupStatus.LOCKED);
+        var otherPeriod = createActivePeriod();
+        for (var state : List.of(RegistrationPeriodStatus.ACTIVE, RegistrationPeriodStatus.CLOSED,
+                RegistrationPeriodStatus.CANCELLED)) {
+            period.setStatus(state);
+            assertThatThrownBy(() -> groupService.create(new CreateGroupRequest(otherPeriod.getId(), "Other"),
+                    leaderStudent.getUser().getId())).isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("active group");
+        }
+        var otherGroup = groupService.create(new CreateGroupRequest(otherPeriod.getId(), "Other"),
+                thirdStudent.getUser().getId());
+        assertThatThrownBy(() -> groupService.addMember(otherGroup.id(),
+                new AddGroupMemberRequest(secondStudent.getStudentCode()), thirdStudent.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("active group");
+        studentGroupRepository.findById(group.id()).orElseThrow().setStatus(GroupStatus.CLOSED);
+        assertThat(groupService.create(new CreateGroupRequest(otherPeriod.getId(), "Next project"),
+                leaderStudent.getUser().getId()).id()).isPositive();
+    }
+
+    @Test
+    void closedOrCancelledPeriodRejectsTopicRegistrationEvenInsideDateWindow() {
+        var topic = createPublishedTopic("closed-period");
+        var group = createActiveGroup("Group", leaderStudent, secondStudent);
+        for (var state : List.of(RegistrationPeriodStatus.CLOSED, RegistrationPeriodStatus.CANCELLED)) {
+            period.setStatus(state);
+            assertThatThrownBy(() -> registrationService.create(
+                    new CreateTopicRegistrationRequest(group.id(), topic.id(), "Test"), leaderStudent.getUser().getId()))
+                    .isInstanceOf(BusinessRuleException.class).hasMessageContaining("active registration period");
+        }
+        period.setStatus(RegistrationPeriodStatus.ACTIVE);
+        assertThat(registrationService.create(new CreateTopicRegistrationRequest(group.id(), topic.id(), "Test"),
+                leaderStudent.getUser().getId()).status()).isEqualTo(RegistrationStatus.PENDING);
+    }
+
+    @Test
+    void finalizationRejectsAComponentWithNoAssignedEvaluator() {
+        var project = createAssignedProject("missing-component", leaderStudent, secondStudent);
+        var scored = createLockedCatalog("scored", "Scored", AssessmentComponentType.OTHER, 1);
+        createLockedCatalog("missing", "Missing", AssessmentComponentType.REVIEW, 1);
+        submitFullScore(project.id(), scored, lecturerThree, null);
+        assertThatThrownBy(() -> evaluationResultService.finalizeResult(project.id(), admin.getId()))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("evaluator assignment is missing");
+        assertThat(resultRepository.countByAssignmentId(project.id())).isZero();
+    }
+
+    @Test
+    void onlyTheCorrespondingChairCanFinalizeACommitteeResultThroughHttp(@Autowired MockMvc mvc) throws Exception {
+        var project = createAssignedProject("chair-only", leaderStudent, secondStudent);
+        var catalog = createLockedCatalog("committee", "Committee", AssessmentComponentType.COMMITTEE, 3);
+        Long committeeId = evaluationCommitteeService.createCommittee(
+                new CreateCommitteeRequest(period.getId(), "Council"), admin.getId());
+        evaluationCommitteeService.addMember(committeeId,
+                new AddCommitteeMemberRequest(lecturerThree.getId(), 1, CommitteeRole.CHAIR), admin.getId());
+        evaluationCommitteeService.addMember(committeeId,
+                new AddCommitteeMemberRequest(lecturerFour.getId(), 2, CommitteeRole.SECRETARY), admin.getId());
+        evaluationCommitteeService.addMember(committeeId,
+                new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER), admin.getId());
+        Long defenseId = defenseSessionService.schedule(new CreateDefenseRequest(project.id(), committeeId,
+                "A101", nowUtc().plusDays(2), nowUtc().plusDays(2).plusHours(1)), admin.getId());
+        submitFullScore(project.id(), catalog, lecturerThree, defenseId);
+        submitFullScore(project.id(), catalog, lecturerFour, defenseId);
+        submitFullScore(project.id(), catalog, lecturerFive, defenseId);
+        Long otherCommittee = evaluationCommitteeService.createCommittee(
+                new CreateCommitteeRequest(period.getId(), "Unrelated council"), admin.getId());
+        evaluationCommitteeService.addMember(otherCommittee,
+                new AddCommitteeMemberRequest(lecturerOne.getId(), 1, CommitteeRole.CHAIR), admin.getId());
+        String url = "/api/v1/project-assignments/" + project.id() + "/results/finalize";
+        for (User denied : List.of(admin, lecturerFour.getUser(), lecturerOne.getUser())) {
+            mvc.perform(post(url).with(user(UserPrincipal.from(denied))).with(csrf()))
+                    .andExpect(status().isForbidden());
+        }
+        mvc.perform(post(url).with(user(UserPrincipal.from(lecturerThree.getUser()))).with(csrf()))
+                .andExpect(status().isOk());
+        assertThat(resultRepository.countByAssignmentId(project.id())).isEqualTo(1);
+    }
+
+    @Test
+    void resultListsAndDetailsAreScopedAndStudentsOnlyReadPublishedSnapshots(@Autowired MockMvc mvc) throws Exception {
+        var project = createAssignedProject("scoped-results", leaderStudent, secondStudent);
+        var catalog = createLockedCatalog("scoped", "Scored", AssessmentComponentType.OTHER, 1);
+        submitFullScore(project.id(), catalog, lecturerThree, null);
+        var finalized = evaluationResultService.finalizeResult(project.id(), admin.getId());
+        assertThat(evaluationResultService.listResults(null, null, null, 0, 1,
+                lecturerFour.getUser().getId()).totalElements()).isZero();
+        assertThat(evaluationResultService.listResults(null, null, null, 0, 1,
+                lecturerThree.getUser().getId()).totalElements()).isEqualTo(1);
+        mvc.perform(get("/api/v1/results/" + finalized.id())
+                .with(user(UserPrincipal.from(lecturerFour.getUser())))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/results/" + finalized.id())
+                .with(user(UserPrincipal.from(leaderStudent.getUser())))).andExpect(status().isForbidden());
+        assertThat(evaluationResultService.getResult(finalized.id(), lecturerThree.getUser().getId()).id())
+                .isEqualTo(finalized.id());
+        assertThat(evaluationResultService.listResults(null, null, null, 0, 10,
+                lecturerOne.getUser().getId()).totalElements()).isZero();
+
+        AcademicAppointment dean = new AcademicAppointment();
+        dean.setLecturer(lecturerFour);
+        dean.setFaculty(createFaculty("OTHER"));
+        dean.setPositionCode(PositionCode.DEAN);
+        dean.setStartsAt(nowUtc().minusDays(1));
+        dean.setAssignedBy(admin);
+        appointments.saveAndFlush(dean);
+        assertThat(evaluationResultService.listResults(null, null, null, 0, 10,
+                lecturerFour.getUser().getId()).totalElements()).isZero();
+        dean.setFaculty(faculty);
+        assertThat(evaluationResultService.listResults(null, null, null, 0, 10,
+                lecturerFour.getUser().getId()).totalElements()).isEqualTo(1);
+        dean.setEndsAt(nowUtc().minusSeconds(1));
+        assertThat(evaluationResultService.listResults(null, null, null, 0, 10,
+                lecturerFour.getUser().getId()).totalElements()).isZero();
+
+        evaluationResultService.publish(finalized.id(), admin.getId());
+        assertThat(evaluationResultService.getResult(finalized.id(), leaderStudent.getUser().getId()).id())
+                .isEqualTo(finalized.id());
+        assertThatThrownBy(() -> evaluationResultService.getResult(finalized.id(), thirdStudent.getUser().getId()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(evaluationResultService.listResults(null, null, null, 0, 10,
+                lecturerOne.getUser().getId()).totalElements()).isEqualTo(1);
+    }
+
+    private void submitFullScore(Long assignmentId, LockedCatalog catalog, Lecturer lecturer, Long defenseId) {
+        Long id = evaluationService.assign(new CreateEvaluationRequest(assignmentId, catalog.rubric().id(),
+                lecturer.getId(), defenseId, nowUtc().plusDays(1)), admin.getId());
+        evaluationService.saveSheet(id, new SaveSheetRequest(0, "Complete",
+                scoreRequests(catalog.rubric(), new BigDecimal("6"), new BigDecimal("4")), true), lecturer.getUser().getId());
     }
 
     private StudentGroupResponse createActiveGroup(String name, Student leader, Student member) {

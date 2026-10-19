@@ -144,7 +144,8 @@ public class EvaluationService {
             throw new ConflictException("This registration period already has an assessment component with that code.");
         }
         if (request.componentType() == AssessmentComponentType.COMMITTEE
-                && (request.expectedEvaluators() < period.getMinCommitteeMembers()
+                && (request.expectedEvaluators() < 3 || request.expectedEvaluators() > 5
+                        || request.expectedEvaluators() < period.getMinCommitteeMembers()
                         || request.expectedEvaluators() > period.getMaxCommitteeMembers())) {
             throw new BusinessRuleException("A committee component must use the evaluator range configured for its registration period.");
         }
@@ -280,6 +281,8 @@ public class EvaluationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Lecturer was not found."));
         AssessmentComponent component = rubric.getComponent();
 
+        validateScoringDeadline(component, assignment, request.deadlineAt());
+
         if (!component.getPeriod().getId().equals(assignment.getPeriod().getId())) {
             throw new BusinessRuleException("Rubric and assignment must belong to the same registration period.");
         }
@@ -347,6 +350,18 @@ public class EvaluationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Evaluation assignment was not found."));
         if (!evaluation.getLecturer().getUser().getId().equals(actorId)) {
             throw new AccessDeniedException("Only the assigned evaluator can score this sheet.");
+        }
+        if (evaluation.getStatus() != EvaluationStatus.ACTIVE) {
+            throw new BusinessRuleException("Only an active evaluation assignment can receive scores.");
+        }
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (now.isAfter(evaluation.getDeadlineAt())) {
+            throw new BusinessRuleException("The scoring deadline has passed.");
+        }
+        LocalDateTime reviewDeadline = evaluation.getAssignment().getPeriod().getReviewDeadlineAt();
+        if (evaluation.getComponent().getComponentType() == AssessmentComponentType.REVIEW
+                && reviewDeadline != null && now.isAfter(reviewDeadline)) {
+            throw new BusinessRuleException("The registration period review deadline has passed.");
         }
 
         ScoreSheet sheet = sheets.findByEvaluationId(evaluationId).orElseGet(() -> {
@@ -420,6 +435,18 @@ public class EvaluationService {
                 });
 
         return sheet(sheet);
+    }
+
+    private void validateScoringDeadline(AssessmentComponent component, ProjectAssignment assignment,
+            LocalDateTime deadline) {
+        if (deadline == null || !deadline.isAfter(LocalDateTime.now(clock))) {
+            throw new BusinessRuleException("The scoring deadline must be in the future.");
+        }
+        LocalDateTime reviewDeadline = assignment.getPeriod().getReviewDeadlineAt();
+        if (component.getComponentType() == AssessmentComponentType.REVIEW
+                && reviewDeadline != null && deadline.isAfter(reviewDeadline)) {
+            throw new BusinessRuleException("The scoring deadline cannot exceed the registration period review deadline.");
+        }
     }
 
     private void ensureReviewCompleteBeforeCommittee(ProjectAssignment assignment) {

@@ -374,16 +374,26 @@ Rule:
 
 Rule:
 
-- Mỗi thành phần chấm phải có đủ số phiếu `SUBMITTED` theo `expectedEvaluators`.
-- Backend tính `finalScore` bằng trung bình cộng các tổng điểm phiếu chấm active hiện có.
+- Đề tài có hội đồng: chỉ chủ tịch hội đồng tương ứng được tổng hợp, kể cả ADMIN không được thay chủ tịch. Đề tài không có hội đồng: ADMIN hoặc người quản lý đúng phạm vi được tổng hợp.
+- Tất cả thành phần cấu hình trong đợt phải `LOCKED`, có đủ phân công ACTIVE và đủ phiếu `SUBMITTED`/`LOCKED` theo `expectedEvaluators`; thành phần chưa phân công không được bỏ qua.
+- Backend tính trung bình các phiếu trong từng thành phần, sau đó trung bình các thành phần để ra `finalScore`.
 - Sau khi finalize, các `score-sheet` liên quan bị khóa.
 
 ### GET `/results/{id}`
 
 Quyền xem:
 
-- `ADMIN`, `LECTURER`: xem mọi kết quả.
-- `STUDENT`: chỉ xem được khi kết quả đã `PUBLISHED` và sinh viên thuộc nhóm của assignment đó.
+- `ADMIN`: xem mọi kết quả.
+- `LECTURER`: chỉ được xem trong phạm vi quản lý khoa/bộ môn còn hiệu lực, hoặc được phân công chấm ACTIVE, hoặc thuộc hội đồng không bị hủy của đề tài. GVHD chỉ được xem kết quả đã `PUBLISHED` của đề tài mình hướng dẫn. Quy tắc này áp dụng cả danh sách và chi tiết, trước phân trang.
+- `STUDENT`: chỉ xem được khi kết quả đã `PUBLISHED` và có sinh viên trong snapshot thành viên của kết quả.
+
+### Ràng buộc backend bổ sung ngày 20/10/2026
+
+- Hạn phân công chấm phải trong tương lai; với REVIEW không được vượt `reviewDeadlineAt` của đợt. Lưu nháp và gửi phiếu đều bị chặn khi quá hạn hoặc phân công bị hủy.
+- Sinh viên không thể tạo/tham gia nhóm khác đợt khi còn thành viên của nhóm FORMING/ACTIVE/LOCKED. Đóng đợt không giải phóng thành viên đang thực hiện; nhóm phải CLOSED hoặc thành viên đã rời nhóm. Các thao tác tạo/thêm/chấp nhận lời mời khóa dòng sinh viên trước khi kiểm tra để tránh hai yêu cầu đồng thời.
+- Đăng ký đề tài chỉ thực hiện khi đợt ACTIVE và còn trong cửa sổ đăng ký.
+- Số thành viên hội đồng luôn trong 3–5; giới hạn được kiểm tra ở DTO, service, khi xếp lịch và schema MySQL.
+- Dự án sử dụng duy nhất `database/ql_de_tai_sinh_vien_schema.sql` để khởi tạo database, đã chứa giới hạn hội đồng mới. Không có file migration riêng. Database đã khởi tạo trước đó không tự thay đổi ràng buộc khi chỉ cập nhật file schema.
 
 ### 2.4. Yêu cầu đổi điểm
 

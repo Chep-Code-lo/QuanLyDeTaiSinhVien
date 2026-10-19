@@ -100,8 +100,9 @@ public class GroupService {
     public StudentGroupResponse create(CreateGroupRequest request, Long actorId) {
         Student creator = requireStudent(actorId);
         RegistrationPeriod period = requireRegistrationWindow(request.periodId());
-        if (groupMemberRepository.existsByPeriodIdAndStudentIdAndLeftAtIsNull(period.getId(), creator.getId())) {
-            throw new BusinessRuleException("Student already belongs to an active group in this registration period.");
+        studentRepository.findByIdForUpdate(creator.getId()).orElseThrow();
+        if (!groupMemberRepository.findConflictingMemberships(period.getId(), creator.getId()).isEmpty()) {
+            throw new BusinessRuleException("Student already belongs to an active group.");
         }
         if (!creator.getDepartment().getFaculty().getId().equals(period.getFaculty().getId())) {
             throw new BusinessRuleException("Student must belong to the same faculty as the registration period.");
@@ -143,8 +144,9 @@ public class GroupService {
         if (!member.getDepartment().getFaculty().getId().equals(period.getFaculty().getId())) {
             throw new BusinessRuleException("All group members must belong to the same faculty as the registration period.");
         }
-        if (groupMemberRepository.existsByPeriodIdAndStudentIdAndLeftAtIsNull(period.getId(), member.getId())) {
-            throw new BusinessRuleException("Student already belongs to an active group in this registration period.");
+        studentRepository.findByIdForUpdate(member.getId()).orElseThrow();
+        if (!groupMemberRepository.findConflictingMemberships(period.getId(), member.getId()).isEmpty()) {
+            throw new BusinessRuleException("Student already belongs to an active group.");
         }
         List<GroupMember> activeMembers =
                 groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(groupId);

@@ -303,8 +303,9 @@ public class GroupInvitationService {
         if (!student.getDepartment().getFaculty().getId().equals(period.getFaculty().getId())) {
             throw new BusinessRuleException("All group members must belong to the same faculty as the registration period.");
         }
-        if (groupMemberRepository.existsByPeriodIdAndStudentIdAndLeftAtIsNull(period.getId(), student.getId())) {
-            throw new BusinessRuleException("Student already belongs to an active group in this registration period.");
+        studentRepository.findByIdForUpdate(student.getId()).orElseThrow();
+        if (!groupMemberRepository.findConflictingMemberships(period.getId(), student.getId()).isEmpty()) {
+            throw new BusinessRuleException("Student already belongs to an active group.");
         }
         if (groupMemberRepository.countByGroupIdAndLeftAtIsNull(group.getId()) >= period.getMaxGroupMembers()) {
             throw new BusinessRuleException("The group has reached its configured maximum number of members.");

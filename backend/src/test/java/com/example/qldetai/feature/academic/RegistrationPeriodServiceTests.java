@@ -147,6 +147,26 @@ class RegistrationPeriodServiceTests {
     }
 
     @Test
+    void committeeRulesRejectCountsOutsideThreeToFive() {
+        for (int[] limits : new int[][] {{2, 5}, {3, 6}, {5, 3}}) {
+            var request = committeePeriod(limits[0], limits[1]);
+            assertThatThrownBy(() -> registrationPeriodService.create(request, admin.getId()))
+                    .isInstanceOf(BusinessRuleException.class);
+        }
+        assertThat(registrationPeriodService.create(committeePeriod(3, 5), admin.getId()).maxCommitteeMembers())
+                .isEqualTo(5);
+        assertThat(registrationPeriodService.create(committeePeriod(5, 5), admin.getId()).minCommitteeMembers())
+                .isEqualTo(5);
+    }
+
+    private CreateRegistrationPeriodRequest committeePeriod(int minimum, int maximum) {
+        return new CreateRegistrationPeriodRequest(faculty.getId(), semester.getId(), "Committee limits",
+                ProjectType.COURSE, LocalDateTime.of(2027, 2, 1, 0, 0), LocalDateTime.of(2027, 2, 10, 0, 0),
+                LocalDateTime.of(2027, 2, 10, 0, 0), LocalDateTime.of(2027, 2, 20, 0, 0),
+                null, null, 1, 3, 72, minimum, maximum);
+    }
+
+    @Test
     void registrationOpenedQueuesExactlyOneAdminEmailWhenDraftBecomesActive() {
         emailNotificationSettingsService.update(
                 admin.getId(),

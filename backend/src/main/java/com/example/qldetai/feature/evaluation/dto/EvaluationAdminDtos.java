@@ -24,7 +24,7 @@ public final class EvaluationAdminDtos {
 
     public record AddCommitteeMemberRequest(
             @NotNull Long lecturerId,
-            @Min(1) @Max(10) int slotNo,
+            @Min(1) @Max(5) int slotNo,
             @NotNull CommitteeRole role) {
     }
 

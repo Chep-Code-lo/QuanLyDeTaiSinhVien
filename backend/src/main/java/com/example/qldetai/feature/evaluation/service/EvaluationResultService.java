@@ -6,6 +6,16 @@ import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ResourceNotFoundException;
 import com.example.qldetai.feature.communication.service.NotificationService;
 import com.example.qldetai.feature.evaluation.domain.AssessmentComponent;
+import com.example.qldetai.feature.evaluation.domain.AssessmentComponentType;
+import com.example.qldetai.feature.evaluation.domain.CommitteeRole;
+import com.example.qldetai.feature.evaluation.domain.DefenseStatus;
+import com.example.qldetai.feature.evaluation.repository.AssessmentComponentRepository;
+import com.example.qldetai.feature.evaluation.repository.CommitteeMemberRepository;
+import com.example.qldetai.feature.evaluation.repository.DefenseSessionRepository;
+import com.example.qldetai.feature.project.service.ProjectAuthorization;
+import com.example.qldetai.feature.identity.domain.RoleCode;
+import com.example.qldetai.security.UserPrincipal;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import com.example.qldetai.feature.evaluation.domain.EvaluationAssignment;
 import com.example.qldetai.feature.evaluation.domain.EvaluationStatus;
 import com.example.qldetai.feature.evaluation.domain.ResultInput;
@@ -69,6 +79,11 @@ public class EvaluationResultService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final EvaluationActorAccess actorAccess;
+    private final AssessmentComponentRepository components;
+    private final DefenseSessionRepository defenses;
+    private final CommitteeMemberRepository committeeMembers;
+    private final ProjectAuthorization projectAuthorization;
+    private final ResultAccess resultAccess;
 
     public EvaluationResultService(
             StudentRepository students,
@@ -84,7 +99,12 @@ public class EvaluationResultService {
             NotificationService notifications,
             ObjectMapper objectMapper,
             Clock clock,
-            EvaluationActorAccess actorAccess) {
+            EvaluationActorAccess actorAccess,
+            AssessmentComponentRepository components,
+            DefenseSessionRepository defenses,
+            CommitteeMemberRepository committeeMembers,
+            ProjectAuthorization projectAuthorization,
+            ResultAccess resultAccess) {
         this.students = students;
         this.assignments = assignments;
         this.sheets = sheets;
@@ -99,6 +119,11 @@ public class EvaluationResultService {
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.actorAccess = actorAccess;
+        this.components = components;
+        this.defenses = defenses;
+        this.committeeMembers = committeeMembers;
+        this.projectAuthorization = projectAuthorization;
+        this.resultAccess = resultAccess;
     }
 
     @Transactional(readOnly = true)
@@ -110,8 +135,7 @@ public class EvaluationResultService {
             int size,
             Long actorId) {
         actorAccess.manager(actorId);
-        Specification<ResultVersion> specification =
-                (root, query, builder) -> builder.conjunction();
+        Specification<ResultVersion> specification = resultAccess.readableBy(actorId);
         if (periodId != null) {
             specification =
                     specification.and(
@@ -148,7 +172,12 @@ public class EvaluationResultService {
         ResultVersion resultVersion =
                 results.findById(resultId)
                         .orElseThrow(() -> new ResourceNotFoundException("Result was not found."));
-        if (!actorAccess.isManager(actorId)) {
+        if (actorAccess.isManager(actorId)) {
+            if (!results.exists(resultAccess.readableBy(actorId).and(
+                    (root, query, cb) -> cb.equal(root.get("id"), resultId)))) {
+                throw new AccessDeniedException("You cannot view this result.");
+            }
+        } else {
             Student student =
                     students.findByUserId(actorId)
                             .orElseThrow(
@@ -169,6 +198,9 @@ public class EvaluationResultService {
     public ResultResponse finalizeResult(Long assignmentId, Long actorId) {
         actorAccess.manager(actorId);
         ProjectAssignment assignment = assignment(assignmentId);
+        List<AssessmentComponent> requiredComponents =
+                components.findByPeriodIdOrderByCodeAsc(assignment.getPeriod().getId());
+        requireFinalizer(assignment, requiredComponents, actorId);
         if (results.findByAssignmentIdAndStatus(assignmentId, ResultStatus.FINALIZED).isPresent()) {
             throw new BusinessRuleException(
                     "A finalized result is already awaiting publication or supersession.");
@@ -187,8 +219,14 @@ public class EvaluationResultService {
                                         evaluation -> evaluation.getComponent().getId()));
         Map<Long, ScoreSheet> sourceSheets = new LinkedHashMap<>();
         List<BigDecimal> componentAverages = new java.util.ArrayList<>();
-        for (List<EvaluationAssignment> componentEvaluations : byComponent.values()) {
-            AssessmentComponent component = componentEvaluations.getFirst().getComponent();
+        if (requiredComponents.isEmpty()) {
+            throw new BusinessRuleException("Configure the required assessment components before finalization.");
+        }
+        for (AssessmentComponent component : requiredComponents) {
+            if (!"LOCKED".equals(component.getStatus())) {
+                throw new BusinessRuleException("All required assessment components must be locked before finalization.");
+            }
+            List<EvaluationAssignment> componentEvaluations = byComponent.getOrDefault(component.getId(), List.of());
             if (componentEvaluations.size() != component.getExpectedEvaluators()) {
                 throw new BusinessRuleException(
                         "Cannot finalize while a required evaluator assignment is missing.");
@@ -249,6 +287,27 @@ public class EvaluationResultService {
         snapshotInputs(resultVersion, activeEvaluations, sourceSheets);
         snapshotMembers(resultVersion, assignment);
         return result(resultVersion);
+    }
+
+    private void requireFinalizer(ProjectAssignment assignment, List<AssessmentComponent> required, Long actorId) {
+        var defense = defenses.findByAssignmentId(assignment.getId());
+        boolean needsChair = defense.isPresent() || required.stream()
+                .anyMatch(component -> component.getComponentType() == AssessmentComponentType.COMMITTEE);
+        if (needsChair) {
+            if (defense.isEmpty() || defense.get().getStatus() == DefenseStatus.CANCELLED
+                    || !committeeMembers.existsByCommitteeIdAndLecturerUserIdAndCommitteeRole(
+                            defense.get().getCommittee().getId(), actorId, CommitteeRole.CHAIR)) {
+                throw new AccessDeniedException("Only the chair of this project's defense committee can finalize its result.");
+            }
+            return;
+        }
+        // Projects without a committee retain the existing scoped academic management workflow.
+        var principal = UserPrincipal.from(actorAccess.user(actorId));
+        var authentication = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+        if (!principal.roles().contains(RoleCode.ADMIN)
+                && !projectAuthorization.canManageAssignment(assignment.getId(), authentication)) {
+            throw new AccessDeniedException("Only this project's academic manager can finalize a result without a committee.");
+        }
     }
 
     @Transactional

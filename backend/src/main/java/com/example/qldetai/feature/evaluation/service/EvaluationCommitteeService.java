@@ -111,11 +111,11 @@ public class EvaluationCommitteeService {
             throw new BusinessRuleException("Only a draft committee can be changed.");
         }
         int maxMembers = committee.getPeriod().getMaxCommitteeMembers();
-        if (request.slotNo() > maxMembers) {
+        if (request.slotNo() > 5 || request.slotNo() > maxMembers) {
             throw new BusinessRuleException(
                     "Committee member slot exceeds this registration period's configured maximum.");
         }
-        if (committeeMembers.findByCommitteeId(committeeId).size() >= maxMembers) {
+        if (committeeMembers.findByCommitteeId(committeeId).size() >= Math.min(5, maxMembers)) {
             throw new BusinessRuleException(
                     "This committee has reached the configured maximum number of members.");
         }

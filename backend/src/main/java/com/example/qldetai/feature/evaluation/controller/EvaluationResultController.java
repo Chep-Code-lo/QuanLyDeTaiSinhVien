@@ -52,8 +52,7 @@ public class EvaluationResultController {
     }
 
     @PostMapping("/project-assignments/{id}/results/finalize")
-    @PreAuthorize(
-            "hasRole('ADMIN') or @projectAuthorization.canManageAssignment(#id, authentication)")
+    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
     public ApiResponse<ResultResponse> finalize(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success("Result finalized.", service.finalizeResult(id, principal.id()));

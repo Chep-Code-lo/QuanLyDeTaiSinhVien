@@ -127,7 +127,8 @@ public class DefenseSessionService {
         List<CommitteeMember> members = committeeMembers.findByCommitteeId(committee.getId());
         int minMembers = assignment.getPeriod().getMinCommitteeMembers();
         int maxMembers = assignment.getPeriod().getMaxCommitteeMembers();
-        if (members.size() < minMembers
+        if (minMembers < 3 || maxMembers > 5 || members.size() < 3 || members.size() > 5
+                || members.size() < minMembers
                 || members.size() > maxMembers
                 || members.stream()
                         .noneMatch(member -> member.getCommitteeRole() == CommitteeRole.CHAIR)

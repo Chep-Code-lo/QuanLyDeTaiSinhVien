@@ -303,9 +303,9 @@ public class RegistrationPeriodService {
         if (rules.invitationExpiryHours() < 1 || rules.invitationExpiryHours() > 720) {
             throw new BusinessRuleException("Invitation expiry must be between 1 and 720 hours.");
         }
-        if (rules.minCommitteeMembers() < 1 || rules.minCommitteeMembers() > 10
-                || rules.maxCommitteeMembers() < 1 || rules.maxCommitteeMembers() > 10) {
-            throw new BusinessRuleException("Committee size limits must be between 1 and 10.");
+        if (rules.minCommitteeMembers() < 3 || rules.minCommitteeMembers() > 5
+                || rules.maxCommitteeMembers() < 3 || rules.maxCommitteeMembers() > 5) {
+            throw new BusinessRuleException("Committee size limits must be between 3 and 5.");
         }
         if (rules.minGroupMembers() > rules.maxGroupMembers()) {
             throw new BusinessRuleException("Minimum group size cannot exceed maximum group size.");
