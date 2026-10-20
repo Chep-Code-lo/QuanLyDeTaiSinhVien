@@ -209,7 +209,7 @@ export function CreateAccountPage() {
             disabled={submitting || loading || loadError || departments.length === 0}
           >
             <h2 className="section-title">Thông tin tài khoản</h2>
-            <p className="section-description">Chọn vai trò và điền thông tin để cấp tài khoản truy cập hệ thống.</p>
+            <p className="section-description"> </p>
             <div className="create-account__grid">
               <div className="form-group">
                 <label className="form-label" htmlFor="create-role">

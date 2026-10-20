@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext'
 type SidebarProps = { onNavigate: () => void }
 
 export function Sidebar({ onNavigate }: SidebarProps) {
-  const { user, hasAnyRole, hasAppointment, canAccessAcademicManagement } = useAuth()
+  const { user, hasRole, hasAnyRole, hasAppointment, canAccessAcademicManagement } = useAuth()
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(
@@ -54,8 +54,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         <img
           className="sidebar__brand-image"
           src="/HCM-UTE_Logo.png"
-          width={88}
-          height={88}
+          width={hasRole('ADMIN') || hasRole('LECTURER') ? 104 : 88}
+          height={hasRole('ADMIN') || hasRole('LECTURER') ? 104 : 88}
           alt="Logo Trường Đại học Công nghệ Kỹ thuật Thành phố Hồ Chí Minh"
         />
       </Link>

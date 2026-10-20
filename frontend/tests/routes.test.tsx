@@ -1,10 +1,21 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { AxiosAdapter } from 'axios'
 import App from '../src/App'
 import { apiClient } from '../src/api/client'
 import type { CurrentUser, RoleCode } from '../src/types/domain'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+// Load the actual styles: rendering routes alone did not catch the broken shell.
+const stylesheet = document.createElement('style')
+beforeAll(() => {
+  stylesheet.textContent = ['index.css', 'App.css', 'student-workspace.css', 'ui.css', 'pages/AnnouncementsPage.css']
+    .map(file => readFileSync(resolve(process.cwd(), 'src', file), 'utf8')).join('\n')
+  document.head.append(stylesheet)
+})
+afterAll(() => stylesheet.remove())
 
 let currentUser: CurrentUser | null
 const emptyPage = { content: [], totalPages: 0, totalElements: 0, page: 0, size: 100 }
@@ -66,6 +77,14 @@ describe.each(['STUDENT', 'LECTURER', 'ADMIN'] as RoleCode[])('Trang dành cho %
     expect(document.querySelector('.toast-error')).toBeNull()
     expect(document.querySelector('.app-sidebar')).toBeTruthy()
     expect(document.querySelector('.page-content')).toBeTruthy()
+    expect(document.querySelector('.app-shell')?.classList.contains('management-shell')).toBe(role !== 'STUDENT')
+    const shell = getComputedStyle(document.querySelector('.app-shell')!)
+    expect(shell.display).toBe('grid')
+    expect(shell.gridTemplateColumns).toBe(`${role === 'STUDENT' ? 264 : 224}px minmax(0, 1fr)`)
+    const logo = getComputedStyle(document.querySelector('.sidebar__brand-image')!)
+    expect(logo.width).toBe(`${role === 'STUDENT' ? 88 : 104}px`)
+    expect(logo.height).toBe(logo.width)
+    expect(getComputedStyle(document.querySelector('.app-main')!).minWidth).toBe('0px')
   })
 })
 
@@ -78,5 +97,6 @@ describe('Trang công khai', () => {
     currentUser = null
     render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>)
     expect(await screen.findByRole('heading', { level: 1, name: heading }, { timeout: 5000 })).toBeTruthy()
+    expect(document.querySelector('.management-shell')).toBeNull()
   })
 })
