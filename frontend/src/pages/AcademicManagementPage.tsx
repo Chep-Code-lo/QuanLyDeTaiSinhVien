@@ -419,8 +419,8 @@ export const AcademicManagementPage: React.FC = () => {
                 <div className="form-group">
                   <label className="form-label">Quy tắc nhóm thực hiện</label>
                   <div className="grid-cols-2">
-                    <div className="form-group"><label className="form-label">Số thành viên tối thiểu <span className="text-red">*</span></label><input type="number" min="1" max="10" step="1" className="form-input" value={newPeriod.minGroupMembers} onChange={(e) => setNewPeriod({ ...newPeriod, minGroupMembers: Number(e.target.value) })} required /></div>
-                    <div className="form-group"><label className="form-label">Số thành viên tối đa <span className="text-red">*</span></label><input type="number" min="1" max="10" step="1" className="form-input" value={newPeriod.maxGroupMembers} onChange={(e) => setNewPeriod({ ...newPeriod, maxGroupMembers: Number(e.target.value) })} required /></div>
+                    <div className="form-group"><label className="form-label">Số thành viên tối thiểu <span className="text-red">*</span></label><input type="number" min="1" max="3" step="1" className="form-input" value={newPeriod.minGroupMembers} onChange={(e) => setNewPeriod({ ...newPeriod, minGroupMembers: Number(e.target.value) })} required /></div>
+                    <div className="form-group"><label className="form-label">Số thành viên tối đa <span className="text-red">*</span></label><input type="number" min="1" max="3" step="1" className="form-input" value={newPeriod.maxGroupMembers} onChange={(e) => setNewPeriod({ ...newPeriod, maxGroupMembers: Number(e.target.value) })} required /></div>
                   </div>
                 </div>
                 <div className="form-group">
@@ -430,8 +430,8 @@ export const AcademicManagementPage: React.FC = () => {
                 <div className="form-group">
                   <label className="form-label">Quy tắc hội đồng</label>
                   <div className="grid-cols-2">
-                    <div className="form-group"><label className="form-label">Số thành viên tối thiểu <span className="text-red">*</span></label><input type="number" min="1" max="10" step="1" className="form-input" value={newPeriod.minCommitteeMembers} onChange={(e) => setNewPeriod({ ...newPeriod, minCommitteeMembers: Number(e.target.value) })} required /></div>
-                    <div className="form-group"><label className="form-label">Số thành viên tối đa <span className="text-red">*</span></label><input type="number" min="1" max="10" step="1" className="form-input" value={newPeriod.maxCommitteeMembers} onChange={(e) => setNewPeriod({ ...newPeriod, maxCommitteeMembers: Number(e.target.value) })} required /></div>
+                    <div className="form-group"><label className="form-label">Số thành viên tối thiểu <span className="text-red">*</span></label><input type="number" min="1" max="3" step="1" className="form-input" value={newPeriod.minCommitteeMembers} onChange={(e) => setNewPeriod({ ...newPeriod, minCommitteeMembers: Number(e.target.value) })} required /></div>
+                    <div className="form-group"><label className="form-label">Số thành viên tối đa <span className="text-red">*</span></label><input type="number" min="1" max="3" step="1" className="form-input" value={newPeriod.maxCommitteeMembers} onChange={(e) => setNewPeriod({ ...newPeriod, maxCommitteeMembers: Number(e.target.value) })} required /></div>
                   </div>
                 </div>
                 {(newPeriod.projectType === 'SPECIALIZED' || newPeriod.projectType === 'GRADUATION') && <div className="form-group"><label className="form-label">Hạn GVPB nộp điểm <span className="text-red">*</span></label><input type="datetime-local" className="form-input" value={newPeriod.reviewDeadlineAt || ''} onChange={(e) => setNewPeriod({ ...newPeriod, reviewDeadlineAt: e.target.value || null })} required /></div>}

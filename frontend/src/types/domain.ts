@@ -263,6 +263,7 @@ export interface DepartmentResponse {
 
 export interface SemesterResponse {
   id: number
+  semesterNo: number
   code: string
   name: string
   academicYear: string
@@ -446,6 +447,7 @@ export type TopicStatus = 'DRAFT' | 'PENDING' | 'APPROVED' | 'PUBLISHED' | 'REJE
 export interface TopicSupervisorResponse { lecturerId: number; lecturerCode: string; lecturerName: string; slotNo: number }
 export interface TopicResponse {
   id: number; periodId: number; periodName: string; facultyId: number; facultyName: string; departmentId: number; departmentName: string
+  availableForRegistration: boolean; proposedBy: number; reservedGroupId?: number; latestReview?: { comment: string; decision: string };
   code: string; title: string; description: string; objectives: string; expectedOutcomes: string; prerequisites?: string; proposerName: string
   visibilityType: 'PUBLIC' | 'PRIVATE' | string; status: TopicStatus; createdAt: string; updatedAt: string; version: number; supervisors: TopicSupervisorResponse[]
 }
