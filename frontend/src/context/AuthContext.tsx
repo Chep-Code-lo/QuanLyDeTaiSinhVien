@@ -2,23 +2,6 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { authApi } from '../api/auth'
 import type { CurrentUser, PositionCode, RoleCode } from '../types/domain'
 
-const MOCK_SESSION_KEY = 'ql-de-tai.mock-session'
-const mockUser: CurrentUser = {
-  id: 0,
-  fullName: 'Nguyễn Lê Hữu Chí',
-  username: 'student.preview',
-  roles: ['STUDENT'],
-  activeAppointments: [],
-  student: { id: 0, studentCode: '22110300', className: '22110CLST', cohort: '2022', departmentId: 1 },
-}
-
-function isMockPreview() {
-  if (new URLSearchParams(window.location.search).get('mock') === '1') {
-    window.localStorage.setItem(MOCK_SESSION_KEY, 'true')
-  }
-  return window.localStorage.getItem(MOCK_SESSION_KEY) === 'true'
-}
-
 interface AuthContextType {
   user: CurrentUser | null
   loading: boolean
@@ -39,11 +22,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true)
 
   const refreshUser = useCallback(async () => {
-    if (isMockPreview()) {
-      setUser(mockUser)
-      setLoading(false)
-      return
-    }
     try {
       setLoading(true)
       const currentUser = await authApi.getCurrentUser()
@@ -59,27 +37,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUser()
   }, [refreshUser])
 
+  useEffect(() => {
+    const expired = () => setUser(null)
+    window.addEventListener('session-expired', expired)
+    return () => window.removeEventListener('session-expired', expired)
+  }, [])
+
   const login = async (username: string, password: string) => {
-    if (isMockPreview()) {
-      setUser({ ...mockUser, username: username || mockUser.username })
-      return
-    }
     const data = await authApi.login({ username, password })
     setUser(data.user)
   }
 
   const logout = async () => {
-    if (isMockPreview()) {
-      window.localStorage.removeItem(MOCK_SESSION_KEY)
-      setUser(null)
-      return
-    }
     try {
       await authApi.logout()
-    } catch {
-      // Ignore logout errors
-    } finally {
       setUser(null)
+    } catch (error) {
+      throw error
     }
   }
 

@@ -30,6 +30,7 @@ export const navigationItems: NavigationItem[] = [
     to: '/admin-appointments',
     adminOnly: true,
   },
+  { icon: '★', label: 'Lịch bảo vệ & Kết quả', to: '/results', roles: ['STUDENT'] },
   { icon: '☻', label: 'Tài khoản', to: '/account' },
   { icon: '◌', label: 'Thông báo', to: '/announcements' },
 ]

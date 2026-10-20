@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
+import { allPages, isWindowOpen, errorMessage } from '../api/student'
+import { registrationApi } from '../api/registrations'
+import { RemoteState } from '../components/RemoteState'
 import { academicApi } from '../api/academic'
 import { groupApi } from '../api/groups'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import type { GroupInvitationResponse, RegistrationPeriodResponse, StudentGroupResponse } from '../types/domain'
+import type { GroupInvitationResponse, RegistrationPeriodResponse, StudentGroupResponse, TopicRegistrationResponse } from '../types/domain'
 
 const messageOf = (error: any) => error.response?.data?.message || 'Không thể thực hiện thao tác. Vui lòng thử lại.'
 
@@ -30,6 +33,20 @@ export function GroupsPage() {
   const [expiresAt, setExpiresAt] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
   const student = hasRole('STUDENT')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [registrations, setRegistrations] = useState<TopicRegistrationResponse[]>([])
+  const [assignedGroups, setAssignedGroups] = useState<number[]>([])
+  const hasOpenGroup = groups.some(g => g.status !== 'CLOSED')
+  const canManage = (g: StudentGroupResponse) => isLeader(g) && ['FORMING','ACTIVE'].includes(g.status) && isWindowOpen(periods.find(p => p.id === g.periodId), 'registration') && !registrations.some(r=>r.groupId===g.id&&['PENDING','APPROVED'].includes(r.status)) && !assignedGroups.includes(g.id)
+  const expiryFor = (g: StudentGroupResponse) => {
+    const end = periods.find(p=>p.id===g.periodId)?.registrationEndAt
+    const value = defaultExpiry(invitationExpiryHoursFor(g.periodId))
+    if (!end || new Date(end) >= new Date(value)) return value
+    const local = new Date(end)
+    local.setMinutes(local.getMinutes() - local.getTimezoneOffset())
+    return local.toISOString().slice(0,16)
+  }
 
   const isLeader = (group: StudentGroupResponse) => group.members.some((member) => member.userId === user?.id && member.memberRole === 'LEADER')
   const invitationExpiryHoursFor = (targetPeriodId: number) =>
@@ -37,11 +54,14 @@ export function GroupsPage() {
 
   const load = async () => {
     setLoading(true)
+    setError('')
     try {
       if (student) {
-        const [myGroups, invitations] = await Promise.all([groupApi.mine(), groupApi.myInvitations()])
+        const [myGroups, invitations, rs, ps] = await Promise.all([groupApi.mine(), allPages(page=>groupApi.myInvitations(page,100)), allPages(page=>registrationApi.list({page,size:100})), allPages(page=>academicApi.getProjectAssignments(undefined,page,100))])
+        setRegistrations(rs)
+        setAssignedGroups(ps.map(p=>p.groupId))
         setGroups(myGroups)
-        setIncoming(invitations.content)
+        setIncoming(invitations)
         const leaderGroups = myGroups.filter(isLeader)
         const invitationLists = await Promise.all(leaderGroups.map(async (group) => [group.id, await groupApi.invitationsForGroup(group.id)] as const))
         setOutgoing(Object.fromEntries(invitationLists))
@@ -51,14 +71,14 @@ export function GroupsPage() {
         setOutgoing({})
       }
     } catch (error) {
-      showError(messageOf(error))
+      setError(errorMessage(error))
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    academicApi.getRegistrationPeriods(undefined, 0, 100).then((items) => setPeriods(items.content)).catch(() => undefined)
+    allPages(page=>academicApi.getRegistrationPeriods(undefined,page,100)).then(setPeriods).catch(e=>setError(errorMessage(e)))
   }, [])
 
   useEffect(() => {
@@ -68,6 +88,8 @@ export function GroupsPage() {
   const create = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!periodId || !name.trim()) return showError('Hãy chọn đợt đăng ký và nhập tên nhóm.')
+    if (busy) return
+    setBusy(true)
     try {
       await groupApi.create({ periodId, name: name.trim() })
       setName('')
@@ -75,24 +97,28 @@ export function GroupsPage() {
       await load()
     } catch (error) {
       showError(messageOf(error))
-    }
+    } finally { setBusy(false) }
   }
 
   const invite = async (group: StudentGroupResponse) => {
     const studentCode = codes[group.id]?.trim()
-    const expiry = expiresAt[group.id] || defaultExpiry(invitationExpiryHoursFor(group.periodId))
+    const expiry = expiresAt[group.id] || expiryFor(group)
     if (!studentCode) return showError('Nhập mã số sinh viên trước.')
+    if (busy) return
+    setBusy(true)
     try {
-      await groupApi.invite({ groupId: group.id, studentCode, expiresAt: expiry })
+      await groupApi.invite({ groupId: group.id, studentCode, expiresAt: new Date(expiry).toISOString() })
       setCodes((items) => ({ ...items, [group.id]: '' }))
       showSuccess('Đã gửi lời mời vào nhóm.')
       await load()
     } catch (error) {
       showError(messageOf(error))
-    }
+    } finally { setBusy(false) }
   }
 
   const respond = async (invitation: GroupInvitationResponse, action: 'accept' | 'reject') => {
+    if (busy) return
+    setBusy(true)
     try {
       const result = action === 'accept' ? await groupApi.acceptInvitation(invitation.id) : await groupApi.rejectInvitation(invitation.id)
       if (result.status === 'EXPIRED') showError('Lời mời đã hết hạn.')
@@ -100,10 +126,12 @@ export function GroupsPage() {
       await load()
     } catch (error) {
       showError(messageOf(error))
-    }
+    } finally { setBusy(false) }
   }
 
   const cancelInvitation = async (invitation: GroupInvitationResponse) => {
+    if (busy) return
+    setBusy(true)
     try {
       const result = await groupApi.cancelInvitation(invitation.id)
       if (result.status === 'EXPIRED') showError('Lời mời đã hết hạn.')
@@ -111,22 +139,27 @@ export function GroupsPage() {
       await load()
     } catch (error) {
       showError(messageOf(error))
-    }
+    } finally { setBusy(false) }
   }
 
   const remove = async (groupId: number, studentId: number) => {
+    if (!window.confirm("Xác nhận xóa thành viên khỏi nhóm?")) return
+    if (busy) return
+    setBusy(true)
     try {
       await groupApi.removeMember(groupId, studentId)
       showSuccess('Đã xóa thành viên.')
       await load()
     } catch (error) {
       showError(messageOf(error))
-    }
+    } finally { setBusy(false) }
   }
 
   return <>
-    <PageHeader title="Nhóm thực hiện" description="Mỗi sinh viên chỉ thuộc một nhóm trong một đợt; trưởng nhóm mời thành viên và người được mời tự xác nhận tham gia." />
+    <PageHeader title="Nhóm thực hiện" description="Mỗi sinh viên chỉ thuộc một nhóm đang thực hiện, tối đa 3 người; trưởng nhóm mời thành viên và người được mời tự xác nhận tham gia." />
 
+    <RemoteState loading={false} error={error} retry={load} />
+    <fieldset className="student-fieldset" disabled={busy || loading || !!error}>
     {student && incoming.some((invitation) => invitation.status === 'PENDING') && (
       <section className="page-card">
         <h2 className="section-title">Lời mời chờ phản hồi</h2>
@@ -139,7 +172,7 @@ export function GroupsPage() {
                 <time>Hết hạn: {new Date(invitation.expiresAt).toLocaleString('vi-VN')}</time>
               </div>
               <div className="inline-form">
-                <button className="btn btn-primary" onClick={() => respond(invitation, 'accept')}>Đồng ý</button>
+                <button className="btn btn-primary" disabled={hasOpenGroup || !isWindowOpen(periods.find(p=>p.id===invitation.periodId),'registration')} onClick={() => respond(invitation, 'accept')}>Đồng ý</button>
                 <button className="btn btn-secondary" onClick={() => respond(invitation, 'reject')}>Từ chối</button>
               </div>
             </article>
@@ -148,19 +181,19 @@ export function GroupsPage() {
       </section>
     )}
 
-    {student ? (
+    {student ? (hasOpenGroup ? <section className="page-card"><p>Bạn đã thuộc một nhóm đang thực hiện. Không thể tạo hoặc tham gia nhóm khác.</p></section> : (
       <section className="page-card">
         <h2 className="section-title">Tạo nhóm mới</h2>
         <form className="inline-form" onSubmit={create}>
           <select className="form-select" value={periodId ?? ''} onChange={(event) => setPeriodId(Number(event.target.value) || undefined)} required>
             <option value="">Chọn đợt đăng ký</option>
-            {periods.map((period) => <option key={period.id} value={period.id}>{period.name} - {period.projectType}</option>)}
+            {periods.filter(p=>isWindowOpen(p,'registration')&&!groups.some(g=>g.periodId===p.id)).map((period) => <option key={period.id} value={period.id}>{period.name} - {period.projectType}</option>)}
           </select>
           <input className="form-input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Tên nhóm" required />
           <button className="btn btn-primary">Tạo nhóm</button>
         </form>
       </section>
-    ) : (
+    )) : (
       <section className="page-card">
         <label className="form-label">Lọc theo đợt đăng ký</label>
         <select className="form-select" value={periodId ?? ''} onChange={(event) => setPeriodId(Number(event.target.value) || undefined)}>
@@ -178,7 +211,6 @@ export function GroupsPage() {
       ) : (
         <div className="stack-list">
           {groups.map((group) => {
-            const leader = isLeader(group)
             const invitations = outgoing[group.id] ?? []
             const invitationExpiryHours = invitationExpiryHoursFor(group.periodId)
             return <article key={group.id} className="group-card">
@@ -190,15 +222,15 @@ export function GroupsPage() {
                 {group.members.map((member) => (
                   <li key={member.studentId}>
                     <span><strong>{member.fullName}</strong> · {member.studentCode} · {member.className}</span>
-                    {member.memberRole === 'LEADER' ? <span className="badge badge-info">Trưởng nhóm</span> : student && leader ? <button className="text-button" onClick={() => remove(group.id, member.studentId)}>Xóa</button> : null}
+                    {member.memberRole === 'LEADER' ? <span className="badge badge-info">Trưởng nhóm</span> : student && canManage(group) ? <button className="text-button" onClick={() => remove(group.id, member.studentId)}>Xóa</button> : null}
                   </li>
                 ))}
               </ul>
-              {student && leader && group.status !== 'LOCKED' && group.status !== 'CLOSED' && <>
+              {student && canManage(group) && <>
                 <div className="inline-form">
                   <input className="form-input" value={codes[group.id] || ''} onChange={(event) => setCodes((items) => ({ ...items, [group.id]: event.target.value }))} placeholder="Mã số sinh viên" />
-                  <input className="form-input" type="datetime-local" value={expiresAt[group.id] || defaultExpiry(invitationExpiryHours)} onChange={(event) => setExpiresAt((items) => ({ ...items, [group.id]: event.target.value }))} />
-                  <button className="btn btn-secondary" onClick={() => invite(group)}>Gửi lời mời</button>
+                  <input className="form-input" type="datetime-local" value={expiresAt[group.id] || expiryFor(group)} onChange={(event) => setExpiresAt((items) => ({ ...items, [group.id]: event.target.value }))} />
+                  <button className="btn btn-secondary" disabled={group.members.length >= 3} onClick={() => invite(group)}>Gửi lời mời</button>
                 </div>
                 <p className="text-secondary text-xs">Lời mời có thời hạn tối đa {invitationExpiryHours} giờ, đồng thời không được vượt quá thời điểm đóng đăng ký.</p>
                 {invitations.length > 0 && (
@@ -217,5 +249,6 @@ export function GroupsPage() {
         </div>
       )}
     </section>
+    </fieldset>
   </>
 }

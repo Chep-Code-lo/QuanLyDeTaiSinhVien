@@ -10,7 +10,7 @@ const workspaceRoot = resolve(configDir, '..')
 export default defineConfig(({ mode }) => {
   const rootEnv = loadEnv(mode, workspaceRoot, '')
   const frontendPort = Number.parseInt(rootEnv.FRONTEND_PORT ?? '', 10)
-  const backendPort = rootEnv.BACKEND_PORT ?? '8080'
+  const backendPort = process.env.BACKEND_PORT ?? rootEnv.BACKEND_PORT ?? '8080'
 
   return {
     plugins: [react()],

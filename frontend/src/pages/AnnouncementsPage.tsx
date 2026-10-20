@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { allPages } from '../api/student'
+import { DownloadButton } from '../components/RemoteState'
 import { Link } from 'react-router-dom'
 import { academicApi } from '../api/academic'
 import { announcementApi } from '../api/announcements'
@@ -11,6 +13,14 @@ import type { AnnouncementResponse, FacultyResponse, NotificationResponse } from
 
 const messageOf = (error: any) => error.response?.data?.message || 'Không thể thực hiện thao tác. Vui lòng thử lại.'
 
+function relatedPath(path: string) {
+  if (path.startsWith('/results')) return '/results'
+  if (path.startsWith('/project-assignments') || path.startsWith('/milestones')) return '/progress'
+  if (path.startsWith('/topic-registrations')) return '/registrations'
+  if (path.startsWith('/topics')) return '/topics'
+  if (path.startsWith('/groups') || path.startsWith('/group-invitations')) return '/groups'
+  return '/announcements'
+}
 export function AnnouncementsPage() {
   const { user, hasAppointment, hasRole } = useAuth()
   const { showError, showSuccess } = useToast()
@@ -34,9 +44,9 @@ export function AnnouncementsPage() {
   const loadPublic = async () => {
     setLoading(true)
     try {
-      const [official, personal] = await Promise.all([announcementApi.list({ size: 100 }), notificationApi.list(0, 100)])
-      setAnnouncements(official.content)
-      setNotifications(personal.content)
+      const [official, personal] = await Promise.all([allPages(page=>announcementApi.list({ page, size: 100 })), allPages(page=>notificationApi.list(page, 100))])
+      setAnnouncements(official)
+      setNotifications(personal)
     } catch (error) {
       showError(messageOf(error))
     } finally {
@@ -71,6 +81,7 @@ export function AnnouncementsPage() {
     if (item.readAt) return
     try {
       const updated = await notificationApi.markRead(item.id)
+      window.dispatchEvent(new Event('notifications-updated'))
       setNotifications((items) => items.map((candidate) => candidate.id === item.id ? updated : candidate))
     } catch (error) {
       showError(messageOf(error))
@@ -88,7 +99,7 @@ export function AnnouncementsPage() {
     event.preventDefault()
     if (!title.trim() || !content.trim() || (!editing && !facultyId)) return
     const optionalAttachment = attachmentFileId.trim() ? Number(attachmentFileId) : null
-    if (attachmentFileId.trim() && (!Number.isInteger(optionalAttachment) || optionalAttachment <= 0)) {
+    if (attachmentFileId.trim() && (optionalAttachment == null || !Number.isInteger(optionalAttachment) || optionalAttachment <= 0)) {
       showError('Mã tệp đính kèm không hợp lệ.')
       return
     }
@@ -132,7 +143,7 @@ export function AnnouncementsPage() {
       {managing && <><div className="inline-form"><select className="form-select" value={facultyId ?? ''} onChange={(event) => setFacultyId(Number(event.target.value) || undefined)}>{allowedFacultyIds.map((id) => <option key={id} value={id}>{faculties.find((faculty) => faculty.id === id)?.name ?? `Khoa #${id}`}</option>)}</select></div>
         <form className="stack-form" onSubmit={save}><input className="form-input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Tiêu đề thông báo" maxLength={250} required /><textarea className="form-textarea" value={content} onChange={(event) => setContent(event.target.value)} placeholder="Nội dung thông báo" required /><input className="form-input" value={attachmentFileId} onChange={(event) => setAttachmentFileId(event.target.value)} placeholder="Mã tệp đính kèm (không bắt buộc)" inputMode="numeric" /><div className="inline-form"><button className="btn btn-primary">{editing ? 'Lưu bản nháp' : 'Tạo bản nháp'}</button>{editing && <button type="button" className="btn btn-secondary" onClick={resetEditor}>Hủy sửa</button>}</div></form>
         <div className="stack-list">{managed.map((announcement) => <article key={announcement.id} className="notification-item"><div><h2>{announcement.title} <StatusBadge status={announcement.status} /></h2><p>{announcement.content}</p><time>Tạo: {new Date(announcement.createdAt).toLocaleString('vi-VN')}</time></div><div className="inline-form">{announcement.status === 'DRAFT' && <><button className="text-button" onClick={() => edit(announcement)}>Sửa</button><button className="text-button" onClick={() => transition(announcement, 'publish')}>Công bố</button><button className="text-button" onClick={() => transition(announcement, 'remove')}>Xóa</button></>}{announcement.status === 'PUBLISHED' && <button className="text-button" onClick={() => transition(announcement, 'archive')}>Lưu trữ</button>}{announcement.status === 'ARCHIVED' && <button className="text-button" onClick={() => transition(announcement, 'remove')}>Xóa</button>}</div></article>)}</div></>}</section>}
-    <section className="page-card"><h2 className="section-title">Thông báo chính thức</h2>{loading ? <div className="content-state"><span className="spinner" /><p>Đang tải thông báo...</p></div> : announcements.length === 0 ? <div className="content-state"><strong>Chưa có thông báo chính thức.</strong></div> : <div className="notification-list">{announcements.map((announcement) => <article key={announcement.id} className="notification-item"><div><h2>{announcement.title}</h2><p>{announcement.content}</p><small>{announcement.facultyName} · {announcement.createdByName}</small><time>{new Date(announcement.publishedAt ?? announcement.createdAt).toLocaleString('vi-VN')}</time></div>{announcement.attachmentPath && <a className="text-button" href={announcement.attachmentPath}>{announcement.attachmentName || 'Tệp đính kèm'}</a>}</article>)}</div>}</section>
-    <section className="page-card"><h2 className="section-title">Nhắc việc cá nhân</h2>{loading ? null : notifications.length === 0 ? <div className="content-state"><strong>Bạn chưa có nhắc việc nào.</strong></div> : <div className="notification-list">{notifications.map((item) => <article key={item.id} className={`notification-item${item.readAt ? '' : ' notification-item--unread'}`} onClick={() => markRead(item)}><div><h2>{item.title}</h2><p>{item.content}</p><time>{new Date(item.createdAt).toLocaleString('vi-VN')}</time></div>{item.targetPath && <Link className="text-button" to={item.targetPath}>Mở liên quan</Link>}</article>)}</div>}</section>
+    <section className="page-card"><h2 className="section-title">Thông báo chính thức</h2>{loading ? <div className="content-state"><span className="spinner" /><p>Đang tải thông báo...</p></div> : announcements.length === 0 ? <div className="content-state"><strong>Chưa có thông báo chính thức.</strong></div> : <div className="notification-list">{announcements.map((announcement) => <article key={announcement.id} className="notification-item"><div><h2>{announcement.title}</h2><p>{announcement.content}</p><small>{announcement.facultyName} · {announcement.createdByName}</small><time>{new Date(announcement.publishedAt ?? announcement.createdAt).toLocaleString('vi-VN')}</time></div>{announcement.attachmentFileId && <DownloadButton id={announcement.attachmentFileId} name={announcement.attachmentName || 'attachment'}/>}</article>)}</div>}</section>
+    <section className="page-card"><h2 className="section-title">Nhắc việc cá nhân</h2>{loading ? null : notifications.length === 0 ? <div className="content-state"><strong>Bạn chưa có nhắc việc nào.</strong></div> : <div className="notification-list">{notifications.map((item) => <article key={item.id} className={`notification-item${item.readAt ? '' : ' notification-item--unread'}`} onClick={() => markRead(item)}><div><h2>{item.title}</h2><p>{item.content}</p><time>{new Date(item.createdAt).toLocaleString('vi-VN')}</time></div>{item.targetPath && <Link className="text-button" to={relatedPath(item.targetPath)}>Mở liên quan</Link>}</article>)}</div>}</section>
   </>
 }

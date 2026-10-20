@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import { PublicHome } from '../StudentPortal'
+import { PublicHome } from '../pages/PublicHome'
+import { StudentProgressPage } from '../pages/StudentProgressPage'
+import { StudentResultsPage } from '../pages/StudentResultsPage'
 import { ProtectedRoute } from '../components/ProtectedRoute'
 import { AppLayout } from '../layouts/AppLayout'
 import { AcademicAppointmentsPage } from '../pages/AcademicAppointmentsPage'
@@ -32,6 +34,8 @@ function PublicHomeRoute() {
 }
 
 export function AppRoutes() {
+  const { hasRole } = useAuth()
+  const student = hasRole('STUDENT') && !hasRole('ADMIN') && !hasRole('LECTURER')
   return (
     <Routes>
       <Route path="/" element={<PublicHomeRoute />} />
@@ -44,10 +48,13 @@ export function AppRoutes() {
           <Route path="topics" element={<TopicsPage />} />
           <Route path="groups" element={<GroupsPage />} />
           <Route path="registrations" element={<RegistrationsPage />} />
-          <Route path="progress" element={<MilestoneManagementPage />} />
+          <Route path="progress" element={student ? <StudentProgressPage /> : <MilestoneManagementPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
           <Route path="account" element={<AccountPage />} />
 
+          <Route element={<ProtectedRoute roles={['STUDENT']} />}>
+            <Route path="results" element={<StudentResultsPage />} />
+          </Route>
           {/* Lecturer & Admin Routes */}
           <Route element={<ProtectedRoute roles={['LECTURER', 'ADMIN']} />}>
             <Route path="evaluations" element={<AssessmentSetupWizardPage />} />

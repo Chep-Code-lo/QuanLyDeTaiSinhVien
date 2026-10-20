@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { notificationApi } from '../api/notifications'
+import { allPages, errorMessage } from '../api/student'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 
@@ -7,7 +9,11 @@ type HeaderProps = { onMenuClick: () => void }
 
 export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuth()
-  const { showSuccess } = useToast()
+  const { showSuccess, showError } = useToast()
+  const navigate = useNavigate()
+  const [search, setSearch] = useState('')
+  const [unread, setUnread] = useState<number | null>(null)
+  const [loggingOut, setLoggingOut] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -17,10 +23,22 @@ export function Header({ onMenuClick }: HeaderProps) {
     return () => document.removeEventListener('mousedown', closeMenu)
   }, [])
 
+  useEffect(() => {
+    let active = true
+    const refresh = () => allPages(page=>notificationApi.list(page,100))
+      .then(items=>{if(active)setUnread(items.filter(n=>!n.readAt).length)})
+      .catch(()=>{if(active)setUnread(null)})
+    void refresh()
+    window.addEventListener('notifications-updated',refresh)
+    const timer = window.setInterval(refresh,60000)
+    return ()=>{active=false;clearInterval(timer);window.removeEventListener('notifications-updated',refresh)}
+  }, [user?.id])
+
   const handleLogout = async () => {
-    await logout()
-    showSuccess('Đã đăng xuất thành công')
-    window.location.assign('/')
+    if(loggingOut)return
+    setLoggingOut(true)
+    try { await logout(); showSuccess('Đã đăng xuất thành công'); navigate('/') }
+    catch(e){showError(errorMessage(e))}finally{setLoggingOut(false)}
   }
 
   const getInitials = (name?: string) => {
@@ -40,20 +58,21 @@ export function Header({ onMenuClick }: HeaderProps) {
   return (
     <header className="topbar">
       <button className="topbar__menu" type="button" onClick={onMenuClick} aria-label="Mở menu điều hướng">☰</button>
-      <label className="topbar__search">
+      <form className="topbar__search" onSubmit={e=>{e.preventDefault();navigate(`/topics?q=${encodeURIComponent(search.trim())}`)}}>
         <span aria-hidden="true">⌕</span>
-        <input type="search" placeholder="Tìm kiếm đề tài, giảng viên, sinh viên..." aria-label="Tìm kiếm toàn hệ thống" />
-      </label>
+        <input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Tìm đề tài, bộ môn, GVHD..." aria-label="Tìm kiếm đề tài" />
+        <button className="text-button" type="submit">Tìm</button>
+      </form>
       <div className="topbar__actions flex items-center gap-3">
         {user ? (
           <>
-            <Link className="notification-button" to="/announcements" title="Thông báo" aria-label="Thông báo mới"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg><span>3</span></Link>
+            <Link className="notification-button" to="/announcements" title="Thông báo" aria-label="Thông báo mới"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>{unread!==null&&unread>0&&<span>{unread}</span>}</Link>
             <div className="account-menu" ref={menuRef}>
             <button className="topbar__account" type="button" onClick={() => setMenuOpen((value) => !value)} aria-expanded={menuOpen}>
               <span className="topbar__avatar">{getInitials(user.fullName)}</span>
               <span className="topbar__account-copy"><strong>{user.fullName}</strong><small>{getRoleLabel()}</small></span><span aria-hidden="true">⌄</span>
             </button>
-            {menuOpen && <div className="account-menu__dropdown"><Link to="/account" onClick={() => setMenuOpen(false)}>Hồ sơ & cài đặt <span>›</span></Link><button type="button" onClick={handleLogout}>Đăng xuất <span>↗</span></button></div>}
+            {menuOpen && <div className="account-menu__dropdown"><Link to="/account" onClick={() => setMenuOpen(false)}>Hồ sơ & cài đặt <span>›</span></Link><button type="button" disabled={loggingOut} onClick={handleLogout}>Đăng xuất <span>↗</span></button></div>}
             </div>
           </>
         ) : (
