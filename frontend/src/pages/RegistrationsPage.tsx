@@ -169,7 +169,10 @@ export function RegistrationsPage() {
   }
   return (
     <>
-      <PageHeader title="Đăng ký đề tài" />
+      <PageHeader
+        title="Đăng ký đề tài"
+        description={student ? 'Mỗi nhóm chỉ được đăng ký một đề tài đã công bố. Sau khi được duyệt, nhóm thực hiện theo hướng dẫn của giảng viên phụ trách.' : undefined}
+      />
       {canCreateTopic && (
         <RegistrationTopicForm onCreated={(topic) => setTopics((current) => [topic, ...current])} />
       )}

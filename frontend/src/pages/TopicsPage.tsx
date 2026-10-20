@@ -7,14 +7,17 @@ import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
 import { useToast } from '../context/ToastContext'
+import { useAuth } from '../context/AuthContext'
 import type { TopicResponse, TopicStatus } from '../types/domain'
 
 export function TopicsPage() {
   const { showError } = useToast()
+  const { hasRole } = useAuth()
+  const student = hasRole('STUDENT')
   const [topics, setTopics] = useState<TopicResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
-  const [status, setStatus] = useState<TopicStatus>('')
+  const [status, setStatus] = useState<TopicStatus>(student ? 'PUBLISHED' : '')
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get('q') ?? ''
   const [error, setError] = useState('')
@@ -24,7 +27,8 @@ export function TopicsPage() {
     let active = true
     setLoading(true)
     setError('')
-    allPages(page => topicApi.list({ status: status || undefined, page, size: 100 }))
+    const visibleStatus = student ? 'PUBLISHED' : status || undefined
+    allPages(page => topicApi.list({ status: visibleStatus, page, size: 100 }))
       .then((data) => {
         if (!active) return
         setTopics(data)
@@ -37,7 +41,7 @@ export function TopicsPage() {
       })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [showError, status, revision])
+  }, [showError, status, revision, student])
   const filtered = useMemo(() => {
     const text = query.trim().toLocaleLowerCase('vi')
     return text
@@ -59,7 +63,10 @@ export function TopicsPage() {
   const visible = filtered.slice(currentPage * 10, (currentPage + 1) * 10)
   return (
     <>
-      <PageHeader title="Đề tài & Dự án" />
+      <PageHeader
+        title={student ? 'Danh sách đề tài đã công bố' : 'Đề tài & Dự án'}
+        description={student ? 'Chỉ hiển thị các đề tài đã được khoa công bố và có thể xem để đăng ký.' : undefined}
+      />
       <section className="page-card">
         <div className="topics-toolbar">
           <label className="search-field">
@@ -70,7 +77,7 @@ export function TopicsPage() {
               placeholder="Tìm mã, tên đề tài, bộ môn, GVHD..."
             />
           </label>
-          <AnimatedSelect
+          {!student && <AnimatedSelect
             wrapperClassName="topic-filter"
             value={status}
             onChange={(e) => {
@@ -84,7 +91,7 @@ export function TopicsPage() {
             <option value="APPROVED">Đã duyệt</option>
             <option value="PUBLISHED">Đã công bố</option>
             <option value="REJECTED">Từ chối</option>
-          </AnimatedSelect>
+          </AnimatedSelect>}
         </div>
         {loading ? (
           <div className="content-state">

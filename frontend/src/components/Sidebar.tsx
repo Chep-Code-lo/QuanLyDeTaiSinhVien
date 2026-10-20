@@ -7,6 +7,8 @@ type SidebarProps = { onNavigate: () => void }
 
 export function Sidebar({ onNavigate }: SidebarProps) {
   const { user, hasAnyRole, hasAppointment, canAccessAcademicManagement } = useAuth()
+  const isStudent = user?.roles?.includes('STUDENT') &&
+    !user.roles.includes('LECTURER') && !user.roles.includes('ADMIN')
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(
@@ -28,6 +30,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const filteredItems = navigationItems.filter((item) => {
     if (!user) return item.to === '/' || item.to === '/account'
 
+    if (isStudent && item.to === '/dashboard') return false
+
     if (item.adminOnly && !user.roles?.includes('ADMIN')) {
       return false
     }
@@ -46,11 +50,16 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     }
 
     return true
+  }).sort((left, right) => {
+    if (!isStudent) return 0
+    if (left.to === '/announcements') return -1
+    if (right.to === '/announcements') return 1
+    return 0
   })
 
   return (
     <aside className="sidebar app-sidebar">
-      <Link className="sidebar__brand" to="/dashboard" aria-label="Về trang tổng quan" onClick={onNavigate}>
+      <Link className="sidebar__brand" to={isStudent ? '/announcements' : '/dashboard'} aria-label={isStudent ? 'Về trang thông báo' : 'Về trang tổng quan'} onClick={onNavigate}>
         <img
           className="sidebar__brand-image"
           src="/HCM-UTE_Logo.png"
@@ -63,6 +72,12 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       <nav className="sidebar__nav" aria-label="Điều hướng chính" onScroll={handleNavScroll}>
         {filteredItems.map((item) => {
           const Icon = item.icon
+          const label = isStudent
+            ? ({
+                '/topics': 'Đề tài đã công bố',
+                '/progress': 'Tiến độ & Báo cáo',
+              } as Record<string, string>)[item.to] ?? item.label
+            : item.label
 
           return (
             <NavLink
@@ -77,7 +92,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               <span className="sidebar__icon" aria-hidden="true">
                 <Icon size={18} strokeWidth={1.8} />
               </span>
-              <span>{item.label}</span>
+              <span>{label}</span>
             </NavLink>
           )
         })}

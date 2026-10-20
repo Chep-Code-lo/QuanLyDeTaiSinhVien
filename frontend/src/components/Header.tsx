@@ -37,7 +37,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const handleLogout = async () => {
     if(loggingOut)return
     setLoggingOut(true)
-    try { await logout(); showSuccess('Đã đăng xuất thành công'); navigate('/') }
+    try { await logout(); showSuccess('Đã đăng xuất thành công'); navigate('/', { replace: true }) }
     catch(e){showError(errorMessage(e))}finally{setLoggingOut(false)}
   }
 

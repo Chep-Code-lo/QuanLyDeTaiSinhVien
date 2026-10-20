@@ -70,7 +70,7 @@ export function AppRoutes() {
       {/* Authenticated Layout */}
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="dashboard" element={student ? <Navigate to="/announcements" replace /> : <DashboardPage />} />
           <Route path="topics" element={<TopicsPage />} />
           <Route path="groups" element={<GroupsPage />} />
           <Route path="registrations" element={<RegistrationsPage />} />
