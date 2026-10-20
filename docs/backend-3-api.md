@@ -575,3 +575,30 @@ mvn test
 ```
 
 Tại thời điểm dựng tài liệu này, backend đã pass toàn bộ test hiện có, bao gồm test workflow cho upload file, `/auth/me`, lecturer directory và luồng đánh giá/đổi điểm.
+
+### Cấu hình hội đồng với vai trò tùy nhập
+
+- `POST /evaluation-committees/configuration`: tạo hội đồng và toàn bộ thành viên trong một transaction.
+- `PUT /evaluation-committees/{id}/configuration`: thay cấu hình hội đồng chưa có phân công chấm; gửi `version` lấy từ lần đọc gần nhất.
+- Quyền tạo: quản trị viên hoặc trưởng khoa quản lý đợt. Quyền cập nhật: quản trị viên hoặc người được quản lý hội đồng.
+
+```json
+{
+  "periodId": 1,
+  "name": "Hội Đồng 1",
+  "rubricId": 35,
+  "version": 0,
+  "members": [
+    { "lecturerId": 18, "roleName": "Chủ tịch" },
+    { "lecturerId": 19, "roleName": "Thư ký" },
+    { "lecturerId": 20, "roleName": "Ủy viên chuyên môn" },
+    { "lecturerId": 21, "roleName": "Phó chủ tịch" }
+  ]
+}
+```
+
+Bỏ `version` khi tạo mới. Response là `EvaluationCommitteeResponse`, thêm `rubricId`; mỗi thành viên có `roleName` đúng nội dung đã nhập và `role` để xử lý nghiệp vụ. Vai trò Chủ tịch/Thư ký được chuẩn hóa, những tên khác giữ nguyên và thuộc nhóm MEMBER. Không trùng giảng viên; cần đúng một Chủ tịch, một Thư ký và số thành viên trong giới hạn của đợt. Bộ tiêu chí và thành phần phải đã khóa, thuộc loại COMMITTEE cùng đợt.
+
+Có thể lưu hội đồng DRAFT trước khi có lịch bảo vệ. Sau khi có phân công, chỉ được gửi lại cấu hình không đổi; thay thành viên hoặc tiêu chí cần hội đồng mới. Phân công và chốt điểm COMMITTEE dùng số thành viên thực tế của hội đồng, thay vì cố định theo expectedEvaluators của thành phần.
+
+Database đang có dữ liệu cần chạy `database/migrations/20261020_committee_configuration.sql` trước khi khởi động backend mới; migration giữ nguyên các hội đồng cũ và có thể chạy lại.

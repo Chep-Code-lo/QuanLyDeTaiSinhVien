@@ -5,6 +5,7 @@ import com.example.qldetai.feature.evaluation.domain.CommitteeStatus;
 import com.example.qldetai.feature.evaluation.domain.DefenseStatus;
 import com.example.qldetai.feature.evaluation.domain.GradeChangeStatus;
 import com.example.qldetai.feature.evaluation.domain.ResultStatus;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -20,6 +21,19 @@ public final class EvaluationAdminDtos {
     }
 
     public record CreateCommitteeRequest(@NotNull Long periodId, @NotBlank String name) {
+    }
+
+    public record CommitteeMemberInput(
+            @NotNull Long lecturerId,
+            @NotBlank @Size(max = 100) String roleName) {
+    }
+
+    public record SaveCommitteeRequest(
+            @NotNull Long periodId,
+            @NotBlank @Size(max = 200) String name,
+            @NotNull Long rubricId,
+            @NotNull @Size(min = 1, max = 10) List<@Valid CommitteeMemberInput> members,
+            Integer version) {
     }
 
     public record AddCommitteeMemberRequest(
@@ -48,7 +62,8 @@ public final class EvaluationAdminDtos {
             String lecturerCode,
             String lecturerName,
             int slotNo,
-            CommitteeRole role) {
+            CommitteeRole role,
+            String roleName) {
     }
 
     public record EvaluationCommitteeResponse(
@@ -63,7 +78,8 @@ public final class EvaluationAdminDtos {
             String createdByName,
             LocalDateTime createdAt,
             int version,
-            List<CommitteeMemberResponse> members) {
+            List<CommitteeMemberResponse> members,
+            Long rubricId) {
     }
 
     public record DefenseSessionResponse(

@@ -123,6 +123,21 @@ Ghi chú:
 - Frontend container reverse proxy `/api/*` sang backend nên không cần chỉnh `VITE_API_BASE_URL` khi chạy compose.
 - Nếu muốn import lại schema từ đầu, chạy `docker compose down -v` rồi `docker compose up --build`.
 
+### Nâng cấp database đang có dữ liệu
+
+Thay đổi file schema không tự cập nhật volume MySQL đã khởi tạo trước đó.
+Nếu backend báo thiếu cột cấu hình của `registration_periods`, chạy migration
+sau từ thư mục gốc dự án; migration chỉ thêm phần còn thiếu và giữ nguyên dữ liệu,
+lịch đăng ký cũng như các cấu hình đã có:
+
+```powershell
+Get-Content database/migrations/20261018_registration_period_rules.sql -Raw |
+  docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot ql_de_tai_sinh_vien'
+```
+
+Có thể chạy lại migration an toàn. Việc nâng cấp này không gia hạn các đợt đã
+hết hạn; Trưởng khoa hoặc quản trị viên mở đợt mới tại **Quản lý Học thuật**.
+
 ### Reset dữ liệu demo
 
 Khi không cần giữ dữ liệu local, reset toàn bộ dữ liệu Docker rồi khởi tạo lại

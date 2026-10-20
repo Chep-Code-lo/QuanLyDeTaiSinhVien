@@ -9,7 +9,13 @@ const mockUser: CurrentUser = {
   username: 'student.preview',
   roles: ['STUDENT'],
   activeAppointments: [],
-  student: { id: 0, studentCode: '22110300', className: '22110CLST', cohort: '2022', departmentId: 1 },
+  student: {
+    id: 0,
+    studentCode: '22110300',
+    className: '22110CLST',
+    cohort: '2022',
+    departmentId: 1,
+  },
 }
 
 function isMockPreview() {

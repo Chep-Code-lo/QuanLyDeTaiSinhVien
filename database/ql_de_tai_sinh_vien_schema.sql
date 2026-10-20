@@ -454,6 +454,7 @@ CREATE TABLE `evaluation_committees` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'PK; tự tăng; số dương',
   `period_id` BIGINT NOT NULL COMMENT 'FK registration_periods.id',
   `faculty_id` BIGINT NOT NULL COMMENT 'FK faculties.id',
+  `rubric_id` BIGINT NULL COMMENT 'Bộ tiêu chí được chọn cho hội đồng',
   `name` VARCHAR(200) NOT NULL COMMENT 'Tên hội đồng',
   `status` VARCHAR(20) NOT NULL COMMENT 'DRAFT, CONFIRMED, COMPLETED',
   `created_by` BIGINT NOT NULL COMMENT 'FK users.id',
@@ -475,6 +476,7 @@ CREATE TABLE `committee_members` (
   `committee_id` BIGINT NOT NULL COMMENT 'FK evaluation_committees.id',
   `lecturer_id` BIGINT NOT NULL COMMENT 'FK lecturers.id',
   `slot_no` TINYINT NOT NULL COMMENT 'Vị trí 1–10; giới hạn thực tế do đợt đăng ký cấu hình',
+  `role_label` VARCHAR(100) NULL COMMENT 'Vai trò do người dùng nhập',
   `committee_role` VARCHAR(20) NOT NULL COMMENT 'CHAIR, SECRETARY, MEMBER',
   `unique_office` VARCHAR(20) GENERATED ALWAYS AS (CASE WHEN committee_role IN ('CHAIR','SECRETARY') THEN committee_role ELSE NULL END) STORED COMMENT 'CHAIR hoặc SECRETARY; MEMBER cho NULL',
   PRIMARY KEY (`id`),
@@ -888,6 +890,9 @@ ALTER TABLE `evaluation_committees` ADD CONSTRAINT `fk_evaluation_committees_03`
   REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT;
 ALTER TABLE `evaluation_committees` ADD CONSTRAINT `fk_evaluation_committees_04` FOREIGN KEY (`period_id`, `faculty_id`)
   REFERENCES `registration_periods` (`id`, `faculty_id`) ON DELETE RESTRICT ON UPDATE RESTRICT;
+ALTER TABLE `evaluation_committees` ADD CONSTRAINT `fk_evaluation_committees_rubric` FOREIGN KEY (`rubric_id`)
+  REFERENCES `rubrics` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT;
+
 ALTER TABLE `committee_members` ADD CONSTRAINT `fk_committee_members_01` FOREIGN KEY (`committee_id`)
   REFERENCES `evaluation_committees` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT;
 ALTER TABLE `committee_members` ADD CONSTRAINT `fk_committee_members_02` FOREIGN KEY (`lecturer_id`)
@@ -1039,16 +1044,25 @@ LEFT JOIN (SELECT rubric_id, COUNT(*) AS required_count, SUM(max_score) AS rubri
            FROM rubric_criteria GROUP BY rubric_id) c ON c.rubric_id = ss.rubric_id;
 
 CREATE SQL SECURITY INVOKER VIEW v_component_scores AS
-SELECT ea.assignment_id, ea.component_id, ac.expected_evaluators,
+SELECT ea.assignment_id, ea.component_id,
+       MAX(CASE WHEN ac.component_type = 'COMMITTEE' THEN COALESCE(roster.member_count, 0)
+                ELSE ac.expected_evaluators END) AS expected_evaluators,
        COUNT(*) AS assigned_count,
        SUM(COALESCE(st.status IN ('SUBMITTED','LOCKED') AND st.total_score IS NOT NULL, 0)) AS completed_count,
-       CASE WHEN COUNT(*) = ac.expected_evaluators
-             AND SUM(COALESCE(st.status IN ('SUBMITTED','LOCKED') AND st.total_score IS NOT NULL, 0)) = ac.expected_evaluators
+       CASE WHEN COUNT(*) = MAX(CASE WHEN ac.component_type = 'COMMITTEE' THEN COALESCE(roster.member_count, 0)
+                                    ELSE ac.expected_evaluators END)
+             AND SUM(COALESCE(st.status IN ('SUBMITTED','LOCKED') AND st.total_score IS NOT NULL, 0))
+                 = MAX(CASE WHEN ac.component_type = 'COMMITTEE' THEN COALESCE(roster.member_count, 0)
+                            ELSE ac.expected_evaluators END)
+             AND (ac.component_type <> 'COMMITTEE' OR (COUNT(DISTINCT ds.id) = 1 AND COUNT(ds.id) = COUNT(*)))
             THEN AVG(st.total_score) ELSE NULL END AS component_score
 FROM evaluation_assignments ea JOIN assessment_components ac ON ac.id = ea.component_id
+LEFT JOIN defense_sessions ds ON ds.id = ea.defense_id
+LEFT JOIN (SELECT committee_id, COUNT(*) AS member_count FROM committee_members GROUP BY committee_id) roster
+       ON roster.committee_id = ds.committee_id
 LEFT JOIN v_score_sheet_totals st ON st.evaluation_id = ea.id
 WHERE ea.status = 'ACTIVE' AND ac.status = 'LOCKED'
-GROUP BY ea.assignment_id, ea.component_id, ac.expected_evaluators;
+GROUP BY ea.assignment_id, ea.component_id, ac.expected_evaluators, ac.component_type;
 
 CREATE SQL SECURITY INVOKER VIEW v_published_results AS
 SELECT rv.id AS result_id, rv.assignment_id, rv.version_no,

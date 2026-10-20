@@ -2,7 +2,13 @@ import React, { useEffect, useState } from 'react'
 import { lecturerApi } from '../api/lecturers'
 import type { LecturerDirectoryResponse } from '../types/domain'
 
+type LecturerOption = Pick<LecturerDirectoryResponse, 'id' | 'fullName' | 'lecturerCode'> & Partial<LecturerDirectoryResponse>
+
 interface LecturerAutocompleteProps {
+  inputId?: string
+  ariaLabel?: string
+  selectedOption?: LecturerOption
+  excludedIds?: number[]
   value?: number | null
   onChange: (lecturerId: number | null, lecturer?: LecturerDirectoryResponse | null) => void
   placeholder?: string
@@ -15,6 +21,10 @@ interface LecturerAutocompleteProps {
 export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
   value,
   onChange,
+  inputId,
+  ariaLabel,
+  selectedOption,
+  excludedIds = [],
   placeholder = 'Tìm kiếm giảng viên theo tên, mã...',
   disabled = false,
   required = false,
@@ -23,23 +33,30 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
 }) => {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<LecturerDirectoryResponse[]>([])
-  const [selectedLecturer, setSelectedLecturer] = useState<LecturerDirectoryResponse | null>(null)
+  const [selectedLecturer, setSelectedLecturer] = useState<LecturerOption | null>(null)
   const [loading, setLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
 
   // Fetch initial selected lecturer if value is provided
   useEffect(() => {
+    if (value && selectedOption?.id === value) {
+      setSelectedLecturer((current) => current?.id === value && current.fullName === selectedOption.fullName ? current : selectedOption)
+      return
+    }
     if (value && (!selectedLecturer || selectedLecturer.id !== value)) {
-      lecturerApi.list({ size: 50 }).then((res) => {
-        const found = res.content.find((l) => l.id === value || l.userId === value)
-        if (found) {
-          setSelectedLecturer(found)
-        }
-      }).catch(() => {})
+      lecturerApi
+        .list({ size: 50 })
+        .then((res) => {
+          const found = res.content.find((l) => l.id === value || l.userId === value)
+          if (found) {
+            setSelectedLecturer(found)
+          }
+        })
+        .catch(() => {})
     } else if (!value) {
       setSelectedLecturer(null)
     }
-  }, [value, selectedLecturer])
+  }, [value, selectedLecturer, selectedOption])
 
   // Search with debounce
   useEffect(() => {
@@ -80,7 +97,7 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
   return (
     <div className="autocomplete-container">
       {label && (
-        <label className="form-label">
+        <label className="form-label" htmlFor={inputId}>
           {label} {required && <span className="text-red">*</span>}
         </label>
       )}
@@ -91,16 +108,12 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
             <span className="selected-name font-semibold">{selectedLecturer.fullName}</span>
             <span className="selected-badge">
               {selectedLecturer.academicDegree ? `${selectedLecturer.academicDegree}. ` : ''}
-              {selectedLecturer.lecturerCode} - {selectedLecturer.departmentName || selectedLecturer.facultyName}
+              {selectedLecturer.lecturerCode} -{' '}
+              {selectedLecturer.departmentName || 'Chưa có thông tin bộ môn'}
             </span>
           </div>
           {!disabled && (
-            <button
-              type="button"
-              className="btn-clear"
-              onClick={handleClear}
-              title="Xóa lựa chọn"
-            >
+            <button type="button" className="btn-clear" onClick={handleClear} title="Xóa lựa chọn">
               &times;
             </button>
           )}
@@ -108,6 +121,8 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
       ) : (
         <div className="autocomplete-input-wrapper">
           <input
+            id={inputId}
+            aria-label={ariaLabel}
             type="text"
             className={`form-input ${error ? 'input-error' : ''}`}
             placeholder={placeholder}
@@ -123,12 +138,16 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
 
           {isOpen && (
             <div className="autocomplete-dropdown">
-              {loading && <div className="dropdown-item text-secondary py-2 px-3">Đang tìm kiếm...</div>}
-              {!loading && results.length === 0 && (
-                <div className="dropdown-item text-secondary py-2 px-3">Không tìm thấy giảng viên</div>
+              {loading && (
+                <div className="dropdown-item text-secondary py-2 px-3">Đang tìm kiếm...</div>
+              )}
+              {!loading && results.filter((lecturer) => !excludedIds.includes(lecturer.id)).length === 0 && (
+                <div className="dropdown-item text-secondary py-2 px-3">
+                  Không tìm thấy giảng viên
+                </div>
               )}
               {!loading &&
-                results.map((lecturer) => (
+                results.filter((lecturer) => !excludedIds.includes(lecturer.id)).map((lecturer) => (
                   <div
                     key={lecturer.id}
                     className="dropdown-item cursor-pointer py-2 px-3 hover:bg-light"
@@ -139,7 +158,7 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
                     </div>
                     <div className="text-sm text-secondary">
                       {lecturer.academicDegree ? `${lecturer.academicDegree} - ` : ''}
-                      {lecturer.departmentName} ({lecturer.facultyName})
+                      {lecturer.departmentName}
                     </div>
                   </div>
                 ))}

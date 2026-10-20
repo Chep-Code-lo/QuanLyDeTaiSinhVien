@@ -147,7 +147,7 @@ public class EvaluationCommitteeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Committee was not found."));
     }
 
-    private EvaluationCommitteeResponse committee(EvaluationCommittee committee) {
+    EvaluationCommitteeResponse committee(EvaluationCommittee committee) {
         List<CommitteeMemberResponse> members =
                 committeeMembers.findByCommitteeId(committee.getId()).stream()
                         .sorted(Comparator.comparingInt(CommitteeMember::getSlotNo))
@@ -159,7 +159,8 @@ public class EvaluationCommitteeService {
                                                 member.getLecturer().getLecturerCode(),
                                                 member.getLecturer().getUser().getFullName(),
                                                 member.getSlotNo(),
-                                                member.getCommitteeRole()))
+                                                member.getCommitteeRole(),
+                                                member.getRoleLabel()))
                         .toList();
         return new EvaluationCommitteeResponse(
                 committee.getId(),
@@ -173,6 +174,7 @@ public class EvaluationCommitteeService {
                 committee.getCreatedBy().getFullName(),
                 committee.getCreatedAt(),
                 committee.getVersion(),
-                members);
+                members,
+                committee.getRubric() == null ? null : committee.getRubric().getId());
     }
 }

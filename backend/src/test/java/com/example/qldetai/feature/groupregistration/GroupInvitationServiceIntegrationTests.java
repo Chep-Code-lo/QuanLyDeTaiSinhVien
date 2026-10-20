@@ -2,6 +2,11 @@ package com.example.qldetai.feature.groupregistration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.feature.academic.domain.Department;
@@ -36,6 +41,7 @@ import com.example.qldetai.feature.identity.domain.UserStatus;
 import com.example.qldetai.feature.identity.repository.RoleRepository;
 import com.example.qldetai.feature.identity.repository.StudentRepository;
 import com.example.qldetai.feature.identity.repository.UserRepository;
+import com.example.qldetai.security.UserPrincipal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -49,20 +55,28 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.TestConstructor;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
+@AutoConfigureMockMvc
 @Import(GroupInvitationServiceIntegrationTests.InvitationClockConfiguration.class)
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @Transactional
 class GroupInvitationServiceIntegrationTests {
 
     private static final Instant START = Instant.parse("2030-01-15T09:00:00Z");
+
+    @Autowired
+    private MockMvc mvc;
 
     private final GroupInvitationService invitationService;
     private final GroupService groupService;
@@ -233,6 +247,54 @@ class GroupInvitationServiceIntegrationTests {
                         leader.getUser().getId()))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("configured invitation lifetime");
+    }
+
+    @Test
+    void utcExpiryFromVietnamBrowserIsAcceptedWithoutAddingSevenHours() throws Exception {
+        period.setInvitationExpiryHours(72);
+        period.setRegistrationEndAt(now().plusDays(7));
+        StudentGroupResponse group = createGroup();
+
+        // 16:00 in Vietnam is 09:00 UTC, exactly 72 hours after the fixed clock.
+        mvc.perform(post("/api/v1/group-invitations")
+                        .with(user(UserPrincipal.from(leader.getUser()))).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"groupId": %d, "studentCode": "%s", "expiresAt": "2030-01-18T09:00:00.000Z"}
+                                """.formatted(group.id(), invitee.getStudentCode())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.expiresAt").value("2030-01-18T09:00:00"));
+    }
+
+    @Test
+    void expiryAtRegistrationCloseIsAcceptedWhenLessThanConfiguredLifetime() {
+        period.setRegistrationEndAt(now().plusMinutes(30));
+        StudentGroupResponse group = createGroup();
+
+        GroupInvitationResponse invitation = createInvitation(group, period.getRegistrationEndAt());
+
+        assertThat(invitation.expiresAt()).isEqualTo(period.getRegistrationEndAt());
+        assertThat(invitation.status()).isEqualTo(GroupInvitationStatus.PENDING);
+    }
+
+    @Test
+    void expiryPastRegistrationCloseIsRejectedEvenWithinConfiguredLifetime() {
+        period.setRegistrationEndAt(now().plusMinutes(30));
+        StudentGroupResponse group = createGroup();
+
+        assertThatThrownBy(() -> createInvitation(group, now().plusMinutes(31)))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("registration window");
+    }
+
+    @Test
+    void expiryAtCurrentTimeIsRejected() {
+        StudentGroupResponse group = createGroup();
+
+        assertThatThrownBy(() -> createInvitation(group, now()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("future");
     }
 
     private StudentGroupResponse createGroup() {

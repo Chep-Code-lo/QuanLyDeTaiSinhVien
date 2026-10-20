@@ -4,7 +4,7 @@ import { PageHeader } from '../components/PageHeader'
 export function EvaluationsPage() {
   return (
     <>
-      <PageHeader title="Đánh giá" description="Xem các đợt đánh giá, tiêu chí chấm điểm và kết quả được công bố." />
+      <PageHeader title="Tiêu chuẩn đánh giá" />
       <ModulePlaceholder
         title="Kết quả đánh giá"
         description="Bảng điểm và nhận xét hội đồng sẽ hiển thị theo đúng quyền của sinh viên, giảng viên và quản trị viên."

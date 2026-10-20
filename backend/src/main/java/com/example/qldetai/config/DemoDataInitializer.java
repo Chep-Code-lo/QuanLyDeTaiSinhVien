@@ -93,19 +93,14 @@ public class DemoDataInitializer implements ApplicationRunner {
         Faculty faculty = facultyRepository.findByCodeIgnoreCase("CNTT").orElseGet(() -> {
             Faculty created = new Faculty();
             created.setCode("CNTT");
-            created.setName("Công nghệ thông tin");
+            created.setName("Công Nghệ Thông Tin");
             created.setActive(true);
             return facultyRepository.save(created);
         });
-        Department department = departmentRepository.findByFacultyIdAndCodeIgnoreCase(faculty.getId(), "CNPM")
-                .orElseGet(() -> {
-                    Department created = new Department();
-                    created.setFaculty(faculty);
-                    created.setCode("CNPM");
-                    created.setName("Công nghệ phần mềm");
-                    created.setActive(true);
-                    return departmentRepository.save(created);
-                });
+        Department department = ensureDepartment(faculty, "CNPM", "Công Nghệ Phần Mềm");
+        ensureDepartment(faculty, "HTTT", "Hệ Thống Thông Tin");
+        ensureDepartment(faculty, "MANM", "Mạng và An Ninh Mạng");
+        ensureDepartment(faculty, "TTNT", "Trí Tuệ Nhân Tạo");
         Semester semester = semesterRepository.findByAcademicYearIgnoreCaseAndSemesterNo("2026-2027", 1)
                 .orElseGet(() -> {
                     Semester created = new Semester();
@@ -138,8 +133,9 @@ public class DemoDataInitializer implements ApplicationRunner {
             return studentRepository.save(created);
         });
 
-        if (!academicAppointmentRepository.hasActiveFacultyAppointment(
-                lecturerUser.getId(), PositionCode.DEAN, faculty.getId(), LocalDateTime.now())) {
+        // Seed once, including ended or future appointments, so restarts respect admin decisions.
+        if (!academicAppointmentRepository.existsByLecturerIdAndFacultyIdAndPositionCode(
+                lecturer.getId(), faculty.getId(), PositionCode.DEAN)) {
             AcademicAppointment appointment = new AcademicAppointment();
             appointment.setLecturer(lecturer);
             appointment.setFaculty(faculty);
@@ -202,5 +198,17 @@ public class DemoDataInitializer implements ApplicationRunner {
             user.replaceRoles(roles, now);
             return userRepository.save(user);
         });
+    }
+
+    private Department ensureDepartment(Faculty faculty, String code, String name) {
+        return departmentRepository.findByFacultyIdAndCodeIgnoreCase(faculty.getId(), code)
+                .orElseGet(() -> {
+                    Department created = new Department();
+                    created.setFaculty(faculty);
+                    created.setCode(code);
+                    created.setName(name);
+                    created.setActive(true);
+                    return departmentRepository.save(created);
+                });
     }
 }

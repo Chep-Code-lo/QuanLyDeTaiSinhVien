@@ -25,9 +25,7 @@ public class ProgressController {
     }
 
     @PostMapping("/milestones")
-    @PreAuthorize(
-            "hasRole('ADMIN') or @projectAuthorization.canManageAssignment(#request.assignmentId,"
-                + " authentication)")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LECTURER')")
     public ResponseEntity<ApiResponse<MilestoneResponse>> create(
             @Valid @RequestBody CreateMilestoneRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -40,6 +38,23 @@ public class ProgressController {
     public ApiResponse<List<MilestoneResponse>> list(
             @PathVariable Long assignmentId, @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(service.list(assignmentId, principal.id()));
+    }
+
+    @PutMapping("/milestones/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LECTURER')")
+    public ApiResponse<MilestoneResponse> update(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateMilestoneRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success("Milestone updated.", service.update(id, request, principal.id()));
+    }
+
+    @PostMapping("/project-assignments/{assignmentId}/milestones/reminders")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LECTURER')")
+    public ApiResponse<MilestoneReminderResponse> remind(
+            @PathVariable Long assignmentId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success("Milestone reminders sent.", service.remind(assignmentId, principal.id()));
     }
 
     @PostMapping("/milestones/{id}/submissions")

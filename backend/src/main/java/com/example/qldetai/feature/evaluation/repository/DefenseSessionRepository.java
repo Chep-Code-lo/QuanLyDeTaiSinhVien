@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.Query;
 public interface DefenseSessionRepository
         extends JpaRepository<DefenseSession, Long>, JpaSpecificationExecutor<DefenseSession> {
 
+    java.util.List<DefenseSession> findByCommitteeId(Long committeeId);
+
     @Query("""
             select count(d) > 0 from DefenseSession d
             where d.committee.id = :committeeId

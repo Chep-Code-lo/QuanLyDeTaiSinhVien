@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 public interface EvaluationAssignmentRepository
         extends JpaRepository<EvaluationAssignment, Long>, JpaSpecificationExecutor<EvaluationAssignment> {
 
+    boolean existsByDefenseCommitteeId(Long committeeId);
+
     List<EvaluationAssignment> findByLecturerIdAndStatus(Long lecturerId, EvaluationStatus status);
 
     long countByAssignmentIdAndComponentIdAndStatus(Long assignmentId, Long componentId, EvaluationStatus status);

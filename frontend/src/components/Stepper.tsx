@@ -20,10 +20,10 @@ export const Stepper: React.FC<StepperProps> = ({ steps, currentStep }) => {
           const isCurrent = step.number === currentStep
           return (
             <React.Fragment key={step.number}>
-              <div className={`stepper-item ${isCompleted ? 'completed' : ''} ${isCurrent ? 'active' : ''}`}>
-                <div className="stepper-circle">
-                  {isCompleted ? '✓' : step.number}
-                </div>
+              <div
+                className={`stepper-item ${isCompleted ? 'completed' : ''} ${isCurrent ? 'active' : ''}`}
+              >
+                <div className="stepper-circle">{isCompleted ? '✓' : step.number}</div>
                 <div className="stepper-content">
                   <div className="stepper-title">{step.title}</div>
                   {step.description && <div className="stepper-desc">{step.description}</div>}

@@ -115,6 +115,8 @@ Response đăng nhập không có `accessToken`:
 
 Khi tạo tài khoản có role `STUDENT` hoặc `LECTURER`, request phải kèm đúng hồ sơ tương ứng. Mật khẩu được băm BCrypt; API không trả `password_hash`.
 
+Mật khẩu khi tạo tài khoản hoặc đổi mật khẩu phải có từ 8 đến 100 ký tự, ít nhất một chữ in hoa, một chữ số và một ký tự đặc biệt (dấu câu hoặc ký hiệu). Khoảng trắng không được tính là ký tự đặc biệt. Quy tắc này được kiểm tra tại cả frontend và API; API trả HTTP 400 cùng lỗi ở trường `password` hoặc `newPassword` nếu không đạt.
+
 `GET /lecturers` chỉ trả về giảng viên có tài khoản `ACTIVE`. Response mỗi item gồm:
 
 - `id`, `userId`
@@ -200,7 +202,7 @@ Tài khoản được tạo nếu chưa tồn tại:
 - `lecturer@demo.local` hoặc mã `GV001` — `LECTURER`, nhiệm vụ `DEAN` khoa CNTT.
 - `student@demo.local` hoặc mã `SV001` — `STUDENT`.
 
-Initializer cũng tạo khoa CNTT, bộ môn CNPM, học kỳ 1 năm học 2026–2027 và một đợt KLTN hợp lệ. Không có mật khẩu demo mặc định trong source code hoặc SQL.
+Initializer cũng tạo khoa CNTT với bốn bộ môn: Công Nghệ Phần Mềm (CNPM), Hệ Thống Thông Tin (HTTT), Mạng và An Ninh Mạng (MANM), Trí Tuệ Nhân Tạo (TTNT); học kỳ 1 năm học 2026–2027 và một đợt KLTN hợp lệ. Các bộ môn còn thiếu được bổ sung khi khởi động lại với dữ liệu demo được bật. Không có mật khẩu demo mặc định trong source code hoặc SQL.
 
 ## Kiểm thử
 
@@ -209,4 +211,12 @@ cd backend
 mvn test
 ```
 
-Test dùng H2 độc lập, không sửa database MySQL cục bộ.
+Test mặc định dùng H2 độc lập, không sửa database MySQL cục bộ. `DashboardMySqlVerificationTests` chỉ chạy khi bật `-Ddashboard.mysql.verify=true` và cấu hình datasource MySQL cùng `spring.jpa.hibernate.ddl-auto=none`; kiểm tra này chỉ đọc dữ liệu hiện có.
+
+## Dashboard
+
+`GET /api/v1/dashboard` yêu cầu đăng nhập và trả số liệu toàn hệ thống: tổng đề tài, số đề tài đang mở đăng ký, đang thực hiện, đã hoàn thành, thống kê theo loại, đề tài cập nhật gần đây, học kỳ hiện tại và lịch đăng ký sắp tới. Thông báo chưa đọc chỉ tính cho người đang đăng nhập.
+
+- Đang đăng ký: đề tài `PUBLISHED`, đợt `ACTIVE` đang trong khoảng đăng ký và chưa có bản ghi giao đề tài.
+- Đang thực hiện / đã hoàn thành: đếm đề tài riêng biệt trong `project_assignments` theo `IN_PROGRESS` / `COMPLETED`.
+- Tổng đề tài và biểu đồ bao gồm tất cả trạng thái, toàn bộ các đợt. Không có dữ liệu thì trả `0`; không thay bằng dữ liệu mẫu.

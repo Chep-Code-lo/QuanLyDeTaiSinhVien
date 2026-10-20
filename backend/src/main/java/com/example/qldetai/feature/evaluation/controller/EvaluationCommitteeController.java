@@ -7,6 +7,9 @@ import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CreateComm
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.EvaluationCommitteeResponse;
 import com.example.qldetai.feature.evaluation.service.EvaluationCommitteeService;
 import com.example.qldetai.security.UserPrincipal;
+import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.SaveCommitteeRequest;
+import com.example.qldetai.feature.evaluation.service.CommitteeConfigurationService;
+import org.springframework.web.bind.annotation.PutMapping;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -33,8 +36,28 @@ public class EvaluationCommitteeController {
 
     private final EvaluationCommitteeService service;
 
-    public EvaluationCommitteeController(EvaluationCommitteeService service) {
+    private final CommitteeConfigurationService configurations;
+
+    public EvaluationCommitteeController(EvaluationCommitteeService service, CommitteeConfigurationService configurations) {
         this.service = service;
+        this.configurations = configurations;
+    }
+
+    @PostMapping("/evaluation-committees/configuration")
+    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManagePeriod(#request.periodId, authentication)")
+    public ApiResponse<EvaluationCommitteeResponse> createConfiguration(
+            @Valid @RequestBody SaveCommitteeRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(configurations.save(null, request, principal.id()));
+    }
+
+    @PutMapping("/evaluation-committees/{id}/configuration")
+    @PreAuthorize("hasRole('ADMIN') or @evaluationAuthorization.canManageCommittee(#id, authentication)")
+    public ApiResponse<EvaluationCommitteeResponse> updateConfiguration(
+            @PathVariable Long id,
+            @Valid @RequestBody SaveCommitteeRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(configurations.save(id, request, principal.id()));
     }
 
     @GetMapping("/evaluation-committees")

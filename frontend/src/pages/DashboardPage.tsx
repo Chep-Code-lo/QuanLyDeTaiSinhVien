@@ -1,16 +1,327 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { dashboardApi } from '../api/dashboard'
+import type { DashboardSummary } from '../api/dashboard'
 import { PageHeader } from '../components/PageHeader'
+import { StatusBadge } from '../components/StatusBadge'
 import { useAuth } from '../context/AuthContext'
+import { parseUtcDateTime, formatDateTime } from '../utils/dateTime'
+import { greetingName } from '../utils/userDisplay'
+
+const topicTypes = [
+  { type: 'GRADUATION', label: 'Khóa luận tốt nghiệp', color: '#155eef', dot: 'blue' },
+  { type: 'SPECIALIZED', label: 'Tiểu luận chuyên ngành', color: '#ef4444', dot: 'red' },
+  { type: 'RESEARCH', label: 'Nghiên cứu khoa học', color: '#f59e0b', dot: 'yellow' },
+  { type: 'COURSE', label: 'Đề tài môn học', color: '#cbd5e1', dot: 'slate' },
+] as const
+const number = (value: number) => value.toLocaleString('vi-VN')
+const dateTime = (value: string) => formatDateTime(value)
 
 export function DashboardPage() {
   const { user, hasRole } = useAuth()
   const isLecturer = hasRole('LECTURER') || hasRole('ADMIN')
+  const [summary, setSummary] = useState<DashboardSummary | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [revision, setRevision] = useState(0)
 
-  return <>
-    <PageHeader title="Hệ thống quản lý đề tài sinh viên" description="Quản lý · Đăng ký · Thực hiện · Đánh giá đề tài NCKH / TLCN / KLTN" />
-    <section className="welcome-panel"><div><span className="welcome-panel__eyebrow">HỌC KỲ I · 2026–2027</span><h2>Chào mừng trở lại, {user?.fullName || 'Người dùng'}.</h2><p>Hôm nay có <strong>03 công việc</strong> cần bạn theo dõi. Đợt đăng ký đề tài đang mở đến hết ngày 30/09.</p>{user?.activeAppointments?.length ? <div className="welcome-panel__roles">{user.activeAppointments.map((item) => <span key={item.id}>{item.positionCode === 'DEAN' ? 'Trưởng khoa' : 'Trưởng bộ môn'}</span>)}</div> : null}</div><Link className="welcome-panel__action" to={isLecturer ? '/progress' : '/registrations'}>{isLecturer ? 'Quản lý tiến độ' : 'Khám phá đề tài'} <span>→</span></Link></section>
-    <section className="dashboard-grid" aria-label="Chỉ số tổng quan"><article className="metric-card metric-card--blue"><span className="metric-card__icon">▣</span><div><span className="metric-card__label">Tổng đề tài</span><strong className="metric-card__value">128</strong><span className="metric-card__note metric-card__trend">↗ 12% so với kỳ trước</span></div></article><article className="metric-card metric-card--amber"><span className="metric-card__icon">◷</span><div><span className="metric-card__label">Đang đăng ký</span><strong className="metric-card__value">42</strong><span className="metric-card__note">Đợt hiện tại · 18 ngày còn lại</span></div></article><article className="metric-card metric-card--violet"><span className="metric-card__icon">◉</span><div><span className="metric-card__label">Đang thực hiện</span><strong className="metric-card__value">64</strong><span className="metric-card__note">50% tổng đề tài đã duyệt</span></div></article><article className="metric-card metric-card--green"><span className="metric-card__icon">✓</span><div><span className="metric-card__label">Đã hoàn thành</span><strong className="metric-card__value">22</strong><span className="metric-card__note metric-card__trend">↗ 8 đề tài mới công bố</span></div></article></section>
-    <section className="dashboard-insights"><article className="content-card chart-card"><div className="content-card__header"><div><h2>Thống kê đề tài theo loại</h2><span>Cập nhật trong học kỳ hiện tại</span></div><button className="text-button">Xem báo cáo</button></div><div className="chart-layout"><div className="donut"><div><strong>128</strong><span>Đề tài</span></div></div><ul className="chart-legend"><li><i className="dot dot--blue" />Khóa luận tốt nghiệp <b>48</b></li><li><i className="dot dot--red" />Tiểu luận chuyên ngành <b>38</b></li><li><i className="dot dot--yellow" />Nghiên cứu khoa học <b>29</b></li><li><i className="dot dot--slate" />Khác <b>13</b></li></ul></div></article><article className="content-card activity-card"><div className="content-card__header"><div><h2>Việc cần xử lý</h2><span>Ưu tiên trong tuần này</span></div><span className="badge badge-danger">03 mới</span></div><div className="task-list"><Link to="/registrations"><span className="task-list__icon task-list__icon--warning">⌛</span><div><strong>Đơn đăng ký chờ phê duyệt</strong><small>12 nhóm đang chờ phản hồi</small></div><b>›</b></Link><Link to="/progress"><span className="task-list__icon task-list__icon--red">!</span><div><strong>Báo cáo sắp đến hạn</strong><small>06 báo cáo cần nộp trước 25/09</small></div><b>›</b></Link><Link to="/announcements"><span className="task-list__icon task-list__icon--blue">✦</span><div><strong>Thông báo từ khoa</strong><small>Cập nhật lịch bảo vệ đợt 1</small></div><b>›</b></Link></div></article></section>
-    <section className="dashboard-sections"><article className="content-card"><div className="content-card__header"><div><h2>Đề tài mới cập nhật</h2><span>Danh sách được cập nhật gần đây</span></div><Link className="text-button" to="/topics">Xem tất cả</Link></div><div className="topic-preview"><div><span className="topic-preview__code">KLTN-2026-041</span><strong>Ứng dụng AI hỗ trợ học tập cá nhân hóa</strong><small>TS. Nguyễn Văn Minh · Bộ môn CNTT</small></div><span className="badge badge-success">Đang mở</span></div><div className="topic-preview"><div><span className="topic-preview__code">NCKH-2026-018</span><strong>Hệ thống nhận diện rác thải thông minh</strong><small>ThS. Trần Thu Hà · Bộ môn Tự động hóa</small></div><span className="badge badge-info">Đã duyệt</span></div></article><article className="content-card"><div className="content-card__header"><div><h2>Tiến độ sắp tới</h2><span>Các mốc quan trọng cần lưu ý</span></div><Link className="text-button" to="/progress">Lịch tiến độ</Link></div><div className="deadline-item"><time><b>25</b><span>THG 09</span></time><div><strong>Nộp báo cáo tiến độ</strong><small>Các nhóm KLTN · Đợt 1</small></div><span className="badge badge-warning">Còn 5 ngày</span></div><div className="deadline-item"><time><b>30</b><span>THG 09</span></time><div><strong>Kết thúc đăng ký đề tài</strong><small>Học kỳ I · 2026–2027</small></div><span className="badge badge-info">Sắp diễn ra</span></div></article></section>
-  </>
+  useEffect(() => {
+    let active = true
+    let pending = false
+    const refresh = async () => {
+      if (pending) return
+      pending = true
+      setLoading(true)
+      try {
+        const data = await dashboardApi.summary()
+        if (active) {
+          setSummary(data)
+          setError(false)
+        }
+      } catch {
+        if (active) {
+          setSummary(null)
+          setError(true)
+        }
+      } finally {
+        pending = false
+        if (active) setLoading(false)
+      }
+    }
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), 60_000)
+    window.addEventListener('focus', refresh)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [user?.id, revision])
+
+  const counts = topicTypes.map((type) => ({
+    ...type,
+    count: summary?.topicTypes.find((item) => item.projectType === type.type)?.count ?? 0,
+  }))
+  let chartOffset = 0
+  const chartStops = counts.map((item) => {
+    const start = chartOffset
+    chartOffset += summary?.totalTopics ? (item.count / summary.totalTopics) * 100 : 0
+    return `${item.color} ${start}% ${chartOffset}%`
+  })
+  const chartBackground = summary?.totalTopics
+    ? `conic-gradient(${chartStops.join(', ')})`
+    : '#e2e8f0'
+  const metrics = [
+    {
+      label: 'Tổng đề tài',
+      value: summary?.totalTopics,
+      color: 'blue',
+      icon: '▣',
+      note: 'Tất cả đề tài trong hệ thống',
+    },
+    {
+      label: 'Đang đăng ký',
+      value: summary?.registeringTopics,
+      color: 'amber',
+      icon: '◷',
+      note: 'Đề tài đang mở cho sinh viên đăng ký',
+    },
+    {
+      label: 'Đang thực hiện',
+      value: summary?.inProgressTopics,
+      color: 'violet',
+      icon: '◉',
+      note: 'Đề tài đã giao cho nhóm và đang thực hiện',
+    },
+    {
+      label: 'Đã hoàn thành',
+      value: summary?.completedTopics,
+      color: 'green',
+      icon: '✓',
+      note: 'Đề tài có trạng thái thực hiện đã hoàn thành',
+    },
+  ]
+
+  return (
+    <>
+      <PageHeader title="Hệ thống quản lý đề tài sinh viên" />
+      <section className="welcome-panel">
+        <div>
+          <span className="welcome-panel__eyebrow">
+            {summary?.currentSemester
+              ? `HỌC KỲ ${summary.currentSemester.semesterNo} - ${summary.currentSemester.academicYear}`
+              : 'TỔNG QUAN TOÀN HỆ THỐNG'}
+          </span>
+          <h2>Chào mừng trở lại, {greetingName(user)}.</h2>
+          <p>
+            {summary ? (
+              <>
+                Bạn có <strong>{number(summary.unreadNotifications)} thông báo chưa đọc</strong>.{' '}
+                {summary.nextRegistrationCloseAt
+                  ? `Đợt đăng ký gần nhất đóng lúc ${dateTime(summary.nextRegistrationCloseAt)}.`
+                  : 'Hiện không có đợt đang mở đăng ký đề tài.'}
+              </>
+            ) : loading ? (
+              'Đang tải dữ liệu tổng quan...'
+            ) : (
+              'Chưa tải được dữ liệu tổng quan.'
+            )}
+          </p>
+          {user?.activeAppointments?.length ? (
+            <div className="welcome-panel__roles">
+              {user.activeAppointments.map((item) => (
+                <span key={item.id}>
+                  {item.positionCode === 'DEAN' ? 'Trưởng khoa' : 'Trưởng bộ môn'}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <Link className="welcome-panel__action" to={isLecturer ? '/progress' : '/registrations'}>
+          {isLecturer ? 'Quản lý tiến độ' : 'Khám phá đề tài'} <span>→</span>
+        </Link>
+      </section>
+      {error && (
+        <div className="page-card" role="alert">
+          Không tải được số liệu. Vui lòng thử lại.{' '}
+          <button className="text-button" onClick={() => setRevision((value) => value + 1)}>
+            Thử lại
+          </button>
+        </div>
+      )}
+      <section className="dashboard-grid" aria-label="Chỉ số tổng quan" aria-busy={loading}>
+        {metrics.map((metric) => (
+          <article key={metric.label} className={`metric-card metric-card--${metric.color}`}>
+            <span className="metric-card__icon">{metric.icon}</span>
+            <div>
+              <span className="metric-card__label">{metric.label}</span>
+              <strong className="metric-card__value">
+                {metric.value === undefined ? '—' : number(metric.value)}
+              </strong>
+              <span className="metric-card__note">{metric.note}</span>
+            </div>
+          </article>
+        ))}
+      </section>
+      <section className="dashboard-insights">
+        <article className="content-card chart-card">
+          <div className="content-card__header">
+            <div>
+              <h2>Thống kê đề tài theo loại</h2>
+              <span>
+                {summary
+                  ? `Toàn hệ thống · Cập nhật ${dateTime(summary.updatedAt)}`
+                  : 'Đang chờ số liệu'}
+              </span>
+            </div>
+            <button
+              className="text-button"
+              disabled={loading}
+              onClick={() => setRevision((value) => value + 1)}
+            >
+              {loading ? 'Đang tải...' : 'Cập nhật'}
+            </button>
+          </div>
+          <div className="chart-layout">
+            <div
+              className="donut"
+              style={{ background: chartBackground }}
+              role="img"
+              aria-label={
+                summary ? `Tổng ${number(summary.totalTopics)} đề tài theo loại` : 'Chưa có số liệu'
+              }
+            >
+              <div>
+                <strong>{summary ? number(summary.totalTopics) : '—'}</strong>
+                <span>Đề tài</span>
+              </div>
+            </div>
+            <ul className="chart-legend">
+              {counts.map((item) => (
+                <li key={item.type}>
+                  <i className={`dot dot--${item.dot}`} />
+                  {item.label} <b>{summary ? number(item.count) : '—'}</b>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </article>
+        <article className="content-card activity-card">
+          <div className="content-card__header">
+            <div>
+              <h2>Thông tin cần theo dõi</h2>
+              <span>Dữ liệu hiện tại</span>
+            </div>
+            {summary && (
+              <span className="badge badge-info">
+                {number(summary.unreadNotifications)} chưa đọc
+              </span>
+            )}
+          </div>
+          <div className="task-list">
+            <Link to="/announcements">
+              <span className="task-list__icon task-list__icon--blue">✦</span>
+              <div>
+                <strong>Thông báo của bạn</strong>
+                <small>
+                  {summary ? `${number(summary.unreadNotifications)} thông báo chưa đọc` : '—'}
+                </small>
+              </div>
+              <b>›</b>
+            </Link>
+            <Link to="/registrations">
+              <span className="task-list__icon task-list__icon--warning">⌛</span>
+              <div>
+                <strong>Đợt đang mở đăng ký</strong>
+                <small>
+                  {summary
+                    ? `${number(summary.openRegistrationPeriods)} đợt trong toàn hệ thống`
+                    : '—'}
+                </small>
+              </div>
+              <b>›</b>
+            </Link>
+            <Link to="/topics">
+              <span className="task-list__icon task-list__icon--red">▣</span>
+              <div>
+                <strong>Đề tài đang mở đăng ký</strong>
+                <small>
+                  {summary
+                    ? `${number(summary.registeringTopics)} đề tài chưa được giao cho nhóm`
+                    : '—'}
+                </small>
+              </div>
+              <b>›</b>
+            </Link>
+          </div>
+        </article>
+      </section>
+      <section className="dashboard-sections">
+        <article className="content-card">
+          <div className="content-card__header">
+            <div>
+              <h2>Đề tài mới cập nhật</h2>
+              <span>Danh sách được cập nhật gần đây</span>
+            </div>
+            <Link className="text-button" to="/topics">
+              Xem tất cả
+            </Link>
+          </div>
+          {summary?.recentTopics.map((topic) => (
+            <div className="topic-preview" key={topic.id}>
+              <div>
+                <span className="topic-preview__code">{topic.code}</span>
+                <strong>{topic.title}</strong>
+                <small>{topic.departmentName}</small>
+              </div>
+              <StatusBadge status={topic.status} />
+            </div>
+          ))}
+          {summary && summary.recentTopics.length === 0 && (
+            <p className="text-secondary">Chưa có đề tài.</p>
+          )}
+        </article>
+        <article className="content-card">
+          <div className="content-card__header">
+            <div>
+              <h2>Lịch đăng ký sắp tới</h2>
+              <span>Các mốc của đợt đang hoạt động</span>
+            </div>
+            <Link className="text-button" to="/registrations">
+              Đăng ký đề tài
+            </Link>
+          </div>
+          {summary?.upcomingDeadlines.map((deadline) => {
+            const due = parseUtcDateTime(deadline.dueAt)
+            const days = Math.max(
+              0,
+              Math.ceil(
+                (due.getTime() - parseUtcDateTime(summary.updatedAt).getTime()) / 86_400_000,
+              ),
+            )
+            return (
+              <div className="deadline-item" key={`${deadline.periodId}-${deadline.title}`}>
+                <time dateTime={due.toISOString()} title={dateTime(deadline.dueAt)}>
+                  <b>{due.getDate()}</b>
+                  <span>THG {due.getMonth() + 1}</span>
+                </time>
+                <div>
+                  <strong>{deadline.title}</strong>
+                  <small>
+                    {deadline.periodName} · {dateTime(deadline.dueAt)}
+                  </small>
+                </div>
+                <span className="badge badge-info">
+                  {days === 0 ? 'Hôm nay' : `Còn ${days} ngày`}
+                </span>
+              </div>
+            )
+          })}
+          {summary && summary.upcomingDeadlines.length === 0 && (
+            <p className="text-secondary">Chưa có lịch đăng ký sắp tới.</p>
+          )}
+        </article>
+      </section>
+    </>
+  )
 }

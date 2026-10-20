@@ -5,6 +5,7 @@ import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.feature.topic.domain.TopicStatus;
 import com.example.qldetai.feature.topic.dto.TopicDtos.AssignSupervisorsRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.CreateTopicRequest;
+import com.example.qldetai.feature.topic.dto.TopicDtos.CreateRegistrationTopicRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.PublishTopicRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.ReviewTopicRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.TopicResponse;
@@ -66,6 +67,16 @@ public class TopicController {
         TopicResponse created = topicService.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/topics/" + created.id()))
                 .body(ApiResponse.success("Topic proposal created.", created));
+    }
+
+    @PostMapping("/for-registration")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('LECTURER') and @academicAuthorization.canManageDepartment(#request.departmentId, authentication))")
+    public ResponseEntity<ApiResponse<TopicResponse>> createForRegistration(
+            @Valid @RequestBody CreateRegistrationTopicRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        TopicResponse created = topicService.createForRegistration(request, principal.id());
+        return ResponseEntity.created(URI.create("/api/v1/topics/" + created.id()))
+                .body(ApiResponse.success("Đã tạo và công bố đề tài cho sinh viên đăng ký.", created));
     }
 
     @PutMapping("/{id}")

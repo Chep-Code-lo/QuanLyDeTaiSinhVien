@@ -55,6 +55,7 @@ import java.util.Set;
 @Service
 public class EvaluationResultService {
 
+    private final com.example.qldetai.feature.evaluation.repository.CommitteeMemberRepository committeeMembers;
     private final StudentRepository students;
     private final ProjectAssignmentRepository assignments;
     private final ScoreSheetRepository sheets;
@@ -71,6 +72,7 @@ public class EvaluationResultService {
     private final EvaluationActorAccess actorAccess;
 
     public EvaluationResultService(
+            com.example.qldetai.feature.evaluation.repository.CommitteeMemberRepository committeeMembers,
             StudentRepository students,
             ProjectAssignmentRepository assignments,
             ScoreSheetRepository sheets,
@@ -85,6 +87,7 @@ public class EvaluationResultService {
             ObjectMapper objectMapper,
             Clock clock,
             EvaluationActorAccess actorAccess) {
+        this.committeeMembers = committeeMembers;
         this.students = students;
         this.assignments = assignments;
         this.sheets = sheets;
@@ -189,7 +192,23 @@ public class EvaluationResultService {
         List<BigDecimal> componentAverages = new java.util.ArrayList<>();
         for (List<EvaluationAssignment> componentEvaluations : byComponent.values()) {
             AssessmentComponent component = componentEvaluations.getFirst().getComponent();
-            if (componentEvaluations.size() != component.getExpectedEvaluators()) {
+            int expectedEvaluators = component.getExpectedEvaluators();
+            if (component.getComponentType() == com.example.qldetai.feature.evaluation.domain.AssessmentComponentType.COMMITTEE) {
+                var defense = componentEvaluations.getFirst().getDefense();
+                if (defense == null || componentEvaluations.stream().anyMatch(evaluation ->
+                        evaluation.getDefense() == null || !evaluation.getDefense().getId().equals(defense.getId()))) {
+                    throw new BusinessRuleException("Hội đồng cần các phân công thuộc cùng một phiên bảo vệ.");
+                }
+                var memberIds = committeeMembers.findByCommitteeId(defense.getCommittee().getId()).stream()
+                        .map(member -> member.getLecturer().getId()).collect(java.util.stream.Collectors.toSet());
+                var evaluatorIds = componentEvaluations.stream().map(evaluation -> evaluation.getLecturer().getId())
+                        .collect(java.util.stream.Collectors.toSet());
+                expectedEvaluators = memberIds.size();
+                if (!memberIds.equals(evaluatorIds)) {
+                    throw new BusinessRuleException("Cần đủ phân công cho toàn bộ thành viên hội đồng.");
+                }
+            }
+            if (componentEvaluations.size() != expectedEvaluators) {
                 throw new BusinessRuleException(
                         "Cannot finalize while a required evaluator assignment is missing.");
             }

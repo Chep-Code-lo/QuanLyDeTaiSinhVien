@@ -1,0 +1,138 @@
+.milestone-board {
+  --milestone-blue: #2864ef;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 16px;
+  align-items: start;
+  color: #17294f;
+}
+.milestone-board__list,
+.milestone-board__calendar,
+.milestone-board__upcoming,
+.milestone-board__reminder {
+  min-width: 0;
+  border: 1px solid #e3eaf5;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(32 66 115 / 3%);
+}
+.milestone-board__list { padding: 16px 14px; }
+.milestone-board__toolbar,
+.milestone-board__card-heading,
+.milestone-board__calendar-heading,
+.milestone-board__report-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.milestone-board__toolbar { margin-bottom: 14px; flex-wrap: wrap; }
+.milestone-board h2 { margin: 0; font-size: 18px; color: #000; }
+.milestone-board h3 { margin: 0; font-size: 16px; }
+.milestone-board__count { margin-left: 6px; padding: 3px 7px; border-radius: 12px; background: #edf2f9; font-size: 12px; color: #243a64; }
+.milestone-board__sort { display: flex; align-items: center; gap: 5px; color: #6d7e9d; }
+.milestone-board__sort .animated-select__input { min-height: 30px; padding: 5px 27px 5px 9px; border-radius: 5px; font-size: 12px; }
+.milestone-board__timeline { margin: 0; padding: 0; list-style: none; }
+.milestone-board__step { position: relative; padding: 0 0 12px 38px; }
+.milestone-board__step:not(:last-child)::before { position: absolute; top: 22px; bottom: -6px; left: 12px; width: 2px; background: #dbe7ff; content: ''; }
+.milestone-board__number { position: absolute; left: 0; top: 8px; z-index: 1; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--milestone-blue); color: #fff; font-size: 12px; font-weight: 700; box-shadow: 0 0 0 4px #fff; }
+.milestone-board__card { padding: 14px; border: 1px solid #e1e9f5; border-radius: 8px; background: linear-gradient(110deg, #fff, #fbfdff); scroll-margin: 24px; }
+.milestone-board__card--selected { border-color: #6492ff; box-shadow: 0 0 0 2px #e8efff; }
+.milestone-board__card-heading { justify-content: flex-start; flex-wrap: wrap; gap: 7px; }
+.milestone-board__card-heading .badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; }
+.milestone-board__card-heading h3 { min-width: 0; overflow-wrap: anywhere; }
+.milestone-board__card-heading .badge-warning { background: #eaf2ff; border-color: #94baff; color: #2864ef; }
+.milestone-board__tag,
+.milestone-board__remaining { display: inline-flex; align-items: center; padding: 3px 7px; border-radius: 4px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.milestone-board__tag { border: 1px solid transparent; }
+.milestone-board__tag--soon { background: #fff1db; border-color: #f6c971; color: #ae5c12; }
+.milestone-board__tag--normal { background: #eaf2ff; border-color: #cadcfe; color: #2864ef; }
+.milestone-board__tag--late { background: #fee9e8; border-color: #f2b1ae; color: #ba3232; }
+.milestone-board__description { margin: 8px 0 14px; color: #73829d; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.milestone-board__metrics { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.milestone-board__deadline,
+.milestone-board__submission-metric { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.milestone-board__submission-metric { padding-left: 12px; border-left: 1px solid #edf0f7; }
+.milestone-board__icon { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 7px; background: #e9f3ff; color: #3475ff; }
+.milestone-board__label { display: block; margin-bottom: 4px; color: #7b88a2; font-size: 11px; }
+.milestone-board__deadline-value { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+.milestone-board__progress-copy { flex: 1; min-width: 0; }
+.milestone-board__progress-line { display: flex; align-items: center; gap: 7px; color: #8290a8; font-size: 11px; }
+.milestone-board__progress-line strong { flex-shrink: 0; color: #253b64; font-size: 12px; }
+.milestone-board__progress { flex: 1; min-width: 26px; height: 6px; overflow: hidden; border-radius: 8px; background: #e6ebf3; }
+.milestone-board__progress > span { display: block; height: 100%; border-radius: inherit; background: var(--milestone-blue); }
+.milestone-board__card-footer { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.milestone-board__file { display: flex; align-items: center; flex: 1; gap: 8px; min-width: 0; padding: 10px; border-radius: 5px; background: #f4f6fa; color: #78869e; font-size: 12px; }
+.milestone-board__file svg { flex-shrink: 0; }
+.milestone-board__file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.milestone-board__actions { display: flex; flex-shrink: 0; gap: 8px; }
+.milestone-board__button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 10px; border: 1px solid #dfe7f5; border-radius: 5px; background: #fff; color: #39547d; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.milestone-board__button:hover { background: #f0f5ff; border-color: #b5cdfb; }
+.milestone-board__button--primary { border-color: var(--milestone-blue); background: linear-gradient(#3877ff, #2258e5); color: #fff; box-shadow: 0 2px 4px #e0e8fb; }
+.milestone-board__button--primary:hover { background: #2258e5; border-color: #2258e5; }
+.milestone-board__button:disabled { opacity: .5; cursor: not-allowed; }
+.milestone-board__button:focus-visible,
+.milestone-board__sidebar button:focus-visible { outline: 2px solid #2864ef; outline-offset: 3px; }
+.milestone-board__reports { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e5ebf5; }
+.milestone-board__reports h4 { margin: 0 0 10px; font-size: 14px; }
+.milestone-board__reports > p { color: #78869e; font-size: 13px; }
+.milestone-board__report { margin-top: 10px; padding: 12px; border: 1px solid #e5ebf5; border-radius: 6px; font-size: 13px; }
+.milestone-board__report-heading { flex-wrap: wrap; }
+.milestone-board__report time { display: block; margin-top: 5px; color: #78869e; font-size: 11px; }
+.milestone-board__report p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.milestone-board__feedback { margin-top: 10px; padding: 10px; border-radius: 5px; background: #edf4ff; white-space: pre-wrap; overflow-wrap: anywhere; }
+.milestone-board__sidebar { display: grid; gap: 12px; }
+.milestone-board__calendar { padding: 13px 10px 11px; }
+.milestone-board__calendar-heading { margin-bottom: 12px; }
+.milestone-board__calendar-heading h3 { display: flex; align-items: center; gap: 7px; font-size: 14px; }
+.milestone-board__calendar-heading > div { display: flex; gap: 3px; }
+.milestone-board__calendar-heading button { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #617495; cursor: pointer; }
+.milestone-board__calendar-heading button:hover { background: #edf4ff; }
+.milestone-board__calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.milestone-board__weekday { padding: 4px 0 8px; color: #7b89a5; text-align: center; font-size: 11px; }
+.milestone-board__calendar-grid button { min-width: 0; height: 28px; padding: 0; border: 1px solid transparent; border-radius: 4px; background: #fff; color: #60708f; font: inherit; font-size: 12px; cursor: pointer; }
+.milestone-board__calendar-grid button:hover { background: #eaf1ff; }
+.milestone-board__calendar-grid .milestone-board__day--deadline { background: #fff1cf; color: #925c18; font-weight: 700; }
+.milestone-board__calendar-grid .milestone-board__day--today { border-color: #8eb3ff; }
+.milestone-board__calendar-grid .milestone-board__day--selected { background: #4386ff; color: #fff; }
+.milestone-board__calendar-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; color: #8490a6; font-size: 10px; }
+.milestone-board__calendar-legend span { display: flex; align-items: center; gap: 5px; }
+.milestone-board__calendar-legend i { width: 9px; height: 9px; border-radius: 50%; background: #ffd777; }
+.milestone-board__calendar-legend span:last-child i { background: #72a8ff; }
+.milestone-board__upcoming { overflow: hidden; }
+.milestone-board__upcoming > h3 { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; background: #eaf4ff; color: #2856c5; font-size: 14px; }
+.milestone-board__upcoming > h3 > svg:last-child { margin-left: auto; }
+.milestone-board__upcoming-item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px 12px; border: 0; border-top: 1px solid #edf0f7; background: #fff; color: #263b61; font: inherit; text-align: left; cursor: pointer; }
+.milestone-board__upcoming-item:hover { background: #f7faff; }
+.milestone-board__date-chip { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 0 0 36px; padding: 4px; border-radius: 5px; background: #fff0de; color: #a95d12; }
+.milestone-board__date-chip strong { font-size: 18px; }
+.milestone-board__date-chip small { font-size: 9px; }
+.milestone-board__upcoming-item > span:nth-child(2) { flex: 1; min-width: 0; }
+.milestone-board__upcoming-item > span:nth-child(2) > strong { display: block; overflow-wrap: anywhere; font-size: 12px; }
+.milestone-board__upcoming-item > span:nth-child(2) > small { display: block; margin-top: 4px; color: #8090aa; font-size: 11px; }
+.milestone-board__reminder { display: grid; justify-items: start; gap: 7px; padding: 12px; }
+.milestone-board__reminder > strong { font-size: 12px; }
+.milestone-board__reminder p { margin: 0; color: #8290a8; font-size: 11px; line-height: 1.5; }
+.milestone-board__reminder > button { justify-self: end; color: #2864ef; }
+.milestone-board__sidebar-note { margin: 0; padding: 15px 12px; color: #8290a8; font-size: 12px; }
+.milestone-board__empty { display: grid; justify-items: center; gap: 10px; padding: 40px 16px; text-align: center; color: #78869e; }
+.milestone-board__empty h3 { justify-content: center; font-size: 18px; }
+.milestone-board__empty p { margin: 0; font-size: 13px; line-height: 1.5; }
+@media (max-width: 1200px) {
+  .milestone-board__metrics { grid-template-columns: 1fr; }
+  .milestone-board__submission-metric { padding-left: 0; border-left: 0; }
+  .milestone-board__card-footer { flex-wrap: wrap; }
+  .milestone-board__file { flex-basis: 100%; }
+  .milestone-board__actions { justify-content: flex-end; width: 100%; }
+}
+@media (max-width: 960px) {
+  .milestone-board { grid-template-columns: minmax(0, 1fr); }
+  .milestone-board__sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+}
+@media (max-width: 540px) {
+  .milestone-board__sidebar { grid-template-columns: minmax(0, 1fr); }
+  .milestone-board__list { padding: 12px 10px; }
+  .milestone-board__step { padding-left: 32px; }
+  .milestone-board__card { padding: 12px; }
+  .milestone-board__card-heading h3 { flex-basis: 100%; }
+}

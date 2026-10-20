@@ -1,5 +1,7 @@
 package com.example.qldetai.feature.identity;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -17,6 +19,7 @@ import com.example.qldetai.feature.identity.domain.Role;
 import com.example.qldetai.feature.identity.domain.RoleCode;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.domain.UserStatus;
+import com.example.qldetai.feature.identity.dto.IdentityDtos;
 import com.example.qldetai.feature.identity.repository.AcademicAppointmentRepository;
 import com.example.qldetai.feature.identity.repository.LecturerRepository;
 import com.example.qldetai.feature.identity.repository.RoleRepository;
@@ -26,6 +29,8 @@ import java.time.LocalDateTime;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
@@ -111,6 +116,106 @@ class AuthIntegrationTests {
                 .andExpect(jsonPath("$.data.fullName").value("Test Admin"));
         mockMvc.perform(get("/api/v1/admin/users").session(session))
                 .andExpect(status().isOk());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"STUDENT", "LECTURER"})
+    void adminCreatesAccountWithMatchingProfileAndAccountCanLogin(String role) throws Exception {
+        Department department = createDepartment(createFaculty("ACCOUNT"), "CREATE");
+        MockHttpSession adminSession = login("admin@test.local", "TestPassword123!");
+        String profile = role.equals("STUDENT")
+                ? "\"student\": {\"departmentId\": %d, \"studentCode\": \"SVNEW\", \"className\": \"CTK26\", \"cohort\": \"2026\"}"
+                        .formatted(department.getId())
+                : "\"lecturer\": {\"departmentId\": %d, \"lecturerCode\": \"GVNEW\", \"academicDegree\": \"TS\", \"specialization\": \"Software Engineering\"}"
+                        .formatted(department.getId());
+        String payload = """
+                {"email":"New.Account@test.local","password":"NewPassword123!",
+                 "fullName":"New Account","phone":"0901234567","roles":["%s"],%s}
+                """.formatted(role, profile);
+        String profilePath = role.equals("STUDENT") ? "student" : "lecturer";
+
+        mockMvc.perform(post("/api/v1/admin/users").session(adminSession).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.email").value("new.account@test.local"))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.roles[0]").value(role))
+                .andExpect(jsonPath("$.data." + profilePath + ".departmentId").value(department.getId()))
+                .andExpect(jsonPath("$.data.password").doesNotExist())
+                .andExpect(jsonPath("$.data.passwordHash").doesNotExist());
+
+        MockHttpSession newSession = login("new.account@test.local", "NewPassword123!");
+        mockMvc.perform(get("/api/v1/auth/me").session(newSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.roles[0]").value(role))
+                .andExpect(jsonPath("$.data." + profilePath + ".departmentId").value(department.getId()));
+
+        mockMvc.perform(post("/api/v1/admin/users").session(newSession).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/admin/users").session(adminSession).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Email này đã được sử dụng."));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"STUDENT", "LECTURER"})
+    void accountCreationRequiresMatchingProfile(String role) throws Exception {
+        MockHttpSession session = login("admin@test.local", "TestPassword123!");
+        mockMvc.perform(post("/api/v1/admin/users").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"missing-profile@test.local","password":"NewPassword123!",
+                                 "fullName":"Missing Profile","roles":["%s"]}
+                                """.formatted(role)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Ab1!xyz", "password123!", "Password!", "Password123", "Password123 "})
+    void weakPasswordCannotCreateAccount(String password) throws Exception {
+        Department department = createDepartment(createFaculty("PASSWORD"), "CHECK");
+        MockHttpSession session = login("admin@test.local", "TestPassword123!");
+        mockMvc.perform(post("/api/v1/admin/users").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"weak-password@test.local","password":"%s",
+                                 "fullName":"Password Check","roles":["STUDENT"],
+                                 "student":{"departmentId":%d,"studentCode":"SVWEAK","className":"CTK26","cohort":"2026"}}
+                                """.formatted(password, department.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.password").value(IdentityDtos.PASSWORD_REQUIREMENTS));
+        assertFalse(userRepository.existsByEmailIgnoreCase("weak-password@test.local"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Ab1!xyz", "password123!", "Password!", "Password123", "Password123 "})
+    void weakPasswordCannotReplaceCurrentPassword(String password) throws Exception {
+        MockHttpSession session = login("admin@test.local", "TestPassword123!");
+        mockMvc.perform(post("/api/v1/auth/change-password").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"TestPassword123!","newPassword":"%s"}
+                                """.formatted(password)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.newPassword").value(IdentityDtos.PASSWORD_REQUIREMENTS));
+        User user = userRepository.findByEmailIgnoreCase("admin@test.local").orElseThrow();
+        assertTrue(passwordEncoder.matches("TestPassword123!", user.getPasswordHash()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ABCD123!", "Đường123!", "Password1★"})
+    void compliantPasswordCanReplaceCurrentPasswordAndLogin(String password) throws Exception {
+        MockHttpSession session = login("admin@test.local", "TestPassword123!");
+        mockMvc.perform(post("/api/v1/auth/change-password").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"TestPassword123!","newPassword":"%s"}
+                                """.formatted(password)))
+                .andExpect(status().isOk());
+        login("admin@test.local", password);
     }
 
     @Test

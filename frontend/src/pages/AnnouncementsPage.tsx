@@ -1,15 +1,23 @@
+import { formatDateTime } from '../utils/dateTime'
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { academicApi } from '../api/academic'
 import { announcementApi } from '../api/announcements'
 import { notificationApi } from '../api/notifications'
 import { PageHeader } from '../components/PageHeader'
+import { AnnouncementTable } from '../components/AnnouncementTable'
 import { StatusBadge } from '../components/StatusBadge'
+import { ConfirmModal } from '../components/ConfirmModal'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import type { AnnouncementResponse, FacultyResponse, NotificationResponse } from '../types/domain'
 
-const messageOf = (error: any) => error.response?.data?.message || 'Không thể thực hiện thao tác. Vui lòng thử lại.'
+const messageOf = (error: any) =>
+  error.response?.data?.message || 'Không thể thực hiện thao tác. Vui lòng thử lại.'
+
+const announcementTabs = [
+  { id: 'general', label: 'Thông báo chung' },
+  { id: 'personal', label: 'Thông báo cá nhân' },
+] as const
 
 export function AnnouncementsPage() {
   const { user, hasAppointment, hasRole } = useAuth()
@@ -20,27 +28,55 @@ export function AnnouncementsPage() {
   const [managed, setManaged] = useState<AnnouncementResponse[]>([])
   const [facultyId, setFacultyId] = useState<number>()
   const [loading, setLoading] = useState(true)
+  const [personalLoading, setPersonalLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'general' | 'personal'>('general')
   const [managing, setManaging] = useState(false)
   const [editing, setEditing] = useState<AnnouncementResponse>()
+  const [pendingArchive, setPendingArchive] = useState<AnnouncementResponse>()
+  const [archiving, setArchiving] = useState(false)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [attachmentFileId, setAttachmentFileId] = useState('')
-  const canManage = hasRole('ADMIN') || hasAppointment('DEAN')
   const allowedFacultyIds = useMemo(() => {
-    if (hasRole('ADMIN')) return faculties.map((faculty) => faculty.id)
-    return [...new Set((user?.activeAppointments ?? []).filter((item) => item.positionCode === 'DEAN').map((item) => item.facultyId))]
+    return faculties
+      .filter(
+        (faculty) =>
+          hasRole('ADMIN') ||
+          user?.activeAppointments.some(
+            (item) => item.positionCode === 'DEAN' && item.facultyId === faculty.id,
+          ),
+      )
+      .map((faculty) => faculty.id)
   }, [faculties, user, hasRole])
+  const canManage = allowedFacultyIds.length > 0
 
-  const loadPublic = async () => {
+  const loadPublic = async (isCurrent = () => true) => {
     setLoading(true)
     try {
-      const [official, personal] = await Promise.all([announcementApi.list({ size: 100 }), notificationApi.list(0, 100)])
+      const [official, personal] = await Promise.all([
+        announcementApi.list({ size: 100 }),
+        notificationApi.list(0, 100),
+      ])
+      if (!isCurrent()) return
       setAnnouncements(official.content)
       setNotifications(personal.content)
     } catch (error) {
-      showError(messageOf(error))
+      if (isCurrent()) showError(messageOf(error))
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
+    }
+  }
+
+  const loadPersonal = async (isCurrent: () => boolean) => {
+    setPersonalLoading(true)
+    try {
+      const personal = await notificationApi.list(0, 100)
+      if (!isCurrent()) return
+      setNotifications(personal.content)
+    } catch (error) {
+      if (isCurrent()) showError(messageOf(error))
+    } finally {
+      if (isCurrent()) setPersonalLoading(false)
     }
   }
 
@@ -55,8 +91,20 @@ export function AnnouncementsPage() {
   }
 
   useEffect(() => {
-    void loadPublic()
-    if (canManage) academicApi.getFaculties().then(setFaculties).catch(() => undefined)
+    let active = true
+    if (activeTab === 'general') void loadPublic(() => active)
+    else void loadPersonal(() => active)
+    return () => {
+      active = false
+    }
+  }, [user?.id, activeTab])
+
+  useEffect(() => {
+    if (hasRole('ADMIN') || hasAppointment('DEAN'))
+      academicApi
+        .getFaculties()
+        .then(setFaculties)
+        .catch((error) => showError(messageOf(error)))
   }, [user?.id])
 
   useEffect(() => {
@@ -71,7 +119,10 @@ export function AnnouncementsPage() {
     if (item.readAt) return
     try {
       const updated = await notificationApi.markRead(item.id)
-      setNotifications((items) => items.map((candidate) => candidate.id === item.id ? updated : candidate))
+      setNotifications((items) =>
+        items.map((candidate) => (candidate.id === item.id ? updated : candidate)),
+      )
+      window.dispatchEvent(new Event('notifications:changed'))
     } catch (error) {
       showError(messageOf(error))
     }
@@ -88,16 +139,28 @@ export function AnnouncementsPage() {
     event.preventDefault()
     if (!title.trim() || !content.trim() || (!editing && !facultyId)) return
     const optionalAttachment = attachmentFileId.trim() ? Number(attachmentFileId) : null
-    if (attachmentFileId.trim() && (!Number.isInteger(optionalAttachment) || optionalAttachment <= 0)) {
+    if (
+      attachmentFileId.trim() &&
+      (!Number.isInteger(optionalAttachment) || optionalAttachment <= 0)
+    ) {
       showError('Mã tệp đính kèm không hợp lệ.')
       return
     }
     try {
       if (editing) {
-        await announcementApi.update(editing.id, { title: title.trim(), content: content.trim(), attachmentFileId: optionalAttachment })
+        await announcementApi.update(editing.id, {
+          title: title.trim(),
+          content: content.trim(),
+          attachmentFileId: optionalAttachment,
+        })
         showSuccess('Đã cập nhật bản nháp.')
       } else {
-        await announcementApi.create({ facultyId: facultyId!, title: title.trim(), content: content.trim(), attachmentFileId: optionalAttachment })
+        await announcementApi.create({
+          facultyId: facultyId!,
+          title: title.trim(),
+          content: content.trim(),
+          attachmentFileId: optionalAttachment,
+        })
         showSuccess('Đã tạo thông báo ở trạng thái nháp.')
       }
       resetEditor()
@@ -114,25 +177,256 @@ export function AnnouncementsPage() {
     setAttachmentFileId(announcement.attachmentFileId ? String(announcement.attachmentFileId) : '')
   }
 
-  const transition = async (announcement: AnnouncementResponse, action: 'publish' | 'archive' | 'remove') => {
+  const publish = async (announcement: AnnouncementResponse) => {
     try {
-      if (action === 'publish') await announcementApi.publish(announcement.id)
-      if (action === 'archive') await announcementApi.archive(announcement.id)
-      if (action === 'remove') await announcementApi.remove(announcement.id)
-      showSuccess(action === 'publish' ? 'Đã công bố thông báo.' : action === 'archive' ? 'Đã lưu trữ thông báo.' : 'Đã xóa thông báo.')
+      await announcementApi.publish(announcement.id)
+      showSuccess('Đã công bố thông báo.')
       await Promise.all([loadManaged(), loadPublic()])
     } catch (error) {
       showError(messageOf(error))
     }
   }
 
-  return <>
-    <PageHeader title="Thông báo" description="Thông báo chính thức theo khoa và các nhắc việc cá nhân." />
-    {canManage && <section className="page-card"><div className="content-card__header"><div><h2>Quản lý thông báo khoa</h2><span>Tạo nháp, công bố và lưu trữ thông báo trong phạm vi khoa được phân quyền.</span></div><button className="btn btn-secondary" onClick={() => setManaging((value) => !value)}>{managing ? 'Ẩn quản lý' : 'Mở quản lý'}</button></div>
-      {managing && <><div className="inline-form"><select className="form-select" value={facultyId ?? ''} onChange={(event) => setFacultyId(Number(event.target.value) || undefined)}>{allowedFacultyIds.map((id) => <option key={id} value={id}>{faculties.find((faculty) => faculty.id === id)?.name ?? `Khoa #${id}`}</option>)}</select></div>
-        <form className="stack-form" onSubmit={save}><input className="form-input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Tiêu đề thông báo" maxLength={250} required /><textarea className="form-textarea" value={content} onChange={(event) => setContent(event.target.value)} placeholder="Nội dung thông báo" required /><input className="form-input" value={attachmentFileId} onChange={(event) => setAttachmentFileId(event.target.value)} placeholder="Mã tệp đính kèm (không bắt buộc)" inputMode="numeric" /><div className="inline-form"><button className="btn btn-primary">{editing ? 'Lưu bản nháp' : 'Tạo bản nháp'}</button>{editing && <button type="button" className="btn btn-secondary" onClick={resetEditor}>Hủy sửa</button>}</div></form>
-        <div className="stack-list">{managed.map((announcement) => <article key={announcement.id} className="notification-item"><div><h2>{announcement.title} <StatusBadge status={announcement.status} /></h2><p>{announcement.content}</p><time>Tạo: {new Date(announcement.createdAt).toLocaleString('vi-VN')}</time></div><div className="inline-form">{announcement.status === 'DRAFT' && <><button className="text-button" onClick={() => edit(announcement)}>Sửa</button><button className="text-button" onClick={() => transition(announcement, 'publish')}>Công bố</button><button className="text-button" onClick={() => transition(announcement, 'remove')}>Xóa</button></>}{announcement.status === 'PUBLISHED' && <button className="text-button" onClick={() => transition(announcement, 'archive')}>Lưu trữ</button>}{announcement.status === 'ARCHIVED' && <button className="text-button" onClick={() => transition(announcement, 'remove')}>Xóa</button>}</div></article>)}</div></>}</section>}
-    <section className="page-card"><h2 className="section-title">Thông báo chính thức</h2>{loading ? <div className="content-state"><span className="spinner" /><p>Đang tải thông báo...</p></div> : announcements.length === 0 ? <div className="content-state"><strong>Chưa có thông báo chính thức.</strong></div> : <div className="notification-list">{announcements.map((announcement) => <article key={announcement.id} className="notification-item"><div><h2>{announcement.title}</h2><p>{announcement.content}</p><small>{announcement.facultyName} · {announcement.createdByName}</small><time>{new Date(announcement.publishedAt ?? announcement.createdAt).toLocaleString('vi-VN')}</time></div>{announcement.attachmentPath && <a className="text-button" href={announcement.attachmentPath}>{announcement.attachmentName || 'Tệp đính kèm'}</a>}</article>)}</div>}</section>
-    <section className="page-card"><h2 className="section-title">Nhắc việc cá nhân</h2>{loading ? null : notifications.length === 0 ? <div className="content-state"><strong>Bạn chưa có nhắc việc nào.</strong></div> : <div className="notification-list">{notifications.map((item) => <article key={item.id} className={`notification-item${item.readAt ? '' : ' notification-item--unread'}`} onClick={() => markRead(item)}><div><h2>{item.title}</h2><p>{item.content}</p><time>{new Date(item.createdAt).toLocaleString('vi-VN')}</time></div>{item.targetPath && <Link className="text-button" to={item.targetPath}>Mở liên quan</Link>}</article>)}</div>}</section>
-  </>
+  const archive = async () => {
+    if (!pendingArchive || archiving) return
+    setArchiving(true)
+    try {
+      const updated = await announcementApi.archive(pendingArchive.id)
+      setManaged((items) => items.map((item) => item.id === updated.id ? updated : item))
+      if (editing?.id === pendingArchive.id) resetEditor()
+      setPendingArchive(undefined)
+      showSuccess('Đã lưu trữ thông báo.')
+      await Promise.all([loadManaged(), loadPublic()])
+    } catch (error) {
+      showError(messageOf(error))
+    } finally {
+      setArchiving(false)
+    }
+  }
+
+  return (
+    <>
+      <PageHeader title="Thông báo" />
+      <div className="announcement-tabs" role="tablist" aria-label="Loại thông báo">
+        {announcementTabs.map((tab, index) => (
+          <button
+            key={tab.id}
+            id={`announcement-tab-${tab.id}`}
+            className="announcement-tabs__tab"
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            aria-controls={`announcement-panel-${tab.id}`}
+            tabIndex={activeTab === tab.id ? 0 : -1}
+            onClick={() => setActiveTab(tab.id)}
+            onKeyDown={(event) => {
+              let nextIndex: number
+              if (event.key === 'ArrowRight') nextIndex = (index + 1) % announcementTabs.length
+              else if (event.key === 'ArrowLeft') {
+                nextIndex = (index + announcementTabs.length - 1) % announcementTabs.length
+              } else if (event.key === 'Home') nextIndex = 0
+              else if (event.key === 'End') nextIndex = announcementTabs.length - 1
+              else return
+              event.preventDefault()
+              const nextTab = announcementTabs[nextIndex].id
+              setActiveTab(nextTab)
+              document.getElementById(`announcement-tab-${nextTab}`)?.focus()
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <div
+        className="announcement-panel"
+        id="announcement-panel-general"
+        role="tabpanel"
+        aria-labelledby="announcement-tab-general"
+        hidden={activeTab !== 'general'}
+        tabIndex={0}
+      >
+        {canManage && (
+          <section className="page-card">
+            <div className="content-card__header announcement-management-header">
+              <div>
+                <h2>Quản lý thông báo khoa</h2>
+              </div>
+              <button className="btn btn-secondary" aria-expanded={managing} onClick={() => setManaging((value) => !value)}>
+                {managing ? 'Ẩn quản lý' : 'Mở quản lý'}
+              </button>
+            </div>
+            {managing && (
+              <>
+                <form className="stack-form announcement-editor" onSubmit={save}>
+                  <input
+                    className="form-input"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder="Tiêu đề thông báo"
+                    maxLength={250}
+                    required
+                  />
+                  <textarea
+                    className="form-textarea"
+                    value={content}
+                    onChange={(event) => setContent(event.target.value)}
+                    placeholder="Nội dung thông báo"
+                    required
+                  />
+                  <input
+                    className="form-input"
+                    value={attachmentFileId}
+                    onChange={(event) => setAttachmentFileId(event.target.value)}
+                    placeholder="Mã tệp đính kèm (không bắt buộc)"
+                    inputMode="numeric"
+                  />
+                  <div className="announcement-editor__actions">
+                    {editing && (
+                      <button type="button" className="btn btn-secondary" onClick={resetEditor}>
+                        Hủy sửa
+                      </button>
+                    )}
+                    <button type="submit" className="btn btn-primary">
+                      {editing ? 'Lưu bản nháp' : 'Tạo bản nháp'}
+                    </button>
+                  </div>
+                </form>
+                <div className="stack-list">
+                  {managed.map((announcement) => (
+                    <article key={announcement.id} className="notification-item announcement-management-item">
+                      <div className="announcement-management-copy">
+                        <h2>{announcement.title}</h2>
+                        <p>{announcement.content}</p>
+                        <time>Tạo: {formatDateTime(announcement.createdAt)}</time>
+                      </div>
+                      <div className="announcement-management-actions">
+                        <StatusBadge status={announcement.status} />
+                        {announcement.status === 'DRAFT' && (
+                          <>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => edit(announcement)}>
+                              Sửa
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={() => publish(announcement)}
+                            >
+                              Công bố
+                            </button>
+                          </>
+                        )}
+                        {announcement.status !== 'ARCHIVED' && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setPendingArchive(announcement)}
+                          >
+                            Lưu trữ
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+        )}
+        <section className="page-card announcement-inbox-card">
+          <h2 className="section-title">Thông báo chung</h2>
+          {loading ? (
+            <div className="content-state">
+              <span className="spinner" />
+              <p>Đang tải thông báo...</p>
+            </div>
+          ) : announcements.length === 0 ? (
+            <div className="content-state">
+              <strong>Chưa có thông báo chung.</strong>
+            </div>
+          ) : (
+            <AnnouncementTable
+              label="Thông báo chung"
+              items={announcements.map((announcement) => ({
+                id: announcement.id,
+                title: announcement.title,
+                content: announcement.content,
+                senderName: announcement.createdByName,
+                sentAt: announcement.publishedAt ?? announcement.createdAt,
+                attachmentPath: announcement.attachmentPath,
+                attachmentName: announcement.attachmentName,
+                unread: notifications.some(
+                  (item) => item.targetPath === '/announcements' &&
+                    item.title === announcement.title && item.content === announcement.content && !item.readAt,
+                ),
+              }))}
+              onOpen={(id) => {
+                const announcement = announcements.find((item) => item.id === id)
+                if (!announcement) return
+                notifications.filter(
+                  (item) => item.targetPath === '/announcements' &&
+                    item.title === announcement.title && item.content === announcement.content,
+                ).forEach((item) => {
+                  void markRead(item)
+                })
+              }}
+            />
+          )}
+        </section>
+      </div>
+      <section
+        className="page-card announcement-panel announcement-inbox-card"
+        id="announcement-panel-personal"
+        role="tabpanel"
+        aria-labelledby="announcement-tab-personal"
+        hidden={activeTab !== 'personal'}
+        tabIndex={0}
+      >
+        <h2 className="section-title">Thông báo cá nhân</h2>
+        {personalLoading ? (
+          <div className="content-state">
+            <span className="spinner" />
+            <p>Đang tải thông báo...</p>
+          </div>
+        ) : notifications.length === 0 ? (
+          <div className="content-state">
+            <strong>Bạn chưa có thông báo cá nhân nào.</strong>
+          </div>
+        ) : (
+          <AnnouncementTable
+            label="Thông báo cá nhân"
+            items={notifications.map((item) => ({
+              id: item.id,
+              title: item.title,
+              content: item.content,
+              senderName: item.targetPath === '/announcements'
+                ? announcements.find(
+                    (announcement) => announcement.title === item.title &&
+                      announcement.content === item.content,
+                  )?.createdByName ?? 'Hệ thống'
+                : 'Hệ thống',
+              sentAt: item.createdAt,
+              unread: !item.readAt,
+              targetPath: item.targetPath,
+            }))}
+            onOpen={(id) => {
+              const item = notifications.find((notification) => notification.id === id)
+              if (item) void markRead(item)
+            }}
+          />
+        )}
+      </section>
+      <ConfirmModal
+        isOpen={!!pendingArchive}
+        title="Xác nhận lưu trữ thông báo"
+        message={`Bạn có muốn lưu trữ thông báo “${pendingArchive?.title ?? ''}”? Thông báo được giữ lại trong danh sách quản lý và không hiển thị ở Thông báo chung.`}
+        confirmText="Lưu trữ"
+        variant="primary"
+        loading={archiving}
+        onConfirm={archive}
+        onCancel={() => {
+          if (!archiving) setPendingArchive(undefined)
+        }}
+      />
+    </>
+  )
 }

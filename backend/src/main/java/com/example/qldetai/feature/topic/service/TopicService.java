@@ -9,11 +9,15 @@ import com.example.qldetai.feature.academic.domain.Department;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriod;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriodStatus;
 import com.example.qldetai.feature.academic.repository.RegistrationPeriodRepository;
+import com.example.qldetai.feature.academic.repository.DepartmentRepository;
 import com.example.qldetai.feature.communication.service.NotificationService;
 import com.example.qldetai.feature.groupregistration.domain.StudentGroup;
 import com.example.qldetai.feature.groupregistration.repository.StudentGroupRepository;
 import com.example.qldetai.feature.identity.domain.Lecturer;
 import com.example.qldetai.feature.identity.domain.RoleCode;
+import com.example.qldetai.feature.identity.domain.PositionCode;
+import com.example.qldetai.feature.identity.domain.UserStatus;
+import com.example.qldetai.feature.identity.repository.AcademicAppointmentRepository;
 import com.example.qldetai.feature.identity.domain.Student;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.LecturerRepository;
@@ -22,11 +26,13 @@ import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.topic.domain.ProposalSource;
 import com.example.qldetai.feature.topic.domain.Topic;
 import com.example.qldetai.feature.topic.domain.TopicReview;
+import com.example.qldetai.feature.topic.domain.TopicReviewDecision;
 import com.example.qldetai.feature.topic.domain.TopicStatus;
 import com.example.qldetai.feature.topic.domain.TopicSupervisor;
 import com.example.qldetai.feature.topic.domain.VisibilityType;
 import com.example.qldetai.feature.topic.dto.TopicDtos.AssignSupervisorsRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.CreateTopicRequest;
+import com.example.qldetai.feature.topic.dto.TopicDtos.CreateRegistrationTopicRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.PublishTopicRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.ReviewTopicRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.TopicResponse;
@@ -65,6 +71,8 @@ public class TopicService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final Clock clock;
+    private final DepartmentRepository departmentRepository;
+    private final AcademicAppointmentRepository academicAppointmentRepository;
 
     public TopicService(
             TopicRepository topicRepository,
@@ -76,7 +84,9 @@ public class TopicService {
             LecturerRepository lecturerRepository,
             UserRepository userRepository,
             NotificationService notificationService,
-            Clock clock) {
+            Clock clock,
+            DepartmentRepository departmentRepository,
+            AcademicAppointmentRepository academicAppointmentRepository) {
         this.topicRepository = topicRepository;
         this.topicSupervisorRepository = topicSupervisorRepository;
         this.topicReviewRepository = topicReviewRepository;
@@ -87,6 +97,8 @@ public class TopicService {
         this.userRepository = userRepository;
         this.notificationService = notificationService;
         this.clock = clock;
+        this.departmentRepository = departmentRepository;
+        this.academicAppointmentRepository = academicAppointmentRepository;
     }
 
     @Transactional(readOnly = true)
@@ -149,6 +161,83 @@ public class TopicService {
         topic.setCreatedAt(now);
         topic.setUpdatedAt(now);
         return toResponse(topicRepository.save(topic));
+    }
+
+    @Transactional
+    @BusinessAudit(action = "TOPIC_CREATE_PUBLISH", entityType = "TOPIC")
+    public TopicResponse createForRegistration(CreateRegistrationTopicRequest request, Long actorId) {
+        User actor = requireUser(actorId);
+        ensureModerator(actor);
+        Department department = departmentRepository.findById(request.departmentId())
+                .orElseThrow(() -> new ResourceNotFoundException("Bộ môn không tồn tại."));
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (!hasRole(actor, RoleCode.ADMIN)
+                && !academicAppointmentRepository.hasActiveFacultyAppointment(
+                        actorId, PositionCode.DEAN, department.getFaculty().getId(), now)
+                && !academicAppointmentRepository.hasActiveDepartmentAppointment(
+                        actorId, PositionCode.DEPARTMENT_HEAD, department.getId(), now)) {
+            throw new AccessDeniedException("Bạn không có quyền tạo đề tài cho bộ môn này.");
+        }
+        RegistrationPeriod period = requirePeriod(request.periodId());
+        if (!department.getFaculty().getId().equals(period.getFaculty().getId())) {
+            throw new BusinessRuleException("Bộ môn phải thuộc khoa của đợt đăng ký.");
+        }
+        if (!department.isActive() || !department.getFaculty().isActive()) {
+            throw new BusinessRuleException("Khoa hoặc bộ môn đã ngừng hoạt động.");
+        }
+        if (now.isBefore(period.getProposalStartAt()) || now.isAfter(period.getRegistrationEndAt())) {
+            throw new BusinessRuleException("Chỉ được tạo đề tài từ khi mở đề xuất đến khi kết thúc đăng ký.");
+        }
+        String code = normalizeCode(request.code());
+        if (topicRepository.existsByPeriodIdAndCodeIgnoreCase(period.getId(), code)) {
+            throw new ConflictException("Mã đề tài đã được sử dụng trong đợt đăng ký này.");
+        }
+
+        Topic topic = new Topic();
+        topic.setPeriod(period);
+        topic.setFaculty(period.getFaculty());
+        topic.setDepartment(department);
+        topic.setCode(code);
+        apply(topic, request.title(), request.description(), request.objectives(),
+                request.expectedOutcomes(), request.prerequisites(), VisibilityType.OPEN, null);
+        topic.setProposedBy(actor);
+        topic.setProposalSource(ProposalSource.LECTURER);
+        // MySQL requires supervisors to exist before a topic can be published.
+        topic.setStatus(TopicStatus.APPROVED);
+        topic.setCreatedAt(now);
+        topic.setUpdatedAt(now);
+
+        Lecturer primary = requireLecturer(request.primaryLecturerId(), topic);
+        Lecturer secondary = request.secondaryLecturerId() == null
+                ? null : requireLecturer(request.secondaryLecturerId(), topic);
+        if (secondary != null && secondary.getId().equals(primary.getId())) {
+            throw new BusinessRuleException("Hai giảng viên hướng dẫn phải khác nhau.");
+        }
+        if (primary.getUser().getStatus() != UserStatus.ACTIVE
+                || (secondary != null && secondary.getUser().getStatus() != UserStatus.ACTIVE)) {
+            throw new BusinessRuleException("Giảng viên hướng dẫn phải có tài khoản đang hoạt động.");
+        }
+
+        topicRepository.save(topic);
+        TopicReview review = new TopicReview();
+        review.setTopic(topic);
+        review.setReviewedBy(actor);
+        review.setDecision(TopicReviewDecision.APPROVED);
+        review.setComment("Đề tài được quản lý học thuật tạo và công bố cho sinh viên đăng ký.");
+        review.setReviewedAt(now);
+        topicReviewRepository.save(review);
+        topicSupervisorRepository.save(createSupervisor(topic, primary, actor, 1, now));
+        if (secondary != null) {
+            topicSupervisorRepository.save(createSupervisor(topic, secondary, actor, 2, now));
+        }
+        topicSupervisorRepository.flush();
+        topic.setStatus(TopicStatus.PUBLISHED);
+        topic.setPublishedAt(now);
+        topicRepository.saveAndFlush(topic);
+        notificationService.publish(actorId, "topic-published-" + topic.getId(),
+                "Đề tài đã được công bố",
+                "Đề tài " + topic.getCode() + " đã sẵn sàng cho sinh viên đăng ký.", "/topics");
+        return toResponse(topic);
     }
 
     @Transactional

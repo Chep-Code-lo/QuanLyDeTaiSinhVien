@@ -6,6 +6,7 @@ import { AppLayout } from '../layouts/AppLayout'
 import { AcademicAppointmentsPage } from '../pages/AcademicAppointmentsPage'
 import { AcademicManagementPage } from '../pages/AcademicManagementPage'
 import { AccountPage } from '../pages/AccountPage'
+import { CreateAccountPage } from '../pages/CreateAccountPage'
 import { AssessmentSetupWizardPage } from '../pages/AssessmentSetupWizardPage'
 import { DashboardPage } from '../pages/DashboardPage'
 import { EvaluatorAssignmentPage } from '../pages/EvaluatorAssignmentPage'
@@ -23,12 +24,21 @@ function PublicHomeRoute() {
   const { isAuthenticated } = useAuth()
   const [loginOpen, setLoginOpen] = useState(false)
   if (isAuthenticated) return <Navigate to="/dashboard" replace />
-  return <>
-    <PublicHome onLogin={() => setLoginOpen(true)} />
-    {loginOpen && <div className="public-login-backdrop" role="dialog" aria-modal="true" aria-label="Đăng nhập hệ thống">
-      <LoginForm onClose={() => setLoginOpen(false)} onSuccess={() => navigate('/dashboard')} />
-    </div>}
-  </>
+  return (
+    <>
+      <PublicHome onLogin={() => setLoginOpen(true)} />
+      {loginOpen && (
+        <div
+          className="public-login-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Đăng nhập hệ thống"
+        >
+          <LoginForm onClose={() => setLoginOpen(false)} onSuccess={() => navigate('/dashboard')} />
+        </div>
+      )}
+    </>
+  )
 }
 
 export function AppRoutes() {
@@ -61,6 +71,7 @@ export function AppRoutes() {
 
           {/* Admin Only Route */}
           <Route element={<ProtectedRoute roles={['ADMIN']} />}>
+            <Route path="admin-users/new" element={<CreateAccountPage />} />
             <Route path="admin-appointments" element={<AcademicAppointmentsPage />} />
           </Route>
         </Route>

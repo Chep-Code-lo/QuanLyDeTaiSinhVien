@@ -1,4 +1,5 @@
 import React from 'react'
+import { componentTypeLabel, statusLabel } from '../utils/displayLabels'
 
 interface StatusBadgeProps {
   status: string
@@ -33,38 +34,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label }) => {
 
   const getLabel = (st: string) => {
     if (label) return label
-    switch (st?.toUpperCase()) {
-      case 'DRAFT':
-        return 'Nháp'
-      case 'LOCKED':
-        return 'Đã khóa 🔒'
-      case 'OPEN':
-        return 'Mở'
-      case 'SUBMITTED':
-        return 'Đã nộp'
-      case 'ACCEPTED':
-        return 'Đã chấp nhận'
-      case 'REVISION_REQUIRED':
-        return 'Yêu cầu chỉnh sửa'
-      case 'ACTIVE':
-        return 'Hoạt động'
-      case 'CANCELLED':
-        return 'Đã hủy'
-      case 'EXPIRED':
-        return 'Hết hạn'
-      case 'PUBLISHED':
-        return 'Đã công bố'
-      case 'ARCHIVED':
-        return 'Đã lưu trữ'
-      case 'CLOSED':
-        return 'Đóng'
-      case 'REVIEW':
-        return 'Đánh giá Độc lập (Review)'
-      case 'COMMITTEE':
-        return 'Hội đồng (Committee)'
-      default:
-        return st
-    }
+    if (['REVIEW', 'COMMITTEE', 'OTHER'].includes(st?.toUpperCase())) return componentTypeLabel(st)
+    return statusLabel(st)
   }
 
   return <span className={getBadgeClass(status)}>{getLabel(status)}</span>

@@ -7,7 +7,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.feature.academic.domain.Department;
@@ -97,7 +97,6 @@ import com.example.qldetai.feature.topic.dto.TopicDtos.TopicResponse;
 import com.example.qldetai.feature.topic.service.TopicAuthorization;
 import com.example.qldetai.feature.topic.service.TopicService;
 import com.example.qldetai.security.UserPrincipal;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -108,7 +107,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -148,29 +146,30 @@ class ProjectLifecycleIntegrationTests {
     private final Clock clock;
 
     ProjectLifecycleIntegrationTests(
-            TopicService topicService,
-            GroupService groupService,
-            RegistrationService registrationService,
-            ProjectAssignmentService projectAssignmentService,
-            EvaluationService evaluationService,
-            EvaluationCommitteeService evaluationCommitteeService,
-            DefenseSessionService defenseSessionService,
-            EvaluationResultService evaluationResultService,
-            GradeChangeService gradeChangeService,
-            FacultyRepository facultyRepository,
-            DepartmentRepository departmentRepository,
-            SemesterRepository semesterRepository,
-            RegistrationPeriodRepository registrationPeriodRepository,
-            RoleRepository roleRepository,
-            UserRepository userRepository,
-            StudentRepository studentRepository,
-            LecturerRepository lecturerRepository,
-            GroupMemberRepository groupMemberRepository,
-            StudentGroupRepository studentGroupRepository,
-            TopicRegistrationRepository topicRegistrationRepository,
-            ProjectAssignmentRepository projectAssignmentRepository,
-            PasswordEncoder passwordEncoder,
-            Clock clock) {
+        TopicService topicService,
+        GroupService groupService,
+        RegistrationService registrationService,
+        ProjectAssignmentService projectAssignmentService,
+        EvaluationService evaluationService,
+        EvaluationCommitteeService evaluationCommitteeService,
+        DefenseSessionService defenseSessionService,
+        EvaluationResultService evaluationResultService,
+        GradeChangeService gradeChangeService,
+        FacultyRepository facultyRepository,
+        DepartmentRepository departmentRepository,
+        SemesterRepository semesterRepository,
+        RegistrationPeriodRepository registrationPeriodRepository,
+        RoleRepository roleRepository,
+        UserRepository userRepository,
+        StudentRepository studentRepository,
+        LecturerRepository lecturerRepository,
+        GroupMemberRepository groupMemberRepository,
+        StudentGroupRepository studentGroupRepository,
+        TopicRegistrationRepository topicRegistrationRepository,
+        ProjectAssignmentRepository projectAssignmentRepository,
+        PasswordEncoder passwordEncoder,
+        Clock clock
+    ) {
         this.topicService = topicService;
         this.groupService = groupService;
         this.registrationService = registrationService;
@@ -195,6 +194,9 @@ class ProjectLifecycleIntegrationTests {
         this.passwordEncoder = passwordEncoder;
         this.clock = clock;
     }
+
+    @Autowired
+    private com.example.qldetai.feature.evaluation.service.CommitteeConfigurationService committeeConfigurations;
 
     private Faculty faculty;
     private Department department;
@@ -231,51 +233,58 @@ class ProjectLifecycleIntegrationTests {
 
     @Test
     void topicLifecycleCanGoFromProposalToPublished() {
-        TopicResponse created =
-                topicService.create(
-                        new CreateTopicRequest(
-                                period.getId(),
-                                "dt-01",
-                                "Xây dựng API backend 2",
-                                "Mô tả đề tài",
-                                "Hoàn thiện các API nghiệp vụ",
-                                "Có thể ghép với frontend",
-                                "Biết Spring Boot",
-                                VisibilityType.OPEN,
-                                null),
-                        lecturerOne.getUser().getId());
+        TopicResponse created = topicService.create(
+            new CreateTopicRequest(
+                period.getId(),
+                "dt-01",
+                "Xây dựng API backend 2",
+                "Mô tả đề tài",
+                "Hoàn thiện các API nghiệp vụ",
+                "Có thể ghép với frontend",
+                "Biết Spring Boot",
+                VisibilityType.OPEN,
+                null
+            ),
+            lecturerOne.getUser().getId()
+        );
 
         assertThat(created.code()).isEqualTo("DT-01");
         assertThat(created.status()).isEqualTo(TopicStatus.PENDING);
         assertThat(created.proposalSource().name()).isEqualTo("LECTURER");
 
-        TopicResponse reviewed =
-                topicService.review(
-                        created.id(),
-                        new ReviewTopicRequest(
-                                created.version(),
-                                TopicReviewDecision.APPROVED,
-                                "Đề tài đạt yêu cầu."),
-                        admin.getId());
+        TopicResponse reviewed = topicService.review(
+            created.id(),
+            new ReviewTopicRequest(
+                created.version(),
+                TopicReviewDecision.APPROVED,
+                "Đề tài đạt yêu cầu."
+            ),
+            admin.getId()
+        );
 
         assertThat(reviewed.status()).isEqualTo(TopicStatus.APPROVED);
         assertThat(reviewed.latestReview()).isNotNull();
         assertThat(reviewed.latestReview().decision()).isEqualTo(TopicReviewDecision.APPROVED);
 
-        TopicResponse assigned =
-                topicService.assignSupervisors(
-                        reviewed.id(),
-                        new AssignSupervisorsRequest(
-                                reviewed.version(), lecturerOne.getId(), lecturerTwo.getId()),
-                        admin.getId());
+        TopicResponse assigned = topicService.assignSupervisors(
+            reviewed.id(),
+            new AssignSupervisorsRequest(
+                reviewed.version(),
+                lecturerOne.getId(),
+                lecturerTwo.getId()
+            ),
+            admin.getId()
+        );
 
         assertThat(assigned.supervisors()).hasSize(2);
         assertThat(assigned.supervisors().getFirst().slotNo()).isEqualTo(1);
         assertThat(assigned.supervisors().get(1).slotNo()).isEqualTo(2);
 
-        TopicResponse published =
-                topicService.publish(
-                        assigned.id(), new PublishTopicRequest(assigned.version()), admin.getId());
+        TopicResponse published = topicService.publish(
+            assigned.id(),
+            new PublishTopicRequest(assigned.version()),
+            admin.getId()
+        );
 
         assertThat(published.status()).isEqualTo(TopicStatus.PUBLISHED);
         assertThat(published.publishedAt()).isNotNull();
@@ -284,71 +293,86 @@ class ProjectLifecycleIntegrationTests {
 
     @Test
     void groupMemberSlotIsReusedAfterRemovingAMember() {
-        StudentGroupResponse created =
-                groupService.create(
-                        new CreateGroupRequest(period.getId(), "Nhóm backend 2"),
-                        leaderStudent.getUser().getId());
+        StudentGroupResponse created = groupService.create(
+            new CreateGroupRequest(period.getId(), "Nhóm backend 2"),
+            leaderStudent.getUser().getId()
+        );
 
         groupService.addMember(
-                created.id(),
-                new AddGroupMemberRequest(secondStudent.getStudentCode()),
-                leaderStudent.getUser().getId());
+            created.id(),
+            new AddGroupMemberRequest(secondStudent.getStudentCode()),
+            leaderStudent.getUser().getId()
+        );
         groupService.addMember(
-                created.id(),
-                new AddGroupMemberRequest(thirdStudent.getStudentCode()),
-                leaderStudent.getUser().getId());
+            created.id(),
+            new AddGroupMemberRequest(thirdStudent.getStudentCode()),
+            leaderStudent.getUser().getId()
+        );
         groupService.removeMember(
-                created.id(), secondStudent.getId(), leaderStudent.getUser().getId());
+            created.id(),
+            secondStudent.getId(),
+            leaderStudent.getUser().getId()
+        );
 
-        StudentGroupResponse updated =
-                groupService.addMember(
-                        created.id(),
-                        new AddGroupMemberRequest(fourthStudent.getStudentCode()),
-                        leaderStudent.getUser().getId());
+        StudentGroupResponse updated = groupService.addMember(
+            created.id(),
+            new AddGroupMemberRequest(fourthStudent.getStudentCode()),
+            leaderStudent.getUser().getId()
+        );
 
         List<GroupMember> activeMembers =
-                groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(created.id());
+            groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(created.id());
         assertThat(updated.status()).isEqualTo(GroupStatus.ACTIVE);
         assertThat(activeMembers).hasSize(3);
         assertThat(activeMembers).extracting(GroupMember::getSlotNo).containsExactly(1, 2, 3);
         assertThat(activeMembers)
-                .extracting(member -> member.getStudent().getStudentCode())
-                .containsExactly(
-                        leaderStudent.getStudentCode(),
-                        fourthStudent.getStudentCode(),
-                        thirdStudent.getStudentCode());
+            .extracting(member -> member.getStudent().getStudentCode())
+            .containsExactly(
+                leaderStudent.getStudentCode(),
+                fourthStudent.getStudentCode(),
+                thirdStudent.getStudentCode()
+            );
     }
 
     @Test
     void topicRegistrationCanBeSubmittedAndApproved() {
         TopicResponse topic = createPublishedTopic("dt-reg-01");
-        StudentGroupResponse group =
-                createActiveGroup("Nhóm đăng ký", leaderStudent, secondStudent);
+        StudentGroupResponse group = createActiveGroup(
+            "Nhóm đăng ký",
+            leaderStudent,
+            secondStudent
+        );
 
-        TopicRegistrationResponse created =
-                registrationService.create(
-                        new CreateTopicRegistrationRequest(
-                                group.id(), topic.id(), "Nhóm phù hợp với đề tài này."),
-                        leaderStudent.getUser().getId());
+        TopicRegistrationResponse created = registrationService.create(
+            new CreateTopicRegistrationRequest(
+                group.id(),
+                topic.id(),
+                "Nhóm phù hợp với đề tài này."
+            ),
+            leaderStudent.getUser().getId()
+        );
 
         assertThat(created.status()).isEqualTo(RegistrationStatus.PENDING);
         assertThat(created.topicCode()).isEqualTo(topic.code());
 
-        TopicRegistrationResponse reviewed =
-                registrationService.review(
-                        created.id(),
-                        new ReviewTopicRegistrationRequest(
-                                created.version(), RegistrationStatus.APPROVED, null),
-                        admin.getId());
+        TopicRegistrationResponse reviewed = registrationService.review(
+            created.id(),
+            new ReviewTopicRegistrationRequest(
+                created.version(),
+                RegistrationStatus.APPROVED,
+                null
+            ),
+            admin.getId()
+        );
 
         assertThat(reviewed.status()).isEqualTo(RegistrationStatus.APPROVED);
         assertThat(reviewed.reviewedBy()).isEqualTo(admin.getId());
         assertThat(reviewed.decisionReason()).isNull();
         assertThat(projectAssignmentRepository.findByRegistrationId(reviewed.id()))
-                .isPresent()
-                .get()
-                .extracting(project -> project.getStatus())
-                .isEqualTo(AssignmentStatus.IN_PROGRESS);
+            .isPresent()
+            .get()
+            .extracting(project -> project.getStatus())
+            .isEqualTo(AssignmentStatus.IN_PROGRESS);
     }
 
     @Test
@@ -357,401 +381,620 @@ class ProjectLifecycleIntegrationTests {
         StudentGroupResponse firstGroup = createActiveGroup("Nhóm A", leaderStudent, secondStudent);
         StudentGroupResponse secondGroup = createActiveGroup("Nhóm B", thirdStudent, fourthStudent);
 
-        TopicRegistrationResponse approvedRegistration =
-                registrationService.create(
-                        new CreateTopicRegistrationRequest(
-                                firstGroup.id(), topic.id(), "Nhóm A đăng ký."),
-                        leaderStudent.getUser().getId());
+        TopicRegistrationResponse approvedRegistration = registrationService.create(
+            new CreateTopicRegistrationRequest(firstGroup.id(), topic.id(), "Nhóm A đăng ký."),
+            leaderStudent.getUser().getId()
+        );
 
-        TopicRegistrationResponse pendingRegistration =
-                registrationService.create(
-                        new CreateTopicRegistrationRequest(
-                                secondGroup.id(), topic.id(), "Nhóm B đăng ký."),
-                        thirdStudent.getUser().getId());
+        TopicRegistrationResponse pendingRegistration = registrationService.create(
+            new CreateTopicRegistrationRequest(secondGroup.id(), topic.id(), "Nhóm B đăng ký."),
+            thirdStudent.getUser().getId()
+        );
 
-        approvedRegistration =
-                registrationService.review(
-                        approvedRegistration.id(),
-                        new ReviewTopicRegistrationRequest(
-                                approvedRegistration.version(), RegistrationStatus.APPROVED, null),
-                        admin.getId());
+        approvedRegistration = registrationService.review(
+            approvedRegistration.id(),
+            new ReviewTopicRegistrationRequest(
+                approvedRegistration.version(),
+                RegistrationStatus.APPROVED,
+                null
+            ),
+            admin.getId()
+        );
 
-        ProjectAssignmentResponse created =
-                projectAssignmentService.create(
-                        new CreateAssignmentRequest(approvedRegistration.id()), admin.getId());
+        ProjectAssignmentResponse created = projectAssignmentService.create(
+            new CreateAssignmentRequest(approvedRegistration.id()),
+            admin.getId()
+        );
 
         assertThat(created.status()).isEqualTo(AssignmentStatus.IN_PROGRESS);
         assertThat(projectAssignmentRepository.existsByGroupId(firstGroup.id())).isTrue();
-        assertThat(studentGroupRepository.findById(firstGroup.id()).orElseThrow().getStatus())
-                .isEqualTo(GroupStatus.LOCKED);
+        assertThat(
+            studentGroupRepository.findById(firstGroup.id()).orElseThrow().getStatus()
+        ).isEqualTo(GroupStatus.LOCKED);
 
-        TopicRegistration rejectedRegistration =
-                topicRegistrationRepository.findById(pendingRegistration.id()).orElseThrow();
+        TopicRegistration rejectedRegistration = topicRegistrationRepository
+            .findById(pendingRegistration.id())
+            .orElseThrow();
         assertThat(rejectedRegistration.getStatus()).isEqualTo(RegistrationStatus.REJECTED);
 
-        ProjectAssignmentResponse completed =
-                projectAssignmentService.updateStatus(
-                        created.id(),
-                        new UpdateAssignmentStatusRequest(
-                                created.version(), AssignmentStatus.COMPLETED),
-                        admin.getId());
+        ProjectAssignmentResponse completed = projectAssignmentService.updateStatus(
+            created.id(),
+            new UpdateAssignmentStatusRequest(created.version(), AssignmentStatus.COMPLETED),
+            admin.getId()
+        );
 
         assertThat(completed.status()).isEqualTo(AssignmentStatus.COMPLETED);
-        assertThat(studentGroupRepository.findById(firstGroup.id()).orElseThrow().getStatus())
-                .isEqualTo(GroupStatus.CLOSED);
+        assertThat(
+            studentGroupRepository.findById(firstGroup.id()).orElseThrow().getStatus()
+        ).isEqualTo(GroupStatus.CLOSED);
     }
 
     @Test
     void assessmentCatalogCanBeLockedBeforeEvaluatorAssignment() {
-        LockedCatalog catalog =
-                createLockedCatalog("rv-01", "Chấm phản biện", AssessmentComponentType.REVIEW, 1);
+        LockedCatalog catalog = createLockedCatalog(
+            "rv-01",
+            "Chấm phản biện",
+            AssessmentComponentType.REVIEW,
+            1
+        );
 
         assertThat(catalog.component().componentType()).isEqualTo(AssessmentComponentType.REVIEW);
         assertThat(catalog.component().status()).isEqualTo("LOCKED");
         assertThat(catalog.rubric().status()).isEqualTo("LOCKED");
         assertThat(catalog.rubric().criteria())
-                .extracting(criterion -> criterion.maxScore())
-                .containsExactly(new BigDecimal("6.00"), new BigDecimal("4.00"));
+            .extracting(criterion -> criterion.maxScore())
+            .containsExactly(new BigDecimal("6.00"), new BigDecimal("4.00"));
+    }
+
+    @Test
+    void committeeConfigurationHttpEndpointValidatesInputAndScope(@Autowired MockMvc mvc) throws Exception {
+        var catalog = createLockedCatalog("committee-http", "Hội đồng HTTP", AssessmentComponentType.COMMITTEE, 3);
+        String body = """
+            {"periodId":%d,"name":"Hội Đồng 1","rubricId":%d,"members":[
+                {"lecturerId":%d,"roleName":"Chủ tịch"},
+                {"lecturerId":%d,"roleName":"Thư ký"},
+                {"lecturerId":%d,"roleName":"Ủy viên chuyên môn"}]}
+            """.formatted(period.getId(), catalog.rubric().id(), lecturerThree.getId(), lecturerFour.getId(), lecturerFive.getId());
+        mvc.perform(post("/api/v1/evaluation-committees/configuration")
+            .with(user(UserPrincipal.from(lecturerOne.getUser()))).with(csrf())
+            .contentType("application/json").content(body))
+            .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/evaluation-committees/configuration")
+            .with(user(UserPrincipal.from(admin))).with(csrf())
+            .contentType("application/json").content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.name").value("Hội Đồng 1"))
+            .andExpect(jsonPath("$.data.rubricId").value(catalog.rubric().id()))
+            .andExpect(jsonPath("$.data.members[2].roleName").value("Ủy viên chuyên môn"));
+        mvc.perform(post("/api/v1/evaluation-committees/configuration")
+            .with(user(UserPrincipal.from(admin))).with(csrf())
+            .contentType("application/json").content(body.replace("Ủy viên chuyên môn", "")))
+            .andExpect(status().isBadRequest());
+        assertThat(evaluationCommitteeService.listCommittees(period.getId(), 0, 10).content()).hasSize(1);
+    }
+
+    @Test
+    void configurableFiveMemberCommitteeCanAssignAndFinalizeAllFiveEvaluators() {
+        var project = createAssignedProject("committee-five", leaderStudent, secondStudent);
+        var catalog = createLockedCatalog("committee-five", "Hội đồng 5 người", AssessmentComponentType.COMMITTEE, 3);
+        var sixth = createLecturer("GV06", "Giảng viên 6");
+        var seventh = createLecturer("GV07", "Giảng viên 7");
+        var roster = List.of(lecturerThree, lecturerFour, lecturerFive, sixth, seventh);
+        var inputs = List.of(
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CommitteeMemberInput(lecturerThree.getId(), "Chủ tịch"),
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CommitteeMemberInput(lecturerFour.getId(), "Thư ký"),
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CommitteeMemberInput(lecturerFive.getId(), "Phó chủ tịch"),
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CommitteeMemberInput(sixth.getId(), "Ủy viên chuyên môn"),
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CommitteeMemberInput(seventh.getId(), "Ủy viên"));
+        var saved = committeeConfigurations.save(null,
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.SaveCommitteeRequest(
+                period.getId(), "Hội Đồng 1", catalog.rubric().id(), inputs, null), admin.getId());
+        assertThat(saved.name()).isEqualTo("Hội Đồng 1");
+        assertThat(saved.rubricId()).isEqualTo(catalog.rubric().id());
+        assertThat(saved.members()).hasSize(5);
+        assertThat(saved.members().get(2).roleName()).isEqualTo("Phó chủ tịch");
+        assertThat(saved.members().get(2).role()).isEqualTo(CommitteeRole.MEMBER);
+        var start = nowUtc().plusDays(5);
+        var defense = defenseSessionService.schedule(new CreateDefenseRequest(
+            project.id(), saved.id(), "A101", start, start.plusHours(1)), admin.getId());
+        for (var lecturer : roster) {
+            var evaluation = evaluationService.assign(new CreateEvaluationRequest(
+                project.id(), catalog.rubric().id(), lecturer.getId(), defense, nowUtc().plusDays(7)), admin.getId());
+            evaluationService.saveSheet(evaluation, new SaveSheetRequest(0, "Đạt", scoreRequests(
+                catalog.rubric(), new BigDecimal("6.00"), new BigDecimal("4.00")), true), lecturer.getUser().getId());
+        }
+        assertThat(evaluationService.listAssignments(period.getId(), project.id(), null, null, 0, 10).content()).hasSize(5);
+        assertThat(evaluationResultService.finalizeResult(project.id(), admin.getId()).finalScore()).isEqualByComparingTo("10.00");
+        assertThatThrownBy(() -> committeeConfigurations.save(saved.id(),
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.SaveCommitteeRequest(
+                period.getId(), "Đổi tên sau khi chấm", catalog.rubric().id(), inputs, evaluationCommitteeService.listCommittees(period.getId(), 0, 10).content().getFirst().version()), admin.getId()))
+            .isInstanceOf(BusinessRuleException.class);
+    }
+
+    @Test
+    void committeeConfigurationRejectsDuplicateLecturersAndWrongRubricType() {
+        var catalog = createLockedCatalog("committee-validation", "Hội đồng", AssessmentComponentType.COMMITTEE, 3);
+        var duplicateInputs = List.of(
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CommitteeMemberInput(lecturerThree.getId(), "Chủ tịch"),
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CommitteeMemberInput(lecturerFour.getId(), "Thư ký"),
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CommitteeMemberInput(lecturerThree.getId(), "Ủy viên"));
+        assertThatThrownBy(() -> committeeConfigurations.save(null,
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.SaveCommitteeRequest(
+                period.getId(), "Trùng giảng viên", catalog.rubric().id(), duplicateInputs, null), admin.getId()))
+            .isInstanceOf(BusinessRuleException.class).hasMessageContaining("một vai trò");
+        var review = createLockedCatalog("review-validation", "Phản biện", AssessmentComponentType.REVIEW, 1);
+        assertThatThrownBy(() -> committeeConfigurations.save(null,
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.SaveCommitteeRequest(
+                period.getId(), "Sai rubric", review.rubric().id(), duplicateInputs, null), admin.getId()))
+            .isInstanceOf(BusinessRuleException.class).hasMessageContaining("bộ tiêu chí hội đồng");
+        assertThat(evaluationCommitteeService.listCommittees(period.getId(), 0, 10).content()).isEmpty();
+    }
+
+    @Test
+    void committeeRosterUpdateReplacesMembersAndRejectsStaleVersion() {
+        var catalog = createLockedCatalog("committee-update", "Hội đồng", AssessmentComponentType.COMMITTEE, 3);
+        var inputs = List.of(
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CommitteeMemberInput(lecturerThree.getId(), "Chủ tịch"),
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CommitteeMemberInput(lecturerFour.getId(), "Thư ký"),
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CommitteeMemberInput(lecturerFive.getId(), "Ủy viên"));
+        var saved = committeeConfigurations.save(null,
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.SaveCommitteeRequest(
+                period.getId(), "Hội đồng cập nhật", catalog.rubric().id(), inputs, null), admin.getId());
+        var updatedInputs = List.of(inputs.get(0), inputs.get(1),
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CommitteeMemberInput(lecturerFive.getId(), "Ủy viên chuyên môn"));
+        var updated = committeeConfigurations.save(saved.id(),
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.SaveCommitteeRequest(
+                period.getId(), saved.name(), catalog.rubric().id(), updatedInputs, saved.version()), admin.getId());
+        assertThat(updated.members()).hasSize(3);
+        assertThat(updated.members().get(2).roleName()).isEqualTo("Ủy viên chuyên môn");
+        assertThat(updated.version()).isGreaterThan(saved.version());
+        assertThatThrownBy(() -> committeeConfigurations.save(saved.id(),
+            new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.SaveCommitteeRequest(
+                period.getId(), saved.name(), catalog.rubric().id(), inputs, saved.version()), admin.getId()))
+            .isInstanceOf(com.example.qldetai.exception.ConflictException.class);
     }
 
     @Test
     void committeeEvaluationAppearsInAssignmentAndDefenseReads() {
-        ProjectAssignmentResponse assignment =
-                createAssignedProject("dt-defense-01", leaderStudent, secondStudent);
-        LockedCatalog catalog =
-                createLockedCatalog("hd-01", "Chấm hội đồng", AssessmentComponentType.COMMITTEE, 3);
+        ProjectAssignmentResponse assignment = createAssignedProject(
+            "dt-defense-01",
+            leaderStudent,
+            secondStudent
+        );
+        LockedCatalog catalog = createLockedCatalog(
+            "hd-01",
+            "Chấm hội đồng",
+            AssessmentComponentType.COMMITTEE,
+            3
+        );
 
-        Long committeeId =
-                evaluationCommitteeService.createCommittee(
-                        new CreateCommitteeRequest(period.getId(), "Hội đồng demo"), admin.getId());
+        Long committeeId = evaluationCommitteeService.createCommittee(
+            new CreateCommitteeRequest(period.getId(), "Hội đồng demo"),
+            admin.getId()
+        );
         evaluationCommitteeService.addMember(
-                committeeId,
-                new AddCommitteeMemberRequest(lecturerThree.getId(), 1, CommitteeRole.CHAIR),
-                admin.getId());
+            committeeId,
+            new AddCommitteeMemberRequest(lecturerThree.getId(), 1, CommitteeRole.CHAIR),
+            admin.getId()
+        );
         evaluationCommitteeService.addMember(
-                committeeId,
-                new AddCommitteeMemberRequest(lecturerFour.getId(), 2, CommitteeRole.SECRETARY),
-                admin.getId());
+            committeeId,
+            new AddCommitteeMemberRequest(lecturerFour.getId(), 2, CommitteeRole.SECRETARY),
+            admin.getId()
+        );
         evaluationCommitteeService.addMember(
-                committeeId,
-                new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER),
-                admin.getId());
+            committeeId,
+            new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER),
+            admin.getId()
+        );
 
         LocalDateTime startsAt = nowUtc().plusDays(5);
-        Long defenseId =
-                defenseSessionService.schedule(
-                        new CreateDefenseRequest(
-                                assignment.id(),
-                                committeeId,
-                                "Phòng A101",
-                                startsAt,
-                                startsAt.plusHours(1)),
-                        admin.getId());
+        Long defenseId = defenseSessionService.schedule(
+            new CreateDefenseRequest(
+                assignment.id(),
+                committeeId,
+                "Phòng A101",
+                startsAt,
+                startsAt.plusHours(1)
+            ),
+            admin.getId()
+        );
 
-        Long evaluationId =
-                evaluationService.assign(
-                        new CreateEvaluationRequest(
-                                assignment.id(),
-                                catalog.rubric().id(),
-                                lecturerThree.getId(),
-                                defenseId,
-                                nowUtc().plusDays(7)),
-                        admin.getId());
+        Long evaluationId = evaluationService.assign(
+            new CreateEvaluationRequest(
+                assignment.id(),
+                catalog.rubric().id(),
+                lecturerThree.getId(),
+                defenseId,
+                nowUtc().plusDays(7)
+            ),
+            admin.getId()
+        );
 
         PageResponse<EvaluationCommitteeResponse> committees =
-                evaluationCommitteeService.listCommittees(period.getId(), 0, 10);
-        PageResponse<DefenseSessionResponse> defenses =
-                defenseSessionService.listDefenses(period.getId(), committeeId, 0, 10);
-        PageResponse<EvaluationAssignmentResponse> evaluations =
-                evaluationService.listAssignments(
-                        period.getId(), assignment.id(), lecturerThree.getId(), null, 0, 10);
+            evaluationCommitteeService.listCommittees(period.getId(), 0, 10);
+        PageResponse<DefenseSessionResponse> defenses = defenseSessionService.listDefenses(
+            period.getId(),
+            committeeId,
+            0,
+            10
+        );
+        PageResponse<EvaluationAssignmentResponse> evaluations = evaluationService.listAssignments(
+            period.getId(),
+            assignment.id(),
+            lecturerThree.getId(),
+            null,
+            0,
+            10
+        );
 
         assertThat(committeeId).isPositive();
         assertThat(defenseId).isPositive();
         assertThat(evaluationId).isPositive();
         assertThat(committees.content())
-                .singleElement()
-                .satisfies(
-                        committee -> {
-                            assertThat(committee.status().name()).isEqualTo("CONFIRMED");
-                            assertThat(committee.members()).hasSize(3);
-                        });
+            .singleElement()
+            .satisfies(committee -> {
+                assertThat(committee.status().name()).isEqualTo("CONFIRMED");
+                assertThat(committee.members()).hasSize(3);
+            });
         assertThat(defenses.content())
-                .singleElement()
-                .satisfies(
-                        defense -> {
-                            assertThat(defense.id()).isEqualTo(defenseId);
-                            assertThat(defense.assignmentId()).isEqualTo(assignment.id());
-                            assertThat(defense.committeeId()).isEqualTo(committeeId);
-                        });
+            .singleElement()
+            .satisfies(defense -> {
+                assertThat(defense.id()).isEqualTo(defenseId);
+                assertThat(defense.assignmentId()).isEqualTo(assignment.id());
+                assertThat(defense.committeeId()).isEqualTo(committeeId);
+            });
         assertThat(evaluations.content())
-                .singleElement()
-                .satisfies(
-                        evaluation -> {
-                            assertThat(evaluation.id()).isEqualTo(evaluationId);
-                            assertThat(evaluation.defenseId()).isEqualTo(defenseId);
-                            assertThat(evaluation.evaluatorRole()).isEqualTo("COMMITTEE_MEMBER");
-                            assertThat(evaluation.lecturerId()).isEqualTo(lecturerThree.getId());
-                        });
+            .singleElement()
+            .satisfies(evaluation -> {
+                assertThat(evaluation.id()).isEqualTo(evaluationId);
+                assertThat(evaluation.defenseId()).isEqualTo(defenseId);
+                assertThat(evaluation.evaluatorRole()).isEqualTo("COMMITTEE_MEMBER");
+                assertThat(evaluation.lecturerId()).isEqualTo(lecturerThree.getId());
+            });
     }
 
     @Test
     void defenseCannotBeScheduledUntilEveryReviewSheetIsSubmitted() {
-        ProjectAssignmentResponse assignment =
-                createAssignedProject("dt-review-gate-01", leaderStudent, secondStudent);
-        LockedCatalog reviewCatalog =
-                createLockedCatalog(
-                        "review-gate-01", "Phản biện bắt buộc", AssessmentComponentType.REVIEW, 1);
+        ProjectAssignmentResponse assignment = createAssignedProject(
+            "dt-review-gate-01",
+            leaderStudent,
+            secondStudent
+        );
+        LockedCatalog reviewCatalog = createLockedCatalog(
+            "review-gate-01",
+            "Phản biện bắt buộc",
+            AssessmentComponentType.REVIEW,
+            1
+        );
         evaluationService.assign(
-                new CreateEvaluationRequest(
-                        assignment.id(),
-                        reviewCatalog.rubric().id(),
-                        lecturerThree.getId(),
-                        null,
-                        nowUtc().plusDays(4)),
-                admin.getId());
+            new CreateEvaluationRequest(
+                assignment.id(),
+                reviewCatalog.rubric().id(),
+                lecturerThree.getId(),
+                null,
+                nowUtc().plusDays(4)
+            ),
+            admin.getId()
+        );
 
-        Long committeeId =
-                evaluationCommitteeService.createCommittee(
-                        new CreateCommitteeRequest(period.getId(), "Hội đồng kiểm tra phản biện"),
-                        admin.getId());
+        Long committeeId = evaluationCommitteeService.createCommittee(
+            new CreateCommitteeRequest(period.getId(), "Hội đồng kiểm tra phản biện"),
+            admin.getId()
+        );
         evaluationCommitteeService.addMember(
-                committeeId,
-                new AddCommitteeMemberRequest(lecturerThree.getId(), 1, CommitteeRole.CHAIR),
-                admin.getId());
+            committeeId,
+            new AddCommitteeMemberRequest(lecturerThree.getId(), 1, CommitteeRole.CHAIR),
+            admin.getId()
+        );
         evaluationCommitteeService.addMember(
-                committeeId,
-                new AddCommitteeMemberRequest(lecturerFour.getId(), 2, CommitteeRole.SECRETARY),
-                admin.getId());
+            committeeId,
+            new AddCommitteeMemberRequest(lecturerFour.getId(), 2, CommitteeRole.SECRETARY),
+            admin.getId()
+        );
         evaluationCommitteeService.addMember(
-                committeeId,
-                new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER),
-                admin.getId());
+            committeeId,
+            new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER),
+            admin.getId()
+        );
 
         LocalDateTime startsAt = nowUtc().plusDays(5);
-        assertThatThrownBy(
-                        () ->
-                                defenseSessionService.schedule(
-                                        new CreateDefenseRequest(
-                                                assignment.id(),
-                                                committeeId,
-                                                "Phòng A102",
-                                                startsAt,
-                                                startsAt.plusHours(1)),
-                                        admin.getId()))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("Complete every reviewer assignment");
+        assertThatThrownBy(() ->
+            defenseSessionService.schedule(
+                new CreateDefenseRequest(
+                    assignment.id(),
+                    committeeId,
+                    "Phòng A102",
+                    startsAt,
+                    startsAt.plusHours(1)
+                ),
+                admin.getId()
+            )
+        )
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("Complete every reviewer assignment");
     }
 
     @Test
     void gradeChangeCannotReopenAScoreSheetUsedByAFinalizedResult() {
-        ProjectAssignmentResponse assignment =
-                createAssignedProject("dt-grade-change-01", leaderStudent, secondStudent);
-        LockedCatalog catalog =
-                createLockedCatalog("pb-01", "Chấm phản biện 1", AssessmentComponentType.REVIEW, 1);
+        ProjectAssignmentResponse assignment = createAssignedProject(
+            "dt-grade-change-01",
+            leaderStudent,
+            secondStudent
+        );
+        LockedCatalog catalog = createLockedCatalog(
+            "pb-01",
+            "Chấm phản biện 1",
+            AssessmentComponentType.REVIEW,
+            1
+        );
 
-        Long evaluationId =
-                evaluationService.assign(
-                        new CreateEvaluationRequest(
-                                assignment.id(),
-                                catalog.rubric().id(),
-                                lecturerThree.getId(),
-                                null,
-                                nowUtc().plusDays(4)),
-                        admin.getId());
+        Long evaluationId = evaluationService.assign(
+            new CreateEvaluationRequest(
+                assignment.id(),
+                catalog.rubric().id(),
+                lecturerThree.getId(),
+                null,
+                nowUtc().plusDays(4)
+            ),
+            admin.getId()
+        );
 
-        ScoreSheetResponse submittedSheet =
-                evaluationService.saveSheet(
-                        evaluationId,
-                        new SaveSheetRequest(
-                                0,
-                                "Bản chấm đầu tiên",
-                                scoreRequests(
-                                        catalog.rubric(),
-                                        new BigDecimal("6.00"),
-                                        new BigDecimal("4.00")),
-                                true),
-                        lecturerThree.getUser().getId());
+        ScoreSheetResponse submittedSheet = evaluationService.saveSheet(
+            evaluationId,
+            new SaveSheetRequest(
+                0,
+                "Bản chấm đầu tiên",
+                scoreRequests(catalog.rubric(), new BigDecimal("6.00"), new BigDecimal("4.00")),
+                true
+            ),
+            lecturerThree.getUser().getId()
+        );
 
         // The request is valid while the sheet is still submitted; finalization
         // may happen before an administrator decides whether to approve it.
-        Long changeId =
-                gradeChangeService.requestChange(
-                        submittedSheet.id(),
-                        new CreateGradeChangeRequest("Cần chỉnh lại nhận xét và điểm."),
-                        lecturerThree.getUser().getId());
-        ResultResponse finalized =
-                evaluationResultService.finalizeResult(assignment.id(), admin.getId());
+        Long changeId = gradeChangeService.requestChange(
+            submittedSheet.id(),
+            new CreateGradeChangeRequest("Cần chỉnh lại nhận xét và điểm."),
+            lecturerThree.getUser().getId()
+        );
+        ResultResponse finalized = evaluationResultService.finalizeResult(
+            assignment.id(),
+            admin.getId()
+        );
 
-        assertThatThrownBy(
-                        () ->
-                                gradeChangeService.reviewChange(
-                                        changeId,
-                                        new ReviewGradeChangeRequest(
-                                                true, "Cho phép sửa lại phiếu chấm."),
-                                        admin.getId()))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("captured by a result version");
+        assertThatThrownBy(() ->
+            gradeChangeService.reviewChange(
+                changeId,
+                new ReviewGradeChangeRequest(true, "Cho phép sửa lại phiếu chấm."),
+                admin.getId()
+            )
+        )
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("captured by a result version");
         ResultResponse published = evaluationResultService.publish(finalized.id(), admin.getId());
-        assertThatThrownBy(
-                        () ->
-                                gradeChangeService.requestChange(
-                                        submittedSheet.id(),
-                                        new CreateGradeChangeRequest(
-                                                "Không được mở lại sau khi chốt."),
-                                        lecturerThree.getUser().getId()))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("captured by a result version");
-        assertThatThrownBy(
-                        () ->
-                                evaluationService.saveSheet(
-                                        evaluationId,
-                                        new SaveSheetRequest(
-                                                submittedSheet.version(),
-                                                "Không được sửa nguồn điểm đã chốt",
-                                                scoreRequests(
-                                                        catalog.rubric(),
-                                                        new BigDecimal("5.50"),
-                                                        new BigDecimal("4.00")),
-                                                true),
-                                        lecturerThree.getUser().getId()))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("captured by a result version");
+        assertThatThrownBy(() ->
+            gradeChangeService.requestChange(
+                submittedSheet.id(),
+                new CreateGradeChangeRequest("Không được mở lại sau khi chốt."),
+                lecturerThree.getUser().getId()
+            )
+        )
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("captured by a result version");
+        assertThatThrownBy(() ->
+            evaluationService.saveSheet(
+                evaluationId,
+                new SaveSheetRequest(
+                    submittedSheet.version(),
+                    "Không được sửa nguồn điểm đã chốt",
+                    scoreRequests(catalog.rubric(), new BigDecimal("5.50"), new BigDecimal("4.00")),
+                    true
+                ),
+                lecturerThree.getUser().getId()
+            )
+        )
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("captured by a result version");
 
-        PageResponse<GradeChangeRequestResponse> allChanges =
-                gradeChangeService.listChanges(null, submittedSheet.id(), 0, 10, admin.getId());
+        PageResponse<GradeChangeRequestResponse> allChanges = gradeChangeService.listChanges(
+            null,
+            submittedSheet.id(),
+            0,
+            10,
+            admin.getId()
+        );
 
         assertThat(finalized.status().name()).isEqualTo("FINALIZED");
         assertThat(published.status().name()).isEqualTo("PUBLISHED");
         assertThat(allChanges.content())
-                .singleElement()
-                .satisfies(
-                        change -> {
-                            assertThat(change.id()).isEqualTo(changeId);
-                            assertThat(change.status()).isEqualTo(GradeChangeStatus.PENDING);
-                            assertThat(change.appliedAt()).isNull();
-                            assertThat(change.reviewedAt()).isNull();
-                        });
+            .singleElement()
+            .satisfies(change -> {
+                assertThat(change.id()).isEqualTo(changeId);
+                assertThat(change.status()).isEqualTo(GradeChangeStatus.PENDING);
+                assertThat(change.appliedAt()).isNull();
+                assertThat(change.reviewedAt()).isNull();
+            });
     }
 
     @Test
     void finalResultAveragesEachComponentBeforeAveragingTheComponentsAndKeepsSnapshots() {
-        ProjectAssignmentResponse assignment =
-                createAssignedProject("dt-result-formula-01", leaderStudent, secondStudent);
-        LockedCatalog singleEvaluatorComponent =
-                createLockedCatalog(
-                        "other-formula-01",
-                        "Điểm thành phần một người chấm",
-                        AssessmentComponentType.OTHER,
-                        1);
-        LockedCatalog twoEvaluatorComponent =
-                createLockedCatalog(
-                        "review-formula-01",
-                        "Điểm thành phần hai người chấm",
-                        AssessmentComponentType.REVIEW,
-                        2);
+        ProjectAssignmentResponse assignment = createAssignedProject(
+            "dt-result-formula-01",
+            leaderStudent,
+            secondStudent
+        );
+        LockedCatalog singleEvaluatorComponent = createLockedCatalog(
+            "other-formula-01",
+            "Điểm thành phần một người chấm",
+            AssessmentComponentType.OTHER,
+            1
+        );
+        LockedCatalog twoEvaluatorComponent = createLockedCatalog(
+            "review-formula-01",
+            "Điểm thành phần hai người chấm",
+            AssessmentComponentType.REVIEW,
+            2
+        );
 
-        Long singleEvaluator =
-                evaluationService.assign(
-                        new CreateEvaluationRequest(
-                                assignment.id(),
-                                singleEvaluatorComponent.rubric().id(),
-                                lecturerThree.getId(),
-                                null,
-                                nowUtc().plusDays(4)),
-                        admin.getId());
-        Long firstReviewer =
-                evaluationService.assign(
-                        new CreateEvaluationRequest(
-                                assignment.id(),
-                                twoEvaluatorComponent.rubric().id(),
-                                lecturerFour.getId(),
-                                null,
-                                nowUtc().plusDays(4)),
-                        admin.getId());
-        Long secondReviewer =
-                evaluationService.assign(
-                        new CreateEvaluationRequest(
-                                assignment.id(),
-                                twoEvaluatorComponent.rubric().id(),
-                                lecturerFive.getId(),
-                                null,
-                                nowUtc().plusDays(4)),
-                        admin.getId());
+        Long singleEvaluator = evaluationService.assign(
+            new CreateEvaluationRequest(
+                assignment.id(),
+                singleEvaluatorComponent.rubric().id(),
+                lecturerThree.getId(),
+                null,
+                nowUtc().plusDays(4)
+            ),
+            admin.getId()
+        );
+        Long firstReviewer = evaluationService.assign(
+            new CreateEvaluationRequest(
+                assignment.id(),
+                twoEvaluatorComponent.rubric().id(),
+                lecturerFour.getId(),
+                null,
+                nowUtc().plusDays(4)
+            ),
+            admin.getId()
+        );
+        Long secondReviewer = evaluationService.assign(
+            new CreateEvaluationRequest(
+                assignment.id(),
+                twoEvaluatorComponent.rubric().id(),
+                lecturerFive.getId(),
+                null,
+                nowUtc().plusDays(4)
+            ),
+            admin.getId()
+        );
 
         evaluationService.saveSheet(
-                singleEvaluator,
-                new SaveSheetRequest(
-                        0,
-                        "8 điểm",
-                        scoreRequests(
-                                singleEvaluatorComponent.rubric(),
-                                new BigDecimal("6.00"),
-                                new BigDecimal("2.00")),
-                        true),
-                lecturerThree.getUser().getId());
+            singleEvaluator,
+            new SaveSheetRequest(
+                0,
+                "8 điểm",
+                scoreRequests(
+                    singleEvaluatorComponent.rubric(),
+                    new BigDecimal("6.00"),
+                    new BigDecimal("2.00")
+                ),
+                true
+            ),
+            lecturerThree.getUser().getId()
+        );
         evaluationService.saveSheet(
-                firstReviewer,
-                new SaveSheetRequest(
-                        0,
-                        "2 điểm",
-                        scoreRequests(
-                                twoEvaluatorComponent.rubric(),
-                                new BigDecimal("2.00"),
-                                BigDecimal.ZERO),
-                        true),
-                lecturerFour.getUser().getId());
+            firstReviewer,
+            new SaveSheetRequest(
+                0,
+                "2 điểm",
+                scoreRequests(
+                    twoEvaluatorComponent.rubric(),
+                    new BigDecimal("2.00"),
+                    BigDecimal.ZERO
+                ),
+                true
+            ),
+            lecturerFour.getUser().getId()
+        );
         evaluationService.saveSheet(
-                secondReviewer,
-                new SaveSheetRequest(
-                        0,
-                        "10 điểm",
-                        scoreRequests(
-                                twoEvaluatorComponent.rubric(),
-                                new BigDecimal("6.00"),
-                                new BigDecimal("4.00")),
-                        true),
-                lecturerFive.getUser().getId());
+            secondReviewer,
+            new SaveSheetRequest(
+                0,
+                "10 điểm",
+                scoreRequests(
+                    twoEvaluatorComponent.rubric(),
+                    new BigDecimal("6.00"),
+                    new BigDecimal("4.00")
+                ),
+                true
+            ),
+            lecturerFive.getUser().getId()
+        );
 
-        ResultResponse finalized =
-                evaluationResultService.finalizeResult(assignment.id(), admin.getId());
-        ResultDetailResponse detail =
-                evaluationResultService.getResult(finalized.id(), admin.getId());
+        ResultResponse finalized = evaluationResultService.finalizeResult(
+            assignment.id(),
+            admin.getId()
+        );
+        ResultDetailResponse detail = evaluationResultService.getResult(
+            finalized.id(),
+            admin.getId()
+        );
 
         // (8 + average(2, 10)) / 2 = 7.00.  A mean across all three sheets would be 6.67.
         assertThat(finalized.finalScore()).isEqualByComparingTo("7.00");
         assertThat(detail.inputs()).hasSize(3);
-        assertThat(detail.inputs())
-                .allSatisfy(
-                        input -> {
-                            assertThat(input.sheetVersion()).isPositive();
-                            assertThat(input.rubricSnapshot()).isNotBlank();
-                        });
+        assertThat(detail.inputs()).allSatisfy(input -> {
+            assertThat(input.sheetVersion()).isPositive();
+            assertThat(input.rubricSnapshot()).isNotBlank();
+        });
         assertThat(detail.members())
-                .extracting(member -> member.studentId())
-                .containsExactlyInAnyOrder(leaderStudent.getId(), secondStudent.getId());
+            .extracting(member -> member.studentId())
+            .containsExactlyInAnyOrder(leaderStudent.getId(), secondStudent.getId());
         assertThat(
-                        evaluationService
-                                .mySheet(singleEvaluator, lecturerThree.getUser().getId())
-                                .status())
-                .isEqualTo(ScoreSheetStatus.LOCKED);
+            evaluationService.mySheet(singleEvaluator, lecturerThree.getUser().getId()).status()
+        ).isEqualTo(ScoreSheetStatus.LOCKED);
+    }
+
+    @Test
+    void milestoneAccessUsesActiveFacultyAndDepartmentAppointments(
+        @Autowired AcademicAppointmentRepository appointments,
+        @Autowired MockMvc mvc
+    ) throws Exception {
+        ProjectAssignmentResponse assigned = createAssignedProject("MILESTONE-SCOPE", leaderStudent, secondStudent);
+        UserPrincipal principal = UserPrincipal.from(lecturerFive.getUser());
+        String endpoint = "/api/v1/project-assignments/" + assigned.id() + "/milestones";
+        mvc.perform(get(endpoint).with(user(principal)))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value("Bạn không có quyền thực hiện thao tác này."));
+
+        AcademicAppointment appointment = new AcademicAppointment();
+        appointment.setLecturer(lecturerFive);
+        appointment.setFaculty(faculty);
+        appointment.setPositionCode(PositionCode.DEAN);
+        appointment.setStartsAt(nowUtc().minusDays(2));
+        appointment.setAssignedBy(admin);
+        appointments.saveAndFlush(appointment);
+        mvc.perform(get(endpoint).with(user(principal))).andExpect(status().isOk());
+
+        appointment.setPositionCode(PositionCode.DEPARTMENT_HEAD);
+        appointment.setDepartment(department);
+        appointments.saveAndFlush(appointment);
+        mvc.perform(get(endpoint).with(user(principal))).andExpect(status().isOk());
+
+        Faculty otherFaculty = createFaculty("OUTSIDE");
+        appointment.setFaculty(otherFaculty);
+        appointment.setDepartment(createDepartment(otherFaculty, "OUTSIDE"));
+        appointments.saveAndFlush(appointment);
+        mvc.perform(get(endpoint).with(user(principal))).andExpect(status().isForbidden());
+
+        appointment.setFaculty(faculty);
+        appointment.setDepartment(department);
+        appointment.setEndsAt(nowUtc().minusDays(1));
+        appointments.saveAndFlush(appointment);
+        mvc.perform(get(endpoint).with(user(principal))).andExpect(status().isForbidden());
     }
 
     @Test
     void resourceAuthorizationKeepsFacultyScopeAfterExtraction(
-            @Autowired AcademicAppointmentRepository appointments,
-            @Autowired TopicAuthorization topicAuthorization,
-            @Autowired RegistrationAuthorization registrationAuthorization,
-            @Autowired ProjectAuthorization projectAuthorization,
-            @Autowired EvaluationAuthorization evaluationAuthorization,
-            @Autowired MockMvc mvc)
-            throws Exception {
-        ProjectAssignmentResponse assigned =
-                createAssignedProject("AUTH", leaderStudent, secondStudent);
+        @Autowired AcademicAppointmentRepository appointments,
+        @Autowired TopicAuthorization topicAuthorization,
+        @Autowired RegistrationAuthorization registrationAuthorization,
+        @Autowired ProjectAuthorization projectAuthorization,
+        @Autowired EvaluationAuthorization evaluationAuthorization,
+        @Autowired MockMvc mvc
+    ) throws Exception {
+        ProjectAssignmentResponse assigned = createAssignedProject(
+            "AUTH",
+            leaderStudent,
+            secondStudent
+        );
         var project = projectAssignmentRepository.findById(assigned.id()).orElseThrow();
-        var catalog =
-                createLockedCatalog(
-                        "AUTH", "Authorization rubric", AssessmentComponentType.REVIEW, 1);
+        var catalog = createLockedCatalog(
+            "AUTH",
+            "Authorization rubric",
+            AssessmentComponentType.REVIEW,
+            1
+        );
         AcademicAppointment appointment = new AcademicAppointment();
         appointment.setLecturer(lecturerOne);
         appointment.setFaculty(faculty);
@@ -760,173 +1003,214 @@ class ProjectLifecycleIntegrationTests {
         appointment.setAssignedBy(admin);
         appointments.saveAndFlush(appointment);
         UserPrincipal principal = UserPrincipal.from(lecturerOne.getUser());
-        var authentication =
-                UsernamePasswordAuthenticationToken.authenticated(
-                        principal, null, principal.getAuthorities());
+        var authentication = UsernamePasswordAuthenticationToken.authenticated(
+            principal,
+            null,
+            principal.getAuthorities()
+        );
 
-        assertThat(topicAuthorization.canManageTopic(project.getTopic().getId(), authentication))
-                .isTrue();
         assertThat(
-                        registrationAuthorization.canManageRegistration(
-                                project.getRegistration().getId(), authentication))
-                .isTrue();
-        assertThat(projectAuthorization.canManageAssignment(project.getId(), authentication))
-                .isTrue();
-        assertThat(evaluationAuthorization.canManageRubric(catalog.rubric().id(), authentication))
-                .isTrue();
-        assertThat(projectAuthorization.canManageAssignment(Long.MAX_VALUE, authentication))
-                .isFalse();
+            topicAuthorization.canManageTopic(project.getTopic().getId(), authentication)
+        ).isTrue();
+        assertThat(
+            registrationAuthorization.canManageRegistration(
+                project.getRegistration().getId(),
+                authentication
+            )
+        ).isTrue();
+        assertThat(
+            projectAuthorization.canManageAssignment(project.getId(), authentication)
+        ).isTrue();
+        assertThat(
+            evaluationAuthorization.canManageRubric(catalog.rubric().id(), authentication)
+        ).isTrue();
+        assertThat(
+            projectAuthorization.canManageAssignment(Long.MAX_VALUE, authentication)
+        ).isFalse();
         assertThat(topicAuthorization.canManageTopic(project.getTopic().getId(), null)).isFalse();
 
         String request = "{\"periodId\":" + period.getId() + ",\"name\":\"Scope committee\"}";
         mvc.perform(
-                        post("/api/v1/evaluation-committees")
-                                .with(user(principal))
-                                .with(csrf())
-                                .contentType("application/json")
-                                .content(request))
-                .andExpect(status().isCreated());
+            post("/api/v1/evaluation-committees")
+                .with(user(principal))
+                .with(csrf())
+                .contentType("application/json")
+                .content(request)
+        ).andExpect(status().isCreated());
 
         // An appointment in another faculty cannot grant access to these same resources.
         appointment.setFaculty(createFaculty("OTHER"));
         appointments.saveAndFlush(appointment);
-        assertThat(topicAuthorization.canManageTopic(project.getTopic().getId(), authentication))
-                .isFalse();
         assertThat(
-                        registrationAuthorization.canManageRegistration(
-                                project.getRegistration().getId(), authentication))
-                .isFalse();
-        assertThat(projectAuthorization.canManageAssignment(project.getId(), authentication))
-                .isFalse();
-        assertThat(evaluationAuthorization.canManageRubric(catalog.rubric().id(), authentication))
-                .isFalse();
+            topicAuthorization.canManageTopic(project.getTopic().getId(), authentication)
+        ).isFalse();
+        assertThat(
+            registrationAuthorization.canManageRegistration(
+                project.getRegistration().getId(),
+                authentication
+            )
+        ).isFalse();
+        assertThat(
+            projectAuthorization.canManageAssignment(project.getId(), authentication)
+        ).isFalse();
+        assertThat(
+            evaluationAuthorization.canManageRubric(catalog.rubric().id(), authentication)
+        ).isFalse();
         mvc.perform(
-                        post("/api/v1/evaluation-committees")
-                                .with(user(principal))
-                                .with(csrf())
-                                .contentType("application/json")
-                                .content(request))
-                .andExpect(status().isForbidden());
+            post("/api/v1/evaluation-committees")
+                .with(user(principal))
+                .with(csrf())
+                .contentType("application/json")
+                .content(request)
+        ).andExpect(status().isForbidden());
     }
 
     @Test
     void regroupedEvaluationReadEndpointsRemainAvailable(@Autowired MockMvc mvc) throws Exception {
         UserPrincipal principal = UserPrincipal.from(admin);
-        for (String resource :
-                List.of(
-                        "assessment-components",
-                        "rubrics",
-                        "evaluation-assignments",
-                        "evaluation-committees",
-                        "defense-sessions",
-                        "results",
-                        "grade-change-requests")) {
-            mvc.perform(get("/api/v1/" + resource).with(user(principal)))
-                    .andExpect(status().isOk());
+        for (String resource : List.of(
+            "assessment-components",
+            "rubrics",
+            "evaluation-assignments",
+            "evaluation-committees",
+            "defense-sessions",
+            "results",
+            "grade-change-requests"
+        )) {
+            mvc.perform(get("/api/v1/" + resource).with(user(principal))).andExpect(
+                status().isOk()
+            );
         }
     }
 
     private TopicResponse createPublishedTopic(String code) {
-        TopicResponse created =
-                topicService.create(
-                        new CreateTopicRequest(
-                                period.getId(),
-                                code,
-                                "Đề tài " + code,
-                                "Mô tả " + code,
-                                "Mục tiêu " + code,
-                                "Kết quả " + code,
-                                null,
-                                VisibilityType.OPEN,
-                                null),
-                        lecturerOne.getUser().getId());
-        TopicResponse reviewed =
-                topicService.review(
-                        created.id(),
-                        new ReviewTopicRequest(
-                                created.version(), TopicReviewDecision.APPROVED, "Đạt."),
-                        admin.getId());
-        TopicResponse assigned =
-                topicService.assignSupervisors(
-                        reviewed.id(),
-                        new AssignSupervisorsRequest(
-                                reviewed.version(), lecturerOne.getId(), lecturerTwo.getId()),
-                        admin.getId());
+        TopicResponse created = topicService.create(
+            new CreateTopicRequest(
+                period.getId(),
+                code,
+                "Đề tài " + code,
+                "Mô tả " + code,
+                "Mục tiêu " + code,
+                "Kết quả " + code,
+                null,
+                VisibilityType.OPEN,
+                null
+            ),
+            lecturerOne.getUser().getId()
+        );
+        TopicResponse reviewed = topicService.review(
+            created.id(),
+            new ReviewTopicRequest(created.version(), TopicReviewDecision.APPROVED, "Đạt."),
+            admin.getId()
+        );
+        TopicResponse assigned = topicService.assignSupervisors(
+            reviewed.id(),
+            new AssignSupervisorsRequest(
+                reviewed.version(),
+                lecturerOne.getId(),
+                lecturerTwo.getId()
+            ),
+            admin.getId()
+        );
         return topicService.publish(
-                assigned.id(), new PublishTopicRequest(assigned.version()), admin.getId());
+            assigned.id(),
+            new PublishTopicRequest(assigned.version()),
+            admin.getId()
+        );
     }
 
     private StudentGroupResponse createActiveGroup(String name, Student leader, Student member) {
-        StudentGroupResponse group =
-                groupService.create(
-                        new CreateGroupRequest(period.getId(), name), leader.getUser().getId());
+        StudentGroupResponse group = groupService.create(
+            new CreateGroupRequest(period.getId(), name),
+            leader.getUser().getId()
+        );
         return groupService.addMember(
-                group.id(),
-                new AddGroupMemberRequest(member.getStudentCode()),
-                leader.getUser().getId());
+            group.id(),
+            new AddGroupMemberRequest(member.getStudentCode()),
+            leader.getUser().getId()
+        );
     }
 
     private ProjectAssignmentResponse createAssignedProject(
-            String topicCode, Student leader, Student member) {
+        String topicCode,
+        Student leader,
+        Student member
+    ) {
         TopicResponse topic = createPublishedTopic(topicCode);
         StudentGroupResponse group = createActiveGroup(unique("Nhóm " + topicCode), leader, member);
-        TopicRegistrationResponse registration =
-                registrationService.create(
-                        new CreateTopicRegistrationRequest(
-                                group.id(), topic.id(), "Nhóm phù hợp với đề tài."),
-                        leader.getUser().getId());
-        registration =
-                registrationService.review(
-                        registration.id(),
-                        new ReviewTopicRegistrationRequest(
-                                registration.version(), RegistrationStatus.APPROVED, null),
-                        admin.getId());
+        TopicRegistrationResponse registration = registrationService.create(
+            new CreateTopicRegistrationRequest(group.id(), topic.id(), "Nhóm phù hợp với đề tài."),
+            leader.getUser().getId()
+        );
+        registration = registrationService.review(
+            registration.id(),
+            new ReviewTopicRegistrationRequest(
+                registration.version(),
+                RegistrationStatus.APPROVED,
+                null
+            ),
+            admin.getId()
+        );
         return projectAssignmentService.create(
-                new CreateAssignmentRequest(registration.id()), admin.getId());
+            new CreateAssignmentRequest(registration.id()),
+            admin.getId()
+        );
     }
 
     private LockedCatalog createLockedCatalog(
-            String code,
-            String name,
-            AssessmentComponentType componentType,
-            int expectedEvaluators) {
-        AssessmentComponentResponse component =
-                evaluationService.createComponent(
-                        new CreateAssessmentComponentRequest(
-                                period.getId(),
-                                unique(code),
-                                name,
-                                componentType,
-                                expectedEvaluators),
-                        admin.getId());
-        RubricResponse draftRubric =
-                evaluationService.createRubric(
-                        new CreateRubricRequest(
-                                component.id(),
-                                name + " rubric",
-                                List.of(
-                                        new CriterionRequest(
-                                                "Nội dung",
-                                                "Đánh giá nội dung",
-                                                new BigDecimal("6.00"),
-                                                1),
-                                        new CriterionRequest(
-                                                "Trình bày",
-                                                "Đánh giá trình bày",
-                                                new BigDecimal("4.00"),
-                                                2))),
-                        admin.getId());
+        String code,
+        String name,
+        AssessmentComponentType componentType,
+        int expectedEvaluators
+    ) {
+        AssessmentComponentResponse component = evaluationService.createComponent(
+            new CreateAssessmentComponentRequest(
+                period.getId(),
+                unique(code),
+                name,
+                componentType,
+                expectedEvaluators
+            ),
+            admin.getId()
+        );
+        RubricResponse draftRubric = evaluationService.createRubric(
+            new CreateRubricRequest(
+                component.id(),
+                name + " rubric",
+                List.of(
+                    new CriterionRequest(
+                        "Nội dung",
+                        "Đánh giá nội dung",
+                        new BigDecimal("6.00"),
+                        1
+                    ),
+                    new CriterionRequest(
+                        "Trình bày",
+                        "Đánh giá trình bày",
+                        new BigDecimal("4.00"),
+                        2
+                    )
+                )
+            ),
+            admin.getId()
+        );
         RubricResponse lockedRubric = evaluationService.lockRubric(draftRubric.id(), admin.getId());
-        AssessmentComponentResponse lockedComponent =
-                evaluationService.lockComponent(component.id(), admin.getId());
+        AssessmentComponentResponse lockedComponent = evaluationService.lockComponent(
+            component.id(),
+            admin.getId()
+        );
         return new LockedCatalog(lockedComponent, lockedRubric);
     }
 
     private List<ScoreRequest> scoreRequests(
-            RubricResponse rubric, BigDecimal firstScore, BigDecimal secondScore) {
+        RubricResponse rubric,
+        BigDecimal firstScore,
+        BigDecimal secondScore
+    ) {
         return List.of(
-                new ScoreRequest(rubric.criteria().get(0).id(), firstScore, "Tiêu chí 1"),
-                new ScoreRequest(rubric.criteria().get(1).id(), secondScore, "Tiêu chí 2"));
+            new ScoreRequest(rubric.criteria().get(0).id(), firstScore, "Tiêu chí 1"),
+            new ScoreRequest(rubric.criteria().get(1).id(), secondScore, "Tiêu chí 2")
+        );
     }
 
     private Faculty createFaculty(String baseCode) {
@@ -1018,7 +1302,29 @@ class ProjectLifecycleIntegrationTests {
     }
 
     private String unique(String base) {
-        return base + "-" + System.nanoTime();
+        return uniqueCode(base, 20);
+    }
+
+    private String uniqueCode(String base, int maxLength) {
+        String suffix = Long.toString(System.nanoTime());
+        String normalized = base == null ? "X" : base.trim();
+        if (normalized.isEmpty()) {
+            normalized = "X";
+        }
+
+        int allowedPrefix = Math.max(1, maxLength - suffix.length() - 1);
+        String prefix =
+            normalized.length() > allowedPrefix
+                ? normalized.substring(0, allowedPrefix)
+                : normalized;
+
+        String candidate = prefix + "-" + suffix;
+        if (candidate.length() > maxLength) {
+            int safePrefixLength = Math.max(1, maxLength - suffix.length() - 1);
+            prefix = normalized.substring(0, Math.min(normalized.length(), safePrefixLength));
+            candidate = prefix + "-" + suffix;
+        }
+        return candidate.length() > maxLength ? suffix.substring(0, maxLength - 1) : candidate;
     }
 
     private record LockedCatalog(AssessmentComponentResponse component, RubricResponse rubric) {}

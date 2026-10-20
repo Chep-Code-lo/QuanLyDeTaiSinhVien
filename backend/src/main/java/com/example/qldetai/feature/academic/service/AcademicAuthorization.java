@@ -42,12 +42,14 @@ public class AcademicAuthorization {
 
     public boolean canManageDepartment(Long departmentId, Authentication authentication) {
         UserPrincipal principal = principal(authentication);
-        if (principal == null) {
-            return false;
-        }
+        return principal != null && canManageDepartmentAsUser(departmentId, principal.id());
+    }
+
+    public boolean canManageDepartmentAsUser(Long departmentId, Long userId) {
+        if (departmentId == null || userId == null) return false;
         LocalDateTime now = LocalDateTime.now(clock);
         if (academicAppointmentRepository.hasActiveDepartmentAppointment(
-                principal.id(), PositionCode.DEPARTMENT_HEAD, departmentId, now)) {
+                userId, PositionCode.DEPARTMENT_HEAD, departmentId, now)) {
             return true;
         }
         return departmentRepository
@@ -55,7 +57,7 @@ public class AcademicAuthorization {
                 .map(
                         department ->
                                 academicAppointmentRepository.hasActiveFacultyAppointment(
-                                        principal.id(),
+                                        userId,
                                         PositionCode.DEAN,
                                         department.getFaculty().getId(),
                                         now))

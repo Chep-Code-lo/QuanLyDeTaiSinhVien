@@ -100,6 +100,7 @@ Response lỗi:
 | GET | `/topics` | Đã đăng nhập | Danh sách đề tài |
 | GET | `/topics/{id}` | Đã đăng nhập | Chi tiết đề tài |
 | POST | `/topics` | `ADMIN`, `LECTURER`, `STUDENT` | Tạo đề tài |
+| POST | `/topics/for-registration` | `ADMIN` hoặc giảng viên đang giữ chức Trưởng khoa/Trưởng bộ môn đúng phạm vi | Tạo, phê duyệt, gán hướng dẫn và công bố đề tài trong một giao dịch |
 | PUT | `/topics/{id}` | `ADMIN`, `LECTURER`, `STUDENT` | Sửa nội dung đề tài |
 | PUT | `/topics/{id}/supervisors` | `ADMIN`, `LECTURER` | Gán giảng viên hướng dẫn |
 | PATCH | `/topics/{id}/review` | `ADMIN`, `LECTURER` | Review đề tài |
@@ -192,6 +193,40 @@ Response mẫu:
   "timestamp": "2026-09-15T16:00:00Z"
 }
 ```
+
+### POST `/topics/for-registration`
+
+Được sử dụng tại trang `/registrations` cho chức năng **Tạo và công bố**.
+Trưởng khoa được tạo đề tài cho các bộ môn thuộc khoa đang phụ trách;
+Trưởng bộ môn chỉ được tạo cho bộ môn đang phụ trách. Bổ nhiệm đã kết thúc
+hoặc chưa có hiệu lực không cấp quyền, kể cả với phiên đăng nhập cũ.
+Quản trị viên được sử dụng chức năng mà không cần hồ sơ giảng viên.
+
+```json
+{
+  "periodId": 1,
+  "departmentId": 1,
+  "code": "KLTN-2026-01",
+  "title": "Hệ thống hỗ trợ sinh viên",
+  "description": "Mô tả nội dung đề tài",
+  "objectives": "Mục tiêu thực hiện",
+  "expectedOutcomes": "Ứng dụng và báo cáo hoàn chỉnh",
+  "prerequisites": "Kiến thức lập trình web",
+  "primaryLecturerId": 1,
+  "secondaryLecturerId": null
+}
+```
+
+Đợt phải `ACTIVE`, bộ môn phải thuộc khoa của đợt và còn hoạt động.
+Cho phép tạo từ lúc bắt đầu đề xuất đến hết thời gian đăng ký, bao gồm cả
+giai đoạn đăng ký sau khi đóng đề xuất. Giảng viên hướng dẫn phải đang hoạt
+động, thuộc cùng khoa và hai người hướng dẫn phải khác nhau nếu chọn cả hai.
+
+Trả `201` với `TopicResponse`: trạng thái `PUBLISHED`, phạm vi `OPEN`,
+có hướng dẫn chính và lịch sử phê duyệt `APPROVED`. Nếu thông tin không hợp
+lệ thì không lưu đề tài, quyết định duyệt hoặc phân công hướng dẫn dang dở.
+Sinh viên đăng ký qua `POST /topic-registrations` theo các quy tắc hiện hành
+của đợt và nhóm.
 
 ### PUT `/topics/{id}`
 

@@ -6,6 +6,8 @@ import type {
   CreateEvaluationRequest,
   CreateRubricRequest,
   DefenseSessionResponse,
+  EvaluationCommitteeResponse,
+  SaveCommitteeRequest,
   EvaluationAssignmentResponse,
   EvaluationStatus,
   RubricResponse,
@@ -32,17 +34,25 @@ export interface ListDefensesParams {
 export const evaluationApi = {
   // Assessment Components
   listComponents: async (periodId?: number) => {
-    const response = await apiClient.get<ApiResponse<AssessmentComponentResponse[]>>('/assessment-components', {
-      params: { periodId },
-    })
+    const response = await apiClient.get<ApiResponse<AssessmentComponentResponse[]>>(
+      '/assessment-components',
+      {
+        params: { periodId },
+      },
+    )
     return response.data.data
   },
   createComponent: async (payload: CreateAssessmentComponentRequest) => {
-    const response = await apiClient.post<ApiResponse<AssessmentComponentResponse>>('/assessment-components', payload)
+    const response = await apiClient.post<ApiResponse<AssessmentComponentResponse>>(
+      '/assessment-components',
+      payload,
+    )
     return response.data.data
   },
   lockComponent: async (id: number) => {
-    const response = await apiClient.patch<ApiResponse<AssessmentComponentResponse>>(`/assessment-components/${id}/lock`)
+    const response = await apiClient.patch<ApiResponse<AssessmentComponentResponse>>(
+      `/assessment-components/${id}/lock`,
+    )
     return response.data.data
   },
 
@@ -64,9 +74,12 @@ export const evaluationApi = {
 
   // Evaluation Assignments
   listAssignments: async (params: ListAssignmentsParams = {}) => {
-    const response = await apiClient.get<ApiResponse<PageResponse<EvaluationAssignmentResponse>>>('/evaluation-assignments', {
-      params,
-    })
+    const response = await apiClient.get<ApiResponse<PageResponse<EvaluationAssignmentResponse>>>(
+      '/evaluation-assignments',
+      {
+        params,
+      },
+    )
     return response.data.data
   },
   assign: async (payload: CreateEvaluationRequest) => {
@@ -74,21 +87,45 @@ export const evaluationApi = {
     return response.data.data
   },
 
+  listCommittees: async (params: { periodId?: number; page?: number; size?: number } = {}) => {
+    const response = await apiClient.get<ApiResponse<PageResponse<EvaluationCommitteeResponse>>>(
+      '/evaluation-committees', { params },
+    )
+    return response.data.data
+  },
+
+  saveCommittee: async (id: number | null, payload: SaveCommitteeRequest) => {
+    const response = id
+      ? await apiClient.put<ApiResponse<EvaluationCommitteeResponse>>(
+        '/evaluation-committees/' + id + '/configuration', payload)
+      : await apiClient.post<ApiResponse<EvaluationCommitteeResponse>>(
+        '/evaluation-committees/configuration', payload)
+    return response.data.data
+  },
+
   // Defense Sessions
   listDefenses: async (params: ListDefensesParams = {}) => {
-    const response = await apiClient.get<ApiResponse<PageResponse<DefenseSessionResponse>>>('/defense-sessions', {
-      params,
-    })
+    const response = await apiClient.get<ApiResponse<PageResponse<DefenseSessionResponse>>>(
+      '/defense-sessions',
+      {
+        params,
+      },
+    )
     return response.data.data
   },
 
   // Score Sheets
   getScoreSheet: async (assignmentId: number) => {
-    const response = await apiClient.get<ApiResponse<ScoreSheetResponse>>(`/evaluation-assignments/${assignmentId}/score-sheet`)
+    const response = await apiClient.get<ApiResponse<ScoreSheetResponse>>(
+      `/evaluation-assignments/${assignmentId}/score-sheet`,
+    )
     return response.data.data
   },
   saveScoreSheet: async (assignmentId: number, payload: SaveSheetRequest) => {
-    const response = await apiClient.put<ApiResponse<ScoreSheetResponse>>(`/evaluation-assignments/${assignmentId}/score-sheet`, payload)
+    const response = await apiClient.put<ApiResponse<ScoreSheetResponse>>(
+      `/evaluation-assignments/${assignmentId}/score-sheet`,
+      payload,
+    )
     return response.data.data
   },
 }

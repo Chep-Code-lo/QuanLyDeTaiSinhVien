@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type { InternalAxiosRequestConfig } from 'axios'
 import type { ApiResponse } from '../types/api'
+import { localizeApiError } from '../utils/errorMessages'
 
 type CsrfResponse = { headerName: string; parameterName: string; token: string }
 
@@ -98,8 +99,13 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 403) {
       clearCsrfToken()
     }
-    return Promise.reject(error)
-  }
+    return Promise.reject(localizeApiError(error))
+  },
+)
+
+csrfClient.interceptors.response.use(
+  (response) => response,
+  (error) => Promise.reject(localizeApiError(error)),
 )
 
 export const tokenStorage = {

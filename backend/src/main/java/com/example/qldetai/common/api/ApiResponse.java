@@ -1,6 +1,7 @@
 package com.example.qldetai.common.api;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.example.qldetai.common.i18n.ErrorMessages;
 import java.time.Instant;
 
 /**
@@ -14,7 +15,6 @@ import java.time.Instant;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ApiResponse<T>(boolean success, String message, T data, Instant timestamp) {
-
     public static <T> ApiResponse<T> success(T data) {
         return success("Request completed successfully.", data);
     }
@@ -24,10 +24,10 @@ public record ApiResponse<T>(boolean success, String message, T data, Instant ti
     }
 
     public static ApiResponse<Void> failure(String message) {
-        return new ApiResponse<>(false, message, null, Instant.now());
+        return new ApiResponse<>(false, ErrorMessages.vietnamese(message), null, Instant.now());
     }
 
     public static <T> ApiResponse<T> failure(String message, T data) {
-        return new ApiResponse<>(false, message, data, Instant.now());
+        return new ApiResponse<>(false, ErrorMessages.vietnamese(message), data, Instant.now());
     }
 }

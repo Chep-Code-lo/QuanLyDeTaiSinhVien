@@ -1,7 +1,22 @@
+import {
+  Bell,
+  Building2,
+  CircleUserRound,
+  ClipboardCheck,
+  Clock3,
+  Crown,
+  Flag,
+  FolderKanban,
+  House,
+  Star,
+  UserPlus,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react'
 import type { PositionCode, RoleCode } from '../types/domain'
 
 export type NavigationItem = {
-  icon: string
+  icon: LucideIcon
   label: string
   to: string
   roles?: RoleCode[]
@@ -11,25 +26,26 @@ export type NavigationItem = {
 }
 
 export const navigationItems: NavigationItem[] = [
-  { icon: '⌂', label: 'Tổng quan', to: '/dashboard' },
-  { icon: '◫', label: 'Đề tài & Dự án', to: '/topics' },
-  { icon: '◉', label: 'Nhóm đề tài', to: '/groups' },
-  { icon: '✓', label: 'Đăng ký đề tài', to: '/registrations' },
-  { icon: '◷', label: 'Tiến độ & Milestone', to: '/progress' },
-  { icon: '★', label: 'Setup Đánh giá', to: '/evaluations', roles: ['LECTURER', 'ADMIN'] },
-  { icon: '⚑', label: 'Gán Evaluator', to: '/evaluator-assignment', roles: ['LECTURER', 'ADMIN'] },
+  { icon: House, label: 'Tổng quan', to: '/dashboard' },
+  { icon: Bell, label: 'Thông báo', to: '/announcements' },
+  { icon: FolderKanban, label: 'Đề tài & Dự án', to: '/topics' },
+  { icon: UsersRound, label: 'Nhóm đề tài', to: '/groups' },
+  { icon: ClipboardCheck, label: 'Đăng ký đề tài', to: '/registrations' },
+  { icon: Clock3, label: 'Tiến độ & Mốc báo cáo', to: '/progress' },
+  { icon: Star, label: 'Tiêu chuẩn đánh giá', to: '/evaluations', roles: ['LECTURER', 'ADMIN'] },
   {
-    icon: '🏢',
+    icon: Flag,
+    label: 'Phân công hội đồng',
+    to: '/evaluator-assignment',
+    roles: ['LECTURER', 'ADMIN'],
+  },
+  {
+    icon: Building2,
     label: 'Quản lý Học thuật',
     to: '/academic-management',
     requireAcademicManagement: true,
   },
-  {
-    icon: '👑',
-    label: 'Gán Chức vụ (Admin)',
-    to: '/admin-appointments',
-    adminOnly: true,
-  },
-  { icon: '☻', label: 'Tài khoản', to: '/account' },
-  { icon: '◌', label: 'Thông báo', to: '/announcements' },
+  { icon: Crown, label: 'Bổ nhiệm chức vụ', to: '/admin-appointments', adminOnly: true },
+  { icon: UserPlus, label: 'Tạo tài khoản', to: '/admin-users/new', adminOnly: true },
+  { icon: CircleUserRound, label: 'Hồ sơ cá nhân', to: '/account' },
 ]

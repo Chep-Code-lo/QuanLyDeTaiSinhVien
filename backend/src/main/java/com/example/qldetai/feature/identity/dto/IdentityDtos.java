@@ -8,11 +8,17 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 import java.util.Set;
 
 public final class IdentityDtos {
+
+    public static final String PASSWORD_PATTERN =
+            "(?s)(?=.*\\p{Lu})(?=.*\\p{Nd})(?=.*[\\p{P}\\p{S}]).{8,100}";
+    public static final String PASSWORD_REQUIREMENTS =
+            "Mật khẩu phải có từ 8 đến 100 ký tự, gồm ít nhất một chữ in hoa, một chữ số và một ký tự đặc biệt.";
 
     private IdentityDtos() {
     }
@@ -22,7 +28,9 @@ public final class IdentityDtos {
 
     public record ChangePasswordRequest(
             @NotBlank String currentPassword,
-            @NotBlank @Size(min = 8, max = 100) String newPassword) {
+            @NotBlank(message = PASSWORD_REQUIREMENTS)
+            @Size(min = 8, max = 100, message = PASSWORD_REQUIREMENTS)
+            @Pattern(regexp = PASSWORD_PATTERN, message = PASSWORD_REQUIREMENTS) String newPassword) {
     }
 
     public record CurrentUserResponse(
@@ -54,7 +62,9 @@ public final class IdentityDtos {
 
     public record CreateUserRequest(
             @NotBlank @Email @Size(max = 254) String email,
-            @NotBlank @Size(min = 8, max = 100) String password,
+            @NotBlank(message = PASSWORD_REQUIREMENTS)
+            @Size(min = 8, max = 100, message = PASSWORD_REQUIREMENTS)
+            @Pattern(regexp = PASSWORD_PATTERN, message = PASSWORD_REQUIREMENTS) String password,
             @NotBlank @Size(max = 150) String fullName,
             @Size(max = 20) String phone,
             @NotEmpty Set<RoleCode> roles,

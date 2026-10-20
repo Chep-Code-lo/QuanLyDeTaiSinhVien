@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface AcademicAppointmentRepository extends JpaRepository<AcademicAppointment, Long> {
 
+    boolean existsByLecturerIdAndFacultyIdAndPositionCode(Long lecturerId, Long facultyId, PositionCode positionCode);
+
     @Query("""
             select a from AcademicAppointment a
             join fetch a.lecturer l

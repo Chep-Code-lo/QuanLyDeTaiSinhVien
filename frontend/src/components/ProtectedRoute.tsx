@@ -14,8 +14,14 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   appointments,
   requireAcademicManagement,
 }) => {
-  const { user, loading, isAuthenticated, hasAnyRole, hasAppointment, canAccessAcademicManagement } =
-    useAuth()
+  const {
+    user,
+    loading,
+    isAuthenticated,
+    hasAnyRole,
+    hasAppointment,
+    canAccessAcademicManagement,
+  } = useAuth()
 
   if (loading) {
     return (
@@ -46,9 +52,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return (
       <div className="page-card error-container text-center py-12">
         <h2>Không có quyền truy cập</h2>
-        <p className="text-secondary mt-2">
-          Bạn không có vai trò phù hợp để xem nội dung này.
-        </p>
+        <p className="text-secondary mt-2">Bạn không có vai trò phù hợp để xem nội dung này.</p>
       </div>
     )
   }

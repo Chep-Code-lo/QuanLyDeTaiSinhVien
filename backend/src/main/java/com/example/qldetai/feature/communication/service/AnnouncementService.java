@@ -13,6 +13,7 @@ import com.example.qldetai.feature.communication.dto.CommunicationDtos.CreateAnn
 import com.example.qldetai.feature.communication.dto.CommunicationDtos.UpdateAnnouncementRequest;
 import com.example.qldetai.feature.communication.repository.AnnouncementRepository;
 import com.example.qldetai.feature.identity.domain.User;
+import com.example.qldetai.feature.identity.domain.UserStatus;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.progress.domain.StoredFile;
 import com.example.qldetai.feature.progress.repository.StoredFileRepository;
@@ -31,6 +32,7 @@ public class AnnouncementService {
     private final FacultyRepository facultyRepository;
     private final UserRepository userRepository;
     private final StoredFileRepository storedFileRepository;
+    private final NotificationService notificationService;
     private final Clock clock;
 
     public AnnouncementService(
@@ -38,11 +40,13 @@ public class AnnouncementService {
             FacultyRepository facultyRepository,
             UserRepository userRepository,
             StoredFileRepository storedFileRepository,
+            NotificationService notificationService,
             Clock clock) {
         this.announcementRepository = announcementRepository;
         this.facultyRepository = facultyRepository;
         this.userRepository = userRepository;
         this.storedFileRepository = storedFileRepository;
+        this.notificationService = notificationService;
         this.clock = clock;
     }
 
@@ -110,6 +114,15 @@ public class AnnouncementService {
         }
         announcement.setStatus(AnnouncementStatus.PUBLISHED);
         announcement.setPublishedAt(LocalDateTime.now(clock));
+        // The published feed is visible to all users, so notify every active account.
+        for (User recipient : userRepository.findByStatus(UserStatus.ACTIVE)) {
+            notificationService.publish(
+                    recipient.getId(),
+                    "announcement-published:" + announcement.getId(),
+                    announcement.getTitle(),
+                    announcement.getContent(),
+                    "/announcements");
+        }
         return toResponse(announcement);
     }
 
@@ -117,9 +130,6 @@ public class AnnouncementService {
     @BusinessAudit(action = "ANNOUNCEMENT_ARCHIVE", entityType = "ANNOUNCEMENT", entityIdArgument = 0)
     public AnnouncementResponse archive(Long id) {
         Announcement announcement = requireAnnouncement(id);
-        if (announcement.getStatus() != AnnouncementStatus.PUBLISHED) {
-            throw new BusinessRuleException("Only a published announcement can be archived.");
-        }
         announcement.setStatus(AnnouncementStatus.ARCHIVED);
         return toResponse(announcement);
     }
