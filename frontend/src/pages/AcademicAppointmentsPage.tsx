@@ -84,10 +84,6 @@ export const AcademicAppointmentsPage: React.FC = () => {
       showError('Chức vụ Trưởng bộ môn yêu cầu chọn bộ môn phụ trách!')
       return
     }
-    if (newAppointment.endsAt && new Date(newAppointment.endsAt) <= new Date(newAppointment.startsAt)) {
-      showError('Ngày kết thúc phải sau ngày bắt đầu bổ nhiệm.')
-      return
-    }
 
     try {
       setSubmitting(true)
@@ -251,7 +247,7 @@ export const AcademicAppointmentsPage: React.FC = () => {
           <div className="modal-content scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="font-semibold text-lg">Tạo quyết định bổ nhiệm mới</h3>
-              <button type="button" className="btn-close" disabled={submitting} onClick={() => setIsModalOpen(false)}>
+              <button type="button" className="btn-close" onClick={() => { if (!submitting) setIsModalOpen(false) }}>
                 &times;
               </button>
             </div>
@@ -346,7 +342,7 @@ export const AcademicAppointmentsPage: React.FC = () => {
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { if (!submitting) setIsModalOpen(false) }}
                   disabled={submitting}
                 >
                   Hủy

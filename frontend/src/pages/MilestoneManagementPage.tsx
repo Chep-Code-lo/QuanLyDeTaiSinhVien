@@ -6,7 +6,6 @@ import { academicApi } from '../api/academic'
 import { allPages } from '../api/student'
 import { milestoneApi } from '../api/milestones'
 import { MilestoneBoard } from '../components/MilestoneBoard'
-import { SelectionPanel } from '../components/SelectionPanel'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -240,19 +239,23 @@ export const MilestoneManagementPage: React.FC = () => {
       </div>
 
       {/* Select Assignment Selector */}
-      <SelectionPanel id="milestone-assignment" label="Đề tài / Dự án" description="Chọn dự án để xem mốc báo cáo và phản hồi.">
+      <div className="page-card mb-6">
+        <div className="form-group mb-0">
+          <label className="section-title section-title--label" htmlFor="milestone-assignment">
+            Chọn Đề tài / Dự án Phân công:
+          </label>
           <AnimatedSelect
             id="milestone-assignment"
-            className="form-select"
+            className="form-select font-semibold"
             value={selectedAssignmentId ?? ''}
             onChange={(e) => {
               setMilestones([])
               setSelectedAssignmentId(Number(e.target.value) || null)
             }}
-            disabled={loadingAssignments || assignments.length === 0}
+            disabled={loadingAssignments || !assignments.length}
           >
             {assignments.length === 0 ? (
-              <option value="">{loadingAssignments ? 'Đang tải dự án...' : 'Chưa có dự án được phân công'}</option>
+              <option value="">-- Không có đề tài nào --</option>
             ) : (
               assignments.map((a: ProjectAssignmentResponse) => (
                 <option key={a.id} value={a.id}>
@@ -261,7 +264,8 @@ export const MilestoneManagementPage: React.FC = () => {
               ))
             )}
           </AnimatedSelect>
-      </SelectionPanel>
+        </div>
+      </div>
 
       <MilestoneBoard
         key={selectedAssignmentId ?? 'no-assignment'}

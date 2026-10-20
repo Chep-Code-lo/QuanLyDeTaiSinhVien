@@ -151,6 +151,6 @@ describe('Hồi quy frontend', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Thông báo cá nhân' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Thông báo kiểm tra' }))
     await waitFor(() => expect(mocks.unread).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(screen.getByRole('link', { name: 'Thông báo mới' }).textContent).toBe(''))
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Thông báo', exact: true }).querySelector('.notification-button__dot')).toBeNull())
   })
 })

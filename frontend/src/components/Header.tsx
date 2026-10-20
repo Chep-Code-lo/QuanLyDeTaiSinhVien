@@ -8,7 +8,8 @@ import { useToast } from '../context/ToastContext'
 type HeaderProps = { onMenuClick: () => void }
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const { user, logout } = useAuth()
+  const { user, logout, hasRole } = useAuth()
+  const management = hasRole('ADMIN') || hasRole('LECTURER')
   const { showSuccess, showError } = useToast()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
@@ -58,15 +59,15 @@ export function Header({ onMenuClick }: HeaderProps) {
   return (
     <header className="topbar">
       <button className="topbar__menu" type="button" onClick={onMenuClick} aria-label="Mở menu điều hướng">☰</button>
-      <form className="topbar__search" onSubmit={e=>{e.preventDefault();navigate(`/topics?q=${encodeURIComponent(search.trim())}`)}}>
+      {management ? <div className="topbar__school">Trường Đại học Công nghệ Kỹ thuật TP.HCM</div> : <form className="topbar__search" onSubmit={e=>{e.preventDefault();navigate(`/topics?q=${encodeURIComponent(search.trim())}`)}}>
         <span aria-hidden="true">⌕</span>
         <input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Tìm đề tài, bộ môn, GVHD..." aria-label="Tìm kiếm đề tài" />
         <button className="text-button" type="submit">Tìm</button>
-      </form>
+      </form>}
       <div className="topbar__actions flex items-center gap-3">
         {user ? (
           <>
-            <Link className="notification-button" to="/announcements" title="Thông báo" aria-label="Thông báo mới"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>{unread!==null&&unread>0&&<span>{unread}</span>}</Link>
+            <Link className="notification-button" to="/announcements" title="Thông báo" aria-label={management ? (unread ? 'Có thông báo mới' : 'Thông báo') : 'Thông báo mới'}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>{unread!==null&&unread>0&&(management ? <span className="notification-button__dot" aria-hidden="true" /> : <span>{unread}</span>)}</Link>
             <div className="account-menu" ref={menuRef}>
             <button className="topbar__account" type="button" onClick={() => setMenuOpen((value) => !value)} aria-expanded={menuOpen}>
               <span className="topbar__avatar">{getInitials(user.fullName)}</span>

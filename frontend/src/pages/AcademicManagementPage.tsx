@@ -98,7 +98,7 @@ export const AcademicManagementPage: React.FC = () => {
       if (res.length > 0) {
         setNewPeriod((prev) => ({ ...prev, semesterId: res[0].id }))
       }
-    }).catch(error => showError(error.response?.data?.message || 'Không thể tải học kỳ.'))
+    })
   }, [])
 
   // This portal always creates periods for the configured IT faculty.
