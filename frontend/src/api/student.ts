@@ -26,7 +26,7 @@ export const projectTypes: Record<string, string> = {
 export interface PublishedResult {
   id: number; assignmentId: number; topicCode: string; topicTitle: string; groupName: string; periodName: string
   finalScore: number; publishedAt: string; versionNo: number
-  inputs: { id: number; componentCode: string; scoreSnapshot: number; rubricSnapshot: string }[]
+  inputs: { id: number; componentCode: string; scoreSnapshot: number; rubricSnapshot: string; lecturerId?: number; lecturerName?: string; overallComment?: string }[]
   members: { studentId: number; studentCodeSnapshot: string; fullNameSnapshot: string }[]
 }
 export const studentApi = {

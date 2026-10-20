@@ -64,7 +64,7 @@ const management = [
 
 describe.each(['STUDENT', 'LECTURER', 'ADMIN'] as RoleCode[])('Trang dành cho %s', role => {
   const routes = role === 'STUDENT'
-    ? [...common, ['/progress', 'Tiến độ & báo cáo'], ['/results', 'Lịch bảo vệ & kết quả']]
+    ? [...common.filter(([path]) => path !== '/dashboard' && path !== '/topics'), ['/dashboard', 'Thông báo'], ['/topics', 'Danh sách đề tài đã công bố'], ['/progress', 'Tiến độ & báo cáo'], ['/results', 'Lịch bảo vệ & kết quả']]
     : role === 'LECTURER'
       ? [...common, ...management, ['/score-sheets', 'Chấm điểm đề tài']]
       : [...common, ...management, ['/admin-users/new', 'Tạo tài khoản'], ['/admin-appointments', 'Bổ nhiệm chức vụ']]
