@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import { getItFaculty } from '../config/facultyScope'
 import type { ApiResponse, PageResponse } from '../types/api'
 import type {
   CreateRegistrationPeriodRequest,
@@ -11,19 +12,17 @@ import type {
 } from '../types/domain'
 
 export const academicApi = {
-  getFaculties: async () => {
-    const response = await apiClient.get<ApiResponse<FacultyResponse[]>>('/faculties')
-    return response.data.data
-  },
+  getFaculties: async () => [await getItFaculty()],
   createFaculty: async (payload: { code: string; name: string }) => {
     const response = await apiClient.post<ApiResponse<FacultyResponse>>('/faculties', payload)
     return response.data.data
   },
   getDepartments: async (facultyId?: number) => {
+    const scopeId = facultyId ?? (await getItFaculty()).id
     const response = await apiClient.get<ApiResponse<DepartmentResponse[]>>('/departments', {
-      params: { facultyId },
+      params: { facultyId: scopeId },
     })
-    return response.data.data
+    return response.data.data.filter((department) => department.facultyId === scopeId)
   },
   createDepartment: async (payload: { facultyId: number; code: string; name: string }) => {
     const response = await apiClient.post<ApiResponse<DepartmentResponse>>('/departments', payload)
@@ -38,27 +37,46 @@ export const academicApi = {
     return response.data.data
   },
   getRegistrationPeriods: async (facultyId?: number, page = 0, size = 20) => {
-    const response = await apiClient.get<ApiResponse<PageResponse<RegistrationPeriodResponse>>>('/registration-periods', {
-      params: { facultyId, page, size },
-    })
+    const scopeId = facultyId ?? (await getItFaculty()).id
+    const response = await apiClient.get<ApiResponse<PageResponse<RegistrationPeriodResponse>>>(
+      '/registration-periods',
+      {
+        params: { facultyId: scopeId, page, size },
+      },
+    )
     return response.data.data
   },
   createRegistrationPeriod: async (payload: CreateRegistrationPeriodRequest) => {
-    const response = await apiClient.post<ApiResponse<RegistrationPeriodResponse>>('/registration-periods', payload)
+    const response = await apiClient.post<ApiResponse<RegistrationPeriodResponse>>(
+      '/registration-periods',
+      payload,
+    )
     return response.data.data
   },
   updateRegistrationPeriod: async (id: number, payload: UpdateRegistrationPeriodRequest) => {
-    const response = await apiClient.put<ApiResponse<RegistrationPeriodResponse>>(`/registration-periods/${id}`, payload)
+    const response = await apiClient.put<ApiResponse<RegistrationPeriodResponse>>(
+      `/registration-periods/${id}`,
+      payload,
+    )
     return response.data.data
   },
-  changeRegistrationPeriodStatus: async (id: number, payload: { status: string; version: number }) => {
-    const response = await apiClient.patch<ApiResponse<RegistrationPeriodResponse>>(`/registration-periods/${id}/status`, payload)
+  changeRegistrationPeriodStatus: async (
+    id: number,
+    payload: { status: string; version: number },
+  ) => {
+    const response = await apiClient.patch<ApiResponse<RegistrationPeriodResponse>>(
+      `/registration-periods/${id}/status`,
+      payload,
+    )
     return response.data.data
   },
   getProjectAssignments: async (periodId?: number, page = 0, size = 20) => {
-    const response = await apiClient.get<ApiResponse<PageResponse<ProjectAssignmentResponse>>>('/project-assignments', {
-      params: { periodId, page, size },
-    })
+    const response = await apiClient.get<ApiResponse<PageResponse<ProjectAssignmentResponse>>>(
+      '/project-assignments',
+      {
+        params: { periodId, page, size },
+      },
+    )
     return response.data.data
   },
 }

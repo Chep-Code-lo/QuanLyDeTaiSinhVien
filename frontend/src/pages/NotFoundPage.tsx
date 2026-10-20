@@ -7,7 +7,9 @@ export function NotFoundPage() {
         <span className="not-found-card__code">404</span>
         <h1>Không tìm thấy trang</h1>
         <p>Đường dẫn bạn mở không tồn tại hoặc đã được thay đổi.</p>
-        <Link className="button--outline" to="/">Về trang tổng quan</Link>
+        <Link className="button--outline" to="/">
+          Về trang tổng quan
+        </Link>
       </section>
     </main>
   )

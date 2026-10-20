@@ -8,7 +8,7 @@ export function AppLogo() {
       </span>
       <span className="app-logo__copy">
         <strong>Quản lý đề tài HCMUTE</strong>
-        <small>Student Project Management</small>
+        <small>Hệ thống quản lý đề tài sinh viên</small>
       </span>
     </Link>
   )

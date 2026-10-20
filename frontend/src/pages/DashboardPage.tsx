@@ -1,51 +1,327 @@
-﻿import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { academicApi } from '../api/academic'
-import { topicApi } from '../api/topics'
-import { registrationApi } from '../api/registrations'
-import { milestoneApi } from '../api/milestones'
-import { allPages, dateText, errorMessage, isWindowOpen, projectTypes } from '../api/student'
+import { dashboardApi } from '../api/dashboard'
+import type { DashboardSummary } from '../api/dashboard'
 import { PageHeader } from '../components/PageHeader'
-import { RemoteState } from '../components/RemoteState'
 import { StatusBadge } from '../components/StatusBadge'
 import { useAuth } from '../context/AuthContext'
-import type { MilestoneResponse, ProjectAssignmentResponse, RegistrationPeriodResponse, TopicResponse } from '../types/domain'
+import { parseUtcDateTime, formatDateTime } from '../utils/dateTime'
+import { greetingName } from '../utils/userDisplay'
+
+const topicTypes = [
+  { type: 'GRADUATION', label: 'Khóa luận tốt nghiệp', color: '#155eef', dot: 'blue' },
+  { type: 'SPECIALIZED', label: 'Tiểu luận chuyên ngành', color: '#ef4444', dot: 'red' },
+  { type: 'RESEARCH', label: 'Nghiên cứu khoa học', color: '#f59e0b', dot: 'yellow' },
+  { type: 'COURSE', label: 'Đề tài môn học', color: '#cbd5e1', dot: 'slate' },
+] as const
+const number = (value: number) => value.toLocaleString('vi-VN')
+const dateTime = (value: string) => formatDateTime(value)
 
 export function DashboardPage() {
   const { user, hasRole } = useAuth()
-  const [data, setData] = useState<{ topics: TopicResponse[]; projects: ProjectAssignmentResponse[]; periods: RegistrationPeriodResponse[]; milestones: MilestoneResponse[]; pending: number }>()
+  const isLecturer = hasRole('LECTURER') || hasRole('ADMIN')
+  const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const student = hasRole('STUDENT') && !hasRole('ADMIN') && !hasRole('LECTURER')
-  const load = useCallback(async () => {
-    setLoading(true); setError('')
-    try {
-      const [topics, projects, periods, pending] = await Promise.all([
-        allPages(page => topicApi.list({ status: 'PUBLISHED', page, size: 100 })),
-        allPages(page => academicApi.getProjectAssignments(undefined, page, 100)),
-        allPages(page => academicApi.getRegistrationPeriods(undefined, page, 100)),
-        registrationApi.list({ status: 'PENDING', size: 1 }),
-      ])
-      const milestones = student ? (await Promise.all(projects.map(p => milestoneApi.listByAssignment(p.id)))).flat() : []
-      setData({ topics, projects, periods, milestones, pending: pending.totalElements })
-    } catch (e) { setError(errorMessage(e)); setData(undefined) } finally { setLoading(false) }
-  }, [student])
-  useEffect(() => { void load() }, [load])
-  const deadlines = data?.milestones.filter(m => ['OPEN', 'REVISION_REQUIRED'].includes(m.status)).sort((a,b) => a.dueAt.localeCompare(b.dueAt)) ?? []
-  return <>
-    <PageHeader title="Tổng quan" description="Dữ liệu hiện tại trong phạm vi tài khoản của bạn." />
-    <section className="welcome-panel"><div><span className="welcome-panel__eyebrow">CỔNG QUẢN LÝ ĐỀ TÀI</span><h2>Chào {user?.fullName}.</h2><p>Theo dõi đợt đăng ký, đề tài và các mốc thực hiện của bạn tại đây.</p></div><Link className="welcome-panel__action" to="/topics">Khám phá đề tài →</Link></section>
-    <RemoteState loading={loading} error={error} retry={load} />
-    {data && !loading && <>
-      <section className="dashboard-grid">{[
-        ['Đề tài đã công bố', data.topics.length, '/topics', 'blue'],
-        ['Đăng ký chờ duyệt', data.pending, '/registrations', 'amber'],
-        [student ? 'Dự án của nhóm' : 'Dự án', data.projects.length, '/progress', 'violet'],
-        ['Đã hoàn thành', data.projects.filter(p => p.status === 'COMPLETED').length, '/progress', 'green'],
-      ].map(([label,count,to,color]) => <Link key={label} to={String(to)} className={`metric-card metric-card--${color}`}><div><span className="metric-card__label">{label}</span><strong className="metric-card__value">{count}</strong><span className="metric-card__note">Xem chi tiết →</span></div></Link>)}</section>
-      <section className="dashboard-sections"><article className="content-card"><h2>Đợt đang nhận đăng ký</h2>{data.periods.filter(p => isWindowOpen(p,'registration')).map(p => <div className="topic-preview" key={p.id}><div><strong>{p.name}</strong><small>{projectTypes[p.projectType]} · Đến {dateText(p.registrationEndAt)}</small></div><Link to="/registrations" className="text-button">Đăng ký</Link></div>)}{!data.periods.some(p => isWindowOpen(p,'registration')) && <p>Hiện không có đợt đang nhận đăng ký.</p>}<h3>Đợt nhận đề xuất</h3>{data.periods.filter(p => isWindowOpen(p,'proposal')).map(p => <p key={p.id}>{p.name} · Đến {dateText(p.proposalEndAt)} <Link to="/topics">Đề xuất</Link></p>)}{!data.periods.some(p => isWindowOpen(p,'proposal')) && <p>Hiện không có đợt nhận đề xuất.</p>}</article>
-      <article className="content-card"><h2>{student ? 'Báo cáo cần theo dõi' : 'Dự án gần đây'}</h2>{student ? deadlines.slice(0,5).map(m => <div className="topic-preview" key={m.id}><div><strong>{m.title}</strong><small>{dateText(m.dueAt)} {new Date(m.dueAt).getTime() < Date.now() ? '· Quá hạn' : ''}</small></div><Link to="/progress" className="text-button">Xem</Link></div>) : data.projects.slice(0,5).map(p => <p key={p.id}>{p.topicTitle} · <StatusBadge status={p.status} /></p>)}{student && !deadlines.length && <p>Không có báo cáo đang chờ nộp hoặc yêu cầu chỉnh sửa.</p>}</article></section>
-      <section className="page-card"><h2>Đề tài đã công bố gần đây</h2>{data.topics.slice(0,5).map(t => <div className="topic-preview" key={t.id}><div><strong>{t.title}</strong><small>{t.code} · {t.departmentName}</small></div><Link to={`/topics?topic=${t.id}`} className="text-button">Chi tiết</Link></div>)}{!data.topics.length && <p>Chưa có đề tài được công bố trong phạm vi của bạn.</p>}</section>
-    </>}
-  </>
+  const [error, setError] = useState(false)
+  const [revision, setRevision] = useState(0)
+
+  useEffect(() => {
+    let active = true
+    let pending = false
+    const refresh = async () => {
+      if (pending) return
+      pending = true
+      setLoading(true)
+      try {
+        const data = await dashboardApi.summary()
+        if (active) {
+          setSummary(data)
+          setError(false)
+        }
+      } catch {
+        if (active) {
+          setSummary(null)
+          setError(true)
+        }
+      } finally {
+        pending = false
+        if (active) setLoading(false)
+      }
+    }
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), 60_000)
+    window.addEventListener('focus', refresh)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [user?.id, revision])
+
+  const counts = topicTypes.map((type) => ({
+    ...type,
+    count: summary?.topicTypes.find((item) => item.projectType === type.type)?.count ?? 0,
+  }))
+  let chartOffset = 0
+  const chartStops = counts.map((item) => {
+    const start = chartOffset
+    chartOffset += summary?.totalTopics ? (item.count / summary.totalTopics) * 100 : 0
+    return `${item.color} ${start}% ${chartOffset}%`
+  })
+  const chartBackground = summary?.totalTopics
+    ? `conic-gradient(${chartStops.join(', ')})`
+    : '#e2e8f0'
+  const metrics = [
+    {
+      label: 'Tổng đề tài',
+      value: summary?.totalTopics,
+      color: 'blue',
+      icon: '▣',
+      note: 'Tất cả đề tài trong hệ thống',
+    },
+    {
+      label: 'Đang đăng ký',
+      value: summary?.registeringTopics,
+      color: 'amber',
+      icon: '◷',
+      note: 'Đề tài đang mở cho sinh viên đăng ký',
+    },
+    {
+      label: 'Đang thực hiện',
+      value: summary?.inProgressTopics,
+      color: 'violet',
+      icon: '◉',
+      note: 'Đề tài đã giao cho nhóm và đang thực hiện',
+    },
+    {
+      label: 'Đã hoàn thành',
+      value: summary?.completedTopics,
+      color: 'green',
+      icon: '✓',
+      note: 'Đề tài có trạng thái thực hiện đã hoàn thành',
+    },
+  ]
+
+  return (
+    <>
+      <PageHeader title="Hệ thống quản lý đề tài sinh viên" />
+      <section className="welcome-panel">
+        <div>
+          <span className="welcome-panel__eyebrow">
+            {summary?.currentSemester
+              ? `HỌC KỲ ${summary.currentSemester.semesterNo} - ${summary.currentSemester.academicYear}`
+              : 'TỔNG QUAN TOÀN HỆ THỐNG'}
+          </span>
+          <h2>Chào mừng trở lại, {greetingName(user)}.</h2>
+          <p>
+            {summary ? (
+              <>
+                Bạn có <strong>{number(summary.unreadNotifications)} thông báo chưa đọc</strong>.{' '}
+                {summary.nextRegistrationCloseAt
+                  ? `Đợt đăng ký gần nhất đóng lúc ${dateTime(summary.nextRegistrationCloseAt)}.`
+                  : 'Hiện không có đợt đang mở đăng ký đề tài.'}
+              </>
+            ) : loading ? (
+              'Đang tải dữ liệu tổng quan...'
+            ) : (
+              'Chưa tải được dữ liệu tổng quan.'
+            )}
+          </p>
+          {user?.activeAppointments?.length ? (
+            <div className="welcome-panel__roles">
+              {user.activeAppointments.map((item) => (
+                <span key={item.id}>
+                  {item.positionCode === 'DEAN' ? 'Trưởng khoa' : 'Trưởng bộ môn'}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <Link className="welcome-panel__action" to={isLecturer ? '/progress' : '/registrations'}>
+          {isLecturer ? 'Quản lý tiến độ' : 'Khám phá đề tài'} <span>→</span>
+        </Link>
+      </section>
+      {error && (
+        <div className="page-card" role="alert">
+          Không tải được số liệu. Vui lòng thử lại.{' '}
+          <button className="text-button" onClick={() => setRevision((value) => value + 1)}>
+            Thử lại
+          </button>
+        </div>
+      )}
+      <section className="dashboard-grid" aria-label="Chỉ số tổng quan" aria-busy={loading}>
+        {metrics.map((metric) => (
+          <article key={metric.label} className={`metric-card metric-card--${metric.color}`}>
+            <span className="metric-card__icon">{metric.icon}</span>
+            <div>
+              <span className="metric-card__label">{metric.label}</span>
+              <strong className="metric-card__value">
+                {metric.value === undefined ? '—' : number(metric.value)}
+              </strong>
+              <span className="metric-card__note">{metric.note}</span>
+            </div>
+          </article>
+        ))}
+      </section>
+      <section className="dashboard-insights">
+        <article className="content-card chart-card">
+          <div className="content-card__header">
+            <div>
+              <h2>Thống kê đề tài theo loại</h2>
+              <span>
+                {summary
+                  ? `Toàn hệ thống · Cập nhật ${dateTime(summary.updatedAt)}`
+                  : 'Đang chờ số liệu'}
+              </span>
+            </div>
+            <button
+              className="text-button"
+              disabled={loading}
+              onClick={() => setRevision((value) => value + 1)}
+            >
+              {loading ? 'Đang tải...' : 'Cập nhật'}
+            </button>
+          </div>
+          <div className="chart-layout">
+            <div
+              className="donut"
+              style={{ background: chartBackground }}
+              role="img"
+              aria-label={
+                summary ? `Tổng ${number(summary.totalTopics)} đề tài theo loại` : 'Chưa có số liệu'
+              }
+            >
+              <div>
+                <strong>{summary ? number(summary.totalTopics) : '—'}</strong>
+                <span>Đề tài</span>
+              </div>
+            </div>
+            <ul className="chart-legend">
+              {counts.map((item) => (
+                <li key={item.type}>
+                  <i className={`dot dot--${item.dot}`} />
+                  {item.label} <b>{summary ? number(item.count) : '—'}</b>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </article>
+        <article className="content-card activity-card">
+          <div className="content-card__header">
+            <div>
+              <h2>Thông tin cần theo dõi</h2>
+              <span>Dữ liệu hiện tại</span>
+            </div>
+            {summary && (
+              <span className="badge badge-info">
+                {number(summary.unreadNotifications)} chưa đọc
+              </span>
+            )}
+          </div>
+          <div className="task-list">
+            <Link to="/announcements">
+              <span className="task-list__icon task-list__icon--blue">✦</span>
+              <div>
+                <strong>Thông báo của bạn</strong>
+                <small>
+                  {summary ? `${number(summary.unreadNotifications)} thông báo chưa đọc` : '—'}
+                </small>
+              </div>
+              <b>›</b>
+            </Link>
+            <Link to="/registrations">
+              <span className="task-list__icon task-list__icon--warning">⌛</span>
+              <div>
+                <strong>Đợt đang mở đăng ký</strong>
+                <small>
+                  {summary
+                    ? `${number(summary.openRegistrationPeriods)} đợt trong toàn hệ thống`
+                    : '—'}
+                </small>
+              </div>
+              <b>›</b>
+            </Link>
+            <Link to="/topics">
+              <span className="task-list__icon task-list__icon--red">▣</span>
+              <div>
+                <strong>Đề tài đang mở đăng ký</strong>
+                <small>
+                  {summary
+                    ? `${number(summary.registeringTopics)} đề tài chưa được giao cho nhóm`
+                    : '—'}
+                </small>
+              </div>
+              <b>›</b>
+            </Link>
+          </div>
+        </article>
+      </section>
+      <section className="dashboard-sections">
+        <article className="content-card">
+          <div className="content-card__header">
+            <div>
+              <h2>Đề tài mới cập nhật</h2>
+              <span>Danh sách được cập nhật gần đây</span>
+            </div>
+            <Link className="text-button" to="/topics">
+              Xem tất cả
+            </Link>
+          </div>
+          {summary?.recentTopics.map((topic) => (
+            <div className="topic-preview" key={topic.id}>
+              <div>
+                <span className="topic-preview__code">{topic.code}</span>
+                <strong>{topic.title}</strong>
+                <small>{topic.departmentName}</small>
+              </div>
+              <StatusBadge status={topic.status} />
+            </div>
+          ))}
+          {summary && summary.recentTopics.length === 0 && (
+            <p className="text-secondary">Chưa có đề tài.</p>
+          )}
+        </article>
+        <article className="content-card">
+          <div className="content-card__header">
+            <div>
+              <h2>Lịch đăng ký sắp tới</h2>
+              <span>Các mốc của đợt đang hoạt động</span>
+            </div>
+            <Link className="text-button" to="/registrations">
+              Đăng ký đề tài
+            </Link>
+          </div>
+          {summary?.upcomingDeadlines.map((deadline) => {
+            const due = parseUtcDateTime(deadline.dueAt)
+            const days = Math.max(
+              0,
+              Math.ceil(
+                (due.getTime() - parseUtcDateTime(summary.updatedAt).getTime()) / 86_400_000,
+              ),
+            )
+            return (
+              <div className="deadline-item" key={`${deadline.periodId}-${deadline.title}`}>
+                <time dateTime={due.toISOString()} title={dateTime(deadline.dueAt)}>
+                  <b>{due.getDate()}</b>
+                  <span>THG {due.getMonth() + 1}</span>
+                </time>
+                <div>
+                  <strong>{deadline.title}</strong>
+                  <small>
+                    {deadline.periodName} · {dateTime(deadline.dueAt)}
+                  </small>
+                </div>
+                <span className="badge badge-info">
+                  {days === 0 ? 'Hôm nay' : `Còn ${days} ngày`}
+                </span>
+              </div>
+            )
+          })}
+          {summary && summary.upcomingDeadlines.length === 0 && (
+            <p className="text-secondary">Chưa có lịch đăng ký sắp tới.</p>
+          )}
+        </article>
+      </section>
+    </>
+  )
 }

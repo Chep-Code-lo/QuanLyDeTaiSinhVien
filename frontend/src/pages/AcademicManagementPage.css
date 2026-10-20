@@ -1,0 +1,21 @@
+.academic-management-page .registration-periods-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.academic-management-page .registration-periods-header h2 {
+  margin: 0;
+}
+
+.academic-management-page .registration-periods-header > .btn {
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .academic-management-page .registration-periods-header {
+    flex-wrap: wrap;
+  }
+}

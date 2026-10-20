@@ -1,0 +1,53 @@
+.animated-select {
+  position: relative;
+  min-width: 0;
+}
+
+.inline-form > .animated-select {
+  flex: 1 1 220px;
+}
+
+.animated-select .animated-select__input {
+  display: block;
+  appearance: none;
+  font-family: inherit;
+  padding-right: 42px;
+  cursor: pointer;
+}
+
+.animated-select__arrow {
+  position: absolute;
+  top: 50%;
+  right: 13px;
+  color: var(--ink-500);
+  pointer-events: none;
+  transform: translateY(-50%) rotate(0deg);
+  transition:
+    transform 180ms ease,
+    color 180ms ease;
+}
+
+.animated-select__input:open + .animated-select__arrow {
+  color: var(--primary-blue);
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.animated-select__input:disabled {
+  cursor: not-allowed;
+}
+
+.animated-select .animated-select__input:focus-visible {
+  outline: none;
+  border-color: #6891d0;
+  box-shadow: var(--focus-ring);
+}
+
+.animated-select__input:disabled + .animated-select__arrow {
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-select__arrow {
+    transition: none;
+  }
+}

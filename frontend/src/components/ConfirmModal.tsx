@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useId } from 'react'
 
 interface ConfirmModalProps {
   isOpen: boolean
@@ -23,6 +23,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const titleId = useId()
+  const messageId = useId()
   if (!isOpen) return null
 
   const getConfirmBtnClass = () => {
@@ -37,22 +39,47 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   }
 
   return (
-    <div className="modal-backdrop fade-in" onClick={onCancel}>
-      <div className="modal-content scale-in" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop fade-in" onClick={loading ? undefined : onCancel}>
+      <div
+        className="modal-content scale-in"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={messageId}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
-          <h3 className="modal-title font-semibold text-lg">{title}</h3>
-          <button type="button" className="btn-close" onClick={onCancel}>
+          <h3 id={titleId} className="modal-title font-semibold text-lg">
+            {title}
+          </h3>
+          <button
+            type="button"
+            className="btn-close"
+            onClick={onCancel}
+            disabled={loading}
+            aria-label="Đóng hộp thoại"
+          >
             &times;
           </button>
         </div>
         <div className="modal-body py-4">
-          <p className="text-body">{message}</p>
+          <p id={messageId} className="text-body">
+            {message}
+          </p>
         </div>
-        <div className="modal-footer flex gap-3 justify-end">
+        <div
+          className="modal-footer"
+          style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}
+        >
           <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={loading}>
             {cancelText}
           </button>
-          <button type="button" className={getConfirmBtnClass()} onClick={onConfirm} disabled={loading}>
+          <button
+            type="button"
+            className={getConfirmBtnClass()}
+            onClick={onConfirm}
+            disabled={loading}
+          >
             {loading ? 'Đang xử lý...' : confirmText}
           </button>
         </div>

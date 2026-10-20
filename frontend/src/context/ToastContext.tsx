@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useState } from 'react'
+import { vietnameseErrorMessage } from '../utils/errorMessages'
 
 export interface ToastMessage {
   id: string
@@ -32,11 +33,11 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         removeToast(id)
       }, 4000)
     },
-    [removeToast]
+    [removeToast],
   )
 
   const showSuccess = useCallback((msg: string) => addToast('success', msg), [addToast])
-  const showError = useCallback((msg: string) => addToast('error', msg), [addToast])
+  const showError = useCallback((msg: string) => addToast('error', vietnameseErrorMessage(msg)), [addToast])
   const showInfo = useCallback((msg: string) => addToast('info', msg), [addToast])
 
   return (

@@ -23,3 +23,6 @@ frontend/.vite/
 *.iml
 Thumbs.db
 .DS_Store
+
+# Local tunnel process state and logs
+.runtime/

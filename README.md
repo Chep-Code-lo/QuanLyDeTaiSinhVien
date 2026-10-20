@@ -114,6 +114,37 @@ Trên Windows, cho phép kết nối TCP vào cổng `5173` trên mạng **Priva
 Windows Firewall chưa hỏi khi khởi động Docker. Không dùng Wi-Fi công cộng;
 nếu mạng đang là **Public**, hãy chuyển nó sang **Private** trước.
 
+### Chạy qua Cloudflare Tunnel trên Windows
+
+Cài `cloudflared` nếu máy chưa có, rồi khởi động stack local:
+
+```powershell
+winget install --id Cloudflare.cloudflared -e
+docker compose up -d --build
+```
+
+Từ thư mục gốc dự án, chạy:
+
+```powershell
+.\scripts\Start-CloudflareTunnel.ps1 -Build
+```
+
+Script tạo tunnel đến frontend `http://127.0.0.1:5173` (hoặc `FRONTEND_PORT` trong `.env`), in URL HTTPS, tự cập nhật `APP_BASE_URL`, CORS và cookie trong `.env`, rồi cập nhật container. MySQL phải đang chạy trước đó. Các lần chạy tiếp theo có thể bỏ `-Build` nếu mã nguồn không thay đổi.
+
+Mở URL HTTPS được in ra để dùng cả giao diện lẫn `/api/v1`; không tạo tunnel riêng đến cổng backend. Nginx chuyển tiếp thông tin HTTPS đến Spring Boot, cookie dùng `Secure`, `SameSite=Lax` và không gắn cứng vào domain cũ.
+
+[Quick Tunnel của Cloudflare](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) có URL tạm thời. Khi tạo tunnel mới, script thay origin cũ trong cấu hình bằng URL mới. Log và trạng thái tiến trình lưu trong `.runtime/cloudflare/` và được Git bỏ qua. Script không dừng những tunnel khác đang chạy trên máy.
+
+Script dùng cấu hình riêng `.runtime/cloudflare/quick.yml`, tránh tự nạp ingress của tunnel có tên trong `~/.cloudflared/config.yml`. Cấu hình cũ có thể khiến Quick Tunnel trả 404 dù đã kết nối thành công.
+
+Để dừng tunnel do script quản lý:
+
+```powershell
+.\scripts\Start-CloudflareTunnel.ps1 -Stop
+```
+
+Nếu dùng tunnel có tên và domain riêng, trỏ dịch vụ Cloudflare về frontend `http://localhost:5173`, đặt `APP_BASE_URL` và `CORS_ALLOWED_ORIGINS` theo domain đó, rồi chạy `docker compose up -d --no-deps backend`. Không cần chạy script Quick Tunnel trong trường hợp này.
+
 Ghi chú:
 
 - MySQL được expose ra host qua cổng `3307` mặc định để tránh đụng MySQL cục bộ.

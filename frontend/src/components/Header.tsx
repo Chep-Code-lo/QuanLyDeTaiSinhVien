@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { notificationApi } from '../api/notifications'
-import { allPages, errorMessage } from '../api/student'
+import { errorMessage } from '../api/student'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -25,8 +25,8 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   useEffect(() => {
     let active = true
-    const refresh = () => allPages(page=>notificationApi.list(page,100))
-      .then(items=>{if(active)setUnread(items.filter(n=>!n.readAt).length)})
+    const refresh = () => notificationApi.unreadCount()
+      .then(count=>{if(active)setUnread(count)})
       .catch(()=>{if(active)setUnread(null)})
     void refresh()
     window.addEventListener('notifications-updated',refresh)

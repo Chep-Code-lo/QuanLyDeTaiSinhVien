@@ -12,23 +12,16 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 .student-score { font-size:36px; color:#166534; white-space:nowrap; }
 .student-score small { font-size:16px; color:#64748b; }
 .student-step { font-size:36px; color:#2563eb; font-weight:800; }
-.public-home .public-topic { padding:26px; }
-.public-home .public-hero { background:linear-gradient(100deg,#eef5ff 0%,#eef5ffed 50%,#eef5ff55 100%),url('/hero-campus.jpg') center/cover; }
-.public-home .public-brand img { max-width:70px; height:60px; object-fit:contain; }
-.public-home .public-nav nav a { cursor:pointer; }
-.public-home .public-footer { justify-content:space-between; }
 .student-fieldset input[type=file] { display:block; padding:14px; border:1px dashed #94a3b8; border-radius:8px; width:100%; }
 .content-card h3,.page-card h3 { margin-top:20px; }
 .page-card p,.content-card p { line-height:1.65; }
 .topbar__search button { margin-right:10px; }
 .metric-card { color:inherit; text-decoration:none; }
 .table-container { overflow-x:auto; }
-:focus-visible { outline:3px solid #3b82f6; outline-offset:3px; }
+:focus-visible { outline:2px solid #467bc4; outline-offset:3px; }
+:is(.form-input, .form-select, .form-textarea):focus-visible { outline:none; box-shadow:var(--focus-ring); }
+:is(.topbar__search, .search-field) input:focus-visible { outline:none; box-shadow:none; }
 @media(max-width:700px) {
-  .public-home .public-nav nav { display:none; }
-  .public-home .public-brand small { display:none; }
-  .public-home .public-brand b { font-size:12px; }
-  .public-home .public-topic-grid { grid-template-columns:1fr; }
   .student-dialog { padding:18px; }
   .inline-form { flex-wrap:wrap; }
   .topbar__search { min-width:0; }

@@ -4,7 +4,7 @@ import { PageHeader } from '../components/PageHeader'
 export function ProgressPage() {
   return (
     <>
-      <PageHeader title="Tiến độ thực hiện" description="Tổng hợp các mốc báo cáo, công việc cần nộp và phản hồi của giảng viên." />
+      <PageHeader title="Tiến độ & Mốc báo cáo" />
       <ModulePlaceholder
         title="Mốc tiến độ"
         description="Khu vực này là khung cho lịch sử báo cáo và các công việc theo từng giai đoạn của đề tài."

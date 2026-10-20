@@ -1,12 +1,29 @@
-import { NavLink } from 'react-router-dom'
+import { useEffect, useRef, type UIEvent } from 'react'
+import { Link, NavLink } from 'react-router-dom'
 import { navigationItems } from '../config/navigation'
 import { useAuth } from '../context/AuthContext'
-import { AppLogo } from './AppLogo'
 
-type SidebarProps = { collapsed: boolean; onToggle: () => void; onNavigate: () => void }
+type SidebarProps = { onNavigate: () => void }
 
-export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
+export function Sidebar({ onNavigate }: SidebarProps) {
   const { user, hasAnyRole, hasAppointment, canAccessAcademicManagement } = useAuth()
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(
+    () => () => {
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+    },
+    [],
+  )
+
+  const handleNavScroll = (event: UIEvent<HTMLElement>) => {
+    const nav = event.currentTarget
+    nav.classList.add('sidebar__nav--scrolling')
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+    scrollTimerRef.current = setTimeout(() => {
+      nav.classList.remove('sidebar__nav--scrolling')
+    }, 650)
+  }
 
   const filteredItems = navigationItems.filter((item) => {
     if (!user) return item.to === '/' || item.to === '/account'
@@ -32,32 +49,42 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   })
 
   return (
-    <aside className="sidebar">
-      <AppLogo />
-      <button className="sidebar__collapse" type="button" onClick={onToggle} aria-label={collapsed ? 'Mở rộng thanh điều hướng' : 'Thu gọn thanh điều hướng'}>{collapsed ? '›' : '‹'}</button>
+    <aside className="sidebar app-sidebar">
+      <Link className="sidebar__brand" to="/dashboard" aria-label="Về trang tổng quan" onClick={onNavigate}>
+        <img
+          className="sidebar__brand-image"
+          src="/HCM-UTE_Logo.png"
+          width={88}
+          height={88}
+          alt="Logo Trường Đại học Công nghệ Kỹ thuật Thành phố Hồ Chí Minh"
+        />
+      </Link>
       <p className="sidebar__label">Menu chính</p>
-      <nav className="sidebar__nav" aria-label="Điều hướng chính">
-        {filteredItems.map((item) => (
-          <NavLink
-            key={item.to}
-            className={({ isActive }) =>
-              `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
-            }
-            end={item.to === '/'}
-            to={item.to}
-            onClick={onNavigate}
-            title={collapsed ? item.label : undefined}
-          >
-            <span className="sidebar__icon" aria-hidden="true">
-              {item.icon}
-            </span>
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
+      <nav className="sidebar__nav" aria-label="Điều hướng chính" onScroll={handleNavScroll}>
+        {filteredItems.map((item) => {
+          const Icon = item.icon
+
+          return (
+            <NavLink
+              key={item.to}
+              className={({ isActive }) =>
+                `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
+              }
+              end={item.to === '/'}
+              to={item.to}
+              onClick={onNavigate}
+            >
+              <span className="sidebar__icon" aria-hidden="true">
+                <Icon size={18} strokeWidth={1.8} />
+              </span>
+              <span>{item.label}</span>
+            </NavLink>
+          )
+        })}
       </nav>
       <div className="sidebar__footer">
         <div className="font-semibold text-xs text-white">HCM-UTE</div>
-        <div className="text-xs mt-1">Student Project Management</div>
+        <div className="text-xs mt-1">Hệ thống quản lý đề tài sinh viên</div>
       </div>
     </aside>
   )

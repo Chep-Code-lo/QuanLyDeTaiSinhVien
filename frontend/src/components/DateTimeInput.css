@@ -1,0 +1,57 @@
+.date-time-input {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.date-time-input .date-time-input__text {
+  padding-right: 40px;
+  font-variant-numeric: tabular-nums;
+}
+
+.inline-form > .date-time-input {
+  flex: 1 1 220px;
+  width: auto;
+}
+
+.date-time-input__calendar {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 4px;
+  color: var(--ink-500);
+  background: transparent;
+  cursor: pointer;
+}
+
+.date-time-input__calendar:hover {
+  background: #eef2f6;
+}
+
+.date-time-input__calendar:focus-visible {
+  outline: 2px solid var(--accent-blue, #155eef);
+}
+
+.date-time-input__calendar:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.date-time-input__native {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}

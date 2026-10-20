@@ -1,619 +1,302 @@
-import React, { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, FileText, Info, LockKeyhole, Plus, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { academicApi } from '../api/academic'
 import { evaluationApi } from '../api/evaluation'
+import { allPages } from '../api/student'
+import { AnimatedSelect } from '../components/AnimatedSelect'
 import { ConfirmModal } from '../components/ConfirmModal'
-import { StatusBadge } from '../components/StatusBadge'
-import { Stepper } from '../components/Stepper'
+import { PageHeader } from '../components/PageHeader'
 import { useToast } from '../context/ToastContext'
-import type {
-  AssessmentComponentResponse,
-  AssessmentComponentType,
-  CriterionRequest,
-  RegistrationPeriodResponse,
-  RubricResponse,
-} from '../types/domain'
+import { componentTypeLabel } from '../utils/displayLabels'
+import { criterionScore, defaultAssessmentCriteria, fromApiCriteria, rubricTotal, toApiCriteria, validRubric } from '../utils/assessmentRubric'
+import type { AssessmentCriterion } from '../utils/assessmentRubric'
+import type { AssessmentComponentResponse, AssessmentComponentType, RegistrationPeriodResponse, RubricResponse } from '../types/domain'
+import './AssessmentSetupWizardPage.css'
 
-const MIN_EXPECTED_EVALUATORS = 1
-const MAX_EXPECTED_EVALUATORS = 10
+const steps = ['Tạo thành phần', 'Tạo bộ tiêu chí', 'Khóa bộ tiêu chí', 'Khóa thành phần']
+const scoreLabel = (score: number) => Number.isFinite(score) ? score.toLocaleString('vi-VN', { maximumFractionDigits: 1 }) : '—'
+const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Vui lòng thử lại.'
 
-export const AssessmentSetupWizardPage: React.FC = () => {
+export function AssessmentSetupWizardPage() {
   const { showSuccess, showError } = useToast()
-
-  const [currentStep, setCurrentStep] = useState<number>(1)
+  const [step, setStep] = useState(1)
   const [periods, setPeriods] = useState<RegistrationPeriodResponse[]>([])
-  const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null)
-
-  // Step 1 State: Assessment Component
+  const [periodId, setPeriodId] = useState<number | null>(null)
+  const [component, setComponent] = useState<AssessmentComponentResponse | null>(null)
   const [components, setComponents] = useState<AssessmentComponentResponse[]>([])
-  const [selectedComponent, setSelectedComponent] = useState<AssessmentComponentResponse | null>(null)
-  const [newComponentCode, setNewComponentCode] = useState('')
-  const [newComponentName, setNewComponentName] = useState('')
-  const [newComponentType, setNewComponentType] = useState<AssessmentComponentType>('REVIEW')
-  const [newExpectedEvaluators, setNewExpectedEvaluators] = useState<number>(2)
-  const [creatingComponent, setCreatingComponent] = useState(false)
+  const [loadingComponents, setLoadingComponents] = useState(false)
+  const [rubric, setRubric] = useState<RubricResponse | null>(null)
+  const [name, setName] = useState('')
+  const [componentType, setComponentType] = useState<AssessmentComponentType>('REVIEW')
+  const [evaluators, setEvaluators] = useState(1)
+  const [criteria, setCriteria] = useState<AssessmentCriterion[]>(defaultAssessmentCriteria)
+  const [rubricName, setRubricName] = useState('')
+  const [loadingPeriods, setLoadingPeriods] = useState(true)
+  const [loadingRubric, setLoadingRubric] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [revision, setRevision] = useState(0)
+  const [busy, setBusy] = useState(false)
+  const [checkedRubric, setCheckedRubric] = useState(false)
+  const [checkedComponent, setCheckedComponent] = useState(false)
+  const [detailsVisible, setDetailsVisible] = useState(false)
+  const [lockTarget, setLockTarget] = useState<'rubric' | 'component' | null>(null)
 
-  // Step 2 & 3 State: Rubric & Lock Rubric
-  const [, setRubrics] = useState<RubricResponse[]>([])
-  const [selectedRubric, setSelectedRubric] = useState<RubricResponse | null>(null)
-  const [newRubricName, setNewRubricName] = useState('')
-  const [criteria, setCriteria] = useState<CriterionRequest[]>([
-    { name: 'Nội dung thực hiện', description: 'Đánh giá nội dung và kết quả đề tài', maxScore: 5.0, sortOrder: 1 },
-    { name: 'Hình thức báo cáo', description: 'Trình bày tệp tài liệu và chuẩn hóa', maxScore: 5.0, sortOrder: 2 },
-  ])
-  const [creatingRubric, setCreatingRubric] = useState(false)
-
-  // Confirm Modal state for locking
-  const [confirmModal, setConfirmModal] = useState<{
-    isOpen: boolean
-    type: 'LOCK_RUBRIC' | 'LOCK_COMPONENT' | null
-    title: string
-    message: string
-  }>({ isOpen: false, type: null, title: '', message: '' })
-  const [locking, setLocking] = useState(false)
-
-  // Load registration periods
+  const componentId = component?.id
   useEffect(() => {
-    academicApi
-      .getRegistrationPeriods()
-      .then((res) => {
-        setPeriods(res.content)
-        if (res.content.length > 0) {
-          setSelectedPeriodId(res.content[0].id)
-        }
-      })
-      .catch((err) => {
-        showError('Lỗi tải đợt đăng ký: ' + (err.response?.data?.message || err.message))
-      })
-  }, [showError])
+    let active = true
+    allPages(page => academicApi.getRegistrationPeriods(undefined, page, 100)).then((response) => {
+      if (!active) return
+      setPeriods(response)
+      setPeriodId((previous) => previous ?? response[0]?.id ?? null)
+    }).catch((error: unknown) => {
+      if (active) setLoadError(`Không tải được đợt đăng ký. ${errorMessage(error)}`)
+    }).finally(() => { if (active) setLoadingPeriods(false) })
+    return () => { active = false }
+  }, [revision])
 
-  // Load components when period changes
   useEffect(() => {
-    if (!selectedPeriodId) return
-    evaluationApi
-      .listComponents(selectedPeriodId)
-      .then((res) => {
-        setComponents(res)
-      })
-      .catch(() => setComponents([]))
-  }, [selectedPeriodId])
+    if (!periodId) return
+    let active = true
+    setLoadingComponents(true)
+    setComponents([])
+    evaluationApi.listComponents(periodId).then(items => {
+      if (active) setComponents(items)
+    }).catch(error => {
+      if (active) setLoadError(`Không tải được thành phần đánh giá. ${errorMessage(error)}`)
+    }).finally(() => { if (active) setLoadingComponents(false) })
+    return () => { active = false }
+  }, [periodId, revision])
 
-  // Load rubrics when selected component changes
   useEffect(() => {
-    if (!selectedComponent) {
-      setRubrics([])
-      return
-    }
-    evaluationApi
-      .listRubrics(selectedComponent.id)
-      .then((res) => {
-        setRubrics(res)
-        if (res.length > 0) {
-          const locked = res.find((r) => r.status === 'LOCKED')
-          setSelectedRubric(locked || res[0])
-        }
-      })
-      .catch(() => setRubrics([]))
-  }, [selectedComponent])
-
-  // Step 1: Create Component
-  const handleCreateComponent = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedPeriodId) {
-      showError('Vui lòng chọn đợt đăng ký')
-      return
-    }
-    if (
-      !Number.isInteger(newExpectedEvaluators) ||
-      newExpectedEvaluators < MIN_EXPECTED_EVALUATORS ||
-      newExpectedEvaluators > MAX_EXPECTED_EVALUATORS
-    ) {
-      showError(`Số lượng Evaluator dự kiến phải từ ${MIN_EXPECTED_EVALUATORS} đến ${MAX_EXPECTED_EVALUATORS}`)
-      return
-    }
-    try {
-      setCreatingComponent(true)
-      const created = await evaluationApi.createComponent({
-        periodId: selectedPeriodId,
-        code: newComponentCode.trim(),
-        name: newComponentName.trim(),
-        componentType: newComponentType,
-        expectedEvaluators: newExpectedEvaluators,
-      })
-      showSuccess('Tạo Assessment Component thành công!')
-      setComponents((prev) => [...prev, created])
-      setSelectedComponent(created)
-      setCurrentStep(2)
-      setNewComponentCode('')
-      setNewComponentName('')
-    } catch (err: any) {
-      showError('Lỗi tạo Assessment Component: ' + (err.response?.data?.message || err.message))
-    } finally {
-      setCreatingComponent(false)
-    }
-  }
-
-  // Step 2 Criteria helper
-  const handleAddCriterion = () => {
-    setCriteria((prev) => [
-      ...prev,
-      { name: '', description: '', maxScore: 2.0, sortOrder: prev.length + 1 },
-    ])
-  }
-
-  const handleRemoveCriterion = (index: number) => {
-    setCriteria((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  const handleCriterionChange = (index: number, field: keyof CriterionRequest, value: any) => {
-    setCriteria((prev) =>
-      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
-    )
-  }
-
-  const totalCriteriaScore = criteria.reduce((sum, c) => sum + (Number(c.maxScore) || 0), 0)
-
-  // Step 2: Create Rubric
-  const handleCreateRubric = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedComponent) {
-      showError('Vui lòng chọn Assessment Component')
-      return
-    }
-
-    if (totalCriteriaScore !== 10.0) {
-      showError(`Tổng điểm các tiêu chí phải bằng đúng 10.0 điểm! (Hiện tại: ${totalCriteriaScore.toFixed(2)} điểm)`)
-      return
-    }
-
-    try {
-      setCreatingRubric(true)
-      const created = await evaluationApi.createRubric({
-        componentId: selectedComponent.id,
-        name: newRubricName.trim() || `Rubric ${selectedComponent.name}`,
-        criteria,
-      })
-      showSuccess('Tạo Rubric thành công!')
-      setRubrics((prev) => [...prev, created])
-      setSelectedRubric(created)
-      setCurrentStep(3)
-    } catch (err: any) {
-      showError('Lỗi tạo Rubric: ' + (err.response?.data?.message || err.message))
-    } finally {
-      setCreatingRubric(false)
-    }
-  }
-
-  // Step 3 & 4 Confirm Actions
-  const openLockRubricModal = () => {
-    if (!selectedRubric) return
-    setConfirmModal({
-      isOpen: true,
-      type: 'LOCK_RUBRIC',
-      title: 'Xác nhận KHÓA Rubric',
-      message: `Bạn có chắc chắn muốn KHÓA Rubric "${selectedRubric.name}"? Khi đã Khóa, tiêu chí và điểm số sẽ cố định không thể chỉnh sửa!`,
-    })
-  }
-
-  const openLockComponentModal = () => {
-    if (!selectedComponent) return
-    setConfirmModal({
-      isOpen: true,
-      type: 'LOCK_COMPONENT',
-      title: 'Xác nhận KHÓA Assessment Component',
-      message: `Bạn có chắc chắn muốn KHÓA Component "${selectedComponent.name}"? Khi đã Khóa, Component mới đủ điều kiện để nhận phân công Chấm điểm (Evaluator Assignment). Thao tác này không thể hoàn tác!`,
-    })
-  }
-
-  const handleConfirmLock = async () => {
-    try {
-      setLocking(true)
-      if (confirmModal.type === 'LOCK_RUBRIC' && selectedRubric) {
-        const locked = await evaluationApi.lockRubric(selectedRubric.id)
-        showSuccess('Đã KHÓA Rubric thành công 🔒!')
-        setSelectedRubric(locked)
-        setRubrics((prev) => prev.map((r) => (r.id === locked.id ? locked : r)))
-        setCurrentStep(4)
-      } else if (confirmModal.type === 'LOCK_COMPONENT' && selectedComponent) {
-        const locked = await evaluationApi.lockComponent(selectedComponent.id)
-        showSuccess('Đã KHÓA Assessment Component thành công 🔒!')
-        setSelectedComponent(locked)
-        setComponents((prev) => prev.map((c) => (c.id === locked.id ? locked : c)))
+    if (!componentId) return
+    let active = true
+    evaluationApi.listRubrics(componentId).then((response) => {
+      if (!active) return
+      const selected = response.find((item) => item.status === 'LOCKED') || response[0] || null
+      setRubric(selected)
+      if (selected) {
+        setCriteria(fromApiCriteria(selected.criteria))
+        setRubricName(selected.name)
+        setStep(selected.status === 'LOCKED' ? 4 : 2)
+      } else {
+        setStep(2)
       }
-    } catch (err: any) {
-      showError('Lỗi khi khóa: ' + (err.response?.data?.message || err.message))
-    } finally {
-      setLocking(false)
-      setConfirmModal({ isOpen: false, type: null, title: '', message: '' })
-    }
+    }).catch((error: unknown) => {
+      if (active) setLoadError(`Không tải được bộ tiêu chí. ${errorMessage(error)}`)
+    }).finally(() => { if (active) setLoadingRubric(false) })
+    return () => { active = false }
+  }, [componentId, revision])
+
+  const resetSelection = () => {
+    setLoadingRubric(false); setLoadError('')
+    setComponent(null); setRubric(null); setName('')
+    setComponentType('REVIEW'); setEvaluators(1); setCriteria(defaultAssessmentCriteria())
+    setRubricName(''); setCheckedRubric(false); setCheckedComponent(false)
+    setDetailsVisible(false); setStep(1)
   }
 
-  const stepsList = [
-    { number: 1, title: 'Tạo Assessment Component', description: 'Định nghĩa thành phần đánh giá' },
-    { number: 2, title: 'Tạo Rubric', description: 'Thiết lập tiêu chí (Tổng điểm = 10.0)' },
-    { number: 3, title: 'Khóa Rubric', description: 'Xác nhận cố định tiêu chí 🔒' },
-    { number: 4, title: 'Khóa Component', description: 'Hoàn tất & Kích hoạt cho gán evaluator 🔒' },
-  ]
+  const createComponent = async (event: FormEvent) => {
+    event.preventDefault()
+    if (busy) return
+    if (component) { setStep(component.status === 'LOCKED' || rubric?.status === 'LOCKED' ? 4 : 2); return }
+    if (!periodId || !name.trim() || !Number.isInteger(evaluators) || evaluators < 1 || evaluators > 10) {
+      showError('Vui lòng điền tên thành phần và số người chấm từ 1 đến 10.'); return
+    }
+    setBusy(true)
+    try {
+      const created = await evaluationApi.createComponent({
+        periodId, name: name.trim(), code: `${componentType}_${Date.now().toString(36).toUpperCase()}`,
+        componentType, expectedEvaluators: evaluators,
+      })
+      setComponent(created)
+      setComponents(items => [...items, created])
+      setLoadingRubric(true); setStep(2); showSuccess('Đã tạo thành phần đánh giá.')
+    } catch (error: unknown) { showError(errorMessage(error)) }
+    finally { setBusy(false) }
+  }
 
-  return (
-    <div className="assessment-setup-page">
-      <div className="page-header">
-        <div>
-          <span className="page-header__eyebrow">Quy trình Đánh giá</span>
-          <h1>Setup Thành phần Đánh giá & Rubric (Wizard)</h1>
-          <p>Thiết lập chuẩn theo 4 bước bắt buộc: Component ➔ Rubric ➔ Lock Rubric ➔ Lock Component.</p>
-        </div>
-      </div>
+  const total = rubricTotal(criteria)
+  const isValid = validRubric(criteria)
+  const rubricLocked = rubric?.status === 'LOCKED'
+  const componentLocked = component?.status === 'LOCKED'
+  const childCount = criteria.reduce((sum, item) => sum + item.children.length, 0)
+  const savedCriteria = rubric ? fromApiCriteria(rubric.criteria) : null
+  const dirty = !rubric || rubricName.trim() !== rubric.name ||
+    JSON.stringify(toApiCriteria(criteria)) !== JSON.stringify(toApiCriteria(savedCriteria!))
+  const readyToLock = !!rubric && validRubric(savedCriteria || []) && !dirty
+  const periodName = periods.find((period) => period.id === periodId)?.name || component?.periodName || '—'
 
-      {/* Stepper Wizard Indicator */}
-      <Stepper steps={stepsList} currentStep={currentStep} />
+  const saveRubric = async (advance: boolean) => {
+    if (!component || !isValid || busy) return
+    if (rubricLocked || !dirty) { if (advance) setStep(3); return }
+    setBusy(true)
+    try {
+      const created = await evaluationApi.createRubric({
+        componentId: component.id, name: rubricName.trim() || `Bộ tiêu chí ${component.name}`, criteria: toApiCriteria(criteria),
+      })
+      setRubric(created); setRubricName(created.name); setCriteria(fromApiCriteria(created.criteria))
+      setCheckedRubric(false); if (advance) setStep(3)
+      showSuccess('Đã lưu bộ tiêu chí.')
+    } catch (error: unknown) { showError(errorMessage(error)) }
+    finally { setBusy(false) }
+  }
 
-      {/* Select Period & Component Toolbar */}
-      <div className="page-card mb-6 grid-cols-2">
-        <div className="form-group mb-0">
-          <label className="form-label">Chọn Đợt đăng ký:</label>
-          <select
-            className="form-select font-semibold"
-            value={selectedPeriodId ?? ''}
-            onChange={(e) => setSelectedPeriodId(Number(e.target.value))}
-          >
-            {periods.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.facultyName})
-              </option>
-            ))}
-          </select>
-        </div>
+  const confirmLock = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      if (lockTarget === 'rubric' && rubric && checkedRubric && readyToLock) {
+        setRubric(await evaluationApi.lockRubric(rubric.id)); setStep(4); setCheckedComponent(false)
+        showSuccess('Đã khóa bộ tiêu chí.')
+      } else if (lockTarget === 'component' && component && checkedComponent && rubricLocked) {
+        const locked = await evaluationApi.lockComponent(component.id)
+        setComponent(locked)
+        showSuccess('Đã khóa thành phần đánh giá. Sẵn sàng phân công giảng viên chấm.')
+      }
+    } catch (error: unknown) { showError(errorMessage(error)) }
+    finally { setBusy(false); setLockTarget(null) }
+  }
 
-        <div className="form-group mb-0">
-          <label className="form-label">Chọn Component hiện có (nếu có):</label>
-          <select
-            className="form-select font-semibold"
-            value={selectedComponent?.id ?? ''}
-            onChange={(e) => {
-              const found = components.find((c) => c.id === Number(e.target.value))
-              if (found) {
-                setSelectedComponent(found)
-                if (found.status === 'LOCKED') setCurrentStep(4)
-                else setCurrentStep(2)
-              }
-            }}
-          >
-            <option value="">-- Tạo Component mới (Bước 1) --</option>
-            {components.map((c) => (
-              <option key={c.id} value={c.id}>
-                [{c.code}] {c.name} - {c.componentType} (Trạng thái: {c.status})
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+  const updateCriterion = (groupIndex: number, childIndex: number | null, changes: Partial<AssessmentCriterion>) => {
+    setCriteria((previous) => previous.map((group, index) => index !== groupIndex ? group : childIndex === null ? { ...group, ...changes } : {
+      ...group, children: group.children.map((child, index) => index === childIndex ? { ...child, ...changes } : child),
+    }))
+    setCheckedRubric(false)
+  }
+  const addChild = (index: number) => setCriteria((previous) => previous.map((group, groupIndex) => groupIndex !== index ? group : {
+    ...group, score: 0, children: [...group.children, { name: '', score: group.children.length ? 0 : group.score, children: [] }],
+  }))
+  const removeCriterion = (groupIndex: number, childIndex: number | null) => setCriteria((previous) => childIndex === null ? previous.filter((_, index) => index !== groupIndex) :
+    previous.map((group, index) => index !== groupIndex ? group : { ...group, score: 0, children: group.children.filter((_, index) => index !== childIndex) }))
 
-      {/* STEP 1: Create Component */}
-      {currentStep === 1 && (
-        <div className="page-card fade-in">
-          <h2 className="font-semibold text-lg text-primary mb-4">
-            Bước 1: Tạo Assessment Component mới
-          </h2>
-          <form onSubmit={handleCreateComponent} className="space-y-4">
-            <div className="grid-cols-2">
-              <div className="form-group">
-                <label className="form-label">Mã Component (Code) <span className="text-red">*</span></label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Ví dụ: PB_2026, HD_2026..."
-                  value={newComponentCode}
-                  onChange={(e) => setNewComponentCode(e.target.value)}
-                  required
-                />
-              </div>
+  const contextBar = <div className="assessment-context">
+    <div><span>Đợt:</span><strong>{periodName}</strong></div><div><span>Thành phần:</span><strong>{component?.name}</strong></div>
+  </div>
 
-              <div className="form-group">
-                <label className="form-label">Tên Component <span className="text-red">*</span></label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Ví dụ: Đánh giá Phản biện đồ án..."
-                  value={newComponentName}
-                  onChange={(e) => setNewComponentName(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
+  const criteriaTable = (editable: boolean, expanded: boolean) => <div className={`assessment-table-scroll${isValid ? ' assessment-table-scroll--valid' : ''}`}>
+    <table className={`assessment-table ${editable ? 'assessment-table--editable' : ''}`}>
+      <thead><tr><th scope="col">Mã</th><th scope="col">{editable || expanded ? 'Tiêu chí' : 'Nhóm tiêu chí'}</th><th scope="col">Điểm tối đa</th>
+        {editable && <th scope="col"><span className="assessment-sr-only">Thao tác</span></th>}</tr></thead>
+      <tbody>{criteria.map((group, groupIndex) => <Fragment key={groupIndex}>
+        <tr className={group.children.length ? 'assessment-table__group' : ''}>
+          <td>TC{groupIndex + 1}</td><td>{editable ? <input aria-label={`Tên tiêu chí TC${groupIndex + 1}`} value={group.name} maxLength={220}
+            placeholder="Nhập tên tiêu chí" onChange={(event) => updateCriterion(groupIndex, null, { name: event.target.value })} /> :
+            <>{group.name}{!expanded && group.children.length > 0 && <small>{group.children.length} tiêu chí con</small>}</>}</td>
+          <td>{editable && !group.children.length ? <input type="number" min="0.1" max="100" step="0.1" aria-label={`Điểm tối đa TC${groupIndex + 1}`}
+            value={Number.isNaN(group.score) ? '' : group.score} onChange={(event) => updateCriterion(groupIndex, null, { score: event.target.valueAsNumber })} /> : scoreLabel(criterionScore(group))}</td>
+          {editable && <td><div className="assessment-row-actions">
+            <button type="button" onClick={() => addChild(groupIndex)} title="Thêm tiêu chí con" aria-label={`Thêm tiêu chí con cho TC${groupIndex + 1}`}><Plus size={15} /></button>
+            <button type="button" onClick={() => removeCriterion(groupIndex, null)} title="Xóa tiêu chí" aria-label={`Xóa TC${groupIndex + 1}`}><Trash2 size={14} /></button>
+          </div></td>}
+        </tr>
+        {expanded && group.children.map((child, childIndex) => <tr key={childIndex} className={`assessment-table__child ${childIndex === group.children.length - 1 ? 'assessment-table__child--last' : ''}`}>
+          <td><span>TC{groupIndex + 1}.{childIndex + 1}</span></td><td>{editable ? <input aria-label={`Tên tiêu chí TC${groupIndex + 1}.${childIndex + 1}`} value={child.name} maxLength={220}
+            placeholder="Nhập tên tiêu chí con" onChange={(event) => updateCriterion(groupIndex, childIndex, { name: event.target.value })} /> : child.name}</td>
+          <td>{editable ? <input type="number" min="0.1" max="100" step="0.1" aria-label={`Điểm tối đa TC${groupIndex + 1}.${childIndex + 1}`} value={Number.isNaN(child.score) ? '' : child.score}
+            onChange={(event) => updateCriterion(groupIndex, childIndex, { score: event.target.valueAsNumber })} /> : scoreLabel(child.score)}</td>
+          {editable && <td><div className="assessment-row-actions"><button type="button" onClick={() => removeCriterion(groupIndex, childIndex)} title="Xóa tiêu chí con"
+            aria-label={`Xóa TC${groupIndex + 1}.${childIndex + 1}`}><Trash2 size={14} /></button></div></td>}
+        </tr>)}
+      </Fragment>)}</tbody>
+      <tfoot><tr><th scope="row" colSpan={2}>Tổng điểm</th><td colSpan={editable ? 2 : 1}><div className="assessment-total"><strong>{scoreLabel(total)}</strong>
+        {editable && <span className={isValid ? 'assessment-valid' : 'assessment-invalid'}>{isValid && <CheckCircle2 size={17} />}{isValid ? 'Hợp lệ' : '/ 100 điểm'}</span>}</div></td></tr></tfoot>
+    </table>
+  </div>
 
-            <div className="grid-cols-2">
-              <div className="form-group">
-                <label className="form-label">Loại Component (Component Type) <span className="text-red">*</span></label>
-                <select
-                  className="form-select font-semibold"
-                  value={newComponentType}
-                  onChange={(e) => setNewComponentType(e.target.value as AssessmentComponentType)}
-                >
-                  <option value="REVIEW">REVIEW (Chấm phản biện / Đánh giá độc lập)</option>
-                  <option value="COMMITTEE">COMMITTEE (Hội đồng chấm bảo vệ)</option>
-                  <option value="OTHER">OTHER (Loại khác)</option>
-                </select>
-                <span className="text-xs text-secondary mt-1 block">
-                  * COMMITTEE yêu cầu bắt buộc đính kèm Defense Session khi gán evaluator.
-                </span>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">
-                  Số lượng Evaluator dự kiến ({MIN_EXPECTED_EVALUATORS} - {MAX_EXPECTED_EVALUATORS}){' '}
-                  <span className="text-red">*</span>
-                </label>
-                <input
-                  type="number"
-                  min={MIN_EXPECTED_EVALUATORS}
-                  max={MAX_EXPECTED_EVALUATORS}
-                  className="form-input"
-                  value={newExpectedEvaluators}
-                  onChange={(e) => setNewExpectedEvaluators(Number(e.target.value))}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end mt-4">
-              <button type="submit" className="btn btn-primary" disabled={creatingComponent}>
-                {creatingComponent ? 'Đang khởi tạo...' : 'Tiếp tục ➔ Bước 2 (Tạo Rubric)'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* STEP 2: Create Rubric */}
-      {currentStep === 2 && selectedComponent && (
-        <div className="page-card fade-in">
-          <div className="flex justify-between items-center mb-4 border-b pb-3">
-            <div>
-              <h2 className="font-semibold text-lg text-primary">
-                Bước 2: Tạo Rubric cho Component [{selectedComponent.code}] {selectedComponent.name}
-              </h2>
-              <p className="text-sm text-secondary">
-                Yêu cầu: Tổng maxScore của các tiêu chí phải đúng <strong>10.0 điểm</strong>.
-              </p>
-            </div>
-            <StatusBadge status={selectedComponent.status} />
+  return <div className="assessment-setup-page">
+    <PageHeader title="Tiêu chuẩn đánh giá" />
+    <ol className="assessment-steps" aria-label="Các bước thiết lập đánh giá">
+      {steps.map((title, index) => <li key={title} className={`${step === index + 1 ? 'is-current' : ''} ${step > index + 1 || componentLocked ? 'is-complete' : ''}`} aria-current={step === index + 1 ? 'step' : undefined}>
+        <span className="assessment-steps__circle">{step > index + 1 || componentLocked ? <Check size={25} strokeWidth={2} /> : index + 1}</span><span className="assessment-steps__title">{title}</span>
+      </li>)}
+    </ol>
+    {loadError && <div className="assessment-alert assessment-alert--warning" role="alert"><Info size={22} /><div>{loadError}</div><button className="assessment-text-button" type="button" onClick={() => {
+      setLoadError(''); setLoadingPeriods(true); setLoadingRubric(!!componentId); setRevision((value) => value + 1)
+    }}>Thử lại</button></div>}
+    {loadingPeriods || loadingRubric || loadingComponents ? <div className="assessment-card assessment-loading" role="status">Đang tải cấu hình đánh giá…</div> : <>
+      {step === 1 && <section className="assessment-card" aria-labelledby="assessment-step-title">
+        <div className="assessment-card__heading"><h2 id="assessment-step-title">Tạo thành phần đánh giá</h2><span className="assessment-step-badge">Bước 1/4</span></div>
+        <form onSubmit={createComponent}><div className="assessment-fields">
+          <div className="assessment-field"><label htmlFor="assessment-period">Đợt đăng ký</label>
+            <AnimatedSelect id="assessment-period" value={periodId ?? ''} disabled={busy} onChange={(event) => { resetSelection(); setPeriodId(Number(event.target.value) || null) }}>
+              {!periods.length && <option value="">Chưa có đợt đăng ký</option>}{periods.map((period) => <option key={period.id} value={period.id}>{period.name}</option>)}
+            </AnimatedSelect>
           </div>
-
-          <form onSubmit={handleCreateRubric} className="space-y-4">
-            <div className="form-group">
-              <label className="form-label">Tên Rubric <span className="text-red">*</span></label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Ví dụ: Bảng điểm phản biện tiêu chuẩn 2026"
-                value={newRubricName}
-                onChange={(e) => setNewRubricName(e.target.value)}
-                required
-              />
-            </div>
-
-            {/* Criteria List */}
-            <div className="form-group">
-              <div className="flex justify-between items-center mb-2">
-                <label className="form-label mb-0">Danh sách Tiêu chí Đánh giá (Criteria):</label>
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={handleAddCriterion}
-                >
-                  + Thêm Tiêu chí
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                {criteria.map((c, idx) => (
-                  <div key={idx} className="p-3 border rounded-lg bg-gray-50 grid grid-cols-12 gap-3 items-center">
-                    <div className="col-span-4">
-                      <input
-                        type="text"
-                        className="form-input text-sm"
-                        placeholder="Tên tiêu chí"
-                        value={c.name}
-                        onChange={(e) => handleCriterionChange(idx, 'name', e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="col-span-5">
-                      <input
-                        type="text"
-                        className="form-input text-sm"
-                        placeholder="Mô tả tiêu chí"
-                        value={c.description}
-                        onChange={(e) => handleCriterionChange(idx, 'description', e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0.1"
-                        max="10.0"
-                        className="form-input text-sm font-semibold"
-                        placeholder="Điểm max"
-                        value={c.maxScore}
-                        onChange={(e) => handleCriterionChange(idx, 'maxScore', Number(e.target.value))}
-                        required
-                      />
-                    </div>
-                    <div className="col-span-1 text-right">
-                      {criteria.length > 1 && (
-                        <button
-                          type="button"
-                          className="btn-clear text-red"
-                          onClick={() => handleRemoveCriterion(idx)}
-                          title="Xóa tiêu chí"
-                        >
-                          &times;
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-3 flex justify-between items-center p-3 bg-blue-50 text-blue-900 rounded-lg">
-                <span className="font-semibold text-sm">Tổng điểm hiện tại:</span>
-                <span className={`font-bold text-base ${totalCriteriaScore === 10.0 ? 'text-green-700' : 'text-red-700'}`}>
-                  {totalCriteriaScore.toFixed(2)} / 10.0 điểm
-                  {totalCriteriaScore !== 10.0 && ' (Cần bằng đúng 10.0 điểm)'}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center mt-6">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setCurrentStep(1)}
-              >
-                ← Quay lại Bước 1
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={creatingRubric || totalCriteriaScore !== 10.0}
-              >
-                {creatingRubric ? 'Đang lưu...' : 'Tiếp tục ➔ Bước 3 (Lock Rubric)'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* STEP 3: Lock Rubric */}
-      {currentStep === 3 && selectedRubric && (
-        <div className="page-card fade-in">
-          <div className="flex justify-between items-center mb-4 border-b pb-3">
-            <div>
-              <h2 className="font-semibold text-lg text-primary">
-                Bước 3: Xem lại & Khóa Rubric [{selectedRubric.name}]
-              </h2>
-              <p className="text-sm text-secondary">
-                Kiểm tra các tiêu chí trước khi tiến hành Khóa (Lock). Khi đã khóa, Rubric mới có thể dùng để chấm điểm.
-              </p>
-            </div>
-            <StatusBadge status={selectedRubric.status} />
+          {!component && components.length > 0 && <div className="assessment-field">
+            <label htmlFor="assessment-existing">Tiếp tục cấu hình đã lưu</label>
+            <AnimatedSelect id="assessment-existing" value="" disabled={busy} onChange={event => {
+              const saved = components.find(item => item.id === Number(event.target.value))
+              if (!saved) return
+              setLoadError(''); setRubric(null); setCheckedRubric(false); setCheckedComponent(false)
+              setComponent(saved); setName(saved.name); setComponentType(saved.componentType)
+              setEvaluators(saved.expectedEvaluators); setLoadingRubric(true)
+            }}>
+              <option value="">Tạo mới hoặc chọn thành phần đã lưu</option>
+              {components.map(item => <option key={item.id} value={item.id}>{item.name} · {item.status === 'LOCKED' ? 'Đã khóa' : 'Bản nháp'}</option>)}
+            </AnimatedSelect>
+          </div>}
+          <div className="assessment-field"><label htmlFor="assessment-name">Tên thành phần <span>*</span></label><input id="assessment-name" value={name} onChange={(event) => setName(event.target.value)} required maxLength={150}
+            disabled={!!component || busy} placeholder="Ví dụ: Đánh giá phản biện đồ án" /></div>
+          <div className="assessment-field-grid">
+            <div className="assessment-field"><label htmlFor="assessment-type">Hình thức <span>*</span></label><AnimatedSelect id="assessment-type" value={componentType} disabled={!!component || busy} onChange={(event) => {
+              const type = event.target.value as AssessmentComponentType
+              setComponentType(type)
+              if (type === 'REVIEW') setEvaluators(1)
+            }}>
+              <option value="REVIEW">Phản biện độc lập</option><option value="COMMITTEE">Hội đồng chấm bảo vệ</option><option value="OTHER">Hình thức khác</option>
+            </AnimatedSelect></div>
+            <div className="assessment-field"><label htmlFor="assessment-evaluators">Số người chấm <span>*</span></label><input id="assessment-evaluators" type="number" min={1} max={10} step={1} required value={Number.isNaN(evaluators) ? '' : evaluators}
+              disabled={!!component || busy} onChange={(event) => setEvaluators(event.target.valueAsNumber)} /></div>
           </div>
-
-          <div className="table-container mb-4">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Tên tiêu chí</th>
-                  <th>Mô tả</th>
-                  <th>Điểm tối đa</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedRubric.criteria?.map((cr, idx) => (
-                  <tr key={cr.id || idx}>
-                    <td>{idx + 1}</td>
-                    <td className="font-semibold">{cr.name}</td>
-                    <td>{cr.description}</td>
-                    <td className="font-bold text-primary">{cr.maxScore} điểm</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex justify-between items-center mt-6">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setCurrentStep(2)}
-              disabled={selectedRubric.status === 'LOCKED'}
-            >
-              ← Quay lại Bước 2
-            </button>
-            {selectedRubric.status === 'LOCKED' ? (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setCurrentStep(4)}
-              >
-                Đã Khóa 🔒 ➔ Tiếp tục Bước 4 (Lock Component)
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={openLockRubricModal}
-              >
-                🔒 Khóa Rubric Ngay
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* STEP 4: Lock Component */}
-      {currentStep === 4 && selectedComponent && (
-        <div className="page-card fade-in">
-          <div className="flex justify-between items-center mb-4 border-b pb-3">
-            <div>
-              <h2 className="font-semibold text-lg text-primary">
-                Bước 4: Hoàn tất & Khóa Assessment Component [{selectedComponent.name}]
-              </h2>
-              <p className="text-sm text-secondary">
-                Khóa Component để sẵn sàng cho việc phân công Giảng viên chấm điểm (Evaluator Assignment).
-              </p>
-            </div>
-            <StatusBadge status={selectedComponent.status} />
-          </div>
-
-          <div className="p-4 bg-gray-50 rounded-lg space-y-2 mb-6">
-            <div><strong>Mã Component:</strong> {selectedComponent.code}</div>
-            <div><strong>Loại Component:</strong> {selectedComponent.componentType}</div>
-            <div><strong>Số người chấm dự kiến:</strong> {selectedComponent.expectedEvaluators} giảng viên</div>
-            <div><strong>Rubric liên kết:</strong> {selectedRubric?.name ?? 'Đã khóa'}</div>
-          </div>
-
-          <div className="flex justify-between items-center">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setCurrentStep(3)}
-            >
-              ← Quay lại Bước 3
-            </button>
-            {selectedComponent.status === 'LOCKED' ? (
-              <div className="flex items-center gap-3">
-                <span className="badge badge-success text-sm py-2 px-3">
-                  🔒 Assessment Component ĐÃ KHÓA & KÍCH HOẠT THÀNH CÔNG!
-                </span>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={openLockComponentModal}
-              >
-                🔒 Khóa Assessment Component Ngay
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Confirm Modal */}
-      <ConfirmModal
-        isOpen={confirmModal.isOpen}
-        title={confirmModal.title}
-        message={confirmModal.message}
-        variant="danger"
-        confirmText="Xác nhận Khóa 🔒"
-        loading={locking}
-        onConfirm={handleConfirmLock}
-        onCancel={() => setConfirmModal({ isOpen: false, type: null, title: '', message: '' })}
-      />
-    </div>
-  )
+          {componentType === 'COMMITTEE' && <p className="assessment-help">Số người chấm cần nằm trong giới hạn hội đồng của đợt đăng ký. Khi phân công, thành phần này cần gắn với phiên bảo vệ.</p>}
+          <div className="assessment-field"><label htmlFor="assessment-aggregation">Cách tổng hợp điểm <span>*</span></label><AnimatedSelect id="assessment-aggregation" value="average" onChange={() => undefined}><option value="average">Trung bình điểm các giảng viên</option></AnimatedSelect></div>
+          {component && <p className="assessment-help">Thành phần đã được lưu. Chọn “Tiếp tục” để xem cấu hình.</p>}
+        </div><footer className="assessment-actions assessment-actions--end"><button className="assessment-button assessment-button--primary" type="submit" disabled={busy || !periodId || !!loadError}>
+          {busy ? 'Đang lưu…' : componentLocked || rubricLocked ? 'Tiếp tục: Khóa thành phần' : 'Tiếp tục: Tạo bộ tiêu chí'}<ArrowRight size={19} /></button></footer></form>
+      </section>}
+      {step === 2 && component && <section className="assessment-card assessment-card--table" aria-labelledby="assessment-step-title">
+        <div className="assessment-card__heading"><div><h2 id="assessment-step-title">Tạo bộ tiêu chí</h2><p>Bước 2/4</p></div>{!rubricLocked && <button className="assessment-button assessment-button--outline" type="button" disabled={busy}
+          onClick={() => setCriteria((previous) => [...previous, { name: '', score: 0, children: [] }])}><Plus size={20} />Thêm tiêu chí</button>}</div>
+        {contextBar}<fieldset className="assessment-editor" disabled={busy || rubricLocked}>{criteriaTable(!rubricLocked, true)}</fieldset>
+        {!isValid && <p className="assessment-validation" role="status">Điền đầy đủ tên tiêu chí, điểm từ 0,1 đến 100 (tối đa một chữ số thập phân) và tổng điểm bằng 100.</p>}
+        <details className="assessment-advanced"><summary>Tên bộ tiêu chí (tùy chọn)</summary><div className="assessment-field"><label className="assessment-sr-only" htmlFor="assessment-rubric-name">Tên bộ tiêu chí</label><input id="assessment-rubric-name" value={rubricName} maxLength={200}
+          disabled={busy || rubricLocked} placeholder={`Bộ tiêu chí ${component.name}`} onChange={(event) => setRubricName(event.target.value)} /></div></details>
+        <footer className="assessment-actions"><button type="button" className="assessment-button assessment-button--outline" disabled={busy} onClick={() => setStep(1)}><ArrowLeft size={18} />Quay lại</button>
+          <div className="assessment-actions__right">{!rubricLocked && <button type="button" className="assessment-button assessment-button--outline" disabled={busy || !isValid || !dirty || !!loadError} onClick={() => void saveRubric(false)}>{busy ? 'Đang lưu…' : 'Lưu bộ tiêu chí'}</button>}
+            <button type="button" className="assessment-button assessment-button--primary" disabled={busy || !isValid || !!loadError} onClick={() => void saveRubric(true)}>Tiếp tục: Khóa bộ tiêu chí<ArrowRight size={18} /></button></div></footer>
+      </section>}
+      {step === 3 && rubric && <section className="assessment-card assessment-card--table" aria-labelledby="assessment-step-title">
+        <div className="assessment-card__heading"><div><h2 id="assessment-step-title">Khóa bộ tiêu chí</h2><p>Bước 3/4</p></div><span className={`assessment-status ${rubricLocked ? 'assessment-status--success' : ''}`}><LockKeyhole size={16} />{rubricLocked ? 'Đã khóa' : 'Chưa khóa'}</span></div>
+        <p className="assessment-intro">Xác nhận cấu trúc tiêu chí và thang điểm trước khi khóa.</p>{contextBar}{criteriaTable(false, detailsVisible)}
+        <button type="button" className="assessment-text-button assessment-detail-toggle" onClick={() => setDetailsVisible((previous) => !previous)}><FileText size={16} />{detailsVisible ? 'Thu gọn tiêu chí con' : 'Xem chi tiết bộ tiêu chí'}</button>
+        <div className={`assessment-alert ${readyToLock ? 'assessment-alert--success' : 'assessment-alert--warning'}`}><CheckCircle2 size={20} /><strong>{readyToLock ? 'Tổng điểm hợp lệ · Đã có đủ tiêu chí' : 'Bộ tiêu chí chưa hợp lệ. Quay lại để kiểm tra và lưu đủ 100 điểm.'}</strong></div>
+        {!rubricLocked && <><div className="assessment-alert assessment-alert--warning"><LockKeyhole size={21} /><div><strong>Sau khi khóa bộ tiêu chí</strong><p>Cấu trúc tiêu chí và thang điểm sẽ không được chỉnh sửa trực tiếp.</p></div></div>
+          <label className="assessment-checkbox"><input type="checkbox" checked={checkedRubric} onChange={(event) => setCheckedRubric(event.target.checked)} disabled={busy} />Tôi đã kiểm tra cấu trúc tiêu chí và thang điểm.</label></>}
+        <footer className="assessment-actions"><button type="button" className="assessment-button assessment-button--outline" disabled={busy} onClick={() => setStep(2)}><ArrowLeft size={18} />Quay lại</button>
+          {rubricLocked ? <button type="button" className="assessment-button assessment-button--primary" onClick={() => setStep(4)}>Tiếp tục: Khóa thành phần<ArrowRight size={18} /></button> :
+            <button type="button" className="assessment-button assessment-button--primary" disabled={busy || !checkedRubric || !readyToLock || !!loadError} onClick={() => setLockTarget('rubric')}>Khóa bộ tiêu chí</button>}</footer>
+      </section>}
+      {step === 4 && component && <section className="assessment-card" aria-labelledby="assessment-step-title">
+        <div className="assessment-card__heading"><h2 id="assessment-step-title">Khóa thành phần đánh giá</h2><span className="assessment-step-badge">Bước 4/4</span></div><p className="assessment-intro">Xác nhận cấu hình trước khi phân công giảng viên chấm.</p>
+        <dl className="assessment-summary">
+          <div><dt>Đợt đăng ký</dt><dd>{periodName}<span className={`assessment-status ${componentLocked ? 'assessment-status--success' : ''}`}>{componentLocked ? 'Đã khóa' : 'Chờ xác nhận'}</span></dd></div>
+          <div><dt>Tên thành phần</dt><dd>{component.name}</dd></div><div><dt>Hình thức đánh giá</dt><dd>{componentTypeLabel(component.componentType)}</dd></div>
+          <div><dt>Số người chấm</dt><dd>{component.expectedEvaluators} giảng viên</dd></div><div><dt>Cách tổng hợp điểm</dt><dd>Trung bình điểm các giảng viên</dd></div>
+          <div><dt>Bộ tiêu chí</dt><dd>{rubric ? `${criteria.length} nhóm · ${childCount} tiêu chí con · ${scoreLabel(total)} điểm` : 'Chưa có bộ tiêu chí'}
+            {rubric && <button type="button" className="assessment-text-button" onClick={() => { setDetailsVisible(true); setStep(3) }}><FileText size={17} />Xem bộ tiêu chí</button>}</dd></div>
+        </dl>
+        <div className={`assessment-alert ${rubricLocked ? 'assessment-alert--success' : 'assessment-alert--warning'}`}><CheckCircle2 size={30} /><div><strong>{rubricLocked ? 'Bộ tiêu chí đã khóa' : 'Bộ tiêu chí chưa khóa'}</strong><p>{rubricLocked ? 'Cấu trúc và thang điểm đã được xác nhận ở bước 3.' : 'Vui lòng hoàn tất khóa bộ tiêu chí ở bước 3.'}</p></div></div>
+        <div className={`assessment-alert ${componentLocked ? 'assessment-alert--success' : 'assessment-alert--info'}`}><Info size={30} /><div><strong>{componentLocked ? 'Sẵn sàng phân công giảng viên chấm' : 'Xác nhận sẵn sàng phân công'}</strong><p>{componentLocked ? 'Thành phần đánh giá đã được khóa và cấu hình hoàn tất.' : 'Khóa thành phần để xác nhận cấu hình đã hoàn tất và sẵn sàng phân công giảng viên chấm.'}</p>
+          {!componentLocked && <label className="assessment-checkbox"><input type="checkbox" checked={checkedComponent} onChange={(event) => setCheckedComponent(event.target.checked)} disabled={busy || !rubricLocked} />Tôi xác nhận cấu hình đánh giá đã đầy đủ và chính xác.</label>}</div></div>
+        <footer className="assessment-actions"><button type="button" className="assessment-button assessment-button--outline" disabled={busy} onClick={() => setStep(rubric ? 3 : 2)}><ArrowLeft size={18} />Quay lại</button>
+          {componentLocked ? <Link className="assessment-button assessment-button--primary" to="/evaluator-assignment">Phân công giảng viên<ArrowRight size={18} /></Link> :
+            <button type="button" className="assessment-button assessment-button--primary" disabled={busy || !checkedComponent || !rubricLocked || !!loadError} onClick={() => setLockTarget('component')}>Khóa thành phần đánh giá</button>}</footer>
+      </section>}
+    </>}
+    <ConfirmModal isOpen={lockTarget !== null} title={lockTarget === 'rubric' ? 'Xác nhận khóa bộ tiêu chí' : 'Xác nhận khóa thành phần đánh giá'}
+      message={lockTarget === 'rubric' ? `Khóa bộ tiêu chí “${rubric?.name}”? Cấu trúc và thang điểm sẽ không thể chỉnh sửa trực tiếp.` : `Khóa thành phần “${component?.name}” để phân công giảng viên chấm? Thao tác này không thể hoàn tác.`}
+      confirmText={lockTarget === 'rubric' ? 'Khóa bộ tiêu chí' : 'Khóa thành phần'} variant="primary" loading={busy} onConfirm={() => void confirmLock()} onCancel={() => setLockTarget(null)} />
+  </div>
 }

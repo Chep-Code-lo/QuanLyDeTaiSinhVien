@@ -19,6 +19,30 @@ export interface LecturerProfileResponse {
   departmentId: number
 }
 
+export interface UserResponse {
+  id: number
+  email: string
+  fullName: string
+  phone?: string
+  status: UserStatus
+  roles: RoleCode[]
+  student?: StudentProfileResponse
+  lecturer?: LecturerProfileResponse
+  lastLoginAt?: string
+  createdAt: string
+  version: number
+}
+
+export type CreateUserRequest = {
+  email: string
+  password: string
+  fullName: string
+  phone?: string
+} & (
+  | { roles: ['STUDENT']; student: Omit<StudentProfileResponse, 'id'>; lecturer?: never }
+  | { roles: ['LECTURER']; lecturer: Omit<LecturerProfileResponse, 'id'>; student?: never }
+)
+
 export interface AppointmentResponse {
   id: number
   lecturerId: number
@@ -72,6 +96,19 @@ export interface FileResponse {
   mimeType: string
   sizeBytes: number
   sha256: string
+}
+
+export interface UpdateMilestoneRequest {
+  version: number
+  title: string
+  milestoneType: MilestoneType
+  description: string
+  dueAt: string
+}
+
+export interface MilestoneReminderResponse {
+  recipientCount: number
+  milestoneCount: number
 }
 
 export interface FeedbackResponse {
@@ -218,7 +255,7 @@ export interface SaveSheetRequest {
 }
 
 export interface ScoreSheetResponse {
-  id: number
+  id: number | null
   evaluationId: number
   status: ScoreSheetStatus
   version: number
@@ -443,11 +480,78 @@ export interface TopicRegistrationResponse {
   version: number
 }
 
-export type TopicStatus = 'DRAFT' | 'PENDING' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'WITHDRAWN' | string
-export interface TopicSupervisorResponse { lecturerId: number; lecturerCode: string; lecturerName: string; slotNo: number }
+export type TopicStatus =
+  'DRAFT' | 'PENDING' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'WITHDRAWN' | string
+export interface TopicSupervisorResponse {
+  lecturerId: number
+  lecturerCode: string
+  lecturerName: string
+  slotNo: number
+}
 export interface TopicResponse {
-  id: number; periodId: number; periodName: string; facultyId: number; facultyName: string; departmentId: number; departmentName: string
-  availableForRegistration: boolean; proposedBy: number; reservedGroupId?: number; latestReview?: { comment: string; decision: string };
-  code: string; title: string; description: string; objectives: string; expectedOutcomes: string; prerequisites?: string; proposerName: string
-  visibilityType: 'PUBLIC' | 'PRIVATE' | string; status: TopicStatus; createdAt: string; updatedAt: string; version: number; supervisors: TopicSupervisorResponse[]
+  id: number
+  periodId: number
+  periodName: string
+  facultyId: number
+  facultyName: string
+  departmentId: number
+  departmentName: string
+  availableForRegistration: boolean
+  proposedBy: number
+  reservedGroupId?: number
+  latestReview?: { comment: string; decision: string }
+  code: string
+  title: string
+  description: string
+  objectives: string
+  expectedOutcomes: string
+  prerequisites?: string
+  proposerName: string
+  visibilityType: 'PUBLIC' | 'PRIVATE' | string
+  status: TopicStatus
+  createdAt: string
+  updatedAt: string
+  version: number
+  supervisors: TopicSupervisorResponse[]
+}
+
+export interface CreateRegistrationTopicRequest {
+  periodId: number
+  departmentId: number
+  code: string
+  title: string
+  description: string
+  objectives: string
+  expectedOutcomes: string
+  prerequisites?: string
+  primaryLecturerId: number
+  secondaryLecturerId?: number
+}
+
+export interface CommitteeMemberResponse {
+  id: number
+  lecturerId: number
+  lecturerCode: string
+  lecturerName: string
+  slotNo: number
+  role: 'CHAIR' | 'SECRETARY' | 'MEMBER'
+  roleName?: string | null
+}
+
+export interface EvaluationCommitteeResponse {
+  id: number
+  periodId: number
+  name: string
+  status: 'DRAFT' | 'CONFIRMED' | 'COMPLETED'
+  members: CommitteeMemberResponse[]
+  rubricId?: number | null
+  version: number
+}
+
+export interface SaveCommitteeRequest {
+  periodId: number
+  name: string
+  rubricId: number
+  members: { lecturerId: number; roleName: string }[]
+  version?: number
 }
