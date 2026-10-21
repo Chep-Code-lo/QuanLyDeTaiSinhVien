@@ -12,32 +12,32 @@ class EmailTemplateRendererTests {
     private final EmailTemplateRenderer renderer = new EmailTemplateRenderer();
 
     @Test
-    void rendersOnlyWhitelistedVariablesAndEscapesDynamicHtml() {
+    void rendersOnlyWhitelistedVariablesAsPlainText() {
         EmailTemplateRenderer.RenderedEmail rendered = renderer.render(
                 EmailNotificationEventType.TASK_ASSIGNED,
                 "Nhiệm vụ {{taskName}}",
-                "<p>Chào {{studentName}}</p><p>{{taskName}}</p>",
+                "Chào {{studentName}},\n{{taskName}}",
                 Map.of("studentName", "<b>Lan</b>", "taskName", "Báo cáo & kiểm thử"));
 
         assertThat(rendered.subject()).isEqualTo("Nhiệm vụ Báo cáo & kiểm thử");
-        assertThat(rendered.body()).contains("&lt;b&gt;Lan&lt;/b&gt;").contains("&amp;");
+        assertThat(rendered.body()).isEqualTo("Chào <b>Lan</b>,\nBáo cáo & kiểm thử");
     }
 
     @Test
-    void rejectsUnknownVariablesAndExecutableHtml() {
+    void rejectsUnknownAndMalformedVariables() {
         assertThatThrownBy(() -> renderer.validate(
                 EmailNotificationEventType.TASK_ASSIGNED,
                 "{{unknown}}",
-                "<p>Nội dung</p>"))
+                "Nội dung"))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("not allowed");
 
         assertThatThrownBy(() -> renderer.validate(
                 EmailNotificationEventType.TASK_ASSIGNED,
                 "Tiêu đề",
-                "<script>alert(1)</script>"))
+                "Nội dung {{studentName}"))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("executable HTML");
+                .hasMessageContaining("invalid variable token");
     }
 
     @Test
@@ -45,7 +45,7 @@ class EmailTemplateRendererTests {
         EmailTemplateRenderer.RenderedEmail rendered = renderer.render(
                 EmailNotificationEventType.TASK_ASSIGNED,
                 "Nhiệm vụ {{taskName}}",
-                "<p>{{taskName}}</p>",
+                "{{taskName}}",
                 Map.of("taskName", "Báo cáo\r\nBcc: outsider@example.test"));
 
         assertThat(rendered.subject()).doesNotContain("\r").doesNotContain("\n");

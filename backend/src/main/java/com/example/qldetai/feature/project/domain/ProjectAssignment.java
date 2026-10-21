@@ -18,13 +18,16 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "project_assignments")
+@Table(name = "project_assignments", uniqueConstraints = {
+        @UniqueConstraint(name = "uq_project_assignments_02", columnNames = "group_id"),
+        @UniqueConstraint(name = "uq_project_assignments_03", columnNames = "topic_id")})
 @Getter
 @Setter
 @NoArgsConstructor

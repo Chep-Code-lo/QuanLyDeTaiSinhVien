@@ -93,8 +93,10 @@ public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, Long> 
             where o.facultyId in :facultyIds
                or (o.resolvedScopeType = com.example.qldetai.feature.communication.email.NotificationScopeType.FACULTY
                    and o.resolvedScopeId in :facultyIds)
+               or (o.resolvedScopeType = com.example.qldetai.feature.communication.email.NotificationScopeType.LECTURER
+                   and o.resolvedScopeId = :userId)
             """)
-    Page<EmailOutbox> findAccessibleToDean(@Param("facultyIds") Collection<Long> facultyIds, Pageable pageable);
+    Page<EmailOutbox> findAccessibleToDean(@Param("facultyIds") Collection<Long> facultyIds, @Param("userId") Long userId, Pageable pageable);
 
     @Query("""
             select o from EmailOutbox o

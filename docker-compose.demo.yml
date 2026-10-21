@@ -1,0 +1,6 @@
+# Local demo only; opt in explicitly. Do not use this override on the VPS.
+# The MySQL entrypoint imports this seed only when initializing an empty volume.
+services:
+  mysql:
+    volumes:
+      - ./database/seed/demo-data.sql:/docker-entrypoint-initdb.d/02-demo-data.sql:ro

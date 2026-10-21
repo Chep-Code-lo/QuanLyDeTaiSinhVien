@@ -33,7 +33,7 @@ export const navigationItems: NavigationItem[] = [
     adminOnly: true,
   },
   { icon: UserRound, label: 'Quản lý tài khoản', to: '/admin-users', adminOnly: true },
-  { icon: Mail, label: 'Cấu hình email', to: '/email-settings', adminOnly: true },
+  { icon: Mail, label: 'Cấu hình email', to: '/email-settings', roles: ['ADMIN', 'LECTURER'] },
   { icon: CalendarCheck, label: 'Lịch bảo vệ & Kết quả', to: '/results', roles: ['STUDENT'] },
   { icon: UserRound, label: 'Tài khoản', to: '/account' },
   { icon: Bell, label: 'Thông báo', to: '/announcements' },

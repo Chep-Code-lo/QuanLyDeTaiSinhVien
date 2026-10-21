@@ -42,11 +42,14 @@ import com.example.qldetai.feature.topic.dto.TopicDtos.WithdrawTopicRequest;
 import com.example.qldetai.feature.topic.repository.TopicRepository;
 import com.example.qldetai.feature.topic.repository.TopicReviewRepository;
 import com.example.qldetai.feature.topic.repository.TopicSupervisorRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -75,6 +78,7 @@ public class TopicService {
     private final NotificationService notificationService;
     private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
+    private final EntityManager entityManager;
 
 
     @Transactional(readOnly = true)
@@ -83,14 +87,12 @@ public class TopicService {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         User actor = requireUser(actorId);
         if (isAcademicStaff(actor)) {
-            return PageResponse.from(listAll(periodId, status, pageable).map(this::toResponse));
+            return toResponses(listAll(periodId, status, pageable), null);
         }
         if (!hasRole(actor, RoleCode.STUDENT)) {
             throw new AccessDeniedException("A student, lecturer, or administrator account is required.");
         }
-        return PageResponse.from(topicRepository
-                .findVisibleToStudent(periodId, status, actorId, pageable)
-                .map(topic -> toResponse(topic, topic.getProposedBy().getId().equals(actorId))));
+        return toResponses(topicRepository.findVisibleToStudent(periodId, status, actorId, pageable), actorId);
     }
 
     @Transactional(readOnly = true)
@@ -239,7 +241,8 @@ public class TopicService {
     @Transactional
     @BusinessAudit(action = "TOPIC_SUPERVISORS_ASSIGN", entityType = "TOPIC", entityIdArgument = 0)
     public TopicResponse assignSupervisors(Long id, AssignSupervisorsRequest request, Long actorId) {
-        Topic topic = requireTopic(id);
+        Topic topic = topicRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Topic was not found."));
         User actor = requireUser(actorId);
         verifyVersion(topic, request.version());
         ensureModerator(actor);
@@ -255,7 +258,10 @@ public class TopicService {
             throw new BusinessRuleException("Primary and secondary supervisors must be different lecturers.");
         }
 
+        // Supervisor rows are part of the topic revision even if topic fields are unchanged.
+        entityManager.lock(topic, LockModeType.PESSIMISTIC_FORCE_INCREMENT);
         topicSupervisorRepository.deleteByTopicId(topic.getId());
+        topicSupervisorRepository.flush();
         LocalDateTime now = LocalDateTime.now(clock);
         topicSupervisorRepository.save(createSupervisor(topic, primary, actor, 1, now));
         if (secondary != null) {
@@ -525,27 +531,43 @@ public class TopicService {
     }
 
     private TopicResponse toResponse(Topic topic, boolean includeLatestReview) {
-        List<TopicSupervisorResponse> supervisors = topicSupervisorRepository.findByTopicIdOrderBySlotNoAsc(topic.getId())
-                .stream()
+        return toResponse(topic, topicSupervisorRepository.findByTopicIdOrderBySlotNoAsc(topic.getId()),
+                includeLatestReview ? topicReviewRepository.findFirstByTopicIdOrderByReviewedAtDesc(topic.getId()).orElse(null) : null);
+    }
+
+    private PageResponse<TopicResponse> toResponses(Page<Topic> found, Long studentUserId) {
+        if (found.isEmpty()) {
+            return PageResponse.from(found.map(this::toResponse));
+        }
+        List<Long> topicIds = found.getContent().stream().map(Topic::getId).toList();
+        Map<Long, List<TopicSupervisor>> supervisorsByTopic = topicSupervisorRepository
+                .findByTopicIdInOrderBySlotNoAsc(topicIds).stream()
+                .collect(java.util.stream.Collectors.groupingBy(supervisor -> supervisor.getTopic().getId()));
+        List<Long> reviewableIds = found.getContent().stream()
+                .filter(topic -> studentUserId == null || topic.getProposedBy().getId().equals(studentUserId))
+                .map(Topic::getId).toList();
+        Map<Long, TopicReview> latestReviews = reviewableIds.isEmpty() ? Map.of() : topicReviewRepository
+                .findLatestByTopicIds(reviewableIds).stream()
+                .collect(java.util.stream.Collectors.toMap(review -> review.getTopic().getId(), review -> review));
+        return PageResponse.from(found.map(topic -> toResponse(topic,
+                supervisorsByTopic.getOrDefault(topic.getId(), List.of()), latestReviews.get(topic.getId()))));
+    }
+
+    private TopicResponse toResponse(Topic topic, List<TopicSupervisor> foundSupervisors, TopicReview review) {
+        List<TopicSupervisorResponse> supervisors = foundSupervisors.stream()
                 .map(supervisor -> new TopicSupervisorResponse(
                         supervisor.getLecturer().getId(),
                         supervisor.getLecturer().getLecturerCode(),
                         supervisor.getLecturer().getUser().getFullName(),
                         supervisor.getSlotNo()))
                 .toList();
-        TopicReviewResponse latestReview = includeLatestReview
-                ? topicReviewRepository.findByTopicIdOrderByReviewedAtDesc(topic.getId())
-                        .stream()
-                        .findFirst()
-                        .map(review -> new TopicReviewResponse(
+        TopicReviewResponse latestReview = review == null ? null : new TopicReviewResponse(
                                 review.getId(),
                                 review.getDecision(),
                                 review.getComment(),
                                 review.getReviewedBy().getId(),
                                 review.getReviewedBy().getFullName(),
-                                review.getReviewedAt()))
-                        .orElse(null)
-                : null;
+                                review.getReviewedAt());
 
         return new TopicResponse(
                 topic.getId(),

@@ -189,10 +189,10 @@ Rule:
 
 | Method | Path | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/assessment-components` | Đã đăng nhập | Danh sách thành phần chấm |
+| GET | `/assessment-components?periodId={periodId}` | Đã đăng nhập | Danh sách thành phần chấm của một đợt |
 | POST | `/assessment-components` | `ADMIN`, `LECTURER` | Tạo thành phần chấm |
 | PATCH | `/assessment-components/{id}/lock` | `ADMIN`, `LECTURER` | Khóa thành phần chấm |
-| GET | `/rubrics` | Đã đăng nhập | Danh sách rubric |
+| GET | `/rubrics?componentId={componentId}` | Đã đăng nhập | Danh sách rubric của một thành phần chấm |
 | POST | `/rubrics` | `ADMIN`, `LECTURER` | Tạo rubric |
 | PATCH | `/rubrics/{id}/lock` | `ADMIN`, `LECTURER` | Khóa rubric |
 
@@ -395,7 +395,7 @@ Quyền xem:
 - Sinh viên không thể tạo/tham gia nhóm khác đợt khi còn thành viên của nhóm FORMING/ACTIVE/LOCKED. Đóng đợt không giải phóng thành viên đang thực hiện; nhóm phải CLOSED hoặc thành viên đã rời nhóm. Các thao tác tạo/thêm/chấp nhận lời mời khóa dòng sinh viên trước khi kiểm tra để tránh hai yêu cầu đồng thời.
 - Đăng ký đề tài chỉ thực hiện khi đợt ACTIVE và còn trong cửa sổ đăng ký.
 - Số thành viên hội đồng luôn trong 3–5; giới hạn được kiểm tra ở DTO, service, khi xếp lịch và schema MySQL.
-- Dự án sử dụng duy nhất `database/ql_de_tai_sinh_vien_schema.sql` để khởi tạo database, đã chứa giới hạn hội đồng mới. Không có file migration riêng. Database đã khởi tạo trước đó không tự thay đổi ràng buộc khi chỉ cập nhật file schema.
+- Dự án sử dụng duy nhất `database/ql_de_tai_sinh_vien_schema.sql` để khởi tạo cấu trúc database mới và vai trò hệ thống, đã chứa giới hạn hội đồng mới. Dữ liệu demo nằm riêng tại `database/seed/demo-data.sql`, chỉ dùng cho local khi chủ động nạp. `database/migrations/` chỉ dùng nâng cấp database cũ, không phải file khởi tạo thay thế. Database đã khởi tạo trước đó không tự thay đổi ràng buộc khi chỉ cập nhật file chính.
 
 ### 2.4. Yêu cầu đổi điểm
 

@@ -12,6 +12,8 @@ import com.example.qldetai.feature.groupregistration.domain.RegistrationStatus;
 import com.example.qldetai.feature.groupregistration.domain.TopicRegistration;
 import com.example.qldetai.feature.groupregistration.repository.GroupMemberRepository;
 import com.example.qldetai.feature.groupregistration.repository.TopicRegistrationRepository;
+import com.example.qldetai.feature.groupregistration.repository.StudentGroupRepository;
+import com.example.qldetai.feature.topic.repository.TopicRepository;
 import com.example.qldetai.feature.identity.domain.RoleCode;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.UserRepository;
@@ -46,6 +48,8 @@ public class ProjectAssignmentService {
 
     private final ProjectAssignmentRepository projectAssignmentRepository;
     private final TopicRegistrationRepository topicRegistrationRepository;
+    private final StudentGroupRepository studentGroupRepository;
+    private final TopicRepository topicRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
@@ -98,16 +102,19 @@ public class ProjectAssignmentService {
         if (registration.getStatus() != RegistrationStatus.APPROVED) {
             throw new BusinessRuleException("Only approved topic registrations can become project assignments.");
         }
-        ProjectAssignment existing = projectAssignmentRepository.findByRegistrationId(registration.getId()).orElse(null);
+        // The group and topic are the shared roots for registration/member changes and competing approvals.
+        studentGroupRepository.findByIdForUpdate(registration.getGroup().getId()).orElseThrow();
+        topicRepository.findByIdForUpdate(registration.getTopic().getId()).orElseThrow();
+        ProjectAssignment existing = projectAssignmentRepository.findByRegistrationIdForUpdate(registration.getId()).orElse(null);
         if (existing != null) {
             // The endpoint used to be a separate manual step. Keeping retries idempotent avoids
             // breaking clients which still issue that old follow-up request.
             return toResponse(existing);
         }
-        if (projectAssignmentRepository.existsByGroupId(registration.getGroup().getId())) {
+        if (projectAssignmentRepository.findByGroupIdForUpdate(registration.getGroup().getId()).isPresent()) {
             throw new ConflictException("This student group already has a project assignment.");
         }
-        if (projectAssignmentRepository.existsByTopicId(registration.getTopic().getId())) {
+        if (projectAssignmentRepository.findByTopicIdForUpdate(registration.getTopic().getId()).isPresent()) {
             throw new ConflictException("This topic already has a project assignment.");
         }
 
@@ -166,7 +173,7 @@ public class ProjectAssignmentService {
     }
 
     private TopicRegistration requireRegistration(Long id) {
-        return topicRegistrationRepository.findById(id)
+        return topicRegistrationRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Topic registration was not found."));
     }
 

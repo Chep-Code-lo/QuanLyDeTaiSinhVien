@@ -9,10 +9,12 @@ QuanLyDeTaiSinhVien/
 │       ├── common/persistence/ # Base entity và callback timestamp JPA
 │       └── feature/         # Controller, service, domain, DTO theo nghiệp vụ
 ├── database/
-│   ├── migrations/          # Các migration MySQL có version
-│   ├── seed/                # Dữ liệu và thao tác dành cho môi trường demo
-│   └── ql_de_tai_sinh_vien_schema.sql
+│   ├── migrations/          # Chỉ nâng cấp database cũ, giữ dữ liệu hiện có
+│   ├── checks/              # SQL kiểm tra dữ liệu, không khởi tạo database
+│   ├── seed/demo-data.sql   # Dữ liệu demo tùy chọn, không nạp trên VPS
+│   └── ql_de_tai_sinh_vien_schema.sql # File SQL chính: cấu trúc và vai trò hệ thống
 ├── docker-compose.yml        # Khởi chạy các dịch vụ bằng Docker Compose
+├── docker-compose.demo.yml   # Override chủ động dùng khi cần demo local
 ├── docs/                    # Hợp đồng API, hướng dẫn và tài liệu dự án
 ├── frontend/
 │   ├── public/              # Tài nguyên tĩnh
@@ -40,7 +42,7 @@ Quy ước khi thêm mã mới:
   hoặc `utils/`.
 - CSS của một trang/component nằm cạnh tệp TypeScript; CSS global đặt trong
   `styles/`.
-- Dữ liệu demo chỉ được nạp khi MySQL khởi tạo volume mới; mọi tệp seed phải
+- Dữ liệu demo chỉ tự nạp khi chủ động chọn override demo và MySQL khởi tạo volume mới; mọi tệp seed phải
   ghi rõ phạm vi local và cách reset dữ liệu trong phần đầu tệp hoặc README.
 - Cross-cutting concern đặt trong `common/` theo trách nhiệm; không tạo lại
   thư mục `aspect/` chung chung.

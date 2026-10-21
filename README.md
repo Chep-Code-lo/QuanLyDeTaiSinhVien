@@ -6,10 +6,15 @@ Nền tảng quản lý đề tài, nhóm sinh viên, tiến độ, chấm đi�
 
 - `backend/`: Spring Boot REST API.
 - `frontend/`: React + Vite + TypeScript.
-- `database/`: schema MySQL nguồn.
+- `database/ql_de_tai_sinh_vien_schema.sql`: file SQL chính, gồm cấu trúc database và vai trò hệ thống.
+- `database/seed/demo-data.sql`: dữ liệu mẫu riêng cho local/demo, chỉ nạp khi chủ động chọn.
 - `docs/`: tài liệu kiến trúc, API và quy ước phát triển.
 
 ## Chạy cục bộ
+
+**File database chính duy nhất:** [`database/ql_de_tai_sinh_vien_schema.sql`](database/ql_de_tai_sinh_vien_schema.sql). Khi tạo database mới trên MySQL 8.4, mở file này trong MySQL Workbench và chạy toàn bộ, hoặc dùng MySQL CLI: `SOURCE E:/QuanLyDeTaiSinhVien/database/ql_de_tai_sinh_vien_schema.sql;` (đổi đường dẫn theo máy). File tự chọn database `ql_de_tai_sinh_vien`, chỉ tạo cấu trúc và ba vai trò hệ thống; không tạo tài khoản hoặc dữ liệu nghiệp vụ mẫu. Với Docker, việc import diễn ra tự động khi volume MySQL còn trống.
+
+Database đang có dữ liệu tiếp tục dùng nguyên volume hiện tại và chỉ áp dụng migration cần thiết trong `database/migrations/`. Không import lại file chính hoặc reset volume để nâng cấp. Các file trong `database/checks/` chỉ phục vụ kiểm tra dữ liệu.
 
 1. Khởi động MySQL local.
 
@@ -55,10 +60,13 @@ CSRF_COOKIE_SAME_SITE=none
 
 Nếu dùng chung một domain và reverse proxy `/api/*` về backend thì không cần chuyển `same-site` sang `none`.
 
-Khi dùng Docker trên database mới, hệ thống tự nạp bộ dữ liệu demo thống nhất
-gồm một khoa CNTT, ba bộ môn, ba đợt đăng ký và dữ liệu xuyên suốt từ đề tài
-đến đánh giá/kết quả. Danh sách tài khoản nằm tại
-[`docs/demo-accounts.md`](docs/demo-accounts.md).
+Docker mặc định không nạp dữ liệu demo, phù hợp để khởi tạo database sạch khi triển khai VPS. Nếu cần dữ liệu mẫu trên local với volume MySQL mới, chủ động dùng file cấu hình demo:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build -d
+```
+
+File `database/seed/demo-data.sql` chứa khoa CNTT, ba bộ môn, ba đợt đăng ký và dữ liệu từ đề tài đến đánh giá/kết quả. Có thể import riêng file này một lần sau file schema trên database demo còn trống. Danh sách tài khoản nằm tại [`docs/demo-accounts.md`](docs/demo-accounts.md). Không dùng override hoặc seed demo trên VPS. Khi khởi động lại môi trường demo, tiếp tục dùng đủ hai tham số `-f`; thêm override vào volume đã có dữ liệu không tự nạp seed.
 
 Tài liệu hợp đồng các phần backend:
 
@@ -136,7 +144,7 @@ Nếu dùng tunnel có tên và domain riêng, trỏ dịch vụ Cloudflare về
 Ghi chú:
 
 - MySQL được expose ra host qua cổng `3307` mặc định để tránh đụng MySQL cục bộ.
-- Lần khởi động đầu tiên, container MySQL tự import `database/ql_de_tai_sinh_vien_schema.sql`, tạo user ứng dụng và nạp `database/seed/demo-data.sql`.
+- Lần khởi động đầu tiên, container MySQL mặc định chỉ import `database/ql_de_tai_sinh_vien_schema.sql`: đủ 42 bảng, khóa/ràng buộc, view, trigger và ba vai trò hệ thống. Không nạp tài khoản hay dữ liệu demo. Chỉ cấu hình `docker-compose.demo.yml` mới bổ sung seed local. Docker tạo user kết nối MySQL theo cấu hình môi trường; đây không phải tài khoản đăng nhập ứng dụng.
 - Mỗi lần `docker compose up`, service `schema-migrate` sẽ áp dụng migration email theo kiểu idempotent cho volume `mysql_data` hiện có, không xóa dữ liệu.
 - Dữ liệu database được lưu trong volume `mysql_data`.
 - File upload của backend được lưu trong volume `backend_files`.
@@ -151,16 +159,22 @@ SMTP chỉ được cấu hình trong `.env`; không đưa `MAIL_USERNAME` hoặ
 docker compose up --build -d
 ```
 
-Đăng nhập bằng tài khoản quản trị, mở **Cấu hình email**, bật từng loại thông báo cần dùng, lưu mẫu thư và chọn **Gửi thử**. Thư kiểm tra chỉ gửi đến email của tài khoản đang đăng nhập; trạng thái giao hàng hiển thị trong **Nhật ký gửi email**.
+Quản trị viên và giảng viên đều có mục **Cấu hình email**. Chọn mẫu mặc định để chỉnh nội dung thông báo tự động, hoặc chọn **Tạo mẫu mới** để đặt tên và lưu mẫu thư riêng dùng lại về sau. Mẫu riêng thuộc tài khoản tạo mẫu; có thể mở lại và chỉnh sửa trong **Mẫu của tôi**. Mẫu thư dùng văn bản thường, không cần viết HTML.
+
+Để gửi thủ công, lưu nội dung rồi chọn nhóm hoặc từng người và nhấn **Gửi email**. Quản trị viên chọn được Sinh viên, Giảng viên hoặc người cụ thể toàn hệ thống; giảng viên chỉ chọn được Sinh viên hoặc từng sinh viên đang hướng dẫn, không gửi cho giảng viên khác. Backend kiểm tra phạm vi cho cả tìm kiếm, nhóm và ID cụ thể. Thành viên đã rời nhóm hoặc đăng ký chưa được duyệt không nằm trong phạm vi hướng dẫn. Không tự thêm tài khoản đăng nhập vào người nhận. Trạng thái giao hàng hiển thị trong **Nhật ký gửi email**; **Xem trước** chỉ hiển thị dữ liệu minh họa.
+
+Để gửi kết quả điểm tự động, quản trị viên mở **Cấu hình email → Công bố kết quả điểm**, bật công tắc và lưu mẫu. Khi người có quyền công bố kết quả, hệ thống xếp hàng email chứa điểm tổng kết, phiên bản và đường dẫn `/results`, gửi riêng cho các sinh viên có tên trong bản kết quả đã chốt. Chấm/lưu phiếu hoặc chốt điểm chưa công bố không gửi email. Mẫu này không có nút gửi thủ công hoặc chọn người nhận khác. SMTP vẫn cần `EMAIL_ENABLED=true` và các biến `MAIL_*` hợp lệ để giao thư thực tế.
+
+Database đang có dữ liệu cần áp dụng migration còn thiếu trong `database/migrations/`: `003-email-templates.sql` tạo bảng mẫu riêng; `004-result-published-email.sql` mở rộng CHECK event email để nhận `RESULT_PUBLISHED`. Migration 004 thay từng CHECK bằng một lệnh ALTER nguyên tử, giữ các event cũ và có thể chạy lại, không sửa/xóa các dòng dữ liệu. Docker Compose áp dụng qua `schema-migrate` khi dựng lại hệ thống. Nếu chạy ngoài Docker, thực thi migration trên database hiện có; không chạy lại toàn bộ schema bootstrap. File SQL chính đã chứa cấu trúc mới cho database khởi tạo từ đầu.
 
 ### Reset dữ liệu demo
 
 Khi không cần giữ dữ liệu local, reset toàn bộ dữ liệu Docker rồi khởi tạo lại
-schema và tài khoản demo bằng hai lệnh:
+schema và tài khoản demo bằng hai lệnh (chỉ local/demo):
 
 ```powershell
-docker compose down -v
-docker compose up --build -d
+docker compose -f docker-compose.yml -f docker-compose.demo.yml down -v
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build -d
 ```
 
 Lệnh reset xóa cả dữ liệu MySQL lẫn file upload trong volume Docker. Chỉ dùng

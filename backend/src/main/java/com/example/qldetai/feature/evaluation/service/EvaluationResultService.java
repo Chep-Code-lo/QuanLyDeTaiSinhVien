@@ -5,6 +5,7 @@ import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ResourceNotFoundException;
 import com.example.qldetai.feature.communication.service.NotificationService;
+import com.example.qldetai.feature.communication.email.EmailNotificationEventService;
 import com.example.qldetai.feature.evaluation.domain.AssessmentComponent;
 import com.example.qldetai.feature.evaluation.domain.AssessmentComponentType;
 import com.example.qldetai.feature.evaluation.domain.CommitteeRole;
@@ -78,6 +79,7 @@ public class EvaluationResultService {
     private final ResultMemberRepository resultMembers;
     private final GroupMemberRepository groupMembers;
     private final NotificationService notifications;
+    private final EmailNotificationEventService emails;
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final EvaluationActorAccess actorAccess;
@@ -117,16 +119,23 @@ public class EvaluationResultService {
                     specification.and(
                             (root, query, builder) -> builder.equal(root.get("status"), status));
         }
-        return PageResponse.from(
-                results.findAll(
+        var found = results.findAll(
                                 specification,
                                 PageRequest.of(
                                         page,
                                         size,
                                         Sort.by("finalizedAt")
                                                 .descending()
-                                                .and(Sort.by("id").descending())))
-                        .map(this::resultDetail));
+                                                .and(Sort.by("id").descending())));
+        List<Long> ids = found.getContent().stream().map(ResultVersion::getId).toList();
+        Map<Long, List<ResultInput>> inputsByResult = ids.isEmpty() ? Map.of() : resultInputs
+                .findByResultIdInOrderByIdAsc(ids).stream()
+                .collect(java.util.stream.Collectors.groupingBy(input -> input.getResult().getId()));
+        Map<Long, List<ResultMember>> membersByResult = ids.isEmpty() ? Map.of() : resultMembers
+                .findByResultIdInOrderByIdAsc(ids).stream()
+                .collect(java.util.stream.Collectors.groupingBy(member -> member.getResult().getId()));
+        return PageResponse.from(found.map(result -> resultDetail(result,
+                inputsByResult.getOrDefault(result.getId(), List.of()), membersByResult.getOrDefault(result.getId(), List.of()))));
     }
 
     @Transactional(readOnly = true)
@@ -166,11 +175,13 @@ public class EvaluationResultService {
     @BusinessAudit(action = "RESULT_FINALIZE", entityType = "RESULT_VERSION", entityIdArgument = 0)
     public ResultResponse finalizeResult(Long assignmentId, Long actorId) {
         actorAccess.manager(actorId);
-        ProjectAssignment assignment = assignment(assignmentId);
+        ProjectAssignment assignment = assignments.findByIdForUpdate(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project assignment was not found."));
         List<AssessmentComponent> requiredComponents =
                 components.findByPeriodIdOrderByCodeAsc(assignment.getPeriod().getId());
         requireFinalizer(assignment, requiredComponents, actorId);
-        if (results.findByAssignmentIdAndStatus(assignmentId, ResultStatus.FINALIZED).isPresent()) {
+        List<ResultVersion> currentResults = results.findByAssignmentIdForUpdate(assignmentId);
+        if (currentResults.stream().anyMatch(result -> result.getStatus() == ResultStatus.FINALIZED)) {
             throw new BusinessRuleException(
                     "A finalized result is already awaiting publication or supersession.");
         }
@@ -203,7 +214,7 @@ public class EvaluationResultService {
             List<BigDecimal> componentScores = new java.util.ArrayList<>();
             for (EvaluationAssignment evaluation : componentEvaluations) {
                 ScoreSheet sheet =
-                        sheets.findByEvaluationId(evaluation.getId())
+                        sheets.findByEvaluationIdForUpdate(evaluation.getId())
                                 .orElseThrow(
                                         () ->
                                                 new BusinessRuleException(
@@ -237,7 +248,8 @@ public class EvaluationResultService {
 
         ResultVersion resultVersion = new ResultVersion();
         resultVersion.setAssignment(assignment);
-        resultVersion.setVersionNo((int) results.countByAssignmentId(assignmentId) + 1);
+        resultVersion.setVersionNo(Math.addExact(currentResults.stream()
+                .mapToInt(ResultVersion::getVersionNo).max().orElse(0), 1));
         resultVersion.setFinalScore(finalScore);
         resultVersion.setFinalizedBy(actorAccess.user(actorId));
         resultVersion.setFinalizedAt(LocalDateTime.now(clock));
@@ -284,7 +296,7 @@ public class EvaluationResultService {
     public ResultResponse publish(Long resultId, Long actorId) {
         actorAccess.manager(actorId);
         ResultVersion resultVersion =
-                results.findById(resultId)
+                results.findByIdForUpdate(resultId)
                         .orElseThrow(() -> new ResourceNotFoundException("Result was not found."));
         if (resultVersion.getStatus() != ResultStatus.FINALIZED) {
             throw new BusinessRuleException("Only a finalized result can be published.");
@@ -313,6 +325,8 @@ public class EvaluationResultService {
                                         "Kết quả đề tài",
                                         "Kết quả đánh giá của nhóm đã được công bố.",
                                         "/results/" + resultVersion.getId()));
+        results.saveAndFlush(resultVersion);
+        emails.resultPublished(resultVersion);
         return result(resultVersion);
     }
 
@@ -424,13 +438,6 @@ public class EvaluationResultService {
         }
     }
 
-    private ProjectAssignment assignment(Long assignmentId) {
-        return assignments
-                .findById(assignmentId)
-                .orElseThrow(
-                        () -> new ResourceNotFoundException("Project assignment was not found."));
-    }
-
     private ResultResponse result(ResultVersion resultVersion) {
         return new ResultResponse(
                 resultVersion.getId(),
@@ -441,6 +448,11 @@ public class EvaluationResultService {
     }
 
     private ResultDetailResponse resultDetail(ResultVersion resultVersion) {
+        return resultDetail(resultVersion, resultInputs.findByResultIdOrderByIdAsc(resultVersion.getId()),
+                resultMembers.findByResultIdOrderByIdAsc(resultVersion.getId()));
+    }
+
+    private ResultDetailResponse resultDetail(ResultVersion resultVersion, List<ResultInput> inputs, List<ResultMember> members) {
         ProjectAssignment assignment = resultVersion.getAssignment();
         return new ResultDetailResponse(
                 resultVersion.getId(),
@@ -469,7 +481,7 @@ public class EvaluationResultService {
                         ? null
                         : resultVersion.getPublishedBy().getFullName(),
                 resultVersion.getPublishedAt(),
-                resultInputs.findByResultIdOrderByIdAsc(resultVersion.getId()).stream()
+                inputs.stream()
                         .map(
                                 input ->
                                         new ResultInputResponse(
@@ -481,7 +493,7 @@ public class EvaluationResultService {
                                                 input.getScoreSnapshot(),
                                                 input.getRubricSnapshot()))
                         .toList(),
-                resultMembers.findByResultIdOrderByIdAsc(resultVersion.getId()).stream()
+                members.stream()
                         .map(
                                 member ->
                                         new ResultMemberResponse(

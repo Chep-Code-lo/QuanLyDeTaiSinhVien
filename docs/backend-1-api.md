@@ -211,7 +211,7 @@ Mỗi response có header `X-Request-Id`; audit dùng cùng mã để đối chi
 
 ## Dữ liệu demo
 
-Docker nạp `database/seed/demo-data.sql` khi MySQL khởi tạo volume mới. Bộ dữ
+Docker mặc định chỉ nạp schema và vai trò hệ thống, không nạp demo. Dùng `docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build -d` trên volume mới để nạp thêm `database/seed/demo-data.sql` cho local. Bộ dữ
 liệu gồm khoa CNTT, ba bộ môn, các đợt `COURSE`, `SPECIALIZED`, `GRADUATION`,
 đề tài, nhóm, phân công, hội đồng và một kết quả đã công bố. Xem tài khoản tại
 [`demo-accounts.md`](demo-accounts.md).

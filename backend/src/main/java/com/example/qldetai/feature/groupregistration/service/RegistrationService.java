@@ -94,18 +94,19 @@ public class RegistrationService {
     @BusinessAudit(action = "TOPIC_REGISTRATION_CREATE", entityType = "TOPIC_REGISTRATION")
     public TopicRegistrationResponse create(CreateTopicRegistrationRequest request, Long actorId) {
         Student actor = requireStudent(actorId);
-        StudentGroup group = requireGroup(request.groupId());
-        Topic topic = requireTopic(request.topicId());
+        StudentGroup group = requireGroupForUpdate(request.groupId());
+        Topic topic = topicRepository.findByIdForUpdate(request.topicId())
+                .orElseThrow(() -> new ResourceNotFoundException("Topic was not found."));
         ensureLeader(group.getId(), actor.getId());
         ensureGroupReady(group);
-        if (projectAssignmentRepository.existsByGroupId(group.getId())) {
+        if (projectAssignmentRepository.findByGroupIdForUpdate(group.getId()).isPresent()) {
             throw new BusinessRuleException("This group already has a project assignment.");
         }
-        if (projectAssignmentRepository.existsByTopicId(topic.getId())) {
+        if (projectAssignmentRepository.findByTopicIdForUpdate(topic.getId()).isPresent()) {
             throw new ConflictException("This topic already has a project assignment.");
         }
-        if (topicRegistrationRepository.existsByGroupIdAndStatusIn(
-                group.getId(), List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED))) {
+        if (!topicRegistrationRepository.findByGroupIdAndStatusInForUpdate(
+                group.getId(), List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED)).isEmpty()) {
             throw new ConflictException("This group already has a pending or approved topic registration.");
         }
         if (!topic.getPeriod().getId().equals(group.getPeriod().getId())) {
@@ -133,7 +134,7 @@ public class RegistrationService {
     @Transactional
     @BusinessAudit(action = "TOPIC_REGISTRATION_REVIEW", entityType = "TOPIC_REGISTRATION", entityIdArgument = 0)
     public TopicRegistrationResponse review(Long id, ReviewTopicRegistrationRequest request, Long actorId) {
-        TopicRegistration registration = requireRegistration(id);
+        TopicRegistration registration = requireRegistrationForUpdate(id);
         User actor = requireReviewer(actorId);
         verifyVersion(registration, request.version());
         if (registration.getStatus() != RegistrationStatus.PENDING) {
@@ -165,7 +166,7 @@ public class RegistrationService {
     @Transactional
     @BusinessAudit(action = "TOPIC_REGISTRATION_WITHDRAW", entityType = "TOPIC_REGISTRATION", entityIdArgument = 0)
     public TopicRegistrationResponse withdraw(Long id, WithdrawTopicRegistrationRequest request, Long actorId) {
-        TopicRegistration registration = requireRegistration(id);
+        TopicRegistration registration = requireRegistrationForUpdate(id);
         Student actor = requireStudent(actorId);
         verifyVersion(registration, request.version());
         ensureLeader(registration.getGroup().getId(), actor.getId());
@@ -220,14 +221,14 @@ public class RegistrationService {
         return actor;
     }
 
-    private StudentGroup requireGroup(Long id) {
-        return studentGroupRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Student group was not found."));
+    private TopicRegistration requireRegistrationForUpdate(Long id) {
+        return topicRegistrationRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Topic registration was not found."));
     }
 
-    private Topic requireTopic(Long id) {
-        return topicRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Topic was not found."));
+    private StudentGroup requireGroupForUpdate(Long id) {
+        return studentGroupRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Student group was not found."));
     }
 
     private TopicRegistration requireRegistration(Long id) {

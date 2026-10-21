@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
-import { Eye, MailCheck, RefreshCw, Save, Send } from 'lucide-react'
+import { Eye, Plus, RefreshCw, Save, Send } from 'lucide-react'
 import { emailNotificationsApi } from '../api/emailNotifications'
 import { PageHeader } from '../components/PageHeader'
 import { useToast } from '../context/ToastContext'
+import { useAuth } from '../context/AuthContext'
 import type {
   EmailLogResponse,
   EmailNotificationEventType,
@@ -11,6 +12,8 @@ import type {
   EmailOutboxStatus,
   EmailPreviewResponse,
   EmailRecipientGroup,
+  EmailRecipientResponse,
+  EmailTemplateResponse,
   UpdateEmailNotificationSettingRequest,
 } from '../types/domain'
 import { formatDateTime } from '../utils/dateTime'
@@ -31,51 +34,40 @@ type EventDefinition = {
   eventType: EmailNotificationEventType
   label: string
   description: string
-  recipientGroups: EmailRecipientGroup[]
 }
 
 const eventDefinitions: EventDefinition[] = [
   {
+    eventType: 'RESULT_PUBLISHED',
+    label: 'Công bố kết quả điểm',
+    description: 'Tự động gửi điểm tổng kết cho sinh viên có tên trong kết quả khi kết quả được công bố.',
+  },
+  {
     eventType: 'TASK_ASSIGNED',
     label: 'Giao nhiệm vụ',
     description: 'Gửi khi giảng viên giao nhiệm vụ, mốc báo cáo mới.',
-    recipientGroups: ['DIRECT_PARTICIPANTS', 'GROUP_STUDENTS', 'TOPIC_STUDENTS', 'SUPERVISORS'],
   },
   {
     eventType: 'TOPIC_APPROVED',
     label: 'Đề tài được duyệt',
     description: 'Gửi khi đề tài hoặc đăng ký đề tài được phê duyệt.',
-    recipientGroups: ['DIRECT_PARTICIPANTS', 'GROUP_STUDENTS', 'TOPIC_STUDENTS', 'SUPERVISORS'],
   },
   {
     eventType: 'TOPIC_REJECTED',
     label: 'Đề tài bị từ chối',
     description: 'Gửi khi đề tài hoặc đăng ký đề tài chưa được chấp thuận.',
-    recipientGroups: ['DIRECT_PARTICIPANTS', 'GROUP_STUDENTS', 'TOPIC_STUDENTS', 'SUPERVISORS'],
   },
   {
     eventType: 'DEADLINE_REMINDER',
     label: 'Nhắc hạn báo cáo',
     description: 'Tự động nhắc trước hạn nộp của nhiệm vụ và mốc báo cáo.',
-    recipientGroups: ['DIRECT_PARTICIPANTS', 'GROUP_STUDENTS', 'TOPIC_STUDENTS', 'SUPERVISORS'],
   },
   {
     eventType: 'REGISTRATION_OPENED',
     label: 'Mở đợt đăng ký',
     description: 'Gửi khi một đợt đăng ký đề tài được kích hoạt.',
-    recipientGroups: ['FACULTY_STUDENTS', 'FACULTY_LECTURERS', 'ADMINS'],
   },
 ]
-
-const recipientLabels: Record<EmailRecipientGroup, string> = {
-  DIRECT_PARTICIPANTS: 'Người tham gia trực tiếp',
-  FACULTY_STUDENTS: 'Sinh viên thuộc khoa',
-  FACULTY_LECTURERS: 'Giảng viên thuộc khoa',
-  GROUP_STUDENTS: 'Thành viên nhóm',
-  TOPIC_STUDENTS: 'Sinh viên của đề tài',
-  SUPERVISORS: 'Giảng viên hướng dẫn',
-  ADMINS: 'Quản trị viên',
-}
 
 const statusLabels: Record<EmailOutboxStatus, string> = {
   PENDING: 'Đang chờ',
@@ -108,17 +100,31 @@ function formFromSetting(setting: EmailNotificationSettingResponse): EmailForm {
   }
 }
 
+function settingFromTemplate(template: EmailTemplateResponse, scopeType: 'SYSTEM' | 'LECTURER', scopeId: number): EmailNotificationSettingResponse {
+  return {
+    ...template, eventType: 'TASK_ASSIGNED', enabled: false,
+    recipientGroups: ['DIRECT_PARTICIPANTS'], scopeType, scopeId, allowedVariables: [],
+  }
+}
+
 function emailError(error: unknown): string {
   const message = isAxiosError(error) ? error.response?.data?.message : undefined
   switch (message) {
     case 'Save this email setting before sending a test message.':
-      return 'Hãy lưu cấu hình trước khi gửi thư kiểm tra.'
-    case 'The current account does not have an active email address for testing.':
-      return 'Tài khoản đang đăng nhập chưa có email hợp lệ để nhận thư kiểm tra.'
+    case 'Save this email setting before sending email.':
+      return 'Hãy lưu cấu hình trước khi gửi email.'
     case 'MAIL_FROM must be configured before email settings can be saved.':
       return 'Chưa cấu hình địa chỉ gửi mặc định trong biến môi trường MAIL_FROM.'
     case 'From email is not in the deployment\'s verified sender allow-list.':
       return 'Địa chỉ gửi chưa có trong danh sách MAIL_ALLOWED_FROM đã xác thực.'
+    case 'One or more selected recipients are unavailable. Reload the recipient list.':
+      return 'Một số người nhận không còn khả dụng. Vui lòng chọn lại.'
+    case 'No recipients matched the selected group.':
+      return 'Không có người nhận phù hợp trong nhóm đã chọn.'
+    case 'The email template was changed. Reload and try again.':
+      return 'Mẫu email đã được cập nhật. Vui lòng tải lại trước khi sửa.'
+    case 'Email template was not found.':
+      return 'Không tìm thấy mẫu email của bạn.'
     default:
       return message || 'Không thể xử lý cấu hình email. Vui lòng thử lại.'
   }
@@ -126,6 +132,10 @@ function emailError(error: unknown): string {
 
 export function EmailSettingsPage() {
   const { showError, showSuccess } = useToast()
+  const { user } = useAuth()
+  const isAdmin = user?.roles.includes('ADMIN') ?? false
+  const scopeType = isAdmin ? 'SYSTEM' : 'LECTURER'
+  const scopeId = isAdmin ? 0 : user?.id ?? 0
   const [settings, setSettings] = useState<EmailNotificationSettingResponse[]>([])
   const [logs, setLogs] = useState<EmailLogResponse[]>([])
   const [selectedEvent, setSelectedEvent] = useState<EmailNotificationEventType>('TASK_ASSIGNED')
@@ -136,29 +146,63 @@ export function EmailSettingsPage() {
   const [loadError, setLoadError] = useState('')
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
-  const [testing, setTesting] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [recipientType, setRecipientType] = useState<'STUDENT' | 'LECTURER' | 'SPECIFIC'>('SPECIFIC')
+  const [recipientSearch, setRecipientSearch] = useState('')
+  const [recipientPage, setRecipientPage] = useState(0)
+  const [recipients, setRecipients] = useState<EmailRecipientResponse[]>([])
+  const [selectedRecipients, setSelectedRecipients] = useState<EmailRecipientResponse[]>([])
+  const [recipientTotal, setRecipientTotal] = useState(0)
+  const [recipientPages, setRecipientPages] = useState(0)
+  const [recipientsLoading, setRecipientsLoading] = useState(true)
+  const [recipientError, setRecipientError] = useState('')
+  const [customTemplates, setCustomTemplates] = useState<EmailTemplateResponse[]>([])
+  const [selectedCustom, setSelectedCustom] = useState<EmailTemplateResponse | null>(null)
+  const [creatingTemplate, setCreatingTemplate] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [templatePage, setTemplatePage] = useState(0)
+  const [templatePages, setTemplatePages] = useState(0)
+  const [templatesLoading, setTemplatesLoading] = useState(false)
+  const resultEmail = !creatingTemplate && !selectedCustom && selectedEvent === 'RESULT_PUBLISHED'
 
   const selectedSetting = useMemo(
-    () => settings.find((setting) => setting.eventType === selectedEvent),
-    [selectedEvent, settings],
+    () => selectedCustom ? settingFromTemplate(selectedCustom, scopeType, scopeId)
+      : settings.find((setting) => setting.eventType === selectedEvent),
+    [selectedEvent, settings, selectedCustom, scopeType, scopeId],
   )
   const selectedDefinition = useMemo(
-    () => eventDefinitions.find((definition) => definition.eventType === selectedEvent),
-    [selectedEvent],
+    () => creatingTemplate ? { label: 'Tạo mẫu email', description: 'Soạn và lưu mẫu email mới để sử dụng lại.' }
+      : selectedCustom ? { label: selectedCustom.name, description: 'Mẫu email của bạn.' }
+      : eventDefinitions.find((definition) => definition.eventType === selectedEvent),
+    [selectedEvent, selectedCustom, creatingTemplate],
   )
 
   const loadSettings = useCallback(async () => {
     setLoading(true)
     setLoadError('')
     try {
-      const items = await emailNotificationsApi.listSettings()
+      const items = await emailNotificationsApi.listSettings({ scopeType, scopeId })
       setSettings(items)
     } catch (error) {
       setLoadError(emailError(error))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [scopeType, scopeId])
+
+  const loadTemplates = useCallback(async (page = 0) => {
+    setTemplatesLoading(true)
+    try {
+      const result = await emailNotificationsApi.listTemplates(page)
+      setCustomTemplates(result.content)
+      setTemplatePage(page)
+      setTemplatePages(result.totalPages)
+    } catch (error) {
+      showError(emailError(error))
+    } finally {
+      setTemplatesLoading(false)
+    }
+  }, [showError])
 
   const loadLogs = useCallback(async () => {
     setLogsLoading(true)
@@ -175,26 +219,50 @@ export function EmailSettingsPage() {
   useEffect(() => {
     void loadSettings()
     void loadLogs()
-  }, [loadLogs, loadSettings])
+    void loadTemplates()
+  }, [loadLogs, loadSettings, loadTemplates])
 
   useEffect(() => {
-    if (selectedSetting) {
+    if (selectedSetting && !creatingTemplate) {
       setForm(formFromSetting(selectedSetting))
       setPreview(null)
     }
-  }, [selectedSetting])
+  }, [selectedSetting, creatingTemplate])
 
   const updateField = <Field extends keyof EmailForm>(field: Field, value: EmailForm[Field]) => {
     setForm((current) => ({ ...current, [field]: value }))
   }
 
-  const toggleRecipient = (recipientGroup: EmailRecipientGroup) => {
-    setForm((current) => ({
-      ...current,
-      recipientGroups: current.recipientGroups.includes(recipientGroup)
-        ? current.recipientGroups.filter((item) => item !== recipientGroup)
-        : [...current.recipientGroups, recipientGroup],
-    }))
+  const hasUnsavedChanges = selectedSetting
+    ? creatingTemplate || JSON.stringify(form) !== JSON.stringify(formFromSetting(selectedSetting))
+      || Boolean(selectedCustom && templateName.trim() !== selectedCustom.name)
+    : true
+
+  useEffect(() => {
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      void emailNotificationsApi.listRecipients({
+        role: recipientType === 'SPECIFIC' ? undefined : recipientType,
+        search: recipientType === 'SPECIFIC' ? recipientSearch : undefined,
+        page: recipientType === 'SPECIFIC' ? recipientPage : 0,
+      }).then(result => {
+        if (cancelled) return
+        setRecipients(result.content)
+        setRecipientTotal(result.totalElements)
+        setRecipientPages(result.totalPages)
+      }).catch(error => {
+        if (!cancelled) setRecipientError(emailError(error))
+      }).finally(() => {
+        if (!cancelled) setRecipientsLoading(false)
+      })
+    }, 250)
+    return () => { cancelled = true; window.clearTimeout(timer) }
+  }, [recipientType, recipientSearch, recipientPage])
+
+  const togglePerson = (recipient: EmailRecipientResponse) => {
+    setSelectedRecipients(current => current.some(person => person.userId === recipient.userId)
+      ? current.filter(person => person.userId !== recipient.userId)
+      : [...current, recipient])
   }
 
   const requestPayload = (): UpdateEmailNotificationSettingRequest | null => {
@@ -207,8 +275,8 @@ export function EmailSettingsPage() {
       return null
     }
     return {
-      scopeType: 'SYSTEM',
-      scopeId: 0,
+      scopeType: selectedSetting?.scopeType ?? scopeType,
+      scopeId: selectedSetting?.scopeId ?? scopeId,
       enabled: form.enabled,
       senderName: form.senderName.trim(),
       fromEmail: form.fromEmail.trim() || undefined,
@@ -223,11 +291,33 @@ export function EmailSettingsPage() {
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (saving || !selectedSetting) return
+    if ((creatingTemplate || selectedCustom) && !templateName.trim()) {
+      showError('Vui lòng nhập tên mẫu email.')
+      return
+    }
     const payload = requestPayload()
     if (!payload) return
 
     setSaving(true)
     try {
+      if (creatingTemplate || selectedCustom) {
+        const templatePayload = {
+          name: templateName.trim(), senderName: payload.senderName, fromEmail: payload.fromEmail,
+          replyToEmail: payload.replyToEmail, subjectTemplate: payload.subjectTemplate,
+          bodyTemplate: payload.bodyTemplate, version: selectedCustom?.version,
+        }
+        const saved = selectedCustom
+          ? await emailNotificationsApi.updateTemplate(selectedCustom.id, templatePayload)
+          : await emailNotificationsApi.createTemplate(templatePayload)
+        setSelectedCustom(saved)
+        setCreatingTemplate(false)
+        setTemplateName(saved.name)
+        setSelectedEvent('TASK_ASSIGNED')
+        setForm(formFromSetting(settingFromTemplate(saved, scopeType, scopeId)))
+        void loadTemplates()
+        showSuccess('Đã lưu mẫu email.')
+        return
+      }
       const saved = await emailNotificationsApi.updateSetting(selectedEvent, payload)
       setSettings((items) => items.map((item) => item.eventType === saved.eventType ? saved : item))
       setForm(formFromSetting(saved))
@@ -263,21 +353,42 @@ export function EmailSettingsPage() {
     }
   }
 
-  const sendTest = async () => {
-    if (testing || !selectedSetting?.id) {
-      if (!selectedSetting?.id) showError('Hãy lưu cấu hình trước khi gửi thư kiểm tra.')
+  const sendEmail = async () => {
+    if (sending) return
+    if (!selectedSetting?.id || hasUnsavedChanges) {
+      showError('Hãy lưu cấu hình trước khi gửi email.')
       return
     }
-    setTesting(true)
+    if (recipientType === 'SPECIFIC' && selectedRecipients.length === 0) {
+      showError('Chọn ít nhất một người nhận.')
+      return
+    }
+    setSending(true)
     try {
-      const result = await emailNotificationsApi.sendTest(selectedEvent)
-      showSuccess(`Đã xếp hàng thư kiểm tra tới ${result.recipientEmail}.`)
+      const payload = {
+        recipientRoles: recipientType === 'SPECIFIC' ? [] : [recipientType],
+        recipientUserIds: recipientType === 'SPECIFIC' ? selectedRecipients.map(person => person.userId) : [],
+      }
+      const result = selectedCustom
+        ? await emailNotificationsApi.sendTemplate(selectedCustom.id, payload)
+        : await emailNotificationsApi.send(selectedEvent, payload)
+      showSuccess(`Đã xếp hàng gửi email tới ${result.recipientCount} người nhận.`)
       void loadLogs()
     } catch (error) {
       showError(emailError(error))
     } finally {
-      setTesting(false)
+      setSending(false)
     }
+  }
+
+  const beginTemplate = () => {
+    setSelectedCustom(null)
+    setCreatingTemplate(true)
+    setSelectedEvent('TASK_ASSIGNED')
+    setTemplateName('')
+    setPreview(null)
+    setForm({ ...defaultForm, senderName: form.senderName, fromEmail: form.fromEmail,
+      replyToEmail: form.replyToEmail, recipientGroups: ['DIRECT_PARTICIPANTS'] })
   }
 
   if (loading) {
@@ -298,31 +409,30 @@ export function EmailSettingsPage() {
     <div className="email-settings-page">
       <PageHeader
         title="Cấu hình email"
-        description="Thiết lập nội dung và người nhận cho các thông báo email của toàn hệ thống."
+        description={isAdmin ? 'Quản lý mẫu và gửi email đến người nhận đã chọn.' : 'Quản lý mẫu và gửi email đến sinh viên đang hướng dẫn.'}
       />
-
-      <section className="page-card email-settings__notice" aria-label="Trạng thái cấu hình SMTP">
-        <MailCheck size={24} aria-hidden="true" />
-        <div>
-          <strong>SMTP được cấu hình bằng biến môi trường</strong>
-          <p>Thông tin nhạy cảm chỉ nằm trong file <code>.env</code>. Lưu mẫu thư, bật loại thông báo rồi gửi thư kiểm tra để xác nhận kết nối.</p>
-        </div>
-      </section>
 
       <div className="email-settings__layout">
         <nav className="page-card email-settings__events" aria-label="Loại thông báo email">
-          <h2 className="section-title">Loại thông báo</h2>
+          <div className="email-settings__template-heading">
+            <h2 className="section-title">Mẫu email</h2>
+            <button type="button" className="btn btn-primary" onClick={beginTemplate} disabled={saving || sending}>
+              <Plus size={16} aria-hidden="true" /> Tạo mẫu mới
+            </button>
+          </div>
+          <h3 className="email-settings__template-subtitle">Mẫu mặc định</h3>
           <div className="email-settings__event-list">
-            {eventDefinitions.map((definition) => {
+            {eventDefinitions.filter(definition => settings.some(setting => setting.eventType === definition.eventType)).map((definition) => {
               const setting = settings.find((item) => item.eventType === definition.eventType)
-              const active = definition.eventType === selectedEvent
+              const active = !creatingTemplate && !selectedCustom && definition.eventType === selectedEvent
               return (
                 <button
                   key={definition.eventType}
                   type="button"
                   className={`email-settings__event${active ? ' email-settings__event--active' : ''}`}
                   aria-pressed={active}
-                  onClick={() => setSelectedEvent(definition.eventType)}
+                  disabled={saving || sending}
+                  onClick={() => { setSelectedEvent(definition.eventType); setSelectedCustom(null); setCreatingTemplate(false) }}
                 >
                   <span>
                     <strong>{definition.label}</strong>
@@ -335,6 +445,28 @@ export function EmailSettingsPage() {
               )
             })}
           </div>
+          <h3 className="email-settings__template-subtitle">Mẫu của tôi</h3>
+          <div className="email-settings__event-list" aria-label="Mẫu email của tôi">
+            {customTemplates.map(template => (
+              <button key={template.id} type="button"
+                className={`email-settings__event${!creatingTemplate && selectedCustom?.id === template.id ? ' email-settings__event--active' : ''}`}
+                aria-pressed={!creatingTemplate && selectedCustom?.id === template.id} disabled={saving || sending}
+                onClick={() => { setSelectedCustom(template); setCreatingTemplate(false); setSelectedEvent('TASK_ASSIGNED'); setTemplateName(template.name) }}>
+                <span><strong>{template.name}</strong><small>{template.subjectTemplate}</small></span>
+              </button>
+            ))}
+            {customTemplates.length === 0 && !templatesLoading && <p className="email-settings__field-help">Chưa có mẫu riêng. Chọn Tạo mẫu mới để bắt đầu.</p>}
+            {templatesLoading && <p role="status">Đang tải mẫu email...</p>}
+          </div>
+          {templatePages > 1 && (
+            <div className="email-settings__recipient-pagination">
+              <button type="button" className="btn btn-secondary" disabled={templatePage === 0 || templatesLoading}
+                onClick={() => void loadTemplates(templatePage - 1)}>Trước</button>
+              <span>{templatePage + 1} / {templatePages}</span>
+              <button type="button" className="btn btn-secondary" disabled={templatePage + 1 >= templatePages || templatesLoading}
+                onClick={() => void loadTemplates(templatePage + 1)}>Sau</button>
+            </div>
+          )}
         </nav>
 
         <form className="page-card email-settings__form" onSubmit={save}>
@@ -343,7 +475,7 @@ export function EmailSettingsPage() {
               <h2 className="section-title">{selectedDefinition.label}</h2>
               <p>{selectedDefinition.description}</p>
             </div>
-            <label className="email-settings__switch">
+            {!creatingTemplate && !selectedCustom && <label className="email-settings__switch">
               <input
                 type="checkbox"
                 checked={form.enabled}
@@ -351,9 +483,14 @@ export function EmailSettingsPage() {
               />
               <span aria-hidden="true" />
               <b>{form.enabled ? 'Đang bật' : 'Đang tắt'}</b>
-            </label>
+            </label>}
           </div>
 
+          {(creatingTemplate || selectedCustom) && <div className="form-group">
+            <label className="form-label" htmlFor="email-template-name">Tên mẫu email</label>
+            <input id="email-template-name" className="form-input" value={templateName} maxLength={150} required
+              onChange={event => setTemplateName(event.target.value)} placeholder="Ví dụ: Thông báo họp nhóm" />
+          </div>}
           <div className="email-settings__grid">
             <div className="form-group">
               <label className="form-label" htmlFor="email-sender-name">Tên người gửi</label>
@@ -390,7 +527,7 @@ export function EmailSettingsPage() {
                 maxLength={254}
               />
             </div>
-            {selectedEvent === 'DEADLINE_REMINDER' && (
+            {!selectedCustom && !creatingTemplate && selectedEvent === 'DEADLINE_REMINDER' && (
               <div className="form-group">
                 <label className="form-label" htmlFor="email-reminder-hours">Nhắc trước hạn</label>
                 <select
@@ -420,7 +557,8 @@ export function EmailSettingsPage() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label" htmlFor="email-body">Nội dung thư (HTML)</label>
+            <label className="form-label" htmlFor="email-body">Nội dung thư</label>
+            <p className="email-settings__field-help">Soạn nội dung email bằng văn bản thường, có thể xuống dòng.</p>
             <textarea
               id="email-body"
               className="form-input email-settings__body"
@@ -432,46 +570,93 @@ export function EmailSettingsPage() {
             />
           </div>
 
-          <fieldset className="email-settings__recipients">
-            <legend className="form-label">Nhóm người nhận</legend>
-            <div>
-              {selectedDefinition.recipientGroups.map((recipientGroup) => (
-                <label key={recipientGroup} className="email-settings__recipient">
-                  <input
-                    type="checkbox"
-                    checked={form.recipientGroups.includes(recipientGroup)}
-                    onChange={() => toggleRecipient(recipientGroup)}
-                  />
-                  <span>{recipientLabels[recipientGroup]}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <div className="email-settings__variables">
-            <strong>Biến có thể dùng</strong>
-            <div>
-              {selectedSetting.allowedVariables.map((variable) => <code key={variable}>{`{{${variable}}}`}</code>)}
-            </div>
-          </div>
+          {resultEmail ? <p className="email-settings__field-help">Người nhận là sinh viên có tên trong kết quả đã chốt. Email tự động được xếp hàng khi công bố kết quả; không gửi từ biểu mẫu này.</p> : <fieldset className="email-settings__recipients" disabled={sending}>
+            <legend className="form-label">Người nhận email</legend>
+            <label className="form-label" htmlFor="email-recipient-type">Gửi đến</label>
+            <select id="email-recipient-type" className="form-input" value={recipientType} onChange={event => {
+              setRecipientsLoading(true)
+              setRecipientError('')
+              setRecipientType(event.target.value as typeof recipientType)
+              setRecipientPage(0)
+              setRecipientSearch('')
+            }}>
+              <option value="SPECIFIC">Chọn người cụ thể</option>
+              <option value="STUDENT">Sinh viên</option>
+              {isAdmin && <option value="LECTURER">Giảng viên</option>}
+            </select>
+            {recipientType === 'SPECIFIC' && (
+              <div className="email-settings__people">
+                <label className="form-label" htmlFor="email-recipient-search">Tìm người nhận</label>
+                <input id="email-recipient-search" className="form-input" type="search" value={recipientSearch}
+                  placeholder="Tìm theo tên hoặc email" onChange={event => {
+                    setRecipientsLoading(true)
+                    setRecipientError('')
+                    setRecipientSearch(event.target.value)
+                    setRecipientPage(0)
+                  }} />
+                {selectedRecipients.length > 0 && (
+                  <div className="email-settings__selected" aria-label="Người nhận đã chọn">
+                    {selectedRecipients.map(person => (
+                      <button key={person.userId} type="button" className="email-settings__selected-person"
+                        onClick={() => togglePerson(person)} aria-label={`Bỏ chọn ${person.fullName} (${person.email})`}>
+                        {person.fullName} <span>{person.email}</span> ×
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!recipientsLoading && !recipientError && (
+                  <div className="email-settings__person-list">
+                    {recipients.length === 0 ? <p>Không tìm thấy người nhận phù hợp.</p> : recipients.map(person => (
+                      <label key={person.userId} className="email-settings__person">
+                        <input type="checkbox" checked={selectedRecipients.some(selected => selected.userId === person.userId)}
+                          disabled={selectedRecipients.length >= 500 && !selectedRecipients.some(selected => selected.userId === person.userId)}
+                          onChange={() => togglePerson(person)} />
+                        <span><strong>{person.fullName}</strong><small>{person.email}</small></span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {recipientPages > 1 && (
+                  <div className="email-settings__recipient-pagination">
+                    <button type="button" className="btn btn-secondary" disabled={recipientPage === 0 || recipientsLoading}
+                      onClick={() => { setRecipientsLoading(true); setRecipientPage(page => page - 1) }}>Trang trước</button>
+                    <span>Trang {recipientPage + 1} / {recipientPages}</span>
+                    <button type="button" className="btn btn-secondary" disabled={recipientPage + 1 >= recipientPages || recipientsLoading}
+                      onClick={() => { setRecipientsLoading(true); setRecipientPage(page => page + 1) }}>Trang sau</button>
+                  </div>
+                )}
+              </div>
+            )}
+            {recipientsLoading ? <p role="status">Đang tải người nhận...</p>
+              : recipientError ? <p role="alert">{recipientError}</p>
+              : <p className="email-settings__field-help">{recipientType === 'SPECIFIC'
+                ? `Đã chọn ${selectedRecipients.length} người nhận.`
+                : `Gửi tới toàn bộ ${recipientTotal} ${recipientType === 'STUDENT' ? 'sinh viên' : 'giảng viên'}${isAdmin ? '' : ' đang hướng dẫn'}.`}</p>}
+            {hasUnsavedChanges && <p className="email-settings__field-help">Lưu thay đổi trước khi gửi email.</p>}
+          </fieldset>}
 
           <div className="email-settings__actions">
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => setForm(formFromSetting(selectedSetting))}
-              disabled={saving || previewing || testing}
+              onClick={() => {
+                if (creatingTemplate) { setCreatingTemplate(false); return }
+                setForm(formFromSetting(selectedSetting))
+                if (selectedCustom) setTemplateName(selectedCustom.name)
+              }}
+              disabled={saving || previewing || sending}
             >
               <RefreshCw size={17} aria-hidden="true" /> Khôi phục
             </button>
-            <button type="button" className="btn btn-secondary" onClick={() => void showPreview()} disabled={saving || previewing || testing}>
+            <button type="button" className="btn btn-secondary" onClick={() => void showPreview()} disabled={saving || previewing || sending}>
               <Eye size={17} aria-hidden="true" /> {previewing ? 'Đang tạo xem trước...' : 'Xem trước'}
             </button>
-            <button type="button" className="btn btn-secondary" onClick={() => void sendTest()} disabled={saving || previewing || testing || !selectedSetting.id}>
-              <Send size={17} aria-hidden="true" /> {testing ? 'Đang xếp hàng...' : 'Gửi thử'}
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={saving || previewing || testing}>
-              <Save size={17} aria-hidden="true" /> {saving ? 'Đang lưu...' : 'Lưu cấu hình'}
+            {!resultEmail && <button type="button" className="btn btn-secondary" onClick={() => void sendEmail()}
+              disabled={saving || previewing || sending || !selectedSetting.id || hasUnsavedChanges || recipientsLoading || Boolean(recipientError) || (recipientType === 'SPECIFIC' ? selectedRecipients.length === 0 : recipientTotal === 0)}>
+              <Send size={17} aria-hidden="true" /> {sending ? 'Đang xếp hàng...' : 'Gửi email'}
+            </button>}
+            <button type="submit" className="btn btn-primary" disabled={saving || previewing || sending}>
+              <Save size={17} aria-hidden="true" /> {saving ? 'Đang lưu...' : creatingTemplate ? 'Tạo mẫu' : selectedCustom ? 'Lưu mẫu' : 'Lưu cấu hình'}
             </button>
           </div>
         </form>
@@ -491,12 +676,7 @@ export function EmailSettingsPage() {
             {preview.replyToEmail && <div><dt>Phản hồi</dt><dd>{preview.replyToEmail}</dd></div>}
             <div><dt>Tiêu đề</dt><dd>{preview.subject}</dd></div>
           </dl>
-          <iframe
-            className="email-settings__preview-frame"
-            sandbox=""
-            srcDoc={preview.body}
-            title="Nội dung email xem trước"
-          />
+          <pre className="email-settings__preview-body">{preview.body}</pre>
         </section>
       )}
 
@@ -513,7 +693,7 @@ export function EmailSettingsPage() {
         {logsLoading ? (
           <div className="content-state" role="status"><span className="spinner" /><p>Đang tải nhật ký email...</p></div>
         ) : logs.length === 0 ? (
-          <div className="content-state"><strong>Chưa có email nào trong hàng đợi</strong><p>Gửi thử một mẫu thư để kiểm tra cấu hình SMTP.</p></div>
+          <div className="content-state"><strong>Chưa có email nào trong hàng đợi</strong><p>Email đã gửi sẽ xuất hiện tại đây.</p></div>
         ) : (
           <div className="table-container">
             <table className="data-table email-settings__log-table">
@@ -531,7 +711,8 @@ export function EmailSettingsPage() {
                 {logs.map((log) => (
                   <tr key={log.id}>
                     <td>{formatDateTime(log.createdAt)}</td>
-                    <td>{eventDefinitions.find((item) => item.eventType === log.eventType)?.label ?? log.eventType}</td>
+                    <td>{log.eventKey.startsWith('email-manual:') ? 'Email thủ công'
+                      : eventDefinitions.find((item) => item.eventType === log.eventType)?.label ?? log.eventType}</td>
                     <td className="email-settings__recipient-cell"><strong>{log.recipientName}</strong><span>{log.recipientEmail}</span></td>
                     <td>{log.subject}</td>
                     <td><span className={`email-settings__log-status email-settings__log-status--${log.status.toLowerCase()}`} title={log.lastError}>{statusLabels[log.status]}</span></td>

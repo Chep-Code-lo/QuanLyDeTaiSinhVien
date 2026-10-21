@@ -1,5 +1,9 @@
+-- LOCAL/DEMO ONLY. Not imported by the default Docker/VPS configuration.
+-- Requires the main schema and empty application tables. Import once only.
+-- Docker local demo: docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build -d
 SET NAMES utf8mb4 COLLATE utf8mb4_0900_as_cs;
 SET SESSION time_zone = '+00:00';
+USE `ql_de_tai_sinh_vien`;
 START TRANSACTION;
 
 SET @seed_now := UTC_TIMESTAMP(6);

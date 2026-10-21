@@ -6,6 +6,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.ConcurrencyFailureException;
+import jakarta.persistence.OptimisticLockException;
+import jakarta.persistence.PessimisticLockException;
+import jakarta.persistence.LockTimeoutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -15,6 +19,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.ServletRequestBindingException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 /**
  * Converts common request errors to the application's consistent API envelope.
@@ -46,7 +53,9 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.failure("Request validation failed.", violations));
     }
 
-    @ExceptionHandler({HttpMessageNotReadableException.class, IllegalArgumentException.class})
+    @ExceptionHandler({HttpMessageNotReadableException.class, IllegalArgumentException.class,
+            ServletRequestBindingException.class, MethodArgumentTypeMismatchException.class,
+            HandlerMethodValidationException.class})
     public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception exception) {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.failure("The request payload is invalid."));
@@ -68,6 +77,13 @@ public class GlobalExceptionHandler {
                 ? exception.getMessage()
                 : "The requested change conflicts with existing data.";
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.failure(message));
+    }
+
+    @ExceptionHandler({ConcurrencyFailureException.class, OptimisticLockException.class,
+            PessimisticLockException.class, LockTimeoutException.class})
+    public ResponseEntity<ApiResponse<Void>> handleConcurrentChange(Exception exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.failure("The data was changed by another request. Reload and try again."));
     }
 
     @ExceptionHandler({BadCredentialsException.class, AuthenticationException.class})

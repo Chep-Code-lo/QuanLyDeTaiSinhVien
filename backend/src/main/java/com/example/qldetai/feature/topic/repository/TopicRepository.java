@@ -4,6 +4,9 @@ import com.example.qldetai.feature.academic.domain.ProjectType;
 import com.example.qldetai.feature.topic.domain.Topic;
 import com.example.qldetai.feature.topic.domain.TopicStatus;
 import java.util.List;
+import java.util.Optional;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,12 +16,24 @@ import org.springframework.data.repository.query.Param;
 
 public interface TopicRepository extends JpaRepository<Topic, Long> {
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select topic from Topic topic where topic.id = :id")
+    Optional<Topic> findByIdForUpdate(Long id);
+
+    @Override
+    @EntityGraph(attributePaths = {"period", "faculty", "department", "proposedBy", "reservedGroup"})
+    Page<Topic> findAll(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"period", "faculty", "department", "proposedBy", "reservedGroup"})
     Page<Topic> findByStatus(TopicStatus status, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"period", "faculty", "department", "proposedBy", "reservedGroup"})
     Page<Topic> findByPeriodId(Long periodId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"period", "faculty", "department", "proposedBy", "reservedGroup"})
     Page<Topic> findByPeriodIdAndStatus(Long periodId, TopicStatus status, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"period", "faculty", "department", "proposedBy", "reservedGroup"})
     @Query(
             value = """
                     select topic from Topic topic

@@ -46,10 +46,11 @@ import com.example.qldetai.feature.evaluation.repository.RubricRepository;
 import com.example.qldetai.feature.evaluation.repository.ResultInputRepository;
 import com.example.qldetai.feature.evaluation.repository.ScoreDetailRepository;
 import com.example.qldetai.feature.evaluation.repository.ScoreSheetRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -58,6 +59,7 @@ import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
@@ -87,17 +89,12 @@ public class EvaluationService {
     private final UserRepository users;
     private final TopicSupervisorRepository supervisors;
     private final Clock clock;
+    private final EntityManager entityManager;
 
 
     @Transactional(readOnly = true)
     public List<AssessmentComponentResponse> listComponents(Long periodId) {
-        List<AssessmentComponent> found = periodId == null
-                ? components.findAll().stream()
-                        .sorted(Comparator
-                                .comparing((AssessmentComponent component) -> component.getPeriod().getId())
-                                .thenComparing(AssessmentComponent::getCode, String.CASE_INSENSITIVE_ORDER))
-                        .toList()
-                : components.findByPeriodIdOrderByCodeAsc(periodId);
+        List<AssessmentComponent> found = components.findByPeriodIdOrderByCodeAsc(periodId);
         return found.stream().map(this::component).toList();
     }
 
@@ -132,12 +129,11 @@ public class EvaluationService {
     @BusinessAudit(action = "ASSESSMENT_COMPONENT_LOCK", entityType = "ASSESSMENT_COMPONENT", entityIdArgument = 0)
     public AssessmentComponentResponse lockComponent(Long componentId, Long actorId) {
         manager(actorId);
-        AssessmentComponent component = componentEntity(componentId);
+        AssessmentComponent component = componentForUpdate(componentId);
         if (!STATUS_DRAFT.equals(component.getStatus())) {
             throw new BusinessRuleException("Only a DRAFT assessment component can be locked.");
         }
-        boolean hasLockedRubric = rubrics.findByComponentIdOrderByVersionNoDesc(componentId).stream()
-                .anyMatch(rubric -> STATUS_LOCKED.equals(rubric.getStatus()));
+        boolean hasLockedRubric = rubrics.existsByComponentIdAndStatus(componentId, STATUS_LOCKED);
         if (!hasLockedRubric) {
             throw new BusinessRuleException("Lock at least one rubric before locking this assessment component.");
         }
@@ -147,17 +143,23 @@ public class EvaluationService {
 
     @Transactional(readOnly = true)
     public List<RubricResponse> listRubrics(Long componentId) {
-        List<Rubric> found = componentId == null
-                ? rubrics.findAll(Sort.by(Sort.Direction.DESC, "createdAt"))
-                : rubrics.findByComponentIdOrderByVersionNoDesc(componentId);
-        return found.stream().map(this::rubric).toList();
+        List<Rubric> found = rubrics.findByComponentIdOrderByVersionNoDesc(componentId);
+        if (found.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, List<RubricCriterion>> criteriaByRubric = criteria
+                .findByRubricIdInOrderBySortOrder(found.stream().map(Rubric::getId).toList()).stream()
+                .collect(java.util.stream.Collectors.groupingBy(criterion -> criterion.getRubric().getId()));
+        return found.stream().map(rubric -> rubric(rubric,
+                criteriaByRubric.getOrDefault(rubric.getId(), List.of()))).toList();
     }
 
     @Transactional
     @BusinessAudit(action = "RUBRIC_CREATE", entityType = "RUBRIC")
     public RubricResponse createRubric(CreateRubricRequest request, Long actorId) {
         manager(actorId);
-        AssessmentComponent component = componentEntity(request.componentId());
+        validateCriteria(request.criteria());
+        AssessmentComponent component = componentForUpdate(request.componentId());
         if (STATUS_LOCKED.equals(component.getStatus())) {
             throw new BusinessRuleException("A locked assessment component cannot receive a new rubric.");
         }
@@ -165,7 +167,8 @@ public class EvaluationService {
         Rubric rubric = new Rubric();
         rubric.setComponent(component);
         rubric.setName(request.name().trim());
-        rubric.setVersionNo((int) rubrics.countByComponentId(component.getId()) + 1);
+        rubric.setVersionNo(rubrics.findFirstByComponentIdOrderByVersionNoDesc(component.getId())
+                .map(latest -> Math.addExact(latest.getVersionNo(), 1)).orElse(1));
         rubric.setStatus(STATUS_DRAFT);
         rubric = rubrics.save(rubric);
 
@@ -231,17 +234,20 @@ public class EvaluationService {
             specification = specification.and((root, query, builder) -> builder.equal(root.get("status"), status));
         }
 
-        return PageResponse.from(evaluations.findAll(
+        Page<EvaluationAssignment> found = evaluations.findAll(
                         specification,
-                        PageRequest.of(page, size, Sort.by("deadlineAt").ascending().and(Sort.by("id").descending())))
-                .map(this::assignment));
+                        PageRequest.of(page, size, Sort.by("deadlineAt").ascending().and(Sort.by("id").descending())));
+        Map<Long, ScoreSheet> sheetsByEvaluation = found.isEmpty() ? Map.of() : sheets
+                .findByEvaluationIdIn(found.getContent().stream().map(EvaluationAssignment::getId).toList()).stream()
+                .collect(java.util.stream.Collectors.toMap(sheet -> sheet.getEvaluation().getId(), sheet -> sheet));
+        return PageResponse.from(found.map(evaluation -> assignment(evaluation, sheetsByEvaluation.get(evaluation.getId()))));
     }
 
     @Transactional
     @BusinessAudit(action = "EVALUATION_ASSIGN", entityType = "EVALUATION_ASSIGNMENT")
     public Long assign(CreateEvaluationRequest request, Long actorId) {
         manager(actorId);
-        ProjectAssignment assignment = assignments.findById(request.assignmentId())
+        ProjectAssignment assignment = assignments.findByIdForUpdate(request.assignmentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Project assignment was not found."));
         Rubric rubric = rubricEntity(request.rubricId());
         Lecturer lecturer = lecturers.findById(request.lecturerId())
@@ -263,10 +269,12 @@ public class EvaluationService {
                 .anyMatch(supervisor -> supervisor.getLecturer().getId().equals(lecturer.getId()))) {
             throw new BusinessRuleException("A supervisor cannot evaluate their own topic.");
         }
-        if (evaluations.countByAssignmentIdAndComponentIdAndStatus(
-                        assignment.getId(), component.getId(), EvaluationStatus.ACTIVE)
-                >= component.getExpectedEvaluators()) {
+        List<EvaluationAssignment> activeEvaluations = evaluations.findActiveForUpdate(assignment.getId(), component.getId());
+        if (activeEvaluations.size() >= component.getExpectedEvaluators()) {
             throw new ConflictException("This component already has enough evaluators.");
+        }
+        if (activeEvaluations.stream().anyMatch(existing -> existing.getLecturer().getId().equals(lecturer.getId()))) {
+            throw new ConflictException("This lecturer already evaluates this assessment component for the project.");
         }
 
         DefenseSession defense = null;
@@ -313,7 +321,7 @@ public class EvaluationService {
     @Transactional
     @BusinessAudit(action = "SCORE_SHEET_SAVE", entityType = "SCORE_SHEET", entityIdArgument = 0)
     public ScoreSheetResponse saveSheet(Long evaluationId, SaveSheetRequest request, Long actorId) {
-        EvaluationAssignment evaluation = evaluations.findById(evaluationId)
+        EvaluationAssignment evaluation = evaluations.findByIdForUpdate(evaluationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Evaluation assignment was not found."));
         if (!evaluation.getLecturer().getUser().getId().equals(actorId)) {
             throw new AccessDeniedException("Only the assigned evaluator can score this sheet.");
@@ -331,10 +339,12 @@ public class EvaluationService {
             throw new BusinessRuleException("The registration period review deadline has passed.");
         }
 
-        ScoreSheet sheet = sheets.findByEvaluationId(evaluationId).orElseGet(() -> {
+        ScoreSheet sheet = sheets.findByEvaluationIdForUpdate(evaluationId).orElseGet(() -> {
             ScoreSheet freshSheet = new ScoreSheet();
             freshSheet.setEvaluation(evaluation);
             freshSheet.setRubric(evaluation.getRubric());
+            // Revision zero describes the not-yet-created sheet returned by mySheet().
+            freshSheet.setVersion(1);
             return freshSheet;
         });
         if (sheet.getId() != null && resultInputs.existsBySheetId(sheet.getId())) {
@@ -347,16 +357,20 @@ public class EvaluationService {
         if (sheet.getId() != null && sheet.getVersion() != request.version()) {
             throw new ConflictException("The score sheet was changed. Reload and try again.");
         }
+        int originalVersion = sheet.getVersion();
 
         Map<Long, RubricCriterion> allowedCriteria = new HashMap<>();
         criteria.findByRubricIdOrderBySortOrder(evaluation.getRubric().getId())
                 .forEach(criterion -> allowedCriteria.put(criterion.getId(), criterion));
 
-        if (request.scores().size() != allowedCriteria.size()) {
+        if (request.scores() == null || request.scores().size() != allowedCriteria.size()) {
             throw new BusinessRuleException("Every rubric criterion must receive a score.");
         }
         Set<Long> submittedCriterionIds = new HashSet<>();
         for (ScoreRequest score : request.scores()) {
+            if (score == null || score.score() == null || score.score().signum() < 0) {
+                throw new BusinessRuleException("A score must be between zero and its criterion maximum.");
+            }
             RubricCriterion criterion = allowedCriteria.get(score.criterionId());
             if (criterion == null
                     || !submittedCriterionIds.add(score.criterionId())
@@ -376,6 +390,8 @@ public class EvaluationService {
         sheet = sheets.saveAndFlush(sheet);
 
         details.deleteBySheetId(sheet.getId());
+        // Remove old (sheet, criterion) keys before IDENTITY inserts of replacement details.
+        details.flush();
         for (ScoreRequest score : request.scores()) {
             RubricCriterion criterion = allowedCriteria.get(score.criterionId());
             ScoreDetail detail = new ScoreDetail();
@@ -392,6 +408,10 @@ public class EvaluationService {
             sheet.setStatus(ScoreSheetStatus.SUBMITTED);
             sheet.setSubmittedAt(LocalDateTime.now(clock));
             sheet = sheets.saveAndFlush(sheet);
+        }
+        // Details belong to the sheet's version even when its comment/status did not change.
+        if (sheet.getVersion() == originalVersion) {
+            entityManager.lock(sheet, LockModeType.PESSIMISTIC_FORCE_INCREMENT);
         }
 
         gradeChangeRequests.findFirstBySheetIdAndStatusOrderByCreatedAtDesc(sheet.getId(), GradeChangeStatus.APPROVED)
@@ -485,8 +505,8 @@ public class EvaluationService {
         }
     }
 
-    private AssessmentComponent componentEntity(Long componentId) {
-        return components.findById(componentId)
+    private AssessmentComponent componentForUpdate(Long componentId) {
+        return components.findByIdForUpdate(componentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assessment component was not found."));
     }
 
@@ -508,6 +528,10 @@ public class EvaluationService {
     }
 
     private RubricResponse rubric(Rubric rubric) {
+        return rubric(rubric, criteria.findByRubricIdOrderBySortOrder(rubric.getId()));
+    }
+
+    private RubricResponse rubric(Rubric rubric, List<RubricCriterion> rubricCriteria) {
         AssessmentComponent component = rubric.getComponent();
         return new RubricResponse(
                 rubric.getId(),
@@ -517,7 +541,7 @@ public class EvaluationService {
                 rubric.getName(),
                 rubric.getVersionNo(),
                 rubric.getStatus(),
-                criteria.findByRubricIdOrderBySortOrder(rubric.getId()).stream()
+                rubricCriteria.stream()
                         .map(criterion -> new CriterionResponse(
                                 criterion.getId(),
                                 criterion.getName(),
@@ -527,8 +551,7 @@ public class EvaluationService {
                         .toList());
     }
 
-    private EvaluationAssignmentResponse assignment(EvaluationAssignment evaluationAssignment) {
-        ScoreSheet scoreSheet = sheets.findByEvaluationId(evaluationAssignment.getId()).orElse(null);
+    private EvaluationAssignmentResponse assignment(EvaluationAssignment evaluationAssignment, ScoreSheet scoreSheet) {
         ProjectAssignment assignment = evaluationAssignment.getAssignment();
         return new EvaluationAssignmentResponse(
                 evaluationAssignment.getId(),
@@ -576,5 +599,23 @@ public class EvaluationService {
 
     private String normalizeCode(String code) {
         return code.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private void validateCriteria(List<CriterionRequest> requestedCriteria) {
+        if (requestedCriteria == null || requestedCriteria.isEmpty()) {
+            throw new BusinessRuleException("Add at least one rubric criterion.");
+        }
+        Set<Integer> sortOrders = new HashSet<>();
+        for (CriterionRequest criterion : requestedCriteria) {
+            if (criterion == null || criterion.name() == null || criterion.name().isBlank()
+                    || criterion.description() == null || criterion.description().isBlank()
+                    || criterion.maxScore() == null || criterion.maxScore().signum() <= 0
+                    || criterion.maxScore().compareTo(BigDecimal.TEN) > 0 || criterion.sortOrder() < 1) {
+                throw new BusinessRuleException("Rubric criteria require a name, description, positive maximum up to 10, and positive sort order.");
+            }
+            if (!sortOrders.add(criterion.sortOrder())) {
+                throw new BusinessRuleException("Rubric criterion sort orders must be unique.");
+            }
+        }
     }
 }

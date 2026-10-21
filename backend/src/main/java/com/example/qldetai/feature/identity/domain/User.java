@@ -60,7 +60,10 @@ public class User extends AuditedEntity {
     private Set<UserRole> userRoles = new LinkedHashSet<>();
 
     public void replaceRoles(Set<Role> roles, LocalDateTime assignedAt) {
-        userRoles.clear();
-        roles.forEach(role -> userRoles.add(new UserRole(this, role, assignedAt)));
+        // Keep existing links: Hibernate inserts new links before deleting orphans,
+        // so recreating unchanged roles can violate UNIQUE(user_id, role_id).
+        userRoles.removeIf(link -> roles.stream().noneMatch(role -> role.getCode() == link.getRole().getCode()));
+        roles.stream().filter(role -> userRoles.stream().noneMatch(link -> link.getRole().getCode() == role.getCode()))
+                .forEach(role -> userRoles.add(new UserRole(this, role, assignedAt)));
     }
 }

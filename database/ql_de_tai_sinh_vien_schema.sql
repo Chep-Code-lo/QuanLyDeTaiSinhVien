@@ -2,10 +2,12 @@
 SET NAMES utf8mb4 COLLATE utf8mb4_0900_as_cs;
 SET SESSION time_zone = '+00:00';
 SET SESSION sql_mode = 'STRICT_ALL_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
--- This is the single authoritative schema file. For an existing deployment,
--- preserve data and apply only the marked EMAIL NOTIFICATION MIGRATION blocks
--- (sections 39-41 and the matching email_* foreign keys); do not re-run the
--- complete bootstrap script.
+-- FILE SQL CHÍNH DUY NHẤT để khởi tạo dự án trên MySQL 8.4.
+-- Bao gồm toàn bộ bảng, ràng buộc, view, trigger và danh mục vai trò hệ thống.
+-- Không có tài khoản hoặc dữ liệu demo. Demo nằm riêng tại database/seed/demo-data.sql.
+-- Chỉ import vào database mới/chưa có các bảng của dự án; không chạy lại
+-- trên database đang có dữ liệu. File này không DROP/RESET database.
+-- Database cũ: chỉ áp dụng các file trong database/migrations/ để nâng cấp.
 CREATE DATABASE IF NOT EXISTS `ql_de_tai_sinh_vien`
   CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs;
 USE `ql_de_tai_sinh_vien`;
@@ -791,7 +793,7 @@ CREATE TABLE `email_notification_settings` (
   `version` INT NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   CONSTRAINT `uq_email_notification_settings_01` UNIQUE (`event_type`, `scope_type`, `scope_id`),
-  CONSTRAINT `ck_email_notification_settings_01` CHECK (`event_type` IN ('TASK_ASSIGNED','TOPIC_APPROVED','TOPIC_REJECTED','DEADLINE_REMINDER','REGISTRATION_OPENED')),
+  CONSTRAINT `ck_email_notification_settings_01` CHECK (`event_type` IN ('TASK_ASSIGNED','TOPIC_APPROVED','TOPIC_REJECTED','DEADLINE_REMINDER','REGISTRATION_OPENED','RESULT_PUBLISHED')),
   CONSTRAINT `ck_email_notification_settings_02` CHECK (`enabled` IN (0,1)),
   CONSTRAINT `ck_email_notification_settings_03` CHECK (`scope_type` IN ('SYSTEM','FACULTY','LECTURER')),
   CONSTRAINT `ck_email_notification_settings_04` CHECK ((`scope_type` = 'SYSTEM' AND `scope_id` = 0) OR (`scope_type` <> 'SYSTEM' AND `scope_id` > 0)),
@@ -833,7 +835,7 @@ CREATE TABLE `email_outbox` (
   `created_at` DATETIME(6) NOT NULL,
   PRIMARY KEY (`id`),
   CONSTRAINT `uq_email_outbox_01` UNIQUE (`event_key`, `recipient_user_id`),
-  CONSTRAINT `ck_email_outbox_01` CHECK (`event_type` IN ('TASK_ASSIGNED','TOPIC_APPROVED','TOPIC_REJECTED','DEADLINE_REMINDER','REGISTRATION_OPENED')),
+  CONSTRAINT `ck_email_outbox_01` CHECK (`event_type` IN ('TASK_ASSIGNED','TOPIC_APPROVED','TOPIC_REJECTED','DEADLINE_REMINDER','REGISTRATION_OPENED','RESULT_PUBLISHED')),
   CONSTRAINT `ck_email_outbox_02` CHECK (`status` IN ('PENDING','SENDING','SENT','FAILED')),
   CONSTRAINT `ck_email_outbox_03` CHECK (`attempt_count` >= 0),
   CONSTRAINT `ck_email_outbox_04` CHECK (`resolved_scope_type` IN ('SYSTEM','FACULTY','LECTURER')),
@@ -860,6 +862,28 @@ CREATE TABLE `email_delivery_logs` (
   KEY `ix_email_delivery_logs_01` (`outbox_id`, `created_at`)
 ) ENGINE=InnoDB COMMENT='Lịch sử từng lần gửi email';
 -- END EMAIL NOTIFICATION MIGRATION: tables
+
+
+-- 42. Mẫu email cá nhân
+CREATE TABLE `email_templates` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `owner_id` BIGINT NOT NULL,
+  `name` VARCHAR(150) NOT NULL,
+  `sender_name` VARCHAR(150) NOT NULL,
+  `from_email` VARCHAR(254) NOT NULL,
+  `reply_to_email` VARCHAR(254) NULL,
+  `subject_template` VARCHAR(500) NOT NULL,
+  `body_template` MEDIUMTEXT NOT NULL,
+  `created_at` DATETIME(6) NOT NULL,
+  `updated_at` DATETIME(6) NOT NULL,
+  `version` INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `ix_email_templates_owner_updated` (`owner_id`, `updated_at`, `id`),
+  CONSTRAINT `fk_email_templates_owner` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`)
+    ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT `ck_email_templates_name` CHECK (CHAR_LENGTH(TRIM(`name`)) > 0),
+  CONSTRAINT `ck_email_templates_version` CHECK (`version` >= 0)
+) ENGINE=InnoDB COMMENT='Mẫu email cá nhân của giảng viên và quản trị viên';
 
 
 -- PHẦN 2: KHÓA NGOẠI (thêm sau khi mọi bảng và UNIQUE đã tồn tại)

@@ -60,7 +60,10 @@ public class GroupService {
         Page<StudentGroup> groups = periodId == null
                 ? studentGroupRepository.findAll(pageable)
                 : studentGroupRepository.findByPeriodId(periodId, pageable);
-        return PageResponse.from(groups.map(this::toResponse));
+        Map<Long, List<GroupMember>> membersByGroup = groups.isEmpty() ? Map.of() : groupMemberRepository
+                .findByGroupIdInAndLeftAtIsNullOrderBySlotNoAsc(groups.getContent().stream().map(StudentGroup::getId).toList())
+                .stream().collect(java.util.stream.Collectors.groupingBy(member -> member.getGroup().getId()));
+        return PageResponse.from(groups.map(group -> toResponse(group, membersByGroup.getOrDefault(group.getId(), List.of()))));
     }
 
     @Transactional(readOnly = true)
@@ -115,7 +118,7 @@ public class GroupService {
     @BusinessAudit(action = "GROUP_MEMBER_ADD", entityType = "STUDENT_GROUP", entityIdArgument = 0)
     public StudentGroupResponse addMember(Long groupId, AddGroupMemberRequest request, Long actorId) {
         Student actor = requireStudent(actorId);
-        StudentGroup group = requireGroup(groupId);
+        StudentGroup group = requireGroupForUpdate(groupId);
         RegistrationPeriod period = group.getPeriod();
         requireLeader(groupId, actor.getId());
         ensureGroupMutable(group);
@@ -130,7 +133,7 @@ public class GroupService {
             throw new BusinessRuleException("Student already belongs to an active group.");
         }
         List<GroupMember> activeMembers =
-                groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(groupId);
+                groupMemberRepository.findActiveByGroupIdForUpdate(groupId);
         if (activeMembers.size() >= period.getMaxGroupMembers()) {
             throw new BusinessRuleException("The group has reached its configured maximum number of members.");
         }
@@ -159,7 +162,7 @@ public class GroupService {
     @BusinessAudit(action = "GROUP_MEMBER_REMOVE", entityType = "STUDENT_GROUP", entityIdArgument = 0)
     public StudentGroupResponse removeMember(Long groupId, Long studentId, Long actorId) {
         Student actor = requireStudent(actorId);
-        StudentGroup group = requireGroup(groupId);
+        StudentGroup group = requireGroupForUpdate(groupId);
         requireLeader(groupId, actor.getId());
         ensureGroupMutable(group);
 
@@ -181,8 +184,8 @@ public class GroupService {
         if (projectAssignmentRepository.existsByGroupId(group.getId())) {
             throw new BusinessRuleException("This group already has a project assignment and can no longer change members.");
         }
-        if (topicRegistrationRepository.existsByGroupIdAndStatusIn(
-                group.getId(), List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED))) {
+        if (!topicRegistrationRepository.findByGroupIdAndStatusInForUpdate(
+                group.getId(), List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED)).isEmpty()) {
             throw new BusinessRuleException("Group members cannot change after a topic registration is pending or approved.");
         }
     }
@@ -213,6 +216,11 @@ public class GroupService {
                 .orElseThrow(() -> new ResourceNotFoundException("Student group was not found."));
     }
 
+    private StudentGroup requireGroupForUpdate(Long id) {
+        return studentGroupRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Student group was not found."));
+    }
+
     private Student requireStudent(Long actorId) {
         User user = userRepository.findWithRolesById(actorId)
                 .orElseThrow(() -> new ResourceNotFoundException("User account was not found."));
@@ -224,7 +232,7 @@ public class GroupService {
     }
 
     private void refreshGroupStatus(StudentGroup group) {
-        long activeMembers = groupMemberRepository.countByGroupIdAndLeftAtIsNull(group.getId());
+        long activeMembers = groupMemberRepository.findActiveByGroupIdForUpdate(group.getId()).size();
         group.setStatus(activeMembers >= group.getPeriod().getMinGroupMembers()
                 ? GroupStatus.ACTIVE
                 : GroupStatus.FORMING);
@@ -242,9 +250,11 @@ public class GroupService {
     }
 
     private StudentGroupResponse toResponse(StudentGroup group) {
-        List<GroupMemberResponse> members =
-                groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(group.getId())
-                .stream()
+        return toResponse(group, groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(group.getId()));
+    }
+
+    private StudentGroupResponse toResponse(StudentGroup group, List<GroupMember> activeMembers) {
+        List<GroupMemberResponse> members = activeMembers.stream()
                 .map(member -> new GroupMemberResponse(
                         member.getStudent().getId(),
                         member.getStudent().getUser().getId(),

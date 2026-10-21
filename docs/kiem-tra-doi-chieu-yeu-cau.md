@@ -23,7 +23,7 @@ Ngày 20/10/2026. Chỉ thay đổi backend, schema và tài liệu; không thay
 
 ## File SQL duy nhất
 
-Sử dụng [ql_de_tai_sinh_vien_schema.sql](../database/ql_de_tai_sinh_vien_schema.sql) để khởi tạo database. File này đã có đầy đủ ràng buộc hội đồng 3–5 người và slot tối đa 5; không cần file migration riêng.
+Sử dụng duy nhất [ql_de_tai_sinh_vien_schema.sql](../database/ql_de_tai_sinh_vien_schema.sql) để khởi tạo cấu trúc database mới và vai trò hệ thống. Dữ liệu demo nằm riêng tại [seed/demo-data.sql](../database/seed/demo-data.sql), không được nạp mặc định khi triển khai VPS. File chính đã có đầy đủ ràng buộc hội đồng 3–5 người và slot tối đa 5. Các migration chỉ dành cho nâng cấp database cũ có dữ liệu, không cần import thêm khi khởi tạo mới.
 
 Database đã khởi tạo trước đó không tự cập nhật khi chỉ sửa file schema. Chưa chạy lại SQL trên database của người dùng trong lượt này.
 

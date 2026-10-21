@@ -2,13 +2,19 @@ package com.example.qldetai.feature.topic.repository;
 
 import com.example.qldetai.feature.topic.domain.TopicSupervisor;
 import java.util.List;
+import java.util.Collection;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface TopicSupervisorRepository extends JpaRepository<TopicSupervisor, Long> {
 
+    @EntityGraph(attributePaths = "lecturer.user")
     List<TopicSupervisor> findByTopicIdOrderBySlotNoAsc(Long topicId);
+
+    @EntityGraph(attributePaths = "lecturer.user")
+    List<TopicSupervisor> findByTopicIdInOrderBySlotNoAsc(Collection<Long> topicIds);
 
     void deleteByTopicId(Long topicId);
 

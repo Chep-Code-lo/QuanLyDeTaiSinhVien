@@ -414,6 +414,7 @@ export type EmailNotificationEventType =
   | 'TOPIC_REJECTED'
   | 'DEADLINE_REMINDER'
   | 'REGISTRATION_OPENED'
+  | 'RESULT_PUBLISHED'
 export type EmailRecipientGroup =
   | 'DIRECT_PARTICIPANTS'
   | 'FACULTY_STUDENTS'
@@ -482,6 +483,43 @@ export interface EmailTestQueuedResponse {
   outboxId: number
   recipientEmail: string
   status: EmailOutboxStatus
+}
+
+export interface EmailRecipientResponse {
+  userId: number
+  fullName: string
+  email: string
+}
+
+export interface SendEmailRequest {
+  recipientRoles: ('STUDENT' | 'LECTURER')[]
+  recipientUserIds: number[]
+}
+
+export interface EmailQueuedResponse {
+  recipientCount: number
+}
+
+export interface EmailTemplateResponse {
+  id: number
+  name: string
+  senderName: string
+  fromEmail: string
+  replyToEmail?: string
+  subjectTemplate: string
+  bodyTemplate: string
+  version: number
+  updatedAt: string
+}
+
+export interface SaveEmailTemplateRequest {
+  name: string
+  senderName: string
+  fromEmail?: string
+  replyToEmail?: string
+  subjectTemplate: string
+  bodyTemplate: string
+  version?: number
 }
 
 export interface EmailLogResponse {

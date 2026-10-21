@@ -101,6 +101,15 @@ class EmailNotificationSettingsIntegrationTests {
     }
 
     @Test
+    void resultEmailCannotUseBroadRecipientGroups() {
+        var template = EmailTemplateCatalog.definition(EmailNotificationEventType.RESULT_PUBLISHED);
+        assertThatThrownBy(() -> settingsService.update(admin.getId(), EmailNotificationEventType.RESULT_PUBLISHED,
+                new UpdateNotificationSettingRequest(NotificationScopeType.SYSTEM, 0L, true, "University", "thongbao@test.local",
+                        null, template.defaultSubject(), template.defaultBody(), Set.of(EmailRecipientGroup.FACULTY_STUDENTS), null)))
+                .isInstanceOf(com.example.qldetai.exception.BusinessRuleException.class);
+    }
+
+    @Test
     void studentCannotManageNotificationSettings() {
         User student = createUser("email-student", Set.of(RoleCode.STUDENT));
 

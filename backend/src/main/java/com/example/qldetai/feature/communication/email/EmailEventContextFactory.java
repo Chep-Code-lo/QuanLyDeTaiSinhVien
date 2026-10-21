@@ -9,6 +9,10 @@ import com.example.qldetai.feature.groupregistration.domain.RegistrationStatus;
 import com.example.qldetai.feature.groupregistration.domain.TopicRegistration;
 import com.example.qldetai.feature.groupregistration.repository.TopicRegistrationRepository;
 import com.example.qldetai.feature.identity.domain.User;
+import com.example.qldetai.feature.evaluation.domain.ResultVersion;
+import com.example.qldetai.feature.evaluation.domain.ResultStatus;
+import com.example.qldetai.feature.evaluation.repository.ResultMemberRepository;
+import com.example.qldetai.feature.evaluation.repository.ResultVersionRepository;
 import com.example.qldetai.feature.project.domain.ProjectAssignment;
 import com.example.qldetai.feature.project.repository.ProjectAssignmentRepository;
 import com.example.qldetai.feature.progress.domain.Milestone;
@@ -42,6 +46,8 @@ public class EmailEventContextFactory {
     private final RegistrationPeriodRepository registrationPeriodRepository;
     private final MilestoneRepository milestoneRepository;
     private final EmailNotificationProperties properties;
+    private final ResultMemberRepository resultMembers;
+    private final ResultVersionRepository results;
 
     public EmailEventContextFactory(
             GroupMemberRepository groupMemberRepository,
@@ -52,7 +58,9 @@ public class EmailEventContextFactory {
             TopicReviewRepository topicReviewRepository,
             RegistrationPeriodRepository registrationPeriodRepository,
             MilestoneRepository milestoneRepository,
-            EmailNotificationProperties properties) {
+            EmailNotificationProperties properties,
+            ResultMemberRepository resultMembers,
+            ResultVersionRepository results) {
         this.groupMemberRepository = groupMemberRepository;
         this.topicSupervisorRepository = topicSupervisorRepository;
         this.projectAssignmentRepository = projectAssignmentRepository;
@@ -62,6 +70,8 @@ public class EmailEventContextFactory {
         this.registrationPeriodRepository = registrationPeriodRepository;
         this.milestoneRepository = milestoneRepository;
         this.properties = properties;
+        this.resultMembers = resultMembers;
+        this.results = results;
     }
 
     public EmailEventContext taskAssigned(ProjectAssignment assignment, User actor) {
@@ -78,6 +88,26 @@ public class EmailEventContextFactory {
                 activeGroupUserIds(assignment.getGroup().getId()),
                 supervisors(topic.getId()),
                 baseVariables(assignment.getPeriod(), topic, actor, topic.getTitle(), null, null));
+    }
+
+    public EmailEventContext resultPublished(ResultVersion result) {
+        if (result.getStatus() != ResultStatus.PUBLISHED) {
+            throw new BusinessRuleException("Only published results can produce result emails.");
+        }
+        ProjectAssignment assignment = result.getAssignment();
+        Map<String, String> variables = baseVariables(assignment.getPeriod(), assignment.getTopic(),
+                result.getPublishedBy(), null, null, null);
+        variables.put("finalScore", result.getFinalScore().toPlainString());
+        variables.put("resultVersion", Integer.toString(result.getVersionNo()));
+        variables.put("publishedAt", result.getPublishedAt().atZone(ZoneOffset.UTC)
+                .withZoneSameInstant(properties.displayZoneId()).format(DEADLINE_FORMAT));
+        variables.put("resultUrl", normalizedBaseUrl() + "/results");
+        // Use the immutable result membership, never the group's current roster.
+        List<Long> recipients = resultMembers.findByResultIdOrderByIdAsc(result.getId()).stream()
+                .map(member -> member.getStudent().getUser().getId()).distinct().toList();
+        return context(EmailNotificationEventType.RESULT_PUBLISHED, "result-published:" + result.getId(),
+                assignment.getPeriod(), assignment.getGroup().getId(), assignment.getTopic(), assignment.getId(),
+                null, result.getPublishedBy().getId(), recipients, supervisors(assignment.getTopic().getId()), variables);
     }
 
     public EmailEventContext topicRegistrationDecision(TopicRegistration registration, User actor) {
@@ -178,6 +208,11 @@ public class EmailEventContextFactory {
             throw new BusinessRuleException("A reference type and reference id are required for business-data preview.");
         }
         return switch (referenceType) {
+            case RESULT_VERSION -> {
+                requireEvent(eventType, EmailNotificationEventType.RESULT_PUBLISHED);
+                yield resultPublished(results.findById(referenceId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Result was not found.")));
+            }
             case PROJECT_ASSIGNMENT -> {
                 requireEvent(eventType, EmailNotificationEventType.TASK_ASSIGNED);
                 ProjectAssignment assignment = projectAssignmentRepository.findById(referenceId)
@@ -237,6 +272,10 @@ public class EmailEventContextFactory {
         variables.put("facultyName", "Khoa mẫu");
         variables.put("websiteUrl", normalizedBaseUrl());
         variables.put("decisionReason", "Nội dung phản hồi mẫu");
+        variables.put("finalScore", "8.50");
+        variables.put("resultVersion", "1");
+        variables.put("publishedAt", "21/10/2026 10:00 ICT");
+        variables.put("resultUrl", normalizedBaseUrl() + "/results");
         return new EmailEventContext(eventType, "preview:" + eventType, null, null, null, null,
                 null, null, null, List.of(), List.of(), variables);
     }

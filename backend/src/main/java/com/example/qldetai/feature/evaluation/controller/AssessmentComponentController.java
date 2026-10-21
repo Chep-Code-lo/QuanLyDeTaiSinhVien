@@ -36,7 +36,7 @@ public class AssessmentComponentController {
 
     @GetMapping("/assessment-components")
     public ApiResponse<List<AssessmentComponentResponse>> components(
-            @RequestParam(required = false) Long periodId) {
+            @RequestParam Long periodId) {
         return ApiResponse.success(service.listComponents(periodId));
     }
 

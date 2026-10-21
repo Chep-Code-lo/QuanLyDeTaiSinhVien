@@ -76,6 +76,7 @@ export function AppRoutes() {
             <Route path="score-sheets" element={<EvaluationsPage />} />
           </Route>
           <Route element={<ProtectedRoute roles={['LECTURER', 'ADMIN']} />}>
+            <Route path="email-settings" element={<EmailSettingsPage />} />
             <Route
               path="evaluations"
               element={<AssessmentSetupWizardPage />}
@@ -101,7 +102,6 @@ export function AppRoutes() {
               element={<UserManagementPage />}
             />
             <Route path="admin-users/new" element={<Navigate to="/admin-users" replace />} />
-            <Route path="email-settings" element={<EmailSettingsPage />} />
             <Route
               path="admin-appointments"
               element={<AcademicAppointmentsPage />}

@@ -3,6 +3,7 @@ package com.example.qldetai.feature.communication.email;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriod;
 import com.example.qldetai.feature.groupregistration.domain.TopicRegistration;
 import com.example.qldetai.feature.identity.domain.User;
+import com.example.qldetai.feature.evaluation.domain.ResultVersion;
 import com.example.qldetai.feature.project.domain.ProjectAssignment;
 import com.example.qldetai.feature.progress.domain.Milestone;
 import com.example.qldetai.feature.progress.domain.MilestoneStatus;
@@ -57,6 +58,11 @@ public class EmailNotificationEventService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void registrationOpened(RegistrationPeriod period, User actor) {
         enqueue(contextFactory.registrationOpened(period, actor));
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void resultPublished(ResultVersion result) {
+        enqueue(contextFactory.resultPublished(result));
     }
 
     @Transactional(propagation = Propagation.MANDATORY)

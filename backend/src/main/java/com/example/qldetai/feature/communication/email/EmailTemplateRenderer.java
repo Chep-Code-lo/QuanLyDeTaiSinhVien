@@ -6,16 +6,13 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
-import org.springframework.web.util.HtmlUtils;
 
-/** A deliberately small mustache-style renderer with no expression execution. */
+/** A deliberately small plain-text template renderer with no expression execution. */
 @Component
 public class EmailTemplateRenderer {
 
     private static final Pattern VARIABLE = Pattern.compile("\\{\\{\\s*([A-Za-z][A-Za-z0-9]*)\\s*}}");
     private static final Pattern UNBALANCED_TEMPLATE_TOKEN = Pattern.compile("\\{\\{|}}");
-    private static final Pattern UNSAFE_HTML = Pattern.compile(
-            "(?is)<\\s*(script|iframe|object|embed|form)\\b|\\bon[a-z]+\\s*=|javascript\\s*:");
     private static final String MISSING_VALUE = "(không có dữ liệu)";
     private static final int MAX_SUBJECT_LENGTH = 500;
 
@@ -28,9 +25,6 @@ public class EmailTemplateRenderer {
         }
         validateTemplateTokens(eventType, subjectTemplate);
         validateTemplateTokens(eventType, bodyTemplate);
-        if (UNSAFE_HTML.matcher(bodyTemplate).find()) {
-            throw new BusinessRuleException("Email template contains unsupported executable HTML.");
-        }
     }
 
     public RenderedEmail render(
@@ -39,8 +33,8 @@ public class EmailTemplateRenderer {
             String bodyTemplate,
             Map<String, String> values) {
         validate(eventType, subjectTemplate, bodyTemplate);
-        String subject = normalizeSubject(replace(eventType, subjectTemplate, values, false));
-        String body = replace(eventType, bodyTemplate, values, true);
+        String subject = normalizeSubject(replace(eventType, subjectTemplate, values));
+        String body = replace(eventType, bodyTemplate, values);
         return new RenderedEmail(subject, body);
     }
 
@@ -64,17 +58,13 @@ public class EmailTemplateRenderer {
     private String replace(
             EmailNotificationEventType eventType,
             String template,
-            Map<String, String> values,
-            boolean htmlEscape) {
+            Map<String, String> values) {
         Matcher matcher = VARIABLE.matcher(template);
         StringBuffer result = new StringBuffer();
         while (matcher.find()) {
             String key = matcher.group(1);
             String raw = values == null ? null : values.get(key);
             String value = raw == null || raw.isBlank() ? MISSING_VALUE : raw;
-            if (htmlEscape) {
-                value = HtmlUtils.htmlEscape(value);
-            }
             matcher.appendReplacement(result, Matcher.quoteReplacement(value));
         }
         matcher.appendTail(result);

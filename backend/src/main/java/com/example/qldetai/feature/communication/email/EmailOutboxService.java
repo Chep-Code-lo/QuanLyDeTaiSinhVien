@@ -92,6 +92,16 @@ public class EmailOutboxService {
         return messages.stream().map(EmailOutbox::getId).toList();
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void enqueueManual(EmailNotificationSetting setting, User recipient, EmailEventContext context) {
+        Map<String, String> variables = new LinkedHashMap<>(context.variables());
+        variables.put("studentName", recipient.getFullName());
+        EmailTemplateRenderer.RenderedEmail rendered = templateRenderer.render(
+                context.eventType(), setting.getSubjectTemplate(), setting.getBodyTemplate(), variables);
+        LocalDateTime now = LocalDateTime.now(clock);
+        insertIfAbsent(newOutbox(setting, context, recipient, rendered, context.eventKey(), now), now);
+    }
+
     public void recoverStaleClaims() {
         deliveryStateService.recoverStaleClaims();
     }
@@ -121,7 +131,7 @@ public class EmailOutboxService {
                 helper.setReplyTo(message.replyToEmail());
             }
             helper.setSubject(message.subject());
-            helper.setText(message.body(), true);
+            helper.setText(message.body(), false);
             sender.send(mimeMessage);
             deliveryStateService.markSent(outboxId);
         } catch (Exception exception) {

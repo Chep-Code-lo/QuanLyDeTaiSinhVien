@@ -6,5 +6,6 @@ public enum EmailNotificationReferenceType {
     TOPIC_REGISTRATION,
     TOPIC,
     REGISTRATION_PERIOD,
-    MILESTONE
+    MILESTONE,
+    RESULT_VERSION
 }

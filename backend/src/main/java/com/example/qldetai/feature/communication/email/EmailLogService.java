@@ -47,7 +47,7 @@ public class EmailLogService {
             List<Long> facultyIds = academicAppointmentRepository.findActiveDeanFacultyIds(
                     actorId, LocalDateTime.now(clock));
             if (!facultyIds.isEmpty()) {
-                results = outboxRepository.findAccessibleToDean(facultyIds, pageable);
+                results = outboxRepository.findAccessibleToDean(facultyIds, actorId, pageable);
             } else if (lecturerRepository.findByUserId(actorId).isPresent()) {
                 results = outboxRepository.findAccessibleToLecturer(actorId, pageable);
             } else {
