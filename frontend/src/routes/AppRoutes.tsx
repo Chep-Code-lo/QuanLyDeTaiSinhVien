@@ -1,8 +1,8 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { ProtectedRoute } from '../components/ProtectedRoute'
 import { AppLayout } from '../layouts/AppLayout'
-import { LoginForm, LoginPage } from '../pages/LoginPage'
+import { LoginPage } from '../pages/LoginPage'
 import { useAuth } from '../context/AuthContext'
 
 const PublicHome = lazy(() => import('../pages/PublicHome').then(module => ({ default: module.PublicHome })))
@@ -26,31 +26,12 @@ const RegistrationsPage = lazy(() => import('../pages/RegistrationsPage').then(m
 function PublicHomeRoute() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuth()
-  const [loginOpen, setLoginOpen] = useState(false)
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />
   }
 
-  return (
-    <>
-      <PublicHome onLogin={() => setLoginOpen(true)} />
-
-      {loginOpen && (
-        <div
-          className="public-login-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Đăng nhập hệ thống"
-        >
-          <LoginForm
-            onClose={() => setLoginOpen(false)}
-            onSuccess={() => navigate('/dashboard')}
-          />
-        </div>
-      )}
-    </>
-  )
+  return <PublicHome onLogin={() => navigate('/login')} />
 }
 
 export function AppRoutes() {

@@ -23,25 +23,33 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
 @RequestMapping("/api/v1")
+@RequiredArgsConstructor
 public class DefenseSessionController {
 
     private final DefenseSessionService service;
 
-    public DefenseSessionController(DefenseSessionService service) {
-        this.service = service;
-    }
 
     @GetMapping("/defense-sessions")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('LECTURER')")
     public ApiResponse<PageResponse<DefenseSessionResponse>> defenses(
             @RequestParam(required = false) Long periodId,
             @RequestParam(required = false) Long committeeId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return ApiResponse.success(service.listDefenses(periodId, committeeId, page, size));
+    }
+
+    @GetMapping("/student/defense-sessions")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ApiResponse<List<DefenseSessionResponse>> myDefenses(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(service.listDefensesForStudent(principal.id()));
     }
 
     @PostMapping("/defense-sessions")

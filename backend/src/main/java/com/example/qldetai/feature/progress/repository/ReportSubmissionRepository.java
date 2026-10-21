@@ -5,5 +5,6 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 public interface ReportSubmissionRepository extends JpaRepository<ReportSubmission, Long> {
  List<ReportSubmission> findByMilestoneIdOrderByVersionNoDesc(Long milestoneId);
+ List<ReportSubmission> findByFileId(Long fileId);
  long countByMilestoneId(Long milestoneId);
 }

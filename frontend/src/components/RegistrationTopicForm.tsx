@@ -98,12 +98,11 @@ export function RegistrationTopicForm({
     (department) => department.facultyId === selectedPeriod?.facultyId,
   )
   const selectedDepartment =
-    periodDepartments.find((department) => String(department.id) === departmentId) ??
-    periodDepartments[0]
+    periodDepartments.find((department) => String(department.id) === departmentId)
   const facultyId = selectedPeriod?.facultyId
   const proposalStart = serverTimestamp(selectedPeriod?.proposalStartAt)
-  const registrationEnd = serverTimestamp(selectedPeriod?.registrationEndAt)
-  const periodEnded = checkedAt > registrationEnd
+  const proposalEnd = serverTimestamp(selectedPeriod?.proposalEndAt)
+  const proposalEnded = checkedAt > proposalEnd
   const periodNotStarted = checkedAt < proposalStart
   const canManagePeriod =
     admin ||
@@ -263,11 +262,11 @@ export function RegistrationTopicForm({
           ) : (
             <form onSubmit={submit}>
               <fieldset className="topic-creation__fields" disabled={submitting}>
-                {(periodEnded || periodNotStarted) && (
+                {(proposalEnded || periodNotStarted) && (
                   <div className="topic-creation__notice" role="status">
                     <p>
-                      {periodEnded
-                        ? `Đợt “${selectedPeriod?.name}” đã kết thúc đăng ký ngày ${formatDate(registrationEnd)}. Cần mở đợt mới trước khi tạo đề tài cho sinh viên đăng ký.`
+                      {proposalEnded
+                        ? `Đợt “${selectedPeriod?.name}” đã kết thúc thời gian giảng viên đăng ký đề tài ngày ${formatDate(proposalEnd)}.`
                         : `Đợt này bắt đầu nhận đề xuất từ ngày ${formatDate(proposalStart)}.`}
                     </p>
                     {canManagePeriod ? (
@@ -306,7 +305,7 @@ export function RegistrationTopicForm({
                   </div>
                   <div className="form-group">
                     <label className="form-label" htmlFor="topic-department">
-                      Bộ môn phụ trách <span className="text-red">*</span>
+                      Bộ môn <span className="text-red">*</span>
                     </label>
                     <AnimatedSelect
                       id="topic-department"
@@ -314,6 +313,7 @@ export function RegistrationTopicForm({
                       required
                       onChange={(event) => setDepartmentId(event.target.value)}
                     >
+                      <option value="">Chọn bộ môn</option>
                       {periodDepartments.map((department) => (
                         <option key={department.id} value={department.id}>
                           {department.name}
@@ -448,8 +448,10 @@ export function RegistrationTopicForm({
                       loadingLecturers ||
                       !lecturers.length ||
                       !!lecturerError ||
-                      periodEnded ||
-                      periodNotStarted
+                      proposalEnded ||
+                      periodNotStarted ||
+                      !selectedDepartment ||
+                      !primaryId
                     }
                   >
                     {submitting ? 'Đang tạo đề tài...' : 'Tạo và công bố'}

@@ -9,6 +9,7 @@ import com.example.qldetai.security.UserPrincipal;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,13 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/admin/academic-appointments")
 @PreAuthorize("hasRole('ADMIN')")
+@RequiredArgsConstructor
 public class AcademicAppointmentController {
 
     private final AcademicAppointmentService academicAppointmentService;
 
-    public AcademicAppointmentController(AcademicAppointmentService academicAppointmentService) {
-        this.academicAppointmentService = academicAppointmentService;
-    }
 
     @GetMapping
     public ApiResponse<List<AppointmentResponse>> list(@RequestParam(required = false) Long lecturerId) {

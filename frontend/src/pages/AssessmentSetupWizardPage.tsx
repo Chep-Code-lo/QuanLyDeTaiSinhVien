@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, FileText, Info, LockKeyhole, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Check, CheckCircle2, FileText, Info, LockKeyhole, Plus, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { academicApi } from '../api/academic'
 import { evaluationApi } from '../api/evaluation'
@@ -251,10 +251,10 @@ export function AssessmentSetupWizardPage() {
               disabled={!!component || busy} onChange={(event) => setEvaluators(event.target.valueAsNumber)} /></div>
           </div>
           {componentType === 'COMMITTEE' && <p className="assessment-help">Số người chấm cần nằm trong giới hạn hội đồng của đợt đăng ký. Khi phân công, thành phần này cần gắn với phiên bảo vệ.</p>}
-          <div className="assessment-field"><label htmlFor="assessment-aggregation">Cách tổng hợp điểm <span>*</span></label><AnimatedSelect id="assessment-aggregation" value="average" onChange={() => undefined}><option value="average">Trung bình điểm các giảng viên</option></AnimatedSelect></div>
+          <dl className="assessment-fixed-rule"><dt>Cách tổng hợp điểm (cố định)</dt><dd>Trung bình cộng điểm các giảng viên trong từng thành phần. Điểm cuối là trung bình cộng điểm các thành phần.</dd></dl>
           {component && <p className="assessment-help">Thành phần đã được lưu. Chọn “Tiếp tục” để xem cấu hình.</p>}
         </div><footer className="assessment-actions assessment-actions--end"><button className="assessment-button assessment-button--primary" type="submit" disabled={busy || !periodId || !!loadError}>
-          {busy ? 'Đang lưu…' : componentLocked || rubricLocked ? 'Tiếp tục: Khóa thành phần' : 'Tiếp tục: Tạo bộ tiêu chí'}<ArrowRight size={19} /></button></footer></form>
+          {busy ? 'Đang lưu…' : componentLocked || rubricLocked ? 'Tiếp tục: Khóa thành phần' : 'Tiếp tục: Tạo bộ tiêu chí'}</button></footer></form>
       </section>}
       {step === 2 && component && <section className="assessment-card assessment-card--table" aria-labelledby="assessment-step-title">
         <div className="assessment-card__heading"><div><h2 id="assessment-step-title">Tạo bộ tiêu chí</h2><p>Bước 2/4</p></div>{!rubricLocked && <button className="assessment-button assessment-button--outline" type="button" disabled={busy}
@@ -265,25 +265,25 @@ export function AssessmentSetupWizardPage() {
           disabled={busy || rubricLocked} placeholder={`Bộ tiêu chí ${component.name}`} onChange={(event) => setRubricName(event.target.value)} /></div></details>
         <footer className="assessment-actions"><button type="button" className="assessment-button assessment-button--outline" disabled={busy} onClick={() => setStep(1)}><ArrowLeft size={18} />Quay lại</button>
           <div className="assessment-actions__right">{!rubricLocked && <button type="button" className="assessment-button assessment-button--outline" disabled={busy || !isValid || !dirty || !!loadError} onClick={() => void saveRubric(false)}>{busy ? 'Đang lưu…' : 'Lưu bộ tiêu chí'}</button>}
-            <button type="button" className="assessment-button assessment-button--primary" disabled={busy || !isValid || !!loadError} onClick={() => void saveRubric(true)}>Tiếp tục: Khóa bộ tiêu chí<ArrowRight size={18} /></button></div></footer>
+            <button type="button" className="assessment-button assessment-button--primary" disabled={busy || !isValid || !!loadError} onClick={() => void saveRubric(true)}>Tiếp tục: Khóa bộ tiêu chí</button></div></footer>
       </section>}
       {step === 3 && rubric && <section className="assessment-card assessment-card--table" aria-labelledby="assessment-step-title">
         <div className="assessment-card__heading"><div><h2 id="assessment-step-title">Khóa bộ tiêu chí</h2><p>Bước 3/4</p></div><span className={`assessment-status ${rubricLocked ? 'assessment-status--success' : ''}`}><LockKeyhole size={16} />{rubricLocked ? 'Đã khóa' : 'Chưa khóa'}</span></div>
-        <p className="assessment-intro">Xác nhận cấu trúc tiêu chí và thang điểm trước khi khóa.</p>{contextBar}{criteriaTable(false, detailsVisible)}
+        {contextBar}{criteriaTable(false, detailsVisible)}
         <button type="button" className="assessment-text-button assessment-detail-toggle" onClick={() => setDetailsVisible((previous) => !previous)}><FileText size={16} />{detailsVisible ? 'Thu gọn tiêu chí con' : 'Xem chi tiết bộ tiêu chí'}</button>
         <div className={`assessment-alert ${readyToLock ? 'assessment-alert--success' : 'assessment-alert--warning'}`}><CheckCircle2 size={20} /><strong>{readyToLock ? 'Tổng điểm hợp lệ · Đã có đủ tiêu chí' : 'Bộ tiêu chí chưa hợp lệ. Quay lại để kiểm tra và lưu đủ 100 điểm.'}</strong></div>
         {!rubricLocked && <><div className="assessment-alert assessment-alert--warning"><LockKeyhole size={21} /><div><strong>Sau khi khóa bộ tiêu chí</strong><p>Cấu trúc tiêu chí và thang điểm sẽ không được chỉnh sửa trực tiếp.</p></div></div>
           <label className="assessment-checkbox"><input type="checkbox" checked={checkedRubric} onChange={(event) => setCheckedRubric(event.target.checked)} disabled={busy} />Tôi đã kiểm tra cấu trúc tiêu chí và thang điểm.</label></>}
         <footer className="assessment-actions"><button type="button" className="assessment-button assessment-button--outline" disabled={busy} onClick={() => setStep(2)}><ArrowLeft size={18} />Quay lại</button>
-          {rubricLocked ? <button type="button" className="assessment-button assessment-button--primary" onClick={() => setStep(4)}>Tiếp tục: Khóa thành phần<ArrowRight size={18} /></button> :
+          {rubricLocked ? <button type="button" className="assessment-button assessment-button--primary" onClick={() => setStep(4)}>Tiếp tục: Khóa thành phần</button> :
             <button type="button" className="assessment-button assessment-button--primary" disabled={busy || !checkedRubric || !readyToLock || !!loadError} onClick={() => setLockTarget('rubric')}>Khóa bộ tiêu chí</button>}</footer>
       </section>}
       {step === 4 && component && <section className="assessment-card" aria-labelledby="assessment-step-title">
-        <div className="assessment-card__heading"><h2 id="assessment-step-title">Khóa thành phần đánh giá</h2><span className="assessment-step-badge">Bước 4/4</span></div><p className="assessment-intro">Xác nhận cấu hình trước khi phân công giảng viên chấm.</p>
+        <div className="assessment-card__heading"><h2 id="assessment-step-title">Khóa thành phần đánh giá</h2><span className="assessment-step-badge">Bước 4/4</span></div>
         <dl className="assessment-summary">
           <div><dt>Đợt đăng ký</dt><dd>{periodName}<span className={`assessment-status ${componentLocked ? 'assessment-status--success' : ''}`}>{componentLocked ? 'Đã khóa' : 'Chờ xác nhận'}</span></dd></div>
           <div><dt>Tên thành phần</dt><dd>{component.name}</dd></div><div><dt>Hình thức đánh giá</dt><dd>{componentTypeLabel(component.componentType)}</dd></div>
-          <div><dt>Số người chấm</dt><dd>{component.expectedEvaluators} giảng viên</dd></div><div><dt>Cách tổng hợp điểm</dt><dd>Trung bình điểm các giảng viên</dd></div>
+          <div><dt>Số người chấm</dt><dd>{component.expectedEvaluators} giảng viên</dd></div><div><dt>Cách tổng hợp điểm</dt><dd>Trung bình cộng điểm các giảng viên (cố định)</dd></div>
           <div><dt>Bộ tiêu chí</dt><dd>{rubric ? `${criteria.length} nhóm · ${childCount} tiêu chí con · ${scoreLabel(total)} điểm` : 'Chưa có bộ tiêu chí'}
             {rubric && <button type="button" className="assessment-text-button" onClick={() => { setDetailsVisible(true); setStep(3) }}><FileText size={17} />Xem bộ tiêu chí</button>}</dd></div>
         </dl>
@@ -291,7 +291,7 @@ export function AssessmentSetupWizardPage() {
         <div className={`assessment-alert ${componentLocked ? 'assessment-alert--success' : 'assessment-alert--info'}`}><Info size={30} /><div><strong>{componentLocked ? 'Sẵn sàng phân công giảng viên chấm' : 'Xác nhận sẵn sàng phân công'}</strong><p>{componentLocked ? 'Thành phần đánh giá đã được khóa và cấu hình hoàn tất.' : 'Khóa thành phần để xác nhận cấu hình đã hoàn tất và sẵn sàng phân công giảng viên chấm.'}</p>
           {!componentLocked && <label className="assessment-checkbox"><input type="checkbox" checked={checkedComponent} onChange={(event) => setCheckedComponent(event.target.checked)} disabled={busy || !rubricLocked} />Tôi xác nhận cấu hình đánh giá đã đầy đủ và chính xác.</label>}</div></div>
         <footer className="assessment-actions"><button type="button" className="assessment-button assessment-button--outline" disabled={busy} onClick={() => setStep(rubric ? 3 : 2)}><ArrowLeft size={18} />Quay lại</button>
-          {componentLocked ? <Link className="assessment-button assessment-button--primary" to="/evaluator-assignment">Phân công giảng viên<ArrowRight size={18} /></Link> :
+          {componentLocked ? <Link className="assessment-button assessment-button--primary" to="/evaluator-assignment">Phân công giảng viên</Link> :
             <button type="button" className="assessment-button assessment-button--primary" disabled={busy || !checkedComponent || !rubricLocked || !!loadError} onClick={() => setLockTarget('component')}>Khóa thành phần đánh giá</button>}</footer>
       </section>}
     </>}

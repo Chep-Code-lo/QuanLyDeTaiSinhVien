@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -23,6 +24,7 @@ import jakarta.mail.internet.InternetAddress;
 
 /** Persists immutable delivery snapshots and performs SMTP work outside business transactions. */
 @Service
+@RequiredArgsConstructor
 public class EmailOutboxService {
 
     private final EmailOutboxRepository outboxRepository;
@@ -33,25 +35,9 @@ public class EmailOutboxService {
     private final EmailNotificationProperties properties;
     private final Clock clock;
 
-    public EmailOutboxService(
-            EmailOutboxRepository outboxRepository,
-            UserRepository userRepository,
-            EmailTemplateRenderer templateRenderer,
-            ObjectProvider<JavaMailSender> mailSenderProvider,
-            EmailOutboxDeliveryStateService deliveryStateService,
-            EmailNotificationProperties properties,
-            Clock clock) {
-        this.outboxRepository = outboxRepository;
-        this.userRepository = userRepository;
-        this.templateRenderer = templateRenderer;
-        this.mailSenderProvider = mailSenderProvider;
-        this.deliveryStateService = deliveryStateService;
-        this.properties = properties;
-        this.clock = clock;
-    }
 
     /** Called while the source business transaction is still active. */
-    @Transactional(propagation = Propagation.MANDATORY)
+    @Transactional(propagation = Propagation.MANDATORY, noRollbackFor = RuntimeException.class)
     public void enqueue(
             EmailNotificationSetting setting,
             EmailEventContext context,

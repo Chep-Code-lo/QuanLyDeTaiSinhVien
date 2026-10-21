@@ -20,10 +20,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 
 /** Loads profile data before passing it to the query-free identity mapper. */
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class UserProfileService {
     private final StudentRepository students;
     private final LecturerRepository lecturers;
@@ -31,18 +33,6 @@ public class UserProfileService {
     private final IdentityMapper mapper;
     private final Clock clock;
 
-    public UserProfileService(
-            StudentRepository students,
-            LecturerRepository lecturers,
-            AcademicAppointmentRepository appointments,
-            IdentityMapper mapper,
-            Clock clock) {
-        this.students = students;
-        this.lecturers = lecturers;
-        this.appointments = appointments;
-        this.mapper = mapper;
-        this.clock = clock;
-    }
 
     public CurrentUserResponse toCurrentUser(User user) {
         return mapper.toCurrentUser(

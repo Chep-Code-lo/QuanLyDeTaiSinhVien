@@ -24,8 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 public class GradeChangeService {
 
     private final ScoreSheetRepository sheets;
@@ -34,18 +36,6 @@ public class GradeChangeService {
     private final Clock clock;
     private final EvaluationActorAccess actorAccess;
 
-    public GradeChangeService(
-            ScoreSheetRepository sheets,
-            ResultInputRepository resultInputs,
-            GradeChangeRequestRepository changes,
-            Clock clock,
-            EvaluationActorAccess actorAccess) {
-        this.sheets = sheets;
-        this.resultInputs = resultInputs;
-        this.changes = changes;
-        this.clock = clock;
-        this.actorAccess = actorAccess;
-    }
 
     @Transactional(readOnly = true)
     public PageResponse<GradeChangeRequestResponse> listChanges(

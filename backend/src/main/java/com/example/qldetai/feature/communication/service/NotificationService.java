@@ -10,26 +10,20 @@ import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final Clock clock;
 
-    public NotificationService(
-            NotificationRepository notificationRepository,
-            UserRepository userRepository,
-            Clock clock) {
-        this.notificationRepository = notificationRepository;
-        this.userRepository = userRepository;
-        this.clock = clock;
-    }
 
     @Transactional(readOnly = true)
     public PageResponse<NotificationResponse> list(Long userId, int page, int size) {

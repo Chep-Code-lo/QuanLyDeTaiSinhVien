@@ -17,17 +17,16 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
 @RequestMapping("/api/v1")
+@RequiredArgsConstructor
 public class ScoreSheetController {
 
     private final EvaluationService service;
 
-    public ScoreSheetController(EvaluationService service) {
-        this.service = service;
-    }
 
     @GetMapping("/evaluation-assignments/{id}/score-sheet")
     @PreAuthorize("hasRole('LECTURER')")

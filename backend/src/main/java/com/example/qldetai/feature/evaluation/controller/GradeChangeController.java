@@ -27,17 +27,16 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
 @RequestMapping("/api/v1")
+@RequiredArgsConstructor
 public class GradeChangeController {
 
     private final GradeChangeService service;
 
-    public GradeChangeController(GradeChangeService service) {
-        this.service = service;
-    }
 
     @GetMapping("/grade-change-requests")
     @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")

@@ -208,4 +208,37 @@ class RegistrationPeriodServiceTests {
                     assertThat(outbox.getRecipientUser().getId()).isEqualTo(admin.getId());
                 });
     }
+
+    @Test
+    void closedPeriodCanBeReactivated() {
+        RegistrationPeriodResponse created = registrationPeriodService.create(new CreateRegistrationPeriodRequest(
+                faculty.getId(),
+                semester.getId(),
+                "Course period",
+                ProjectType.COURSE,
+                LocalDateTime.of(2027, 2, 1, 0, 0),
+                LocalDateTime.of(2027, 2, 10, 0, 0),
+                LocalDateTime.of(2027, 2, 10, 0, 0),
+                LocalDateTime.of(2027, 2, 20, 0, 0),
+                null,
+                null), admin.getId());
+
+        RegistrationPeriodResponse active = registrationPeriodService.changeStatus(
+                created.id(),
+                new ChangePeriodStatusRequest(created.version(), RegistrationPeriodStatus.ACTIVE),
+                admin.getId());
+        RegistrationPeriodResponse closed = registrationPeriodService.changeStatus(
+                active.id(),
+                new ChangePeriodStatusRequest(active.version(), RegistrationPeriodStatus.CLOSED),
+                admin.getId());
+        RegistrationPeriodResponse reactivated = registrationPeriodService.changeStatus(
+                closed.id(),
+                new ChangePeriodStatusRequest(closed.version(), RegistrationPeriodStatus.ACTIVE),
+                admin.getId());
+
+        assertThat(active.status()).isEqualTo(RegistrationPeriodStatus.ACTIVE);
+        assertThat(closed.status()).isEqualTo(RegistrationPeriodStatus.CLOSED);
+        assertThat(reactivated.status()).isEqualTo(RegistrationPeriodStatus.ACTIVE);
+        assertThat(reactivated.version()).isGreaterThan(closed.version());
+    }
 }

@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Writes transactional-outbox messages after the existing in-app notification is recorded. */
 @Service
+@RequiredArgsConstructor
 public class EmailNotificationEventService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(EmailNotificationEventService.class);
@@ -35,22 +37,6 @@ public class EmailNotificationEventService {
     private final EmailNotificationProperties properties;
     private final Clock clock;
 
-    public EmailNotificationEventService(
-            EmailNotificationSettingsService settingsService,
-            EmailRecipientResolver recipientResolver,
-            EmailOutboxService outboxService,
-            EmailEventContextFactory contextFactory,
-            MilestoneRepository milestoneRepository,
-            EmailNotificationProperties properties,
-            Clock clock) {
-        this.settingsService = settingsService;
-        this.recipientResolver = recipientResolver;
-        this.outboxService = outboxService;
-        this.contextFactory = contextFactory;
-        this.milestoneRepository = milestoneRepository;
-        this.properties = properties;
-        this.clock = clock;
-    }
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void taskAssigned(ProjectAssignment assignment, User actor) {
@@ -101,24 +87,23 @@ public class EmailNotificationEventService {
     }
 
     private void enqueue(EmailEventContext context) {
-        settingsService.resolveForEvent(context).ifPresent(setting -> enqueue(context, setting));
+        try {
+            settingsService.resolveForEvent(context).ifPresent(setting -> enqueue(context, setting));
+        } catch (RuntimeException exception) {
+            // Email delivery is an optional side effect and must not undo the source business action.
+            LOGGER.warn("Email outbox was not created for event type {} and key {}.",
+                    context.eventType(), context.eventKey());
+        }
     }
 
     private void enqueue(EmailEventContext context, EmailNotificationSetting setting) {
         if (!setting.isEnabled()) {
             return;
         }
-        try {
-            List<EmailRecipientResolver.ResolvedRecipient> recipients = recipientResolver.resolve(
-                    settingsService.recipientGroups(setting), context);
-            if (!recipients.isEmpty()) {
-                outboxService.enqueue(setting, context, recipients);
-            }
-        } catch (RuntimeException exception) {
-            // SMTP is never called here. Configuration/rendering errors are recorded
-            // without leaking templates, recipient addresses, or credentials into logs.
-            LOGGER.warn("Email outbox was not created for event type {} and key {}.",
-                    context.eventType(), context.eventKey());
+        List<EmailRecipientResolver.ResolvedRecipient> recipients = recipientResolver.resolve(
+                settingsService.recipientGroups(setting), context);
+        if (!recipients.isEmpty()) {
+            outboxService.enqueue(setting, context, recipients);
         }
     }
 }

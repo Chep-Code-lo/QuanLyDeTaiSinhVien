@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  ArrowDownUp, ArrowRight, CalendarDays, ChevronLeft, ChevronRight,
+  ArrowDownUp, CalendarDays, ChevronLeft, ChevronRight,
   FileText, Paperclip, PencilLine, Send, Users,
 } from 'lucide-react'
 import { AnimatedSelect } from './AnimatedSelect'
@@ -134,7 +134,7 @@ export function MilestoneBoard({
                       <div className="milestone-board__actions">
                         {canManage && <button className="milestone-board__button" type="button" disabled={!canEdit || milestone.status === 'ACCEPTED'} onClick={() => onEdit(milestone)}><PencilLine size={15} aria-hidden="true" />Chỉnh sửa</button>}
                         <button className="milestone-board__button milestone-board__button--primary" type="button" aria-expanded={expanded} aria-controls={expanded ? `milestone-reports-${milestone.id}` : undefined} onClick={() => setExpandedId(expanded ? null : milestone.id)}>
-                          {expanded ? 'Ẩn báo cáo' : 'Xem báo cáo'}<ArrowRight size={15} aria-hidden="true" />
+                          {expanded ? 'Ẩn báo cáo' : 'Xem báo cáo'}
                         </button>
                       </div>
                     </div>
@@ -194,7 +194,7 @@ export function MilestoneBoard({
           <div className="milestone-board__calendar-legend"><span><i />Hạn báo cáo</span><span><i />Ngày đang chọn</span></div>
         </section>
         <section className="milestone-board__upcoming">
-          <h3><CalendarDays size={17} aria-hidden="true" />Mốc sắp tới<ChevronRight size={17} aria-hidden="true" /></h3>
+          <h3><CalendarDays size={17} aria-hidden="true" />Mốc sắp tới</h3>
           {loading ? <p className="milestone-board__sidebar-note">Đang tải...</p> : error ? <p className="milestone-board__sidebar-note">Chưa tải được dữ liệu mốc báo cáo.</p> : upcoming.length === 0 ? <p className="milestone-board__sidebar-note">Chưa có mốc sắp tới.</p> : upcoming.slice(0, 3).map((milestone) => {
             const date = parseUtcDateTime(milestone.dueAt)
             return <button key={milestone.id} type="button" className="milestone-board__upcoming-item" onClick={() => {
@@ -203,7 +203,6 @@ export function MilestoneBoard({
             }}>
               <span className="milestone-board__date-chip"><strong>{date.getDate()}</strong><small>TH{date.getMonth() + 1}</small></span>
               <span><strong>{milestone.title}</strong><small>{milestoneDeadline(milestone.dueAt, now).label} để hoàn thành</small></span>
-              <ChevronRight size={16} aria-hidden="true" />
             </button>
           })}
         </section>

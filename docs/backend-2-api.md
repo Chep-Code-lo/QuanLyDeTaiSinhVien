@@ -97,8 +97,8 @@ Response lỗi:
 
 | Method | Path | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/topics` | Đã đăng nhập | Danh sách đề tài |
-| GET | `/topics/{id}` | Đã đăng nhập | Chi tiết đề tài |
+| GET | `/topics` | Đã đăng nhập | Danh sách đề tài; sinh viên chỉ nhận đề tài đã công bố phù hợp với nhóm của mình và đề tài do chính mình đề xuất |
+| GET | `/topics/{id}` | Đã đăng nhập | Chi tiết đề tài trong phạm vi được phép xem |
 | POST | `/topics` | `ADMIN`, `LECTURER`, `STUDENT` | Tạo đề tài |
 | PUT | `/topics/{id}` | `ADMIN`, `LECTURER`, `STUDENT` | Sửa nội dung đề tài |
 | PUT | `/topics/{id}/supervisors` | `ADMIN`, `LECTURER` | Gán giảng viên hướng dẫn |
@@ -292,9 +292,9 @@ Rule:
 
 | Method | Path | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/groups` | Đã đăng nhập | Danh sách nhóm |
+| GET | `/groups` | `ADMIN`, `LECTURER` | Danh sách nhóm |
 | GET | `/groups/mine` | `STUDENT` | Danh sách nhóm của tôi |
-| GET | `/groups/{id}` | Đã đăng nhập | Chi tiết nhóm |
+| GET | `/groups/{id}` | `ADMIN`, `LECTURER` | Chi tiết nhóm |
 | POST | `/groups` | `STUDENT` | Tạo nhóm |
 | POST | `/groups/{id}/members` | `STUDENT` | Thêm thành viên |
 | DELETE | `/groups/{id}/members/{studentId}` | `STUDENT` | Xóa thành viên |
@@ -394,8 +394,9 @@ Use case:
 
 | Method | Path | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/topic-registrations` | Đã đăng nhập | Danh sách đăng ký đề tài |
-| GET | `/topic-registrations/{id}` | Đã đăng nhập | Chi tiết đăng ký |
+| GET | `/topic-registrations` | `ADMIN`, `LECTURER` | Danh sách đăng ký đề tài |
+| GET | `/topic-registrations/mine` | `STUDENT` | Hồ sơ đăng ký của các nhóm mà sinh viên còn là thành viên |
+| GET | `/topic-registrations/{id}` | `ADMIN`, `LECTURER` hoặc thành viên nhóm | Chi tiết đăng ký trong phạm vi được phép |
 | POST | `/topic-registrations` | `STUDENT` | Tạo đăng ký đề tài |
 | PATCH | `/topic-registrations/{id}/review` | `ADMIN`, `LECTURER` | Duyệt hoặc từ chối đăng ký |
 | PATCH | `/topic-registrations/{id}/withdraw` | `STUDENT` | Rút đăng ký |

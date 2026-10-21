@@ -11,17 +11,16 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
 @RequestMapping("/api/v1/lecturers")
+@RequiredArgsConstructor
 public class LecturerDirectoryController {
 
     private final LecturerDirectoryService lecturerDirectoryService;
 
-    public LecturerDirectoryController(LecturerDirectoryService lecturerDirectoryService) {
-        this.lecturerDirectoryService = lecturerDirectoryService;
-    }
 
     @GetMapping
     public ApiResponse<PageResponse<LecturerDirectoryResponse>> list(

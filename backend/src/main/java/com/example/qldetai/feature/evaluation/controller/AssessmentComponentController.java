@@ -23,17 +23,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
 @RequestMapping("/api/v1")
+@RequiredArgsConstructor
 public class AssessmentComponentController {
 
     private final EvaluationService service;
 
-    public AssessmentComponentController(EvaluationService service) {
-        this.service = service;
-    }
 
     @GetMapping("/assessment-components")
     public ApiResponse<List<AssessmentComponentResponse>> components(

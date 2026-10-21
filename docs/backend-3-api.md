@@ -86,7 +86,8 @@ Response phân trang:
 | Method | Path | Quyền | Mô tả |
 |---|---|---|---|
 | POST | `/files` | Đã đăng nhập | Upload file và nhận `fileId` |
-| GET | `/files/{id}` | Đã đăng nhập | Lấy metadata file đã upload |
+| GET | `/files/{id}` | Người có quyền xem tệp | Lấy metadata file đã upload |
+| GET | `/files/{id}/download` | Người có quyền xem tệp | Tải nội dung tệp nhị phân |
 | POST | `/milestones` | `ADMIN`, `LECTURER` | Tạo mốc tiến độ cho assignment |
 | GET | `/project-assignments/{assignmentId}/milestones` | Đã đăng nhập | Danh sách milestone của assignment |
 | POST | `/milestones/{id}/submissions` | `STUDENT` | Nộp báo cáo vào milestone |
@@ -125,7 +126,8 @@ Response mẫu:
 
 Lưu ý:
 
-- API này chỉ trả metadata, chưa trả file nhị phân để download.
+- Dùng `GET /files/{id}/download` để tải nội dung tệp. API trả `Content-Disposition: attachment` với tên tệp gốc.
+- Người upload, thành viên nhóm có báo cáo dùng tệp, giảng viên hướng dẫn/người quản lý đề tài và người xem được thông báo đính kèm mới có quyền xem hoặc tải tệp.
 - Frontend phải upload file trước, sau đó lấy `data.id` để truyền vào `POST /milestones/{id}/submissions`.
 - Có thể đổi thư mục lưu file bằng biến môi trường `FILE_STORAGE_ROOT`. Nếu không cấu hình, backend dùng thư mục tạm của JVM.
 
@@ -322,7 +324,7 @@ Lưu ý:
 | Method | Path | Quyền | Mô tả |
 |---|---|---|---|
 | POST | `/evaluation-committees` | `ADMIN`, `LECTURER` | Tạo hội đồng |
-| GET | `/evaluation-committees` | Đã đăng nhập | Danh sách hội đồng |
+| GET | `/evaluation-committees` | `ADMIN`, `LECTURER` | Danh sách hội đồng |
 | POST | `/evaluation-committees/{id}/members` | `ADMIN`, `LECTURER` | Thêm thành viên hội đồng |
 | POST | `/defense-sessions` | `ADMIN`, `LECTURER` | Xếp lịch bảo vệ |
 | GET | `/defense-sessions` | Đã đăng nhập | Danh sách buổi bảo vệ |

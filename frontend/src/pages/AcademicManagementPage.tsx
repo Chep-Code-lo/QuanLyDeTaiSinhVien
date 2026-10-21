@@ -1,4 +1,4 @@
-import { formatDateTime } from '../utils/dateTime'
+import { formatDateInput, formatDateTime } from '../utils/dateTime'
 import { DateTimeInput } from '../components/DateTimeInput'
 import { AnimatedSelect } from '../components/AnimatedSelect'
 import React, { useEffect, useState } from 'react'
@@ -25,6 +25,17 @@ const DEFAULT_PERIOD_RULES = {
   maxCommitteeMembers: 5,
 } as const
 
+type NextPeriodStatus = 'ACTIVE' | 'CLOSED'
+
+const nextPeriodStatus = (status: RegistrationPeriodResponse['status']): NextPeriodStatus | null => {
+  if (status === 'DRAFT') return 'ACTIVE'
+  if (status === 'ACTIVE') return 'CLOSED'
+  if (status === 'CLOSED') return 'ACTIVE'
+  return null
+}
+
+const periodStatusActionLabel = (status: NextPeriodStatus) => (status === 'ACTIVE' ? 'Bật' : 'Đóng')
+
 export const AcademicManagementPage: React.FC = () => {
   const { user, hasRole, hasAppointment } = useAuth()
   const { showSuccess, showError } = useToast()
@@ -36,7 +47,7 @@ export const AcademicManagementPage: React.FC = () => {
   const [submittingPeriod, setSubmittingPeriod] = useState(false)
   const [pendingStatusChange, setPendingStatusChange] = useState<{
     period: RegistrationPeriodResponse
-    nextStatus: 'DRAFT' | 'ACTIVE' | 'CLOSED'
+    nextStatus: NextPeriodStatus
   } | null>(null)
   const [changingPeriodStatus, setChangingPeriodStatus] = useState(false)
 
@@ -58,6 +69,8 @@ export const AcademicManagementPage: React.FC = () => {
     defenseDate: null,
     ...DEFAULT_PERIOD_RULES,
   })
+  const requiresReview = newPeriod.projectType === 'SPECIALIZED' || newPeriod.projectType === 'GRADUATION'
+  const requiresDefense = newPeriod.projectType === 'GRADUATION'
 
   const scheduleErrors: Partial<Record<keyof CreateRegistrationPeriodRequest, string>> = {}
   const {
@@ -68,17 +81,17 @@ export const AcademicManagementPage: React.FC = () => {
     reviewDeadlineAt,
   } = newPeriod
   if (proposalStartAt && proposalEndAt && proposalStartAt >= proposalEndAt) {
-    scheduleErrors.proposalEndAt = 'Đóng đề xuất phải sau thời điểm mở đề xuất đề tài.'
+    scheduleErrors.proposalEndAt = 'Kết thúc GV đăng ký phải sau thời điểm bắt đầu GV đăng ký.'
   }
   if (proposalEndAt && registrationStartAt && proposalEndAt > registrationStartAt) {
     scheduleErrors.registrationStartAt =
-      'Mở đăng ký của sinh viên phải từ thời điểm đóng đề xuất đề tài trở đi.'
+      'Bắt đầu SV đăng ký phải từ thời điểm kết thúc GV đăng ký trở đi.'
   }
   if (registrationStartAt && registrationEndAt && registrationStartAt >= registrationEndAt) {
     scheduleErrors.registrationEndAt = 'Đóng đăng ký phải sau thời điểm mở đăng ký của sinh viên.'
   }
   if (
-    (newPeriod.projectType === 'SPECIALIZED' || newPeriod.projectType === 'GRADUATION') &&
+    requiresReview &&
     registrationEndAt &&
     reviewDeadlineAt &&
     reviewDeadlineAt <= registrationEndAt
@@ -133,6 +146,14 @@ export const AcademicManagementPage: React.FC = () => {
       showError('Chưa tải được cấu hình Khoa CNTT. Vui lòng tải lại trang.')
       return
     }
+    if (requiresReview && !newPeriod.reviewDeadlineAt) {
+      showError('Hãy nhập hạn chót GVPB nộp điểm về Khoa.')
+      return
+    }
+    if (requiresDefense && !newPeriod.defenseDate) {
+      showError('Hãy nhập ngày báo cáo hội đồng cho đợt KLTN.')
+      return
+    }
     if (
       !newPeriod.name.trim() ||
       !newPeriod.proposalStartAt ||
@@ -140,7 +161,7 @@ export const AcademicManagementPage: React.FC = () => {
       !newPeriod.registrationStartAt ||
       !newPeriod.registrationEndAt
     ) {
-      showError('Hãy nhập đủ hai giai đoạn: đề xuất đề tài và đăng ký đề tài.')
+      showError('Hãy nhập tên đợt và đủ thời gian đăng ký của GV, SV.')
       return
     }
     const firstScheduleError = Object.entries(scheduleErrors)[0]
@@ -168,9 +189,10 @@ export const AcademicManagementPage: React.FC = () => {
         proposalEndAt: new Date(newPeriod.proposalEndAt).toISOString(),
         registrationStartAt: new Date(newPeriod.registrationStartAt).toISOString(),
         registrationEndAt: new Date(newPeriod.registrationEndAt).toISOString(),
-        reviewDeadlineAt: newPeriod.reviewDeadlineAt
+        reviewDeadlineAt: requiresReview && newPeriod.reviewDeadlineAt
           ? new Date(newPeriod.reviewDeadlineAt).toISOString()
           : null,
+        defenseDate: requiresDefense ? newPeriod.defenseDate : null,
       })
       showSuccess('Tạo đợt đăng ký thành công ở trạng thái nháp!')
       setPeriods((prev) => [created, ...prev])
@@ -255,51 +277,70 @@ export const AcademicManagementPage: React.FC = () => {
           <p className="text-secondary text-center py-6">Chưa có đợt đăng ký nào.</p>
         ) : (
           <div className="table-container">
-            <table className="data-table">
+            <table className="data-table registration-periods-table">
+              <colgroup>
+                <col className="registration-periods-table__number-column" />
+                <col className="registration-periods-table__period-column" />
+                <col className="registration-periods-table__schedule-column" />
+                <col className="registration-periods-table__milestone-column" />
+                <col className="registration-periods-table__rules-column" />
+                <col className="registration-periods-table__status-column" />
+                <col className="registration-periods-table__action-column" />
+              </colgroup>
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Tên đợt đăng ký</th>
-                  <th>Loại đợt</th>
-                  <th>Học kỳ</th>
-                  <th>Thời gian bắt đầu</th>
-                  <th>Thời gian kết thúc</th>
-                  <th>Quy tắc áp dụng</th>
-                  <th>Trạng thái</th>
-                  <th>Thao tác</th>
+                  <th scope="col">#</th>
+                  <th scope="col">Đợt đăng ký</th>
+                  <th scope="col">Thời gian đăng ký</th>
+                  <th scope="col">Mốc đánh giá</th>
+                  <th scope="col">Quy tắc áp dụng</th>
+                  <th scope="col">Trạng thái</th>
+                  <th scope="col">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
-                {periods.map((p, idx) => (
-                  <tr key={p.id}>
+                {periods.map((p, idx) => {
+                  const nextStatus = nextPeriodStatus(p.status)
+                  return <tr key={p.id}>
                     <td>{idx + 1}</td>
-                    <td className="font-semibold text-primary">{p.name}</td>
-                    <td>{projectTypeLabel(p.projectType)}</td>
-                    <td>
-                      HK {p.semesterNo} · {p.academicYear}
+                    <td className="registration-periods-table__period">
+                      <strong>{p.name}</strong>
+                      <span>
+                        {projectTypeLabel(p.projectType)} · HK {p.semesterNo} · {p.academicYear}
+                      </span>
                     </td>
-                    <td className="text-xs">
-                      Đề xuất: {formatDateTime(p.proposalStartAt)}
-                      <br />
-                      Đăng ký: {formatDateTime(p.registrationStartAt)}
+                    <td className="registration-periods-table__schedule">
+                      <span>
+                        <strong>GV:</strong> {formatDateTime(p.proposalStartAt)} – {formatDateTime(p.proposalEndAt)}
+                      </span>
+                      <span>
+                        <strong>SV:</strong> {formatDateTime(p.registrationStartAt)} – {formatDateTime(p.registrationEndAt)}
+                      </span>
                     </td>
-                    <td className="text-xs">
-                      Đề xuất: {formatDateTime(p.proposalEndAt)}
-                      <br />
-                      Đăng ký: {formatDateTime(p.registrationEndAt)}
+                    <td className="registration-periods-table__milestones">
+                      <span>
+                        <strong>GVPB:</strong>{' '}
+                        {p.projectType === 'SPECIALIZED' || p.projectType === 'GRADUATION'
+                          ? (p.reviewDeadlineAt ? formatDateTime(p.reviewDeadlineAt) : 'Chưa thiết lập')
+                          : '—'}
+                      </span>
+                      <span>
+                        <strong>Hội đồng:</strong>{' '}
+                        {p.projectType === 'GRADUATION'
+                          ? (p.defenseDate ? formatDateInput(p.defenseDate, false) : 'Chưa thiết lập')
+                          : '—'}
+                      </span>
                     </td>
-                    <td className="text-xs">
-                      Nhóm: {p.minGroupMembers}–{p.maxGroupMembers} SV
-                      <br />
-                      Lời mời: {p.invitationExpiryHours} giờ
-                      <br />
-                      Hội đồng: {p.minCommitteeMembers}–{p.maxCommitteeMembers} GV
+                    <td className="registration-periods-table__rules">
+                      <span>Nhóm: {p.minGroupMembers}–{p.maxGroupMembers} SV</span>
+                      <span>Lời mời: {p.invitationExpiryHours} giờ</span>
+                      <span>Hội đồng: {p.minCommitteeMembers}–{p.maxCommitteeMembers} GV</span>
                     </td>
                     <td className="registration-period-status">
                       <StatusBadge status={p.status} />
                     </td>
-                    <td>
-                      {(isAdmin || isDean) && (
+                    <td className="registration-periods-table__action">
+                      {(isAdmin || isDean) && nextStatus && (
                         <button
                           type="button"
                           className="btn btn-outline btn-sm"
@@ -307,21 +348,16 @@ export const AcademicManagementPage: React.FC = () => {
                           onClick={() =>
                             setPendingStatusChange({
                               period: p,
-                              nextStatus:
-                                p.status === 'DRAFT'
-                                  ? 'ACTIVE'
-                                  : p.status === 'ACTIVE'
-                                    ? 'CLOSED'
-                                    : 'DRAFT',
+                              nextStatus,
                             })
                           }
                         >
-                          Chuyển trạng thái
+                          {periodStatusActionLabel(nextStatus)}
                         </button>
                       )}
                     </td>
                   </tr>
-                ))}
+                })}
               </tbody>
             </table>
           </div>
@@ -346,9 +382,9 @@ export const AcademicManagementPage: React.FC = () => {
       {/* Modal Create Registration Period */}
       {isPeriodModalOpen && (
         <div className="modal-backdrop fade-in" onClick={() => setIsPeriodModalOpen(false)}>
-          <div className="modal-content scale-in" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content registration-period-modal scale-in" role="dialog" aria-modal="true" aria-labelledby="period-dialog-title" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 className="font-semibold text-lg">Tạo Đợt Đăng Ký Đề Tài Mới</h3>
+              <h3 id="period-dialog-title" className="font-semibold text-lg">Tạo Đợt Đăng Ký Đề Tài Mới</h3>
               <button
                 type="button"
                 className="btn-close"
@@ -360,11 +396,13 @@ export const AcademicManagementPage: React.FC = () => {
             <form onSubmit={handleCreatePeriod}>
               <div className="modal-body py-4 space-y-4">
                 <div className="form-group">
-                  <label className="form-label">
+                  <label className="form-label" htmlFor="period-name">
                     Tên Đợt Đăng Ký <span className="text-red">*</span>
                   </label>
                   <input
                     type="text"
+                    id="period-name"
+                    maxLength={200}
                     className="form-input"
                     placeholder="Ví dụ: Đợt đăng ký Đồ án tốt nghiệp HK1 2026..."
                     value={newPeriod.name}
@@ -374,10 +412,11 @@ export const AcademicManagementPage: React.FC = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">
+                  <label className="form-label" htmlFor="period-semester">
                     Học kỳ áp dụng <span className="text-red">*</span>
                   </label>
                   <AnimatedSelect
+                    id="period-semester"
                     className="form-select"
                     value={newPeriod.semesterId}
                     onChange={(e) =>
@@ -397,19 +436,22 @@ export const AcademicManagementPage: React.FC = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">
+                  <label className="form-label" htmlFor="period-type">
                     Loại đợt <span className="text-red">*</span>
                   </label>
                   <AnimatedSelect
+                    id="period-type"
                     className="form-select"
                     value={newPeriod.projectType}
-                    onChange={(e) =>
-                      setNewPeriod({
-                        ...newPeriod,
-                        projectType: e.target
-                          .value as CreateRegistrationPeriodRequest['projectType'],
-                      })
-                    }
+                    onChange={(e) => {
+                      const projectType = e.target.value as CreateRegistrationPeriodRequest['projectType']
+                      setNewPeriod(previous => ({
+                        ...previous,
+                        projectType,
+                        reviewDeadlineAt: projectType === 'SPECIALIZED' || projectType === 'GRADUATION' ? previous.reviewDeadlineAt : null,
+                        defenseDate: projectType === 'GRADUATION' ? previous.defenseDate : null,
+                      }))
+                    }}
                   >
                     <option value="COURSE">Môn học</option>
                     <option value="RESEARCH">Nghiên cứu khoa học</option>
@@ -420,7 +462,7 @@ export const AcademicManagementPage: React.FC = () => {
                 <div className="grid-cols-2">
                   <div className="form-group">
                     <label className="form-label" htmlFor="period-proposal-start">
-                      Mở đề xuất đề tài <span className="text-red">*</span>
+                      Bắt đầu GV đăng ký <span className="text-red">*</span>
                     </label>
                     <DateTimeInput
                       type="datetime-local"
@@ -440,7 +482,7 @@ export const AcademicManagementPage: React.FC = () => {
 
                   <div className="form-group">
                     <label className="form-label" htmlFor="period-proposal-end">
-                      Đóng đề xuất đề tài <span className="text-red">*</span>
+                      Kết thúc GV đăng ký <span className="text-red">*</span>
                     </label>
                     <DateTimeInput
                       type="datetime-local"
@@ -470,7 +512,7 @@ export const AcademicManagementPage: React.FC = () => {
                 <div className="grid-cols-2">
                   <div className="form-group">
                     <label className="form-label" htmlFor="period-registration-start">
-                      Mở đăng ký của SV <span className="text-red">*</span>
+                      Bắt đầu SV đăng ký <span className="text-red">*</span>
                     </label>
                     <DateTimeInput
                       type="datetime-local"
@@ -481,7 +523,7 @@ export const AcademicManagementPage: React.FC = () => {
                       aria-describedby={
                         scheduleErrors.registrationStartAt
                           ? 'period-registration-start-error'
-                          : 'period-schedule-hint'
+                          : undefined
                       }
                       value={newPeriod.registrationStartAt}
                       onValueChange={(value) =>
@@ -500,7 +542,7 @@ export const AcademicManagementPage: React.FC = () => {
                   </div>
                   <div className="form-group">
                     <label className="form-label" htmlFor="period-registration-end">
-                      Đóng đăng ký của SV <span className="text-red">*</span>
+                      Kết thúc SV đăng ký <span className="text-red">*</span>
                     </label>
                     <DateTimeInput
                       type="datetime-local"
@@ -529,9 +571,64 @@ export const AcademicManagementPage: React.FC = () => {
                     )}
                   </div>
                 </div>
-                <p id="period-schedule-hint" className="text-sm text-secondary">
-                  Đóng đề xuất đề tài trước hoặc cùng lúc mở đăng ký cho sinh viên.
-                </p>
+                <div className={requiresReview ? 'grid-cols-2' : undefined}>
+                  {requiresReview && (
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="period-review-deadline">
+                        Hạn chót GVPB nộp điểm về Khoa <span className="text-red">*</span>
+                      </label>
+                      <DateTimeInput
+                        type="datetime-local"
+                        className="form-input"
+                        id="period-review-deadline"
+                        name="reviewDeadlineAt"
+                        aria-invalid={Boolean(scheduleErrors.reviewDeadlineAt)}
+                        aria-describedby={
+                          scheduleErrors.reviewDeadlineAt ? 'period-review-deadline-error' : undefined
+                        }
+                        value={newPeriod.reviewDeadlineAt || ''}
+                        onValueChange={(value) =>
+                          setNewPeriod({
+                            ...newPeriod,
+                            reviewDeadlineAt: value || null,
+                          })
+                        }
+                        required
+                      />
+                      {scheduleErrors.reviewDeadlineAt && (
+                        <p id="period-review-deadline-error" className="form-error">
+                          {scheduleErrors.reviewDeadlineAt}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="period-defense-date">
+                      Ngày báo cáo hội đồng
+                      {requiresDefense && (
+                        <>
+                          {' '}
+                          <span className="text-red">*</span>
+                        </>
+                      )}
+                    </label>
+                    <DateTimeInput
+                      type="date"
+                      id="period-defense-date"
+                      name="defenseDate"
+                      className="form-input"
+                      value={newPeriod.defenseDate || ''}
+                      disabled={!requiresDefense}
+                      onValueChange={(value) =>
+                        setNewPeriod({
+                          ...newPeriod,
+                          defenseDate: value || null,
+                        })
+                      }
+                      required={requiresDefense}
+                    />
+                  </div>
+                </div>
                 <div className="form-group">
                   <label className="form-label">Quy tắc nhóm thực hiện</label>
                   <div className="grid-cols-2">
@@ -642,56 +739,7 @@ export const AcademicManagementPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                {(newPeriod.projectType === 'SPECIALIZED' ||
-                  newPeriod.projectType === 'GRADUATION') && (
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="period-review-deadline">
-                      Hạn GVPB nộp điểm <span className="text-red">*</span>
-                    </label>
-                    <DateTimeInput
-                      type="datetime-local"
-                      className="form-input"
-                      id="period-review-deadline"
-                      name="reviewDeadlineAt"
-                      aria-invalid={Boolean(scheduleErrors.reviewDeadlineAt)}
-                      aria-describedby={
-                        scheduleErrors.reviewDeadlineAt ? 'period-review-deadline-error' : undefined
-                      }
-                      value={newPeriod.reviewDeadlineAt || ''}
-                      onValueChange={(value) =>
-                        setNewPeriod({
-                          ...newPeriod,
-                          reviewDeadlineAt: value || null,
-                        })
-                      }
-                      required
-                    />
-                    {scheduleErrors.reviewDeadlineAt && (
-                      <p id="period-review-deadline-error" className="form-error">
-                        {scheduleErrors.reviewDeadlineAt}
-                      </p>
-                    )}
-                  </div>
-                )}
-                {newPeriod.projectType === 'GRADUATION' && (
-                  <div className="form-group">
-                    <label className="form-label">
-                      Ngày báo cáo hội đồng <span className="text-red">*</span>
-                    </label>
-                    <DateTimeInput
-                      type="date"
-                      className="form-input"
-                      value={newPeriod.defenseDate || ''}
-                      onValueChange={(value) =>
-                        setNewPeriod({
-                          ...newPeriod,
-                          defenseDate: value || null,
-                        })
-                      }
-                      required
-                    />
-                  </div>
-                )}
+
               </div>
 
               <div

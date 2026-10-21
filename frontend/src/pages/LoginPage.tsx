@@ -59,10 +59,6 @@ export function LoginForm({ onSuccess, onClose }: LoginFormProps) {
       )}
       <AppLogo />
       <h1 id="login-title">Đăng nhập hệ thống</h1>
-      <p>
-        Hệ thống quản lý đề tài của sinh viên Trường Đại học Công Nghệ Kỹ Thuật Thành phố Hồ Chí
-        Minh.
-      </p>
 
       <form className="login-form" onSubmit={handleSubmit}>
         <div className="form-field">

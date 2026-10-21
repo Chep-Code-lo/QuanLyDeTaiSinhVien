@@ -3,6 +3,7 @@ package com.example.qldetai.feature.communication.email;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
  * must cross a Spring proxy for {@code REQUIRES_NEW} to take effect.
  */
 @Service
+@RequiredArgsConstructor
 public class EmailOutboxDeliveryStateService {
 
     private final EmailOutboxRepository outboxRepository;
@@ -21,16 +23,6 @@ public class EmailOutboxDeliveryStateService {
     private final EmailNotificationProperties properties;
     private final Clock clock;
 
-    public EmailOutboxDeliveryStateService(
-            EmailOutboxRepository outboxRepository,
-            EmailDeliveryLogRepository deliveryLogRepository,
-            EmailNotificationProperties properties,
-            Clock clock) {
-        this.outboxRepository = outboxRepository;
-        this.deliveryLogRepository = deliveryLogRepository;
-        this.properties = properties;
-        this.clock = clock;
-    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recoverStaleClaims() {

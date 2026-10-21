@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.net.URI;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,13 +29,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/group-invitations")
 @PreAuthorize("hasRole('STUDENT')")
+@RequiredArgsConstructor
 public class GroupInvitationController {
 
     private final GroupInvitationService groupInvitationService;
 
-    public GroupInvitationController(GroupInvitationService groupInvitationService) {
-        this.groupInvitationService = groupInvitationService;
-    }
 
     @GetMapping("/mine")
     public ApiResponse<PageResponse<GroupInvitationResponse>> mine(

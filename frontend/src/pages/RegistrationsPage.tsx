@@ -6,8 +6,8 @@ import { groupApi } from '../api/groups'
 import { registrationApi } from '../api/registrations'
 import { topicApi } from '../api/topics'
 import { PageHeader } from '../components/PageHeader'
-import { StatusBadge } from '../components/StatusBadge'
 import { RegistrationTopicForm } from '../components/RegistrationTopicForm'
+import { StatusBadge } from '../components/StatusBadge'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { formatDateTime } from '../utils/dateTime'
@@ -61,6 +61,14 @@ export function RegistrationsPage() {
   const selectedGroup = groups.find((group) => group.id === Number(groupId))
   const selectedPeriod = periods.find((period) => period.id === selectedGroup?.periodId)
   const availableTopics = topics.filter((topic) => topic.periodId === selectedGroup?.periodId && topic.availableForRegistration && (!topic.reservedGroupId || topic.reservedGroupId === selectedGroup?.id))
+  const canWithdraw = (item: TopicRegistrationResponse) =>
+    student &&
+    item.status === 'PENDING' &&
+    groups.some(
+      (group) =>
+        group.id === item.groupId &&
+        group.members.some((member) => member.userId === user?.id && member.memberRole === 'LEADER'),
+    )
   const registrationError = (now: number) => {
     if (!selectedGroup) return 'Chọn nhóm của bạn để xem đề tài cùng đợt đăng ký.'
     if (!selectedPeriod) return 'Không tải được đợt đăng ký của nhóm. Vui lòng tải lại trang.'
@@ -86,7 +94,11 @@ export function RegistrationsPage() {
   const load = async () => {
     setLoading(true)
     try {
-      const xs = await allPages(page => registrationApi.list({ page, size: 100 }))
+      const xs = await allPages(page =>
+        student
+          ? registrationApi.mine({ page, size: 100 })
+          : registrationApi.list({ page, size: 100 }),
+      )
       setItems(xs)
       if (student) {
         const [mine, periodPage] = await Promise.all([
@@ -114,7 +126,7 @@ export function RegistrationsPage() {
   const register = async (e: React.FormEvent) => {
     e.preventDefault()
     if (loading || submitting) return
-    const reason = registrationError(Date.now())
+    const reason = registrationError(currentTime)
     if (reason) return showError(reason)
     if (!groupId || !topicId) return showError('Chọn nhóm và đề tài để đăng ký.')
     if (!availableTopics.some((topic) => topic.id === Number(topicId)))
@@ -303,7 +315,7 @@ export function RegistrationsPage() {
                           </button>
                         </>
                       )}
-                      {student && item.status === 'PENDING' && (
+                      {canWithdraw(item) && (
                         <button className="btn btn-secondary btn-sm" onClick={() => withdraw(item)}>
                           Rút
                         </button>

@@ -6,6 +6,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.qldetai.common.api.PageResponse;
@@ -1011,10 +1012,43 @@ class ProjectLifecycleIntegrationTests {
         evaluationResultService.publish(finalized.id(), admin.getId());
         assertThat(evaluationResultService.getResult(finalized.id(), leaderStudent.getUser().getId()).id())
                 .isEqualTo(finalized.id());
+        mvc.perform(get("/api/v1/student/results")
+                        .with(user(UserPrincipal.from(leaderStudent.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(finalized.id()))
+                .andExpect(jsonPath("$.data[0].status").value("PUBLISHED"));
+        mvc.perform(get("/api/v1/student/results")
+                        .with(user(UserPrincipal.from(thirdStudent.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
         assertThatThrownBy(() -> evaluationResultService.getResult(finalized.id(), thirdStudent.getUser().getId()))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         assertThat(evaluationResultService.listResults(null, null, null, 0, 10,
                 lecturerOne.getUser().getId()).totalElements()).isEqualTo(1);
+    }
+
+    @Test
+    void studentsOnlyListRegistrationsForTheirOwnGroups(@Autowired MockMvc mvc) throws Exception {
+        var project = createAssignedProject("student-registration-scope", leaderStudent, secondStudent);
+
+        mvc.perform(get("/api/v1/topic-registrations/mine")
+                        .with(user(UserPrincipal.from(leaderStudent.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].groupId").value(project.groupId()));
+        mvc.perform(get("/api/v1/topic-registrations/mine")
+                        .with(user(UserPrincipal.from(thirdStudent.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").isEmpty());
+        mvc.perform(get("/api/v1/topic-registrations")
+                        .with(user(UserPrincipal.from(leaderStudent.getUser()))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/topic-registrations/{id}", project.registrationId())
+                        .with(user(UserPrincipal.from(leaderStudent.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.groupId").value(project.groupId()));
+        mvc.perform(get("/api/v1/topic-registrations/{id}", project.registrationId())
+                        .with(user(UserPrincipal.from(thirdStudent.getUser()))))
+                .andExpect(status().isForbidden());
     }
 
     private void submitFullScore(Long assignmentId, LockedCatalog catalog, Lecturer lecturer, Long defenseId) {

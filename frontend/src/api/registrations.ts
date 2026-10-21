@@ -10,6 +10,13 @@ export const registrationApi = {
         { params },
       )
     ).data.data,
+  mine: async (params: { periodId?: number; status?: string; page?: number; size?: number } = {}) =>
+    (
+      await apiClient.get<ApiResponse<PageResponse<TopicRegistrationResponse>>>(
+        '/topic-registrations/mine',
+        { params },
+      )
+    ).data.data,
   create: async (payload: { groupId: number; topicId: number; motivation?: string }) =>
     (await apiClient.post<ApiResponse<TopicRegistrationResponse>>('/topic-registrations', payload))
       .data.data,

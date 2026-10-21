@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.net.URI;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,13 +30,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Validated
 @RequestMapping("/api/v1/registration-periods")
+@RequiredArgsConstructor
 public class RegistrationPeriodController {
 
     private final RegistrationPeriodService registrationPeriodService;
 
-    public RegistrationPeriodController(RegistrationPeriodService registrationPeriodService) {
-        this.registrationPeriodService = registrationPeriodService;
-    }
 
     @GetMapping
     public ApiResponse<PageResponse<RegistrationPeriodResponse>> list(

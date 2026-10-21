@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class GroupService {
 
     private final StudentGroupRepository studentGroupRepository;
@@ -51,26 +53,6 @@ public class GroupService {
     private final NotificationService notificationService;
     private final Clock clock;
 
-    public GroupService(
-            StudentGroupRepository studentGroupRepository,
-            GroupMemberRepository groupMemberRepository,
-            TopicRegistrationRepository topicRegistrationRepository,
-            ProjectAssignmentRepository projectAssignmentRepository,
-            RegistrationPeriodRepository registrationPeriodRepository,
-            StudentRepository studentRepository,
-            UserRepository userRepository,
-            NotificationService notificationService,
-            Clock clock) {
-        this.studentGroupRepository = studentGroupRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.topicRegistrationRepository = topicRegistrationRepository;
-        this.projectAssignmentRepository = projectAssignmentRepository;
-        this.registrationPeriodRepository = registrationPeriodRepository;
-        this.studentRepository = studentRepository;
-        this.userRepository = userRepository;
-        this.notificationService = notificationService;
-        this.clock = clock;
-    }
 
     @Transactional(readOnly = true)
     public PageResponse<StudentGroupResponse> list(Long periodId, int page, int size) {

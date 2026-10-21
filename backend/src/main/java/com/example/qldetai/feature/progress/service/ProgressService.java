@@ -29,14 +29,15 @@ import com.example.qldetai.feature.progress.repository.StoredFileRepository;
 import com.example.qldetai.feature.topic.repository.TopicSupervisorRepository;
 import java.time.*;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class ProgressService {
  private final MilestoneRepository milestones; private final ReportSubmissionRepository submissions; private final ReportFeedbackRepository feedback; private final StoredFileRepository files; private final ProjectAssignmentRepository assignments; private final StudentRepository students; private final LecturerRepository lecturers; private final UserRepository users; private final GroupMemberRepository members; private final TopicSupervisorRepository supervisors; private final NotificationService notifications; private final Clock clock;
- public ProgressService(MilestoneRepository milestones, ReportSubmissionRepository submissions, ReportFeedbackRepository feedback, StoredFileRepository files, ProjectAssignmentRepository assignments, StudentRepository students, LecturerRepository lecturers, UserRepository users, GroupMemberRepository members, TopicSupervisorRepository supervisors, NotificationService notifications, Clock clock) { this.milestones=milestones; this.submissions=submissions; this.feedback=feedback; this.files=files; this.assignments=assignments; this.students=students; this.lecturers=lecturers; this.users=users; this.members=members; this.supervisors=supervisors; this.notifications=notifications; this.clock=clock; }
  @Transactional @BusinessAudit(action="MILESTONE_CREATE", entityType="MILESTONE")
  public MilestoneResponse create(CreateMilestoneRequest request, Long actorId) { ProjectAssignment a=assignment(request.assignmentId()); requireManager(actorId); if(a.getStatus()!=AssignmentStatus.IN_PROGRESS) throw new BusinessRuleException("Milestones can only be created for an in-progress assignment."); Milestone m=new Milestone(); m.setAssignment(a); m.setTitle(request.title().trim()); m.setMilestoneType(request.milestoneType()); m.setDescription(request.description().trim()); m.setDueAt(request.dueAt()); m.setCreatedBy(user(actorId)); m.setCreatedAt(LocalDateTime.now(clock)); return response(milestones.save(m)); }
  @Transactional(readOnly=true) public List<MilestoneResponse> list(Long assignmentId, Long actorId) { ProjectAssignment a=assignment(assignmentId); requireAssignmentParticipant(a, actorId); return milestones.findByAssignmentIdOrderByDueAtAsc(assignmentId).stream().map(this::response).toList(); }

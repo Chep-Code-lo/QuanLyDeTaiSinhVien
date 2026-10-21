@@ -29,8 +29,10 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 public class EvaluationCommitteeService {
 
     private final EvaluationCommitteeRepository committees;
@@ -40,20 +42,6 @@ public class EvaluationCommitteeService {
     private final Clock clock;
     private final EvaluationActorAccess actorAccess;
 
-    public EvaluationCommitteeService(
-            EvaluationCommitteeRepository committees,
-            CommitteeMemberRepository committeeMembers,
-            RegistrationPeriodRepository periods,
-            LecturerRepository lecturers,
-            Clock clock,
-            EvaluationActorAccess actorAccess) {
-        this.committees = committees;
-        this.committeeMembers = committeeMembers;
-        this.periods = periods;
-        this.lecturers = lecturers;
-        this.clock = clock;
-        this.actorAccess = actorAccess;
-    }
 
     @Transactional(readOnly = true)
     public PageResponse<EvaluationCommitteeResponse> listCommittees(

@@ -8,7 +8,7 @@ export function PageHeader({ title, description }: PageHeaderProps) {
     <header className="page-header">
       <div>
         <h1>{title}</h1>
-        {description && <p className="text-secondary">{description}</p>}
+        {description && <p>{description}</p>}
       </div>
     </header>
   )

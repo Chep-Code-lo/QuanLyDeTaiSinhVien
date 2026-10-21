@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.net.URI;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,15 +28,14 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/v1/groups")
+@RequiredArgsConstructor
 public class GroupController {
 
     private final GroupService groupService;
 
-    public GroupController(GroupService groupService) {
-        this.groupService = groupService;
-    }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
     public ApiResponse<PageResponse<StudentGroupResponse>> list(
             @RequestParam(required = false) Long periodId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
@@ -50,6 +50,7 @@ public class GroupController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
     public ApiResponse<StudentGroupResponse> get(@PathVariable Long id) {
         return ApiResponse.success(groupService.get(id));
     }

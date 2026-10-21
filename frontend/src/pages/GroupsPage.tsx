@@ -37,11 +37,13 @@ const invitationMessages: Record<string, string> = {
 }
 
 const messageOf = (error: any) => {
+  if (error.response?.status === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+  if (error.response?.status === 403) return 'Tài khoản không có quyền thực hiện thao tác này.'
   const message = error.response?.data?.message
   return invitationMessages[message] || message || 'Không thể thực hiện thao tác. Vui lòng thử lại.'
 }
 
-function latestInvitationExpiry(period: RegistrationPeriodResponse, now = Date.now()) {
+function latestInvitationExpiry(period: RegistrationPeriodResponse, now: number) {
   return new Date(
     Math.min(
       now + period.invitationExpiryHours * 60 * 60 * 1000,
@@ -276,7 +278,7 @@ export function GroupsPage() {
           </form>
         </section>
       ) : (
-        <SelectionPanel id="group-period-filter" label="Lọc theo đợt đăng ký" description="Chọn đợt để xem các nhóm đề tài tương ứng.">
+        <SelectionPanel id="group-period-filter" label="Lọc theo đợt đăng ký">
           <AnimatedSelect
             id="group-period-filter"
             className="form-select"

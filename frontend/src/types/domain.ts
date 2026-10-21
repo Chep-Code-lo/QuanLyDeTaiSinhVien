@@ -507,8 +507,9 @@ export interface TopicResponse {
   expectedOutcomes: string
   prerequisites?: string
   proposerName: string
-  visibilityType: 'PUBLIC' | 'PRIVATE' | string
+  visibilityType: 'OPEN' | 'RESERVED' | string
   status: TopicStatus
+  publishedAt?: string
   createdAt: string
   updatedAt: string
   version: number

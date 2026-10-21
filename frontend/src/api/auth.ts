@@ -29,9 +29,12 @@ export const authApi = {
     return response.data.data
   },
   logout: async () => {
-    const response = await apiClient.post<ApiResponse<void>>('/auth/logout')
-    clearCsrfToken()
-    return response.data
+    try {
+      const response = await apiClient.post<ApiResponse<void>>('/auth/logout')
+      return response.data
+    } finally {
+      clearCsrfToken()
+    }
   },
   changePassword: async (payload: { currentPassword: string; newPassword: string }) => {
     const response = await apiClient.post<ApiResponse<void>>('/auth/change-password', payload)

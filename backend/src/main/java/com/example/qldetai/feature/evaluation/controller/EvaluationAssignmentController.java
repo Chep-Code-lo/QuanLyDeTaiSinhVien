@@ -24,17 +24,16 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
 @RequestMapping("/api/v1")
+@RequiredArgsConstructor
 public class EvaluationAssignmentController {
 
     private final EvaluationService service;
 
-    public EvaluationAssignmentController(EvaluationService service) {
-        this.service = service;
-    }
 
     @GetMapping("/evaluation-assignments")
     @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")

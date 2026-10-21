@@ -26,8 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
     private final AuthenticationManager authenticationManager;
@@ -38,22 +40,6 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
-    public AuthService(
-            AuthenticationManager authenticationManager,
-            SessionAuthenticationStrategy sessionAuthenticationStrategy,
-            SecurityContextRepository securityContextRepository,
-            UserRepository userRepository,
-            UserProfileService userProfileService,
-            PasswordEncoder passwordEncoder,
-            Clock clock) {
-        this.authenticationManager = authenticationManager;
-        this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
-        this.securityContextRepository = securityContextRepository;
-        this.userRepository = userRepository;
-        this.userProfileService = userProfileService;
-        this.passwordEncoder = passwordEncoder;
-        this.clock = clock;
-    }
 
     @Transactional
     public LoginResponse login(

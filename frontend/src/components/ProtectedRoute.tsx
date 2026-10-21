@@ -1,5 +1,5 @@
 import React from 'react'
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import type { PositionCode, RoleCode } from '../types/domain'
 
@@ -14,7 +14,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   appointments,
   requireAcademicManagement,
 }) => {
-  const location = useLocation()
   const {
     user,
     loading,
@@ -34,7 +33,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
+    return <Navigate to="/" replace />
   }
 
   if (requireAcademicManagement && !canAccessAcademicManagement()) {

@@ -40,11 +40,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Settings, template validation, and authorization for all email notification scopes. */
 @Service
+@RequiredArgsConstructor
 public class EmailNotificationSettingsService {
 
     private static final long SYSTEM_SCOPE_ID = 0L;
@@ -68,42 +70,6 @@ public class EmailNotificationSettingsService {
     private final EmailNotificationProperties properties;
     private final Clock clock;
 
-    public EmailNotificationSettingsService(
-            EmailNotificationSettingRepository settingRepository,
-            UserRepository userRepository,
-            LecturerRepository lecturerRepository,
-            FacultyRepository facultyRepository,
-            AcademicAppointmentRepository academicAppointmentRepository,
-            StudentGroupRepository studentGroupRepository,
-            GroupMemberRepository groupMemberRepository,
-            TopicRegistrationRepository topicRegistrationRepository,
-            TopicRepository topicRepository,
-            TopicSupervisorRepository topicSupervisorRepository,
-            ProjectAssignmentRepository projectAssignmentRepository,
-            EmailTemplateRenderer templateRenderer,
-            EmailEventContextFactory contextFactory,
-            EmailRecipientResolver recipientResolver,
-            EmailOutboxService emailOutboxService,
-            EmailNotificationProperties properties,
-            Clock clock) {
-        this.settingRepository = settingRepository;
-        this.userRepository = userRepository;
-        this.lecturerRepository = lecturerRepository;
-        this.facultyRepository = facultyRepository;
-        this.academicAppointmentRepository = academicAppointmentRepository;
-        this.studentGroupRepository = studentGroupRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.topicRegistrationRepository = topicRegistrationRepository;
-        this.topicRepository = topicRepository;
-        this.topicSupervisorRepository = topicSupervisorRepository;
-        this.projectAssignmentRepository = projectAssignmentRepository;
-        this.templateRenderer = templateRenderer;
-        this.contextFactory = contextFactory;
-        this.recipientResolver = recipientResolver;
-        this.emailOutboxService = emailOutboxService;
-        this.properties = properties;
-        this.clock = clock;
-    }
 
     @Transactional(readOnly = true)
     public List<EmailNotificationSettingResponse> list(
@@ -261,7 +227,7 @@ public class EmailNotificationSettingsService {
     }
 
     /** Selects the first matching scope in lecturer -> faculty -> system order. */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = RuntimeException.class)
     public Optional<EmailNotificationSetting> resolveForEvent(EmailEventContext context) {
         LinkedHashSet<Long> lecturerIds = new LinkedHashSet<>(context.responsibleLecturerUserIds() == null
                 ? List.of()

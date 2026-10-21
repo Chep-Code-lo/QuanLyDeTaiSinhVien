@@ -14,8 +14,123 @@
   flex-shrink: 0;
 }
 
+.academic-management-page .registration-periods-table {
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 12px;
+}
+
+.academic-management-page .registration-periods-table th,
+.academic-management-page .registration-periods-table td {
+  padding: 10px 8px;
+  vertical-align: middle;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.academic-management-page .registration-periods-table th {
+  font-size: 12px;
+  white-space: normal;
+}
+
+.registration-periods-table__number-column { width: 4%; }
+.registration-periods-table__period-column { width: 16%; }
+.registration-periods-table__schedule-column { width: 26%; }
+.registration-periods-table__milestone-column { width: 18%; }
+.registration-periods-table__rules-column { width: 15%; }
+.registration-periods-table__status-column { width: 10%; }
+.registration-periods-table__action-column { width: 11%; }
+
+.academic-management-page .registration-periods-table__period strong,
+.academic-management-page .registration-periods-table__period span,
+.academic-management-page .registration-periods-table__schedule span,
+.academic-management-page .registration-periods-table__milestones span,
+.academic-management-page .registration-periods-table__rules span {
+  display: block;
+}
+
+.academic-management-page .registration-periods-table__period strong {
+  color: var(--primary-blue);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.academic-management-page .registration-periods-table__period span,
+.academic-management-page .registration-periods-table__schedule span + span,
+.academic-management-page .registration-periods-table__milestones span + span,
+.academic-management-page .registration-periods-table__rules span + span {
+  margin-top: 4px;
+}
+
+.academic-management-page .registration-periods-table__schedule strong,
+.academic-management-page .registration-periods-table__milestones strong {
+  color: var(--ink-700);
+}
+
+.academic-management-page .registration-periods-table__action .btn {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.portal-shell .academic-management-page .modal-content.registration-period-modal {
+  width: min(100%, 760px);
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.portal-shell .academic-management-page .registration-period-modal .modal-header {
+  flex-shrink: 0;
+  padding: 24px 28px 16px;
+}
+
+.portal-shell .academic-management-page .registration-period-modal > form {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.portal-shell .academic-management-page .registration-period-modal .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 20px 28px;
+}
+
+.portal-shell .academic-management-page .registration-period-modal .modal-footer {
+  flex-shrink: 0;
+  margin-top: 0;
+  padding: 16px 28px 24px;
+}
+
 @media (max-width: 600px) {
   .academic-management-page .registration-periods-header {
     flex-wrap: wrap;
+  }
+
+  .portal-shell .academic-management-page .modal-content.registration-period-modal {
+    max-height: calc(100dvh - 24px);
+    border-radius: 14px;
+  }
+
+  .portal-shell .academic-management-page .registration-period-modal .modal-header {
+    padding: 20px 20px 14px;
+  }
+
+  .portal-shell .academic-management-page .registration-period-modal .modal-body {
+    padding: 18px 20px;
+  }
+
+  .portal-shell .academic-management-page .registration-period-modal .modal-footer {
+    padding: 14px 20px 20px;
   }
 }

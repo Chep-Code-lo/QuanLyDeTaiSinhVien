@@ -15,6 +15,7 @@ import com.example.qldetai.feature.topic.repository.TopicSupervisorRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class EmailLogService {
 
     private final EmailOutboxRepository outboxRepository;
@@ -33,22 +35,6 @@ public class EmailLogService {
     private final TopicSupervisorRepository topicSupervisorRepository;
     private final Clock clock;
 
-    public EmailLogService(
-            EmailOutboxRepository outboxRepository,
-            EmailDeliveryLogRepository deliveryLogRepository,
-            UserRepository userRepository,
-            LecturerRepository lecturerRepository,
-            AcademicAppointmentRepository academicAppointmentRepository,
-            TopicSupervisorRepository topicSupervisorRepository,
-            Clock clock) {
-        this.outboxRepository = outboxRepository;
-        this.deliveryLogRepository = deliveryLogRepository;
-        this.userRepository = userRepository;
-        this.lecturerRepository = lecturerRepository;
-        this.academicAppointmentRepository = academicAppointmentRepository;
-        this.topicSupervisorRepository = topicSupervisorRepository;
-        this.clock = clock;
-    }
 
     @Transactional(readOnly = true)
     public PageResponse<EmailLogResponse> list(Long actorId, int page, int size) {

@@ -21,16 +21,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+
 @Validated
 @RestController
 @RequestMapping("/api/v1")
+@RequiredArgsConstructor
 public class EvaluationResultController {
 
     private final EvaluationResultService service;
 
-    public EvaluationResultController(EvaluationResultService service) {
-        this.service = service;
-    }
 
     @GetMapping("/results")
     @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
@@ -49,6 +50,13 @@ public class EvaluationResultController {
     public ApiResponse<ResultDetailResponse> result(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(service.getResult(id, principal.id()));
+    }
+
+    @GetMapping("/student/results")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ApiResponse<List<ResultDetailResponse>> studentResults(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(service.listPublishedForStudent(principal.id()));
     }
 
     @PostMapping("/project-assignments/{id}/results/finalize")

@@ -24,7 +24,9 @@ import com.example.qldetai.feature.project.repository.ProjectAssignmentRepositor
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -34,6 +36,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class ProjectAssignmentService {
 
     private static final Map<AssignmentStatus, EnumSet<AssignmentStatus>> TRANSITIONS = Map.of(
@@ -49,22 +52,6 @@ public class ProjectAssignmentService {
     private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
 
-    public ProjectAssignmentService(
-            ProjectAssignmentRepository projectAssignmentRepository,
-            TopicRegistrationRepository topicRegistrationRepository,
-            GroupMemberRepository groupMemberRepository,
-            UserRepository userRepository,
-            NotificationService notificationService,
-            EmailNotificationEventService emailNotificationEventService,
-            Clock clock) {
-        this.projectAssignmentRepository = projectAssignmentRepository;
-        this.topicRegistrationRepository = topicRegistrationRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.userRepository = userRepository;
-        this.notificationService = notificationService;
-        this.emailNotificationEventService = emailNotificationEventService;
-        this.clock = clock;
-    }
 
     @Transactional(readOnly = true)
     public PageResponse<ProjectAssignmentResponse> list(Long periodId, AssignmentStatus status, int page, int size) {
@@ -80,6 +67,13 @@ public class ProjectAssignmentService {
             assignments = projectAssignmentRepository.findAll(pageable);
         }
         return PageResponse.from(assignments.map(this::toResponse));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProjectAssignmentResponse> listForStudent(Long userId) {
+        return projectAssignmentRepository.findByCurrentStudentUserId(userId).stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)

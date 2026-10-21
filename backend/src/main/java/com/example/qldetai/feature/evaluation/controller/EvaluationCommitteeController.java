@@ -25,19 +25,19 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
 @RequestMapping("/api/v1")
+@RequiredArgsConstructor
 public class EvaluationCommitteeController {
 
     private final EvaluationCommitteeService service;
 
-    public EvaluationCommitteeController(EvaluationCommitteeService service) {
-        this.service = service;
-    }
 
     @GetMapping("/evaluation-committees")
+    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
     public ApiResponse<PageResponse<EvaluationCommitteeResponse>> committees(
             @RequestParam(required = false) Long periodId,
             @RequestParam(defaultValue = "0") @Min(0) int page,

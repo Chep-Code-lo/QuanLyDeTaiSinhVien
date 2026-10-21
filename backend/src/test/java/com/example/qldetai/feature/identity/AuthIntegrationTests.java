@@ -114,6 +114,28 @@ class AuthIntegrationTests {
     }
 
     @Test
+    void authenticatedUserCanLoadDashboardSummary() throws Exception {
+        MockHttpSession session = login("admin@test.local", "TestPassword123!");
+
+        mockMvc.perform(get("/api/v1/dashboard").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.totalTopics").value(0))
+                .andExpect(jsonPath("$.data.unreadNotifications").value(0));
+    }
+
+    @Test
+    void studentCannotReadGroupOrCommitteeDirectories() throws Exception {
+        String studentEmail = createUserWithRole("student-directory", RoleCode.STUDENT);
+        MockHttpSession session = login(studentEmail, "TestPassword123!");
+
+        mockMvc.perform(get("/api/v1/groups").session(session))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/evaluation-committees").session(session))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void currentUserIncludesActiveAppointmentsForLecturer() throws Exception {
         Faculty faculty = createFaculty("CNTT");
         Department department = createDepartment(faculty, "CNPM");
@@ -207,6 +229,21 @@ class AuthIntegrationTests {
                 .andExpect(status().isOk())
                 .andReturn();
         return (MockHttpSession) login.getRequest().getSession(false);
+    }
+
+    private String createUserWithRole(String emailPrefix, RoleCode roleCode) {
+        String email = emailPrefix + "-" + System.nanoTime() + "@test.local";
+        LocalDateTime now = LocalDateTime.now(clock);
+        User user = new User();
+        user.setEmail(email);
+        user.setPasswordHash(passwordEncoder.encode("TestPassword123!"));
+        user.setFullName("Test " + roleCode.name());
+        user.setStatus(UserStatus.ACTIVE);
+        user.setCreatedAt(now);
+        user.setUpdatedAt(now);
+        user.replaceRoles(Set.of(roleRepository.findByCode(roleCode).orElseThrow()), now);
+        userRepository.saveAndFlush(user);
+        return email;
     }
 
     private Faculty createFaculty(String baseCode) {

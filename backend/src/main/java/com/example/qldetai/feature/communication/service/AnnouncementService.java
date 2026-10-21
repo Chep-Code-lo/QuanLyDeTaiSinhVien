@@ -18,6 +18,7 @@ import com.example.qldetai.feature.progress.domain.StoredFile;
 import com.example.qldetai.feature.progress.repository.StoredFileRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AnnouncementService {
 
     private final AnnouncementRepository announcementRepository;
@@ -33,18 +35,6 @@ public class AnnouncementService {
     private final StoredFileRepository storedFileRepository;
     private final Clock clock;
 
-    public AnnouncementService(
-            AnnouncementRepository announcementRepository,
-            FacultyRepository facultyRepository,
-            UserRepository userRepository,
-            StoredFileRepository storedFileRepository,
-            Clock clock) {
-        this.announcementRepository = announcementRepository;
-        this.facultyRepository = facultyRepository;
-        this.userRepository = userRepository;
-        this.storedFileRepository = storedFileRepository;
-        this.clock = clock;
-    }
 
     /** Public feed: unpublished or archived content is intentionally never returned here. */
     @Transactional(readOnly = true)

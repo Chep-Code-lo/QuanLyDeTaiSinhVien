@@ -27,19 +27,20 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
 @RequestMapping("/api/v1/project-assignments")
+@RequiredArgsConstructor
 public class ProjectAssignmentController {
 
     private final ProjectAssignmentService projectAssignmentService;
 
-    public ProjectAssignmentController(ProjectAssignmentService projectAssignmentService) {
-        this.projectAssignmentService = projectAssignmentService;
-    }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN') or hasRole('LECTURER')")
     public ApiResponse<PageResponse<ProjectAssignmentResponse>> list(
             @RequestParam(required = false) Long periodId,
             @RequestParam(required = false) AssignmentStatus status,
@@ -48,7 +49,15 @@ public class ProjectAssignmentController {
         return ApiResponse.success(projectAssignmentService.list(periodId, status, page, size));
     }
 
+    @GetMapping("/mine")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ApiResponse<List<ProjectAssignmentResponse>> mine(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(projectAssignmentService.listForStudent(principal.id()));
+    }
+
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('LECTURER')")
     public ApiResponse<ProjectAssignmentResponse> get(@PathVariable Long id) {
         return ApiResponse.success(projectAssignmentService.get(id));
     }

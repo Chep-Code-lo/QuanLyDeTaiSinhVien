@@ -19,24 +19,18 @@ import com.example.qldetai.feature.academic.repository.FacultyRepository;
 import com.example.qldetai.feature.academic.repository.SemesterRepository;
 import java.util.List;
 import java.util.Locale;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AcademicCatalogService {
 
     private final FacultyRepository facultyRepository;
     private final DepartmentRepository departmentRepository;
     private final SemesterRepository semesterRepository;
 
-    public AcademicCatalogService(
-            FacultyRepository facultyRepository,
-            DepartmentRepository departmentRepository,
-            SemesterRepository semesterRepository) {
-        this.facultyRepository = facultyRepository;
-        this.departmentRepository = departmentRepository;
-        this.semesterRepository = semesterRepository;
-    }
 
     @Transactional(readOnly = true)
     public List<FacultyResponse> faculties() {

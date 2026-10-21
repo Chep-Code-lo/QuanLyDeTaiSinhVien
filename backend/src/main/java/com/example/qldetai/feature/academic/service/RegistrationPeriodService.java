@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -32,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class RegistrationPeriodService {
 
     private static final int DEFAULT_MIN_GROUP_MEMBERS = 1;
@@ -46,7 +48,7 @@ public class RegistrationPeriodService {
             RegistrationPeriodStatus.ACTIVE,
             EnumSet.of(RegistrationPeriodStatus.CLOSED, RegistrationPeriodStatus.CANCELLED),
             RegistrationPeriodStatus.CLOSED,
-            EnumSet.noneOf(RegistrationPeriodStatus.class),
+            EnumSet.of(RegistrationPeriodStatus.ACTIVE),
             RegistrationPeriodStatus.CANCELLED,
             EnumSet.noneOf(RegistrationPeriodStatus.class));
 
@@ -57,20 +59,6 @@ public class RegistrationPeriodService {
     private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
 
-    public RegistrationPeriodService(
-            RegistrationPeriodRepository registrationPeriodRepository,
-            FacultyRepository facultyRepository,
-            SemesterRepository semesterRepository,
-            UserRepository userRepository,
-            EmailNotificationEventService emailNotificationEventService,
-            Clock clock) {
-        this.registrationPeriodRepository = registrationPeriodRepository;
-        this.facultyRepository = facultyRepository;
-        this.semesterRepository = semesterRepository;
-        this.userRepository = userRepository;
-        this.emailNotificationEventService = emailNotificationEventService;
-        this.clock = clock;
-    }
 
     @Transactional(readOnly = true)
     public PageResponse<RegistrationPeriodResponse> list(Long facultyId, int page, int size) {
@@ -176,6 +164,7 @@ public class RegistrationPeriodService {
                             .orElseThrow(() -> new ResourceNotFoundException("Activating user was not found."));
             emailNotificationEventService.registrationOpened(period, actor);
         }
+        registrationPeriodRepository.flush();
         return toResponse(period);
     }
 

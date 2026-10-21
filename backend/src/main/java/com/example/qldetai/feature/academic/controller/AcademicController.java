@@ -12,6 +12,7 @@ import com.example.qldetai.feature.academic.service.AcademicCatalogService;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,13 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1")
+@RequiredArgsConstructor
 public class AcademicController {
 
     private final AcademicCatalogService academicCatalogService;
 
-    public AcademicController(AcademicCatalogService academicCatalogService) {
-        this.academicCatalogService = academicCatalogService;
-    }
 
     @GetMapping("/faculties")
     public ApiResponse<List<FacultyResponse>> faculties() {

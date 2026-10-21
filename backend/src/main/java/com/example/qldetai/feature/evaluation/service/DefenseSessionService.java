@@ -39,8 +39,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 public class DefenseSessionService {
 
     private final EvaluationCommitteeRepository committees;
@@ -55,30 +57,6 @@ public class DefenseSessionService {
     private final EvaluationAssignmentRepository evaluations;
     private final EvaluationActorAccess actorAccess;
 
-    public DefenseSessionService(
-            EvaluationCommitteeRepository committees,
-            CommitteeMemberRepository committeeMembers,
-            AssessmentComponentRepository components,
-            DefenseSessionRepository defenses,
-            ProjectAssignmentRepository assignments,
-            TopicSupervisorRepository supervisors,
-            ScoreSheetRepository sheets,
-            ScoreDetailRepository details,
-            RubricCriterionRepository criteria,
-            EvaluationAssignmentRepository evaluations,
-            EvaluationActorAccess actorAccess) {
-        this.committees = committees;
-        this.committeeMembers = committeeMembers;
-        this.components = components;
-        this.defenses = defenses;
-        this.assignments = assignments;
-        this.supervisors = supervisors;
-        this.sheets = sheets;
-        this.details = details;
-        this.criteria = criteria;
-        this.evaluations = evaluations;
-        this.actorAccess = actorAccess;
-    }
 
     @Transactional(readOnly = true)
     public PageResponse<DefenseSessionResponse> listDefenses(
@@ -107,6 +85,11 @@ public class DefenseSessionService {
                                                 .descending()
                                                 .and(Sort.by("id").descending())))
                         .map(this::defense));
+    }
+
+    @Transactional(readOnly = true)
+    public List<DefenseSessionResponse> listDefensesForStudent(Long userId) {
+        return defenses.findByCurrentStudentUserId(userId).stream().map(this::defense).toList();
     }
 
     @Transactional

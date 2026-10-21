@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.net.URI;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -28,13 +29,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/admin/users")
 @PreAuthorize("hasRole('ADMIN')")
+@RequiredArgsConstructor
 public class UserAdminController {
 
     private final UserAdminService userAdminService;
 
-    public UserAdminController(UserAdminService userAdminService) {
-        this.userAdminService = userAdminService;
-    }
 
     @GetMapping
     public ApiResponse<PageResponse<UserResponse>> list(

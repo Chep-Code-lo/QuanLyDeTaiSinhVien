@@ -1,7 +1,10 @@
-.announcement-tabs { display: inline-flex; gap: 4px; margin-bottom: 22px; padding: 4px; border: 1px solid var(--line-border); border-radius: 10px; background: #eaf0f7; }
-.announcement-tabs__tab { min-height: 38px; padding: 8px 18px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-500); font-size: 14px; font-weight: 600; transition: background 150ms, color 150ms, box-shadow 150ms; }
-.announcement-tabs__tab[aria-selected=true] { background: #fff; color: var(--primary-blue); box-shadow: 0 1px 4px rgb(15 23 42 / 8%); }
-.announcement-tabs__tab:hover { color: var(--primary-blue); }
+.portal-shell .announcement-tabs { display: flex; align-items: stretch; margin-bottom: 0; }
+.portal-shell .announcement-panel { gap: 10px; }
+.portal-shell .announcement-panel > .page-card { margin-bottom: 0; }
+.portal-shell .announcement-management-card { padding-block: 18px; }
+.announcement-tabs__tab { min-width: 205px; min-height: 44px; padding: 11px 25px; border: 1px solid #cfdaed; border-bottom: 0; border-radius: 10px 10px 0 0; background: #eaf0f7; color: #4c6087; font-size: 14px; font-weight: 700; transition: background 150ms, color 150ms, border-color 150ms; }
+.announcement-tabs__tab[aria-selected=true] { border-color: #1b4c8d; background: linear-gradient(110deg, #205ba1, #173f79); color: #fff; }
+.announcement-tabs__tab:not([aria-selected=true]):hover { background: #e1eaf5; color: #1b4c8d; }
 .announcement-panel:focus { outline: none; }
 .announcement-panel:focus-visible { outline: 2px solid #6891d0; outline-offset: 4px; }
 .announcement-inbox { display: grid; gap: 18px; }
@@ -35,8 +38,7 @@
 .announcement-management-copy p { color: var(--ink-500); white-space: pre-wrap; overflow-wrap: anywhere; }
 .announcement-management-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 768px) {
-  .announcement-tabs { display: flex; }
-  .announcement-tabs__tab { flex: 1; padding-inline: 10px; font-size: 13px; }
+  .announcement-tabs__tab { flex: 1; min-width: 0; padding-inline: 12px; }
   .announcement-management-item { flex-direction: column; }
   .announcement-management-actions { justify-content: flex-start; }
 }

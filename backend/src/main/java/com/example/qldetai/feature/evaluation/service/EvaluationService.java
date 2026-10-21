@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -64,6 +65,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class EvaluationService {
 
     private static final String STATUS_DRAFT = "DRAFT";
@@ -86,40 +88,6 @@ public class EvaluationService {
     private final TopicSupervisorRepository supervisors;
     private final Clock clock;
 
-    public EvaluationService(
-            AssessmentComponentRepository components,
-            RubricRepository rubrics,
-            RubricCriterionRepository criteria,
-            EvaluationAssignmentRepository evaluations,
-            ScoreSheetRepository sheets,
-            ScoreDetailRepository details,
-            GradeChangeRequestRepository gradeChangeRequests,
-            ResultInputRepository resultInputs,
-            ProjectAssignmentRepository assignments,
-            RegistrationPeriodRepository registrationPeriods,
-            DefenseSessionRepository defenses,
-            CommitteeMemberRepository committeeMembers,
-            LecturerRepository lecturers,
-            UserRepository users,
-            TopicSupervisorRepository supervisors,
-            Clock clock) {
-        this.components = components;
-        this.rubrics = rubrics;
-        this.criteria = criteria;
-        this.evaluations = evaluations;
-        this.sheets = sheets;
-        this.details = details;
-        this.gradeChangeRequests = gradeChangeRequests;
-        this.resultInputs = resultInputs;
-        this.assignments = assignments;
-        this.registrationPeriods = registrationPeriods;
-        this.defenses = defenses;
-        this.committeeMembers = committeeMembers;
-        this.lecturers = lecturers;
-        this.users = users;
-        this.supervisors = supervisors;
-        this.clock = clock;
-    }
 
     @Transactional(readOnly = true)
     public List<AssessmentComponentResponse> listComponents(Long periodId) {

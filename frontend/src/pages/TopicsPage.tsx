@@ -5,15 +5,18 @@ import { topicApi } from '../api/topics'
 import { allPages } from '../api/student'
 import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
+import { RegistrationTopicForm } from '../components/RegistrationTopicForm'
 import { StatusBadge } from '../components/StatusBadge'
-import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import type { TopicResponse, TopicStatus } from '../types/domain'
 
 export function TopicsPage() {
+  const { hasAppointment, hasRole } = useAuth()
   const { showError } = useToast()
-  const { hasRole } = useAuth()
   const student = hasRole('STUDENT')
+  const canCreateTopic =
+    !student && (hasRole('ADMIN') || hasAppointment('DEAN') || hasAppointment('DEPARTMENT_HEAD'))
   const [topics, setTopics] = useState<TopicResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
@@ -67,6 +70,9 @@ export function TopicsPage() {
         title={student ? 'Danh sách đề tài đã công bố' : 'Đề tài & Dự án'}
         description={student ? 'Chỉ hiển thị các đề tài đã được khoa công bố và có thể xem để đăng ký.' : undefined}
       />
+      {canCreateTopic && (
+        <RegistrationTopicForm onCreated={(topic) => setTopics((current) => [topic, ...current])} />
+      )}
       <section className="page-card">
         <div className="topics-toolbar">
           <label className="search-field">

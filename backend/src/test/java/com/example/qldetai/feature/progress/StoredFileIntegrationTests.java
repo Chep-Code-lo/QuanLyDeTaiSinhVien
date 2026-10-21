@@ -2,6 +2,8 @@ package com.example.qldetai.feature.progress;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
@@ -79,12 +82,12 @@ class StoredFileIntegrationTests {
     @Test
     void uploadStoresMetadataAndAllowsFileLookup() throws Exception {
         MockHttpSession session = login("admin@test.local", "TestPassword123!");
-        byte[] content = "hello backend".getBytes(StandardCharsets.UTF_8);
+        byte[] fileBytes = "hello backend".getBytes(StandardCharsets.UTF_8);
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "C:\\fakepath\\report-final.pdf",
                 MediaType.APPLICATION_PDF_VALUE,
-                content);
+                fileBytes);
 
         MvcResult upload = mockMvc.perform(multipart("/api/v1/files")
                         .file(file)
@@ -93,7 +96,7 @@ class StoredFileIntegrationTests {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.originalName").value("report-final.pdf"))
                 .andExpect(jsonPath("$.data.mimeType").value(MediaType.APPLICATION_PDF_VALUE))
-                .andExpect(jsonPath("$.data.sizeBytes").value(content.length))
+                .andExpect(jsonPath("$.data.sizeBytes").value(fileBytes.length))
                 .andExpect(jsonPath("$.data.status").value("READY"))
                 .andReturn();
 
@@ -110,8 +113,14 @@ class StoredFileIntegrationTests {
                 .andExpect(jsonPath("$.data.id").value(storedFileId))
                 .andExpect(jsonPath("$.data.originalName").value("report-final.pdf"))
                 .andExpect(jsonPath("$.data.mimeType").value(MediaType.APPLICATION_PDF_VALUE))
-                .andExpect(jsonPath("$.data.sizeBytes").value(content.length))
+                .andExpect(jsonPath("$.data.sizeBytes").value(fileBytes.length))
                 .andExpect(jsonPath("$.data.status").value("READY"));
+
+        mockMvc.perform(get("/api/v1/files/{id}/download", storedFileId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(header().exists(HttpHeaders.CONTENT_DISPOSITION))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF))
+                .andExpect(content().bytes(fileBytes));
     }
 
     private MockHttpSession login(String username, String password) throws Exception {

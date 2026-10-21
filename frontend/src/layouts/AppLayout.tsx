@@ -15,7 +15,7 @@ export function AppLayout() {
     return () => window.removeEventListener('keydown', close)
   }, [mobileOpen])
   return (
-    <div className={`app-shell${management ? ' management-shell' : ''}${mobileOpen ? ' app-shell--mobile-open' : ''}`}>
+    <div className={`app-shell portal-shell${management ? ' management-shell' : ''}${mobileOpen ? ' app-shell--mobile-open' : ''}`}>
       <Sidebar onNavigate={() => setMobileOpen(false)} />
       {mobileOpen && <button className="sidebar-backdrop" type="button" aria-label="Đóng menu điều hướng" onClick={() => setMobileOpen(false)} />}
       <div className="app-main">

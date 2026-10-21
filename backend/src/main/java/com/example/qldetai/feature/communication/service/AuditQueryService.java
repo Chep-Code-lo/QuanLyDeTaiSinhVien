@@ -9,15 +9,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 public class AuditQueryService {
 
     private final AuditLogRepository auditLogRepository;
 
-    public AuditQueryService(AuditLogRepository auditLogRepository) {
-        this.auditLogRepository = auditLogRepository;
-    }
 
     @Transactional(readOnly = true)
     public PageResponse<AuditLogResponse> list(String entityType, int page, int size) {

@@ -8,24 +8,42 @@ services:
       - --default-time-zone=+00:00
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root-password-local}
-      MYSQL_APP_USER: ${MYSQL_APP_USER:-ql_de_tai_app}
-      MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD:-change-me-local}
+      MYSQL_DATABASE: ql_de_tai_sinh_vien
+      MYSQL_USER: ${MYSQL_APP_USER:-ql_de_tai_app}
+      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD:-change-me-local}
     ports:
       - "127.0.0.1:${MYSQL_PORT:-3307}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./database/ql_de_tai_sinh_vien_schema.sql:/docker-entrypoint-initdb.d/00-ql_de_tai_sinh_vien_schema.sql:ro
-      - ./docker/mysql/init/01-create-app-user.sh:/docker-entrypoint-initdb.d/01-create-app-user.sh:ro
+      - ./database/seed/demo-data.sql:/docker-entrypoint-initdb.d/02-demo-data.sql:ro
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "mysql -h localhost -u$$MYSQL_APP_USER -p$$MYSQL_APP_PASSWORD --silent --skip-column-names -e 'SELECT 1 FROM ql_de_tai_sinh_vien.roles LIMIT 1'",
+          "mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent --skip-column-names -e 'SELECT 1 FROM ql_de_tai_sinh_vien.roles LIMIT 1'",
         ]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 30s
+
+  schema-migrate:
+    image: mysql:8.4
+    restart: "no"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_APP_USER: ${MYSQL_APP_USER:-ql_de_tai_app}
+      MYSQL_PWD: ${MYSQL_APP_PASSWORD:-change-me-local}
+    volumes:
+      - ./database/migrations:/migrations:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        exec mysql --protocol=TCP -h mysql -u "$$MYSQL_APP_USER" ql_de_tai_sinh_vien
+        < /migrations/001-email-notifications.sql
 
   backend:
     build:
@@ -35,6 +53,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      schema-migrate:
+        condition: service_completed_successfully
     environment:
       DB_URL: jdbc:mysql://mysql:3306/ql_de_tai_sinh_vien?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC
       DB_USERNAME: ${MYSQL_APP_USER:-ql_de_tai_app}
@@ -47,10 +67,6 @@ services:
       CSRF_COOKIE_SECURE: ${CSRF_COOKIE_SECURE:-false}
       CSRF_COOKIE_SAME_SITE: ${CSRF_COOKIE_SAME_SITE:-lax}
       CSRF_COOKIE_DOMAIN: ${CSRF_COOKIE_DOMAIN:-}
-      # Local-development defaults. Override these to false/a private password
-      # before using this compose file outside a demo environment.
-      DEMO_DATA_ENABLED: ${DEMO_DATA_ENABLED:-true}
-      DEMO_PASSWORD: ${DEMO_PASSWORD:-Demo@123}
       MAIL_HOST: ${MAIL_HOST:-smtp-relay.brevo.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}

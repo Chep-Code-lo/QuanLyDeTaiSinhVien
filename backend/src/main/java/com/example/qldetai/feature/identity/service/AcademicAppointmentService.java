@@ -18,10 +18,12 @@ import com.example.qldetai.feature.identity.repository.AcademicAppointmentReposi
 import com.example.qldetai.feature.identity.repository.LecturerRepository;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AcademicAppointmentService {
 
     private final AcademicAppointmentRepository academicAppointmentRepository;
@@ -31,20 +33,6 @@ public class AcademicAppointmentService {
     private final UserRepository userRepository;
     private final IdentityMapper identityMapper;
 
-    public AcademicAppointmentService(
-            AcademicAppointmentRepository academicAppointmentRepository,
-            LecturerRepository lecturerRepository,
-            FacultyRepository facultyRepository,
-            DepartmentRepository departmentRepository,
-            UserRepository userRepository,
-            IdentityMapper identityMapper) {
-        this.academicAppointmentRepository = academicAppointmentRepository;
-        this.lecturerRepository = lecturerRepository;
-        this.facultyRepository = facultyRepository;
-        this.departmentRepository = departmentRepository;
-        this.userRepository = userRepository;
-        this.identityMapper = identityMapper;
-    }
 
     @Transactional(readOnly = true)
     public List<AppointmentResponse> list(Long lecturerId) {

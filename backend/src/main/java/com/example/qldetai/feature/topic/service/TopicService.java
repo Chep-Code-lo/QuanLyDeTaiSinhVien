@@ -8,10 +8,12 @@ import com.example.qldetai.exception.ResourceNotFoundException;
 import com.example.qldetai.feature.academic.domain.Department;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriod;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriodStatus;
+import com.example.qldetai.feature.academic.repository.DepartmentRepository;
 import com.example.qldetai.feature.academic.repository.RegistrationPeriodRepository;
 import com.example.qldetai.feature.communication.service.NotificationService;
 import com.example.qldetai.feature.communication.email.EmailNotificationEventService;
 import com.example.qldetai.feature.groupregistration.domain.StudentGroup;
+import com.example.qldetai.feature.groupregistration.repository.GroupMemberRepository;
 import com.example.qldetai.feature.groupregistration.repository.StudentGroupRepository;
 import com.example.qldetai.feature.identity.domain.Lecturer;
 import com.example.qldetai.feature.identity.domain.RoleCode;
@@ -28,6 +30,7 @@ import com.example.qldetai.feature.topic.domain.TopicStatus;
 import com.example.qldetai.feature.topic.domain.TopicSupervisor;
 import com.example.qldetai.feature.topic.domain.VisibilityType;
 import com.example.qldetai.feature.topic.dto.TopicDtos.AssignSupervisorsRequest;
+import com.example.qldetai.feature.topic.dto.TopicDtos.CreateRegistrationTopicRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.CreateTopicRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.PublishTopicRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.ReviewTopicRequest;
@@ -44,6 +47,7 @@ import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -52,6 +56,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class TopicService {
 
     private static final EnumSet<TopicStatus> EDITABLE_STATUSES =
@@ -60,8 +65,10 @@ public class TopicService {
     private final TopicRepository topicRepository;
     private final TopicSupervisorRepository topicSupervisorRepository;
     private final TopicReviewRepository topicReviewRepository;
+    private final DepartmentRepository departmentRepository;
     private final RegistrationPeriodRepository registrationPeriodRepository;
     private final StudentGroupRepository studentGroupRepository;
+    private final GroupMemberRepository groupMemberRepository;
     private final StudentRepository studentRepository;
     private final LecturerRepository lecturerRepository;
     private final UserRepository userRepository;
@@ -69,34 +76,37 @@ public class TopicService {
     private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
 
-    public TopicService(
-            TopicRepository topicRepository,
-            TopicSupervisorRepository topicSupervisorRepository,
-            TopicReviewRepository topicReviewRepository,
-            RegistrationPeriodRepository registrationPeriodRepository,
-            StudentGroupRepository studentGroupRepository,
-            StudentRepository studentRepository,
-            LecturerRepository lecturerRepository,
-            UserRepository userRepository,
-            NotificationService notificationService,
-            EmailNotificationEventService emailNotificationEventService,
-            Clock clock) {
-        this.topicRepository = topicRepository;
-        this.topicSupervisorRepository = topicSupervisorRepository;
-        this.topicReviewRepository = topicReviewRepository;
-        this.registrationPeriodRepository = registrationPeriodRepository;
-        this.studentGroupRepository = studentGroupRepository;
-        this.studentRepository = studentRepository;
-        this.lecturerRepository = lecturerRepository;
-        this.userRepository = userRepository;
-        this.notificationService = notificationService;
-        this.emailNotificationEventService = emailNotificationEventService;
-        this.clock = clock;
+
+    @Transactional(readOnly = true)
+    public PageResponse<TopicResponse> list(
+            Long periodId, TopicStatus status, int page, int size, Long actorId) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        User actor = requireUser(actorId);
+        if (isAcademicStaff(actor)) {
+            return PageResponse.from(listAll(periodId, status, pageable).map(this::toResponse));
+        }
+        if (!hasRole(actor, RoleCode.STUDENT)) {
+            throw new AccessDeniedException("A student, lecturer, or administrator account is required.");
+        }
+        return PageResponse.from(topicRepository
+                .findVisibleToStudent(periodId, status, actorId, pageable)
+                .map(topic -> toResponse(topic, topic.getProposedBy().getId().equals(actorId))));
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<TopicResponse> list(Long periodId, TopicStatus status, int page, int size) {
-        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+    public TopicResponse get(Long id, Long actorId) {
+        Topic topic = requireTopic(id);
+        User actor = requireUser(actorId);
+        if (isAcademicStaff(actor)) {
+            return toResponse(topic);
+        }
+        if (!hasRole(actor, RoleCode.STUDENT) || !canStudentView(topic, actorId)) {
+            throw new AccessDeniedException("You cannot view this topic.");
+        }
+        return toResponse(topic, topic.getProposedBy().getId().equals(actorId));
+    }
+
+    private Page<Topic> listAll(Long periodId, TopicStatus status, PageRequest pageable) {
         Page<Topic> topics;
         if (periodId != null && status != null) {
             topics = topicRepository.findByPeriodIdAndStatus(periodId, status, pageable);
@@ -107,12 +117,7 @@ public class TopicService {
         } else {
             topics = topicRepository.findAll(pageable);
         }
-        return PageResponse.from(topics.map(this::toResponse));
-    }
-
-    @Transactional(readOnly = true)
-    public TopicResponse get(Long id) {
-        return toResponse(requireTopic(id));
+        return topics;
     }
 
     @Transactional
@@ -147,13 +152,74 @@ public class TopicService {
                 request.expectedOutcomes(),
                 request.prerequisites(),
                 request.visibilityType(),
-                resolveReservedGroup(period, request.visibilityType(), request.reservedGroupId()));
+                resolveReservedGroup(period, request.visibilityType(), request.reservedGroupId(), actor));
         topic.setProposedBy(actor);
         topic.setProposalSource(source);
         topic.setStatus(TopicStatus.PENDING);
         topic.setCreatedAt(now);
         topic.setUpdatedAt(now);
         return toResponse(topicRepository.save(topic));
+    }
+
+    @Transactional
+    @BusinessAudit(action = "TOPIC_CREATE_FOR_REGISTRATION", entityType = "TOPIC")
+    public TopicResponse createForRegistration(CreateRegistrationTopicRequest request, Long actorId) {
+        User actor = requireUser(actorId);
+        RegistrationPeriod period = requirePeriod(request.periodId());
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (!isProposalWindowOpen(period, now)) {
+            throw new BusinessRuleException("Topics can only be proposed during the proposal window.");
+        }
+
+        Department department = requireActiveDepartment(request.departmentId());
+        if (!department.getFaculty().getId().equals(period.getFaculty().getId())) {
+            throw new BusinessRuleException("Department must belong to the same faculty as the registration period.");
+        }
+
+        String code = normalizeCode(request.code());
+        if (topicRepository.existsByPeriodIdAndCodeIgnoreCase(period.getId(), code)) {
+            throw new ConflictException("Topic code is already used in this registration period.");
+        }
+        if (request.secondaryLecturerId() != null
+                && request.secondaryLecturerId().equals(request.primaryLecturerId())) {
+            throw new BusinessRuleException("Primary and secondary supervisors must be different lecturers.");
+        }
+
+        Topic topic = new Topic();
+        topic.setPeriod(period);
+        topic.setFaculty(period.getFaculty());
+        topic.setDepartment(department);
+        topic.setCode(code);
+        apply(
+                topic,
+                request.title(),
+                request.description(),
+                request.objectives(),
+                request.expectedOutcomes(),
+                request.prerequisites(),
+                VisibilityType.OPEN,
+                null);
+        topic.setProposedBy(actor);
+        topic.setProposalSource(ProposalSource.LECTURER);
+        topic.setStatus(TopicStatus.APPROVED);
+        topic.setCreatedAt(now);
+        topic.setUpdatedAt(now);
+        topic = topicRepository.saveAndFlush(topic);
+
+        Lecturer primary = requireLecturer(request.primaryLecturerId(), topic);
+        Lecturer secondary = request.secondaryLecturerId() == null
+                ? null
+                : requireLecturer(request.secondaryLecturerId(), topic);
+        topicSupervisorRepository.save(createSupervisor(topic, primary, actor, 1, now));
+        if (secondary != null) {
+            topicSupervisorRepository.save(createSupervisor(topic, secondary, actor, 2, now));
+        }
+        topicSupervisorRepository.flush();
+
+        topic.setStatus(TopicStatus.PUBLISHED);
+        topic.setPublishedAt(now);
+        topic.setUpdatedAt(now);
+        return toResponse(topicRepository.saveAndFlush(topic));
     }
 
     @Transactional
@@ -171,7 +237,7 @@ public class TopicService {
                 request.expectedOutcomes(),
                 request.prerequisites(),
                 request.visibilityType(),
-                resolveReservedGroup(topic.getPeriod(), request.visibilityType(), request.reservedGroupId()));
+                resolveReservedGroup(topic.getPeriod(), request.visibilityType(), request.reservedGroupId(), actor));
         topic.setUpdatedAt(LocalDateTime.now(clock));
         return toResponse(topic);
     }
@@ -336,7 +402,8 @@ public class TopicService {
     private StudentGroup resolveReservedGroup(
             RegistrationPeriod period,
             VisibilityType visibilityType,
-            Long reservedGroupId) {
+            Long reservedGroupId,
+            User actor) {
         if (visibilityType == VisibilityType.OPEN) {
             if (reservedGroupId != null) {
                 throw new BusinessRuleException("Open topics cannot target a reserved group.");
@@ -350,6 +417,11 @@ public class TopicService {
                 .orElseThrow(() -> new ResourceNotFoundException("Reserved group was not found."));
         if (!group.getPeriod().getId().equals(period.getId())) {
             throw new BusinessRuleException("Reserved group must belong to the same registration period.");
+        }
+        if (hasRole(actor, RoleCode.STUDENT)
+                && !isAcademicStaff(actor)
+                && !groupMemberRepository.existsByGroupIdAndStudentUserIdAndLeftAtIsNull(group.getId(), actor.getId())) {
+            throw new AccessDeniedException("Students can reserve a topic only for their own group.");
         }
         return group;
     }
@@ -385,6 +457,12 @@ public class TopicService {
             throw new BusinessRuleException("Topics can only be managed in an active registration period.");
         }
         return period;
+    }
+
+    private Department requireActiveDepartment(Long id) {
+        return departmentRepository.findById(id)
+                .filter(Department::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Active department was not found."));
     }
 
     private Topic requireTopic(Long id) {
@@ -427,6 +505,23 @@ public class TopicService {
                 .anyMatch(userRole -> userRole.getRole().getCode() == role);
     }
 
+    private boolean isAcademicStaff(User user) {
+        return hasRole(user, RoleCode.ADMIN) || hasRole(user, RoleCode.LECTURER);
+    }
+
+    private boolean canStudentView(Topic topic, Long studentUserId) {
+        if (topic.getProposedBy().getId().equals(studentUserId)) {
+            return true;
+        }
+        if (topic.getStatus() != TopicStatus.PUBLISHED) {
+            return false;
+        }
+        return topic.getVisibilityType() == VisibilityType.OPEN
+                || (topic.getReservedGroup() != null
+                        && groupMemberRepository.existsByGroupIdAndStudentUserIdAndLeftAtIsNull(
+                                topic.getReservedGroup().getId(), studentUserId));
+    }
+
     private String normalizeCode(String code) {
         return code.trim().toUpperCase(Locale.ROOT);
     }
@@ -436,6 +531,10 @@ public class TopicService {
     }
 
     private TopicResponse toResponse(Topic topic) {
+        return toResponse(topic, true);
+    }
+
+    private TopicResponse toResponse(Topic topic, boolean includeLatestReview) {
         List<TopicSupervisorResponse> supervisors = topicSupervisorRepository.findByTopicIdOrderBySlotNoAsc(topic.getId())
                 .stream()
                 .map(supervisor -> new TopicSupervisorResponse(
@@ -444,17 +543,19 @@ public class TopicService {
                         supervisor.getLecturer().getUser().getFullName(),
                         supervisor.getSlotNo()))
                 .toList();
-        TopicReviewResponse latestReview = topicReviewRepository.findByTopicIdOrderByReviewedAtDesc(topic.getId())
-                .stream()
-                .findFirst()
-                .map(review -> new TopicReviewResponse(
-                        review.getId(),
-                        review.getDecision(),
-                        review.getComment(),
-                        review.getReviewedBy().getId(),
-                        review.getReviewedBy().getFullName(),
-                        review.getReviewedAt()))
-                .orElse(null);
+        TopicReviewResponse latestReview = includeLatestReview
+                ? topicReviewRepository.findByTopicIdOrderByReviewedAtDesc(topic.getId())
+                        .stream()
+                        .findFirst()
+                        .map(review -> new TopicReviewResponse(
+                                review.getId(),
+                                review.getDecision(),
+                                review.getComment(),
+                                review.getReviewedBy().getId(),
+                                review.getReviewedBy().getFullName(),
+                                review.getReviewedAt()))
+                        .orElse(null)
+                : null;
 
         return new TopicResponse(
                 topic.getId(),
@@ -477,6 +578,7 @@ public class TopicService {
                 topic.getReservedGroup() == null ? null : topic.getReservedGroup().getId(),
                 topic.getReservedGroup() == null ? null : topic.getReservedGroup().getName(),
                 topic.getStatus(),
+                topic.getStatus() == TopicStatus.PUBLISHED,
                 topic.getPublishedAt(),
                 topic.getCreatedAt(),
                 topic.getUpdatedAt(),

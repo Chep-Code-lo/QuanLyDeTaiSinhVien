@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { ChevronDown, LogOut, Menu } from 'lucide-react'
 import { notificationApi } from '../api/notifications'
 import { errorMessage } from '../api/student'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { avatarInitial } from '../utils/userDisplay'
+import { NotificationMenu } from '../features/notifications/components/NotificationMenu'
 
 type HeaderProps = { onMenuClick: () => void }
 
@@ -38,14 +41,16 @@ export function Header({ onMenuClick }: HeaderProps) {
   const handleLogout = async () => {
     if(loggingOut)return
     setLoggingOut(true)
-    try { await logout(); showSuccess('Đã đăng xuất thành công'); navigate('/', { replace: true }) }
-    catch(e){showError(errorMessage(e))}finally{setLoggingOut(false)}
-  }
-
-  const getInitials = (name?: string) => {
-    if (!name) return 'U'
-    const parts = name.trim().split(' ')
-    return parts[parts.length - 1].substring(0, 2).toUpperCase()
+    try {
+      await logout()
+      showSuccess('Đã đăng xuất thành công')
+    } catch(e) {
+      showError(errorMessage(e))
+    } finally {
+      setMenuOpen(false)
+      setLoggingOut(false)
+      navigate('/', { replace: true })
+    }
   }
 
   const getRoleLabel = () => {
@@ -58,7 +63,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   return (
     <header className="topbar">
-      <button className="topbar__menu" type="button" onClick={onMenuClick} aria-label="Mở menu điều hướng">☰</button>
+      <button className="topbar__menu" type="button" onClick={onMenuClick} aria-label="Mở menu điều hướng"><Menu size={22} aria-hidden="true" /></button>
       {management ? <div className="topbar__school">Trường Đại học Công nghệ Kỹ thuật TP.HCM</div> : <form className="topbar__search" onSubmit={e=>{e.preventDefault();navigate(`/topics?q=${encodeURIComponent(search.trim())}`)}}>
         <span aria-hidden="true">⌕</span>
         <input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Tìm đề tài, bộ môn, GVHD..." aria-label="Tìm kiếm đề tài" />
@@ -67,13 +72,13 @@ export function Header({ onMenuClick }: HeaderProps) {
       <div className="topbar__actions flex items-center gap-3">
         {user ? (
           <>
-            <Link className="notification-button" to="/announcements" title="Thông báo" aria-label={management ? (unread ? 'Có thông báo mới' : 'Thông báo') : 'Thông báo mới'}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>{unread!==null&&unread>0&&(management ? <span className="notification-button__dot" aria-hidden="true" /> : <span>{unread}</span>)}</Link>
+            <NotificationMenu unread={unread} management={management} onOpen={() => setMenuOpen(false)} />
             <div className="account-menu" ref={menuRef}>
             <button className="topbar__account" type="button" onClick={() => setMenuOpen((value) => !value)} aria-expanded={menuOpen}>
-              <span className="topbar__avatar">{getInitials(user.fullName)}</span>
-              <span className="topbar__account-copy"><strong>{user.fullName}</strong><small>{getRoleLabel()}</small></span><span aria-hidden="true">⌄</span>
+              <span className="topbar__avatar">{avatarInitial(user.fullName)}</span>
+              <span className="topbar__account-copy"><strong>{user.fullName}</strong><small>{getRoleLabel()}</small></span><ChevronDown size={16} aria-hidden="true" />
             </button>
-            {menuOpen && <div className="account-menu__dropdown"><Link to="/account" onClick={() => setMenuOpen(false)}>Hồ sơ & cài đặt <span>›</span></Link><button type="button" disabled={loggingOut} onClick={handleLogout}>Đăng xuất <span>↗</span></button></div>}
+            {menuOpen && <div className="account-menu__dropdown"><Link to="/account" onClick={() => setMenuOpen(false)}>Hồ sơ & cài đặt </Link><button type="button" disabled={loggingOut} onClick={handleLogout}>Đăng xuất <LogOut size={16} aria-hidden="true" /></button></div>}
             </div>
           </>
         ) : (

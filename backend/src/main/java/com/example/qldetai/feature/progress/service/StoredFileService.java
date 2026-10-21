@@ -24,30 +24,20 @@ import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
+@RequiredArgsConstructor
 public class StoredFileService {
 
     private final StoredFileRepository storedFileRepository;
     private final UserRepository userRepository;
     private final Clock clock;
     private final Path storageRoot;
-
-    public StoredFileService(
-            StoredFileRepository storedFileRepository,
-            UserRepository userRepository,
-            Clock clock,
-            @Value("${app.files.storage-root:${java.io.tmpdir}/qldetai-files}") String storageRoot) {
-        this.storedFileRepository = storedFileRepository;
-        this.userRepository = userRepository;
-        this.clock = clock;
-        this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
-    }
 
     @Transactional
     public StoredFileResponse store(MultipartFile file, Long actorId) {
@@ -98,8 +88,24 @@ public class StoredFileService {
 
     @Transactional(readOnly = true)
     public StoredFileResponse get(Long id) {
-        return toResponse(storedFileRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("File was not found.")));
+        return toResponse(requireFile(id));
+    }
+
+    @Transactional(readOnly = true)
+    public DownloadedFile download(Long id) {
+        StoredFile storedFile = requireFile(id);
+        if (storedFile.getStatus() != StoredFileStatus.READY) {
+            throw new BusinessRuleException("The file is not available for download.");
+        }
+        Path path = resolveTarget(storedFile.getStorageKey());
+        if (!Files.isRegularFile(path)) {
+            throw new ResourceNotFoundException("The uploaded file content was not found.");
+        }
+        return new DownloadedFile(
+                path,
+                storedFile.getOriginalName(),
+                storedFile.getMimeType(),
+                storedFile.getSizeBytes());
     }
 
     private StoredFileResponse toResponse(StoredFile storedFile) {
@@ -112,6 +118,12 @@ public class StoredFileService {
                 storedFile.getSha256(),
                 storedFile.getUploadedAt(),
                 storedFile.getStatus());
+    }
+
+    private StoredFile requireFile(Long id) {
+        return storedFileRepository
+                .findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("File was not found."));
     }
 
     private Path resolveTarget(String storageKey) {
@@ -151,5 +163,8 @@ public class StoredFileService {
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is not available in this runtime.", exception);
         }
+    }
+
+    public record DownloadedFile(Path path, String originalName, String mimeType, long sizeBytes) {
     }
 }

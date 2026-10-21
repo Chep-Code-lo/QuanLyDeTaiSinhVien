@@ -35,6 +35,7 @@ import com.example.qldetai.feature.topic.repository.TopicRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -43,6 +44,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class RegistrationService {
 
     private final TopicRegistrationRepository topicRegistrationRepository;
@@ -57,30 +59,6 @@ public class RegistrationService {
     private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
 
-    public RegistrationService(
-            TopicRegistrationRepository topicRegistrationRepository,
-            TopicRepository topicRepository,
-            StudentGroupRepository studentGroupRepository,
-            GroupMemberRepository groupMemberRepository,
-            ProjectAssignmentRepository projectAssignmentRepository,
-            ProjectAssignmentService projectAssignmentService,
-            StudentRepository studentRepository,
-            UserRepository userRepository,
-            NotificationService notificationService,
-            EmailNotificationEventService emailNotificationEventService,
-            Clock clock) {
-        this.topicRegistrationRepository = topicRegistrationRepository;
-        this.topicRepository = topicRepository;
-        this.studentGroupRepository = studentGroupRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.projectAssignmentRepository = projectAssignmentRepository;
-        this.projectAssignmentService = projectAssignmentService;
-        this.studentRepository = studentRepository;
-        this.userRepository = userRepository;
-        this.notificationService = notificationService;
-        this.emailNotificationEventService = emailNotificationEventService;
-        this.clock = clock;
-    }
 
     @Transactional(readOnly = true)
     public PageResponse<TopicRegistrationResponse> list(Long periodId, RegistrationStatus status, int page, int size) {
@@ -96,6 +74,15 @@ public class RegistrationService {
             registrations = topicRegistrationRepository.findAll(pageable);
         }
         return PageResponse.from(registrations.map(this::toResponse));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<TopicRegistrationResponse> listForStudent(
+            Long userId, Long periodId, RegistrationStatus status, int page, int size) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by("registeredAt").descending());
+        return PageResponse.from(topicRegistrationRepository
+                .findByCurrentStudentUserId(userId, periodId, status, pageable)
+                .map(this::toResponse));
     }
 
     @Transactional(readOnly = true)

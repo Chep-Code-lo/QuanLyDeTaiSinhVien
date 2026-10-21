@@ -1,7 +1,7 @@
 import { formatDateTime, toLocalDateTimeInput } from '../utils/dateTime'
 import { DateTimeInput } from '../components/DateTimeInput'
 import { AnimatedSelect } from '../components/AnimatedSelect'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { academicApi } from '../api/academic'
 import { adminApi } from '../api/admin'
 import { LecturerAutocomplete } from '../components/LecturerAutocomplete'
@@ -46,22 +46,9 @@ export const AcademicAppointmentsPage: React.FC = () => {
     endsAt: '',
   })
 
-  useEffect(() => {
-    loadAppointments()
-    academicApi
-      .getFaculties()
-      .then((res) => {
-        setFaculties(res)
-        if (res.length > 0) {
-          setNewAppointment((prev) => ({ ...prev, facultyId: res[0].id }))
-        }
-      })
-      .catch((error) => showError(error.message))
-  }, [])
-
-  const loadAppointments = () => {
+  const loadAppointments = useCallback(() => {
     setLoading(true)
-    Promise.all([adminApi.getAppointments(), academicApi.getDepartments()])
+    return Promise.all([adminApi.getAppointments(), academicApi.getDepartments()])
       .then(([items, catalog]) => {
         setAppointments(items)
         setDepartments(catalog)
@@ -70,7 +57,20 @@ export const AcademicAppointmentsPage: React.FC = () => {
         showError('Lỗi tải danh sách chức vụ: ' + (err.response?.data?.message || err.message)),
       )
       .finally(() => setLoading(false))
-  }
+  }, [showError])
+
+  useEffect(() => {
+    void loadAppointments()
+    void academicApi
+      .getFaculties()
+      .then((res) => {
+        setFaculties(res)
+        if (res.length > 0) {
+          setNewAppointment((prev) => ({ ...prev, facultyId: res[0].id }))
+        }
+      })
+      .catch((error) => showError(error.message))
+  }, [loadAppointments, showError])
 
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault()

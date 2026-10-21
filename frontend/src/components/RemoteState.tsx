@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Download } from 'lucide-react'
 import { errorMessage, studentApi } from '../api/student'
 import { useToast } from '../context/ToastContext'
 
@@ -13,5 +14,5 @@ export function DownloadButton({ id, name }: { id: number; name: string }) {
   return <button className="text-button" disabled={busy} onClick={async () => {
     setBusy(true)
     try { await studentApi.download(id, name) } catch (e) { showError(errorMessage(e)) } finally { setBusy(false) }
-  }}>{busy ? 'Đang tải...' : `Tải ${name}`}</button>
+  }}><Download size={16} aria-hidden="true" />{busy ? 'Đang tải...' : `Tải ${name}`}</button>
 }

@@ -28,19 +28,19 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
 @RequestMapping("/api/v1/topic-registrations")
+@RequiredArgsConstructor
 public class RegistrationController {
 
     private final RegistrationService registrationService;
 
-    public RegistrationController(RegistrationService registrationService) {
-        this.registrationService = registrationService;
-    }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
     public ApiResponse<PageResponse<TopicRegistrationResponse>> list(
             @RequestParam(required = false) Long periodId,
             @RequestParam(required = false) RegistrationStatus status,
@@ -49,7 +49,20 @@ public class RegistrationController {
         return ApiResponse.success(registrationService.list(periodId, status, page, size));
     }
 
+    @GetMapping("/mine")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ApiResponse<PageResponse<TopicRegistrationResponse>> mine(
+            @RequestParam(required = false) Long periodId,
+            @RequestParam(required = false) RegistrationStatus status,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(
+                registrationService.listForStudent(principal.id(), periodId, status, page, size));
+    }
+
     @GetMapping("/{id}")
+    @PreAuthorize("@registrationAuthorization.canViewRegistration(#id, authentication)")
     public ApiResponse<TopicRegistrationResponse> get(@PathVariable Long id) {
         return ApiResponse.success(registrationService.get(id));
     }

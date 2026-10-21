@@ -1,8 +1,9 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import type { AxiosAdapter } from 'axios'
-import App from '../src/App'
+import App from '../src/app/App'
 import { apiClient } from '../src/api/client'
 import type { CurrentUser, RoleCode } from '../src/types/domain'
 import { readFileSync } from 'node:fs'
@@ -11,7 +12,7 @@ import { resolve } from 'node:path'
 // Load the actual styles: rendering routes alone did not catch the broken shell.
 const stylesheet = document.createElement('style')
 beforeAll(() => {
-  stylesheet.textContent = ['index.css', 'App.css', 'student-workspace.css', 'ui.css', 'pages/AnnouncementsPage.css']
+  stylesheet.textContent = ['styles/base.css', 'styles/app.css', 'styles/student-workspace.css', 'styles/ui.css', 'pages/AnnouncementsPage.css']
     .map(file => readFileSync(resolve(process.cwd(), 'src', file), 'utf8')).join('\n')
   document.head.append(stylesheet)
 })
@@ -21,7 +22,7 @@ let currentUser: CurrentUser | null
 const emptyPage = { content: [], totalPages: 0, totalElements: 0, page: 0, size: 100 }
 const originalAdapter = apiClient.defaults.adapter
 const requested: string[] = []
-const paged = new Set(['/topics', '/groups', '/registration-periods', '/group-invitations/mine', '/topic-registrations', '/notifications', '/announcements', '/evaluation-assignments', '/project-assignments', '/defense-sessions', '/evaluation-committees', '/lecturers'])
+const paged = new Set(['/topics', '/groups', '/registration-periods', '/group-invitations/mine', '/topic-registrations', '/topic-registrations/mine', '/notifications', '/announcements', '/evaluation-assignments', '/project-assignments', '/defense-sessions', '/evaluation-committees', '/lecturers'])
 const lists = new Set(['/groups/mine', '/admin/academic-appointments', '/assessment-components', '/rubrics', '/student/results'])
 
 const adapter: AxiosAdapter = async config => {
@@ -80,9 +81,9 @@ describe.each(['STUDENT', 'LECTURER', 'ADMIN'] as RoleCode[])('Trang dành cho %
     expect(document.querySelector('.app-shell')?.classList.contains('management-shell')).toBe(role !== 'STUDENT')
     const shell = getComputedStyle(document.querySelector('.app-shell')!)
     expect(shell.display).toBe('grid')
-    expect(shell.gridTemplateColumns).toBe(`${role === 'STUDENT' ? 264 : 224}px minmax(0, 1fr)`)
+    expect(shell.gridTemplateColumns).toBe('224px minmax(0, 1fr)')
     const logo = getComputedStyle(document.querySelector('.sidebar__brand-image')!)
-    expect(logo.width).toBe(`${role === 'STUDENT' ? 88 : 104}px`)
+    expect(logo.width).toBe('104px')
     expect(logo.height).toBe(logo.width)
     expect(getComputedStyle(document.querySelector('.app-main')!).minWidth).toBe('0px')
   })
@@ -98,5 +99,26 @@ describe('Trang công khai', () => {
     render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>)
     expect(await screen.findByRole('heading', { level: 1, name: heading }, { timeout: 5000 })).toBeTruthy()
     expect(document.querySelector('.management-shell')).toBeNull()
+  })
+
+  it('điều hướng nút đăng nhập từ trang chủ tới trang đăng nhập riêng', async () => {
+    currentUser = null
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Đăng nhập' }))
+
+    expect(await screen.findByRole('heading', { name: 'Đăng nhập hệ thống' })).toBeTruthy()
+    expect(screen.queryByText(/Từ ý tưởng.*đến đề tài hoàn chỉnh/)).toBeNull()
+  })
+
+  it('trở về trang chủ khi đăng xuất từ trang được bảo vệ', async () => {
+    currentUser = user('ADMIN')
+    render(<MemoryRouter initialEntries={['/dashboard']}><App /></MemoryRouter>)
+
+    expect(await screen.findByRole('heading', { name: 'Hệ thống quản lý đề tài sinh viên' })).toBeTruthy()
+    window.dispatchEvent(new Event('session-expired'))
+
+    expect(await screen.findByRole('heading', { name: /Từ ý tưởng.*đến đề tài hoàn chỉnh/ })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Đăng nhập hệ thống' })).toBeNull()
   })
 })

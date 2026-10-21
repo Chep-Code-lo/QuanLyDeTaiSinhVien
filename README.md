@@ -55,20 +55,10 @@ CSRF_COOKIE_SAME_SITE=none
 
 Nếu dùng chung một domain và reverse proxy `/api/*` về backend thì không cần chuyển `same-site` sang `none`.
 
-Khi chạy local không dùng Docker, có thể bật dữ liệu demo gồm admin, giảng viên, sinh viên, nhiệm vụ trưởng khoa và một đợt KLTN đang mở:
-
-```powershell
-$env:DEMO_DATA_ENABLED = "true"
-$env:DEMO_PASSWORD = "Demo@123"
-```
-
-Tài khoản demo:
-
-| Vai trò | Tài khoản | Mật khẩu |
-| --- | --- | --- |
-| Quản trị | `admin@demo.local` | `Demo@123` |
-| Giảng viên / trưởng khoa | `lecturer@demo.local` | `Demo@123` |
-| Sinh viên | `student@demo.local` | `Demo@123` |
+Khi dùng Docker trên database mới, hệ thống tự nạp bộ dữ liệu demo thống nhất
+gồm một khoa CNTT, ba bộ môn, ba đợt đăng ký và dữ liệu xuyên suốt từ đề tài
+đến đánh giá/kết quả. Danh sách tài khoản nằm tại
+[`docs/demo-accounts.md`](docs/demo-accounts.md).
 
 Tài liệu hợp đồng các phần backend:
 
@@ -89,8 +79,6 @@ Repo đã có sẵn cấu hình `docker-compose.yml` để chạy đồng thời
    FRONTEND_PORT=5173
    BACKEND_PORT=8080
    MYSQL_PORT=3307
-   DEMO_DATA_ENABLED=true
-   DEMO_PASSWORD=Demo@123
    ```
 
 2. Khởi động toàn bộ stack:
@@ -148,7 +136,8 @@ Nếu dùng tunnel có tên và domain riêng, trỏ dịch vụ Cloudflare về
 Ghi chú:
 
 - MySQL được expose ra host qua cổng `3307` mặc định để tránh đụng MySQL cục bộ.
-- Lần khởi động đầu tiên, container MySQL sẽ tự import `database/ql_de_tai_sinh_vien_schema.sql` và tạo user ứng dụng.
+- Lần khởi động đầu tiên, container MySQL tự import `database/ql_de_tai_sinh_vien_schema.sql`, tạo user ứng dụng và nạp `database/seed/demo-data.sql`.
+- Mỗi lần `docker compose up`, service `schema-migrate` sẽ áp dụng migration email theo kiểu idempotent cho volume `mysql_data` hiện có, không xóa dữ liệu.
 - Dữ liệu database được lưu trong volume `mysql_data`.
 - File upload của backend được lưu trong volume `backend_files`.
 - Frontend container reverse proxy `/api/*` sang backend nên không cần chỉnh `VITE_API_BASE_URL` khi chạy compose.
@@ -166,3 +155,6 @@ docker compose up --build -d
 
 Lệnh reset xóa cả dữ liệu MySQL lẫn file upload trong volume Docker. Chỉ dùng
 cho môi trường phát triển/demo.
+
+Xem cấu trúc thư mục tại [`docs/project-structure.md`](docs/project-structure.md)
+và phân công thư mục tại [`docs/team-ownership.md`](docs/team-ownership.md).

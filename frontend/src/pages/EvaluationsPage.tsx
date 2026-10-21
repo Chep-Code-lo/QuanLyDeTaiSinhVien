@@ -37,9 +37,9 @@ export function EvaluationsPage() {
   }, [user?.lecturer?.id, revision])
 
   return <>
-    <PageHeader title="Chấm điểm đề tài" description="Xem phân công, lưu phiếu chấm nháp và nộp điểm theo bộ tiêu chí được giao." />
+    <PageHeader title="Chấm điểm đề tài" />
     <RemoteState loading={loading} error={error} retry={() => setRevision(value => value + 1)} />
-    {!loading && !error && <SelectionPanel id="score-assignment" label="Phân công chấm điểm của tôi" description="Chọn đề tài để xem bộ tiêu chí và nhập điểm.">
+    {!loading && !error && <SelectionPanel id="score-assignment" label="Phân công chấm điểm của tôi">
       <AnimatedSelect id="score-assignment" value={selectedId ?? ''} disabled={!assignments.length} onChange={event => setSelectedId(Number(event.target.value) || null)}>
         {!assignments.length && <option value="">Chưa có phân công chấm điểm</option>}
         {assignments.map(item => <option key={item.id} value={item.id}>{item.topicCode} · {item.topicTitle} · {item.componentName} ({item.groupName})</option>)}

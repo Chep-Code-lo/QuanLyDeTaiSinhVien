@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Bell, BookOpen, Check, Clock, FolderOpen, ListChecks } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { dashboardApi } from '../api/dashboard'
 import type { DashboardSummary } from '../api/dashboard'
@@ -76,29 +77,25 @@ export function DashboardPage() {
       label: 'Tổng đề tài',
       value: summary?.totalTopics,
       color: 'blue',
-      icon: '▣',
-      note: 'Tất cả đề tài trong hệ thống',
+      icon: BookOpen,
     },
     {
       label: 'Đang đăng ký',
       value: summary?.registeringTopics,
       color: 'amber',
-      icon: '◷',
-      note: 'Đề tài đang mở cho sinh viên đăng ký',
+      icon: Clock,
     },
     {
       label: 'Đang thực hiện',
       value: summary?.inProgressTopics,
       color: 'violet',
-      icon: '◉',
-      note: 'Đề tài đã giao cho nhóm và đang thực hiện',
+      icon: ListChecks,
     },
     {
       label: 'Đã hoàn thành',
       value: summary?.completedTopics,
       color: 'green',
-      icon: '✓',
-      note: 'Đề tài có trạng thái thực hiện đã hoàn thành',
+      icon: Check,
     },
   ]
 
@@ -113,7 +110,7 @@ export function DashboardPage() {
               : 'TỔNG QUAN TOÀN HỆ THỐNG'}
           </span>
           <h2>Chào mừng trở lại, {greetingName(user)}.</h2>
-          <p>
+          <p role={error && !loading ? 'status' : undefined}>
             {summary ? (
               <>
                 Bạn có <strong>{number(summary.unreadNotifications)} thông báo chưa đọc</strong>.{' '}
@@ -124,7 +121,7 @@ export function DashboardPage() {
             ) : loading ? (
               'Đang tải dữ liệu tổng quan...'
             ) : (
-              'Chưa tải được dữ liệu tổng quan.'
+              <>Chưa tải được dữ liệu tổng quan.{' '}{error && <button className="welcome-panel__retry" type="button" onClick={() => setRevision((value) => value + 1)}>Thử lại</button>}</>
             )}
           </p>
           {user?.activeAppointments?.length ? (
@@ -138,27 +135,18 @@ export function DashboardPage() {
           ) : null}
         </div>
         <Link className="welcome-panel__action" to={isLecturer ? '/progress' : '/registrations'}>
-          {isLecturer ? 'Quản lý tiến độ' : 'Khám phá đề tài'} <span>→</span>
+          {isLecturer ? 'Quản lý tiến độ' : 'Khám phá đề tài'}
         </Link>
       </section>
-      {error && (
-        <div className="page-card" role="alert">
-          Không tải được số liệu. Vui lòng thử lại.{' '}
-          <button className="text-button" onClick={() => setRevision((value) => value + 1)}>
-            Thử lại
-          </button>
-        </div>
-      )}
       <section className="dashboard-grid" aria-label="Chỉ số tổng quan" aria-busy={loading}>
         {metrics.map((metric) => (
           <article key={metric.label} className={`metric-card metric-card--${metric.color}`}>
-            <span className="metric-card__icon">{metric.icon}</span>
+            <span className="metric-card__icon"><metric.icon size={20} strokeWidth={1.8} aria-hidden="true" /></span>
             <div>
               <span className="metric-card__label">{metric.label}</span>
               <strong className="metric-card__value">
                 {metric.value === undefined ? '—' : number(metric.value)}
               </strong>
-              <span className="metric-card__note">{metric.note}</span>
             </div>
           </article>
         ))}
@@ -220,17 +208,16 @@ export function DashboardPage() {
           </div>
           <div className="task-list">
             <Link to="/announcements">
-              <span className="task-list__icon task-list__icon--blue">✦</span>
+              <span className="task-list__icon task-list__icon--blue"><Bell size={18} aria-hidden="true" /></span>
               <div>
                 <strong>Thông báo của bạn</strong>
                 <small>
                   {summary ? `${number(summary.unreadNotifications)} thông báo chưa đọc` : '—'}
                 </small>
               </div>
-              <b>›</b>
             </Link>
             <Link to="/registrations">
-              <span className="task-list__icon task-list__icon--warning">⌛</span>
+              <span className="task-list__icon task-list__icon--warning"><Clock size={18} aria-hidden="true" /></span>
               <div>
                 <strong>Đợt đang mở đăng ký</strong>
                 <small>
@@ -239,10 +226,9 @@ export function DashboardPage() {
                     : '—'}
                 </small>
               </div>
-              <b>›</b>
             </Link>
             <Link to="/topics">
-              <span className="task-list__icon task-list__icon--red">▣</span>
+              <span className="task-list__icon task-list__icon--red"><FolderOpen size={18} aria-hidden="true" /></span>
               <div>
                 <strong>Đề tài đang mở đăng ký</strong>
                 <small>
@@ -251,7 +237,6 @@ export function DashboardPage() {
                     : '—'}
                 </small>
               </div>
-              <b>›</b>
             </Link>
           </div>
         </article>
@@ -260,8 +245,8 @@ export function DashboardPage() {
         <article className="content-card">
           <div className="content-card__header">
             <div>
-              <h2>Đề tài mới cập nhật</h2>
-              <span>Danh sách được cập nhật gần đây</span>
+              <h2>Đề tài mới công bố</h2>
+              <span>Danh sách đề tài đã công bố gần đây</span>
             </div>
             <Link className="text-button" to="/topics">
               Xem tất cả

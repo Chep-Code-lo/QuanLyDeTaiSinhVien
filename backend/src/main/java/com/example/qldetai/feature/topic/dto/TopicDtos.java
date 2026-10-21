@@ -27,6 +27,19 @@ public final class TopicDtos {
             Long reservedGroupId) {
     }
 
+    public record CreateRegistrationTopicRequest(
+            @NotNull Long periodId,
+            @NotNull Long departmentId,
+            @NotBlank @Size(max = 30) String code,
+            @NotBlank @Size(max = 300) String title,
+            @NotBlank String description,
+            @NotBlank String objectives,
+            @NotBlank String expectedOutcomes,
+            String prerequisites,
+            @NotNull Long primaryLecturerId,
+            Long secondaryLecturerId) {
+    }
+
     public record UpdateTopicRequest(
             @NotNull Integer version,
             @NotBlank @Size(max = 300) String title,
@@ -95,6 +108,7 @@ public final class TopicDtos {
             Long reservedGroupId,
             String reservedGroupName,
             TopicStatus status,
+            boolean availableForRegistration,
             LocalDateTime publishedAt,
             LocalDateTime createdAt,
             LocalDateTime updatedAt,

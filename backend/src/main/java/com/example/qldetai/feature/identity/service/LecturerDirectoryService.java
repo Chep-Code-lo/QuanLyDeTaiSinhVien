@@ -9,19 +9,15 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 public class LecturerDirectoryService {
 
     private final LecturerRepository lecturerRepository;
     private final IdentityMapper identityMapper;
 
-    public LecturerDirectoryService(
-            LecturerRepository lecturerRepository,
-            IdentityMapper identityMapper) {
-        this.lecturerRepository = lecturerRepository;
-        this.identityMapper = identityMapper;
-    }
 
     @Transactional(readOnly = true)
     public PageResponse<LecturerDirectoryResponse> list(

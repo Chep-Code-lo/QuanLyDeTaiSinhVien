@@ -5,6 +5,7 @@ import com.example.qldetai.feature.identity.repository.StudentRepository;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 import java.util.Locale;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -12,20 +13,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class DatabaseUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
     private final LecturerRepository lecturerRepository;
 
-    public DatabaseUserDetailsService(
-            UserRepository userRepository,
-            StudentRepository studentRepository,
-            LecturerRepository lecturerRepository) {
-        this.userRepository = userRepository;
-        this.studentRepository = studentRepository;
-        this.lecturerRepository = lecturerRepository;
-    }
 
     @Override
     @Transactional(readOnly = true)

@@ -36,8 +36,10 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 public class UserAdminService {
 
     private final UserRepository userRepository;
@@ -49,24 +51,6 @@ public class UserAdminService {
     private final UserProfileService userProfileService;
     private final Clock clock;
 
-    public UserAdminService(
-            UserRepository userRepository,
-            RoleRepository roleRepository,
-            StudentRepository studentRepository,
-            LecturerRepository lecturerRepository,
-            DepartmentRepository departmentRepository,
-            PasswordEncoder passwordEncoder,
-            UserProfileService userProfileService,
-            Clock clock) {
-        this.userRepository = userRepository;
-        this.roleRepository = roleRepository;
-        this.studentRepository = studentRepository;
-        this.lecturerRepository = lecturerRepository;
-        this.departmentRepository = departmentRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.userProfileService = userProfileService;
-        this.clock = clock;
-    }
 
     @Transactional(readOnly = true)
     public PageResponse<UserResponse> list(String search, int page, int size) {

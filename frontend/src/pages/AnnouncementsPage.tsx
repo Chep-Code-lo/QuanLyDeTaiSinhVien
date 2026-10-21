@@ -39,6 +39,14 @@ export function AnnouncementsPage() {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [attachmentFileId, setAttachmentFileId] = useState('')
+  useEffect(() => {
+    const updateReadState = (event: Event) => {
+      const updated = (event as CustomEvent<{ notification?: NotificationResponse }>).detail?.notification
+      if (updated) setNotifications(items => items.map(item => item.id === updated.id ? updated : item))
+    }
+    window.addEventListener('notifications-updated', updateReadState)
+    return () => window.removeEventListener('notifications-updated', updateReadState)
+  }, [])
   const allowedFacultyIds = useMemo(() => {
     return faculties
       .filter(
@@ -124,7 +132,7 @@ export function AnnouncementsPage() {
       setNotifications((items) =>
         items.map((candidate) => (candidate.id === item.id ? updated : candidate)),
       )
-      window.dispatchEvent(new Event('notifications-updated'))
+      window.dispatchEvent(new CustomEvent('notifications-updated', { detail: { notification: updated } }))
     } catch (error) {
       showError(messageOf(error))
     }
@@ -248,7 +256,7 @@ export function AnnouncementsPage() {
         tabIndex={0}
       >
         {canManage && (
-          <section className="page-card">
+          <section className="page-card announcement-management-card">
             <div className="content-card__header announcement-management-header">
               <div>
                 <h2>Quản lý thông báo khoa</h2>
@@ -408,7 +416,6 @@ export function AnnouncementsPage() {
                 : 'Hệ thống',
               sentAt: item.createdAt,
               unread: !item.readAt,
-              targetPath: item.targetPath,
             }))}
             onOpen={(id) => {
               const item = notifications.find((notification) => notification.id === id)

@@ -1,6 +1,10 @@
 import { apiClient } from './client'
 import type { ApiResponse, PageResponse } from '../types/api'
-import type { RegistrationPeriodResponse } from '../types/domain'
+import type {
+  DefenseSessionResponse,
+  ProjectAssignmentResponse,
+  RegistrationPeriodResponse,
+} from '../types/domain'
 
 export async function allPages<T>(fetchPage: (page: number) => Promise<PageResponse<T>>): Promise<T[]> {
   const first = await fetchPage(0)
@@ -30,6 +34,10 @@ export interface PublishedResult {
   members: { studentId: number; studentCodeSnapshot: string; fullNameSnapshot: string }[]
 }
 export const studentApi = {
+  projectAssignments: async () =>
+    (await apiClient.get<ApiResponse<ProjectAssignmentResponse[]>>('/project-assignments/mine')).data.data,
+  defenses: async () =>
+    (await apiClient.get<ApiResponse<DefenseSessionResponse[]>>('/student/defense-sessions')).data.data,
   results: async () => (await apiClient.get<ApiResponse<PublishedResult[]>>('/student/results')).data.data,
   upload: async (file: File) => {
     const form = new FormData()

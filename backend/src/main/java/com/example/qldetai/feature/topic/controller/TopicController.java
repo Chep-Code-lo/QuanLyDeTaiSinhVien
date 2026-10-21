@@ -4,6 +4,7 @@ import com.example.qldetai.common.api.ApiResponse;
 import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.feature.topic.domain.TopicStatus;
 import com.example.qldetai.feature.topic.dto.TopicDtos.AssignSupervisorsRequest;
+import com.example.qldetai.feature.topic.dto.TopicDtos.CreateRegistrationTopicRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.CreateTopicRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.PublishTopicRequest;
 import com.example.qldetai.feature.topic.dto.TopicDtos.ReviewTopicRequest;
@@ -32,30 +33,32 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
 @RequestMapping("/api/v1/topics")
+@RequiredArgsConstructor
 public class TopicController {
 
     private final TopicService topicService;
 
-    public TopicController(TopicService topicService) {
-        this.topicService = topicService;
-    }
 
     @GetMapping
     public ApiResponse<PageResponse<TopicResponse>> list(
             @RequestParam(required = false) Long periodId,
             @RequestParam(required = false) TopicStatus status,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(topicService.list(periodId, status, page, size));
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(topicService.list(periodId, status, page, size, principal.id()));
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<TopicResponse> get(@PathVariable Long id) {
-        return ApiResponse.success(topicService.get(id));
+    public ApiResponse<TopicResponse> get(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(topicService.get(id, principal.id()));
     }
 
     @PostMapping
@@ -66,6 +69,16 @@ public class TopicController {
         TopicResponse created = topicService.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/topics/" + created.id()))
                 .body(ApiResponse.success("Topic proposal created.", created));
+    }
+
+    @PostMapping("/for-registration")
+    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageDepartment(#request.departmentId, authentication)")
+    public ResponseEntity<ApiResponse<TopicResponse>> createForRegistration(
+            @Valid @RequestBody CreateRegistrationTopicRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        TopicResponse created = topicService.createForRegistration(request, principal.id());
+        return ResponseEntity.created(URI.create("/api/v1/topics/" + created.id()))
+                .body(ApiResponse.success("Topic created and published for registration.", created));
     }
 
     @PutMapping("/{id}")

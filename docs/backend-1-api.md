@@ -43,7 +43,7 @@ Response đăng nhập không có `accessToken`:
   "data": {
     "user": {
       "id": 1,
-      "fullName": "Quản trị demo",
+      "fullName": "Quản trị viên demo",
       "username": "admin@demo.local",
       "roles": ["ADMIN"],
       "student": null,
@@ -73,25 +73,24 @@ Response đăng nhập không có `accessToken`:
   "success": true,
   "data": {
     "id": 12,
-    "fullName": "Nguyễn Văn B",
-    "username": "lecturer@demo.local",
+      "fullName": "TS. Nguyễn Minh Đức",
+      "username": "dean@demo.local",
     "roles": ["LECTURER"],
     "lecturer": {
       "id": 4,
-      "lecturerCode": "GV001",
-      "academicDegree": "TS",
-      "specialization": "Công nghệ phần mềm",
-      "departmentId": 3
+        "lecturerCode": "GV001",
+        "academicDegree": "TS.",
+        "specialization": "Khoa học dữ liệu"
     },
     "activeAppointments": [
       {
         "id": 9,
-        "lecturerId": 4,
+        "lecturerId": 1,
         "lecturerCode": "GV001",
-        "lecturerName": "Nguyễn Văn B",
+        "lecturerName": "TS. Nguyễn Minh Đức",
         "facultyId": 1,
-        "departmentId": 3,
-        "positionCode": "DEPARTMENT_HEAD",
+        "departmentId": null,
+        "positionCode": "DEAN",
         "startsAt": "2026-09-01T08:00:00",
         "endsAt": null
       }
@@ -100,6 +99,12 @@ Response đăng nhập không có `accessToken`:
   "timestamp": "2026-09-18T08:00:00Z"
 }
 ```
+
+### Tổng quan
+
+| Method | Path | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/dashboard` | Đã đăng nhập | Số liệu đề tài, đợt đăng ký, thông báo, lịch gần nhất và dữ liệu biểu đồ tổng quan |
 
 ### Tài khoản và nhiệm vụ
 
@@ -143,8 +148,25 @@ Thứ tự thời gian bắt buộc:
 
 - `SPECIALIZED`, `GRADUATION`: phải có `reviewDeadlineAt` trước khi chuyển `ACTIVE`.
 - Chỉ `GRADUATION` có `defenseDate`; trường này bắt buộc trước khi chuyển `ACTIVE`.
-- Chuyển trạng thái: `DRAFT -> ACTIVE/CANCELLED`, `ACTIVE -> CLOSED/CANCELLED`.
+- Chuyển trạng thái: `DRAFT -> ACTIVE/CANCELLED`, `ACTIVE -> CLOSED/CANCELLED`, `CLOSED -> ACTIVE`; `CANCELLED` là trạng thái kết thúc.
 - Request cập nhật/chuyển trạng thái phải gửi `version`; nếu dữ liệu đã bị người khác sửa, API trả `409`.
+
+### Luồng sinh viên
+
+| Method | Path | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/groups/mine` | `STUDENT` | Nhóm hiện tại của sinh viên trong các đợt đăng ký |
+| GET | `/group-invitations/mine` | `STUDENT` | Lời mời tham gia nhóm của sinh viên |
+| GET | `/topic-registrations/mine` | `STUDENT` | Hồ sơ đăng ký đề tài của các nhóm mà sinh viên còn là thành viên |
+| GET | `/project-assignments/mine` | `STUDENT` | Đề tài đã được giao cho các nhóm mà sinh viên còn là thành viên |
+| GET | `/project-assignments/{id}/milestones` | Thành viên nhóm hoặc người quản lý đề tài | Mốc báo cáo của đề tài được phép xem |
+| GET | `/files/{id}/download` | Người có quyền xem tệp | Tải tệp báo cáo hoặc tệp đính kèm thông báo |
+| GET | `/student/defense-sessions` | `STUDENT` | Lịch bảo vệ của nhóm sinh viên |
+| GET | `/student/results` | `STUDENT` | Chỉ các kết quả `PUBLISHED` có bản chụp điểm/tiêu chí của chính sinh viên |
+
+Endpoint quản trị `/topic-registrations`, `/project-assignments`, `/defense-sessions` và `/results` không dùng cho
+giao diện sinh viên. Điều này tránh trả về dữ liệu của nhóm khác và tránh các lỗi phân quyền
+khi tải tiến độ, lịch bảo vệ hoặc kết quả.
 
 ### Thông báo và audit
 
@@ -187,20 +209,10 @@ Mỗi response có header `X-Request-Id`; audit dùng cùng mã để đối chi
 
 ## Dữ liệu demo
 
-Dữ liệu demo mặc định tắt. Trước khi chạy backend:
-
-```powershell
-$env:DEMO_DATA_ENABLED = "true"
-$env:DEMO_PASSWORD = "a-demo-password-with-at-least-8-characters"
-```
-
-Tài khoản được tạo nếu chưa tồn tại:
-
-- `admin@demo.local` — `ADMIN`.
-- `lecturer@demo.local` hoặc mã `GV001` — `LECTURER`, nhiệm vụ `DEAN` khoa CNTT.
-- `student@demo.local` hoặc mã `SV001` — `STUDENT`.
-
-Initializer cũng tạo khoa CNTT, bộ môn CNPM, học kỳ 1 năm học 2026–2027 và một đợt KLTN hợp lệ. Không có mật khẩu demo mặc định trong source code hoặc SQL.
+Docker nạp `database/seed/demo-data.sql` khi MySQL khởi tạo volume mới. Bộ dữ
+liệu gồm khoa CNTT, ba bộ môn, các đợt `COURSE`, `SPECIALIZED`, `GRADUATION`,
+đề tài, nhóm, phân công, hội đồng và một kết quả đã công bố. Xem tài khoản tại
+[`demo-accounts.md`](demo-accounts.md).
 
 ## Kiểm thử
 

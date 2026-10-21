@@ -61,8 +61,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 public class EvaluationResultService {
 
     private final StudentRepository students;
@@ -85,46 +87,6 @@ public class EvaluationResultService {
     private final ProjectAuthorization projectAuthorization;
     private final ResultAccess resultAccess;
 
-    public EvaluationResultService(
-            StudentRepository students,
-            ProjectAssignmentRepository assignments,
-            ScoreSheetRepository sheets,
-            ScoreDetailRepository details,
-            RubricCriterionRepository criteria,
-            EvaluationAssignmentRepository evaluations,
-            ResultVersionRepository results,
-            ResultInputRepository resultInputs,
-            ResultMemberRepository resultMembers,
-            GroupMemberRepository groupMembers,
-            NotificationService notifications,
-            ObjectMapper objectMapper,
-            Clock clock,
-            EvaluationActorAccess actorAccess,
-            AssessmentComponentRepository components,
-            DefenseSessionRepository defenses,
-            CommitteeMemberRepository committeeMembers,
-            ProjectAuthorization projectAuthorization,
-            ResultAccess resultAccess) {
-        this.students = students;
-        this.assignments = assignments;
-        this.sheets = sheets;
-        this.details = details;
-        this.criteria = criteria;
-        this.evaluations = evaluations;
-        this.results = results;
-        this.resultInputs = resultInputs;
-        this.resultMembers = resultMembers;
-        this.groupMembers = groupMembers;
-        this.notifications = notifications;
-        this.objectMapper = objectMapper;
-        this.clock = clock;
-        this.actorAccess = actorAccess;
-        this.components = components;
-        this.defenses = defenses;
-        this.committeeMembers = committeeMembers;
-        this.projectAuthorization = projectAuthorization;
-        this.resultAccess = resultAccess;
-    }
 
     @Transactional(readOnly = true)
     public PageResponse<ResultDetailResponse> listResults(
@@ -191,6 +153,13 @@ public class EvaluationResultService {
             }
         }
         return resultDetail(resultVersion);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ResultDetailResponse> listPublishedForStudent(Long userId) {
+        return results.findPublishedByStudentUserId(userId).stream()
+                .map(this::resultDetail)
+                .toList();
     }
 
     @Transactional

@@ -1,12 +1,14 @@
 import { useEffect, useRef, type UIEvent } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { navigationItems } from '../config/navigation'
 import { useAuth } from '../context/AuthContext'
 
 type SidebarProps = { onNavigate: () => void }
 
 export function Sidebar({ onNavigate }: SidebarProps) {
-  const { user, hasRole, hasAnyRole, hasAppointment, canAccessAcademicManagement } = useAuth()
+  const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const { user, hasAnyRole, hasAppointment, canAccessAcademicManagement } = useAuth()
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(
@@ -54,8 +56,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         <img
           className="sidebar__brand-image"
           src="/HCM-UTE_Logo.png"
-          width={hasRole('ADMIN') || hasRole('LECTURER') ? 104 : 88}
-          height={hasRole('ADMIN') || hasRole('LECTURER') ? 104 : 88}
+          width={104}
+          height={104}
           alt="Logo Trường Đại học Công nghệ Kỹ thuật Thành phố Hồ Chí Minh"
         />
       </Link>
@@ -63,22 +65,21 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       <nav className="sidebar__nav" aria-label="Điều hướng chính" onScroll={handleNavScroll}>
         {filteredItems.map((item) => {
           const Icon = item.icon
+          const isActive = pathname === item.to || (item.to !== '/' && pathname.startsWith(`${item.to}/`))
 
           return (
-            <NavLink
+            <button
               key={item.to}
-              className={({ isActive }) =>
-                `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
-              }
-              end={item.to === '/'}
-              to={item.to}
-              onClick={onNavigate}
+              type="button"
+              className={`sidebar__link${isActive ? ' sidebar__link--active' : ''}`}
+              aria-current={isActive ? 'page' : undefined}
+              onClick={() => { navigate(item.to); onNavigate() }}
             >
               <span className="sidebar__icon" aria-hidden="true">
                 <Icon size={18} strokeWidth={1.8} />
               </span>
-              <span>{item.label}</span>
-            </NavLink>
+              <span className="sidebar__text">{item.label}</span>
+            </button>
           )
         })}
       </nav>

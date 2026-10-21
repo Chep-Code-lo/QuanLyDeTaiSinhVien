@@ -29,6 +29,7 @@ import com.example.qldetai.feature.project.repository.ProjectAssignmentRepositor
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
@@ -40,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
  * the same transaction, so an invitation can never bypass the period/group constraints.
  */
 @Service
+@RequiredArgsConstructor
 public class GroupInvitationService {
 
     private final GroupInvitationRepository groupInvitationRepository;
@@ -52,26 +54,6 @@ public class GroupInvitationService {
     private final NotificationService notificationService;
     private final Clock clock;
 
-    public GroupInvitationService(
-            GroupInvitationRepository groupInvitationRepository,
-            StudentGroupRepository studentGroupRepository,
-            GroupMemberRepository groupMemberRepository,
-            TopicRegistrationRepository topicRegistrationRepository,
-            ProjectAssignmentRepository projectAssignmentRepository,
-            StudentRepository studentRepository,
-            UserRepository userRepository,
-            NotificationService notificationService,
-            Clock clock) {
-        this.groupInvitationRepository = groupInvitationRepository;
-        this.studentGroupRepository = studentGroupRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.topicRegistrationRepository = topicRegistrationRepository;
-        this.projectAssignmentRepository = projectAssignmentRepository;
-        this.studentRepository = studentRepository;
-        this.userRepository = userRepository;
-        this.notificationService = notificationService;
-        this.clock = clock;
-    }
 
     @Transactional
     public PageResponse<GroupInvitationResponse> mine(Long actorId, int page, int size) {

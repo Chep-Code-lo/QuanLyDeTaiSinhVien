@@ -12,18 +12,17 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
 @RequestMapping("/api/v1/admin/audit-logs")
 @PreAuthorize("hasRole('ADMIN')")
+@RequiredArgsConstructor
 public class AuditController {
 
     private final AuditQueryService auditQueryService;
 
-    public AuditController(AuditQueryService auditQueryService) {
-        this.auditQueryService = auditQueryService;
-    }
 
     @GetMapping
     public ApiResponse<PageResponse<AuditLogResponse>> list(

@@ -9,10 +9,29 @@ $runtimeDir = Join-Path $projectRoot '.runtime/cloudflare'
 $statePath = Join-Path $runtimeDir 'state.json'
 $envPath = Join-Path $projectRoot '.env'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
+$managedEnvNames = @(
+    'APP_BASE_URL',
+    'CORS_ALLOWED_ORIGINS',
+    'SESSION_COOKIE_SECURE',
+    'SESSION_COOKIE_SAME_SITE',
+    'CSRF_COOKIE_SECURE',
+    'CSRF_COOKIE_SAME_SITE',
+    'CSRF_COOKIE_DOMAIN',
+    'SERVER_FORWARD_HEADERS_STRATEGY'
+)
+
+function Get-TunnelState {
+    if (!(Test-Path -LiteralPath $statePath)) { return $null }
+    try {
+        return Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
+    } catch {
+        return $null
+    }
+}
 
 function Get-OwnedTunnel {
-    if (!(Test-Path -LiteralPath $statePath)) { return $null }
-    $saved = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
+    $saved = Get-TunnelState
+    if (!$saved) { return $null }
     $process = Get-Process -Id $saved.processId -ErrorAction SilentlyContinue
     if ($process -and $process.ProcessName -eq 'cloudflared' -and
         $process.StartTime.ToUniversalTime().ToString('o') -eq $saved.startedAt) {
@@ -27,14 +46,6 @@ function Read-TunnelLog([string]$Path) {
         [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
     $reader = New-Object System.IO.StreamReader($stream)
     try { return $reader.ReadToEnd() } finally { $reader.Dispose() }
-}
-
-if ($Stop) {
-    $owned = Get-OwnedTunnel
-    if ($owned) { Stop-Process -Id $owned.Process.Id; Write-Host 'Stopped this project tunnel.' }
-    else { Write-Host 'No active tunnel managed by this project.' }
-    if (Test-Path -LiteralPath $statePath) { Remove-Item -LiteralPath $statePath }
-    return
 }
 
 if (!(Test-Path -LiteralPath $envPath)) {
@@ -53,6 +64,41 @@ function Set-EnvValue([string]$Name, [string]$Value) {
     } else {
         $script:envText = $script:envText.TrimEnd() + "`r`n$line`r`n"
     }
+}
+
+function Restore-Environment([object]$State) {
+    if (!$State -or !$State.environment) { return $false }
+    foreach ($name in $managedEnvNames) {
+        $property = $State.environment.PSObject.Properties[$name]
+        if ($property) {
+            Set-EnvValue $name ([string]$property.Value)
+        }
+    }
+    [System.IO.File]::WriteAllText($envPath, $envText, $utf8)
+    return $true
+}
+
+if ($Stop) {
+    $saved = Get-TunnelState
+    $owned = Get-OwnedTunnel
+    if ($owned) { Stop-Process -Id $owned.Process.Id; Write-Host 'Stopped this project tunnel.' }
+    else { Write-Host 'No active tunnel managed by this project.' }
+
+    if (Restore-Environment $saved) {
+        Push-Location $projectRoot
+        try {
+            & docker compose up -d --no-deps --force-recreate backend
+            if ($LASTEXITCODE -ne 0) { throw 'Docker update failed while restoring local settings.' }
+        } finally {
+            Pop-Location
+        }
+        Write-Host 'Restored the local backend settings.'
+    } elseif ($saved) {
+        Write-Warning 'This tunnel was started by an older script; local cookie settings were not saved.'
+    }
+
+    if (Test-Path -LiteralPath $statePath) { Remove-Item -LiteralPath $statePath }
+    return
 }
 
 $frontendPort = Get-EnvValue 'FRONTEND_PORT'
@@ -102,7 +148,16 @@ try {
             Stop-Process -Id $tunnel.Id -ErrorAction SilentlyContinue
             throw "No tunnel URL received after 60 seconds. Inspect $stderr"
         }
-        $state = @{ processId = $tunnel.Id; startedAt = $tunnelStartedAt; url = $tunnelUrl }
+        $originalEnvironment = [ordered]@{}
+        foreach ($name in $managedEnvNames) {
+            $originalEnvironment[$name] = Get-EnvValue $name
+        }
+        $state = @{
+            processId = $tunnel.Id
+            startedAt = $tunnelStartedAt
+            url = $tunnelUrl
+            environment = $originalEnvironment
+        }
         [System.IO.File]::WriteAllText($statePath, ($state | ConvertTo-Json), $utf8)
     }
 

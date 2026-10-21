@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { Sidebar } from '../src/components/Sidebar'
 import { Header } from '../src/components/Header'
 import { TopicsPage } from '../src/pages/TopicsPage'
@@ -13,7 +13,8 @@ import { LecturerAutocomplete } from '../src/components/LecturerAutocomplete'
 const mocks = vi.hoisted(() => ({
   user: { id: 1, fullName: 'Giảng viên thử nghiệm', roles: ['LECTURER', 'ADMIN'], lecturer: { id: 7 }, activeAppointments: [] },
   showError: vi.fn(), showSuccess: vi.fn(),
-  topics: vi.fn(), periods: vi.fn(), faculties: vi.fn(),
+  logout: vi.fn(),
+  topics: vi.fn(), periods: vi.fn(), faculties: vi.fn(), departments: vi.fn(), createTopic: vi.fn(),
   assignments: vi.fn(), rubrics: vi.fn(), components: vi.fn(), sheet: vi.fn(), save: vi.fn(),
   notifications: vi.fn(), unread: vi.fn(), read: vi.fn(), announcements: vi.fn(),
   lecturers: vi.fn(),
@@ -21,12 +22,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../src/context/AuthContext', () => ({ useAuth: () => ({
   user: mocks.user, hasRole: (role: string) => mocks.user.roles.includes(role),
   hasAnyRole: (roles: string[]) => roles.some(role => mocks.user.roles.includes(role)),
-  hasAppointment: () => false, canAccessAcademicManagement: () => true, logout: vi.fn(),
+  hasAppointment: () => false, canAccessAcademicManagement: () => true, logout: mocks.logout,
 }) }))
 vi.mock('../src/context/ToastContext', () => ({ useToast: () => ({ showError: mocks.showError, showSuccess: mocks.showSuccess }) }))
-vi.mock('../src/api/topics', () => ({ topicApi: { list: mocks.topics } }))
+vi.mock('../src/api/topics', () => ({ topicApi: { list: mocks.topics, createForRegistration: mocks.createTopic } }))
 vi.mock('../src/api/lecturers', () => ({ lecturerApi: { list: mocks.lecturers } }))
-vi.mock('../src/api/academic', () => ({ academicApi: { getRegistrationPeriods: mocks.periods, getFaculties: mocks.faculties } }))
+vi.mock('../src/api/academic', () => ({ academicApi: { getRegistrationPeriods: mocks.periods, getFaculties: mocks.faculties, getDepartments: mocks.departments } }))
 vi.mock('../src/api/evaluation', () => ({ evaluationApi: {
   listAssignments: mocks.assignments, listRubrics: mocks.rubrics, listComponents: mocks.components,
   getScoreSheet: mocks.sheet, saveScoreSheet: mocks.save,
@@ -44,10 +45,24 @@ function mount(element: React.ReactNode, route = '/') {
   return render(<MemoryRouter initialEntries={[route]}>{element}</MemoryRouter>)
 }
 
+function CurrentPath() {
+  return <output data-testid="current-path">{useLocation().pathname}</output>
+}
+
+// jsdom does not implement the native dialog methods; browser checks cover the top layer.
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
+})
+
 beforeEach(() => {
+  mocks.logout.mockReset()
+  mocks.logout.mockResolvedValue(undefined)
   mocks.topics.mockResolvedValue(page([]))
   mocks.periods.mockResolvedValue(page([{ id: 1, name: 'Đợt A' }]))
   mocks.faculties.mockResolvedValue([])
+  mocks.departments.mockResolvedValue([])
+  mocks.createTopic.mockResolvedValue({})
   mocks.assignments.mockResolvedValue(page([assignment]))
   mocks.components.mockResolvedValue([{ id: 3, periodId: 1, name: 'Thành phần đã lưu', componentType: 'REVIEW', expectedEvaluators: 1, status: 'DRAFT' }])
   mocks.rubrics.mockResolvedValue([rubric])
@@ -61,10 +76,21 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('Hồi quy frontend', () => {
-  it('hiển thị biểu tượng SVG và đường dẫn tạo tài khoản cho admin', () => {
+  it('luôn về trang chủ sau khi đăng xuất, kể cả khi API lỗi', async () => {
+    mocks.logout.mockRejectedValueOnce(new Error('offline'))
+    mount(<><Header onMenuClick={vi.fn()} /><CurrentPath /></>, '/dashboard')
+
+    await userEvent.click(await screen.findByRole('button', { name: /Giảng viên thử nghiệm/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Đăng xuất' }))
+
+    await waitFor(() => expect(screen.getByTestId('current-path').textContent).toBe('/'))
+    expect(mocks.showError).toHaveBeenCalled()
+  })
+
+  it('hiển thị biểu tượng SVG và nút tạo tài khoản không có href cho admin', () => {
     const { container } = mount(<Sidebar onNavigate={vi.fn()} />)
     expect(container.querySelectorAll('.sidebar__icon svg').length).toBeGreaterThan(10)
-    expect(screen.getByRole('link', { name: 'Tạo tài khoản' }).getAttribute('href')).toBe('/admin-users/new')
+    expect(screen.getByRole('button', { name: 'Tạo tài khoản' }).hasAttribute('href')).toBe(false)
   })
 
   it('tìm từ URL trên tất cả các trang đề tài, kể cả dữ liệu trang sau', async () => {
@@ -91,6 +117,23 @@ describe('Hồi quy frontend', () => {
     expect(screen.getByText('Biết lập trình')).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: 'Thu gọn' }))
     expect(screen.queryByText('Mô tả chi tiết')).toBeNull()
+  })
+
+  it('hiển thị lựa chọn Bộ môn bắt buộc khi tạo đề tài', async () => {
+    mocks.periods.mockResolvedValue(page([{
+      id: 1, name: 'Đợt đang mở', facultyId: 1, status: 'ACTIVE',
+      proposalStartAt: '2000-01-01T00:00:00Z', proposalEndAt: '2099-12-31T00:00:00Z',
+      registrationStartAt: '2000-01-01T00:00:00Z', registrationEndAt: '2099-12-31T00:00:00Z',
+    }]))
+    mocks.departments.mockResolvedValue([{ id: 3, facultyId: 1, name: 'Công nghệ phần mềm', active: true }])
+    mocks.lecturers.mockResolvedValue(page([{ id: 7, fullName: 'Giảng viên A', lecturerCode: 'GV07', departmentName: 'Công nghệ phần mềm' }]))
+
+    mount(<TopicsPage />)
+    await userEvent.click(screen.getByRole('button', { name: '+ Tạo đề tài' }))
+
+    const department = await screen.findByLabelText(/Bộ môn/)
+    expect((department as HTMLSelectElement).value).toBe('')
+    expect(screen.getByRole('option', { name: 'Chọn bộ môn' })).toBeTruthy()
   })
 
   it('khôi phục đúng giảng viên ở trang sau, không nhầm userId với lecturerId', async () => {
@@ -151,6 +194,57 @@ describe('Hồi quy frontend', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Thông báo cá nhân' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Thông báo kiểm tra' }))
     await waitFor(() => expect(mocks.unread).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(screen.getByRole('link', { name: 'Thông báo', exact: true }).querySelector('.notification-button__dot')).toBeNull())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Thông báo', exact: true }).querySelector('.notification-button__dot')).toBeNull())
+  })
+
+  it('chuông mở danh sách tiêu đề, chọn thông báo mở popup nội dung và đánh dấu đã đọc', async () => {
+    const notification = { id: 41, title: 'Lịch bảo vệ mới', content: 'Nội dung đầy đủ\nDòng thứ hai', targetPath: '/progress', createdAt: '2026-01-01T00:00:00Z' }
+    mocks.notifications.mockResolvedValue(page([notification]))
+    mocks.read.mockResolvedValue({ ...notification, readAt: '2026-01-02T00:00:00Z' })
+    mount(<Header onMenuClick={vi.fn()} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Có thông báo mới' }))
+    expect(await screen.findByRole('button', { name: /Lịch bảo vệ mới/ })).toBeTruthy()
+    expect(screen.queryByText(/Nội dung đầy đủ/)).toBeNull()
+    expect(mocks.read).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: /Lịch bảo vệ mới/ }))
+    expect(await screen.findByRole('dialog', { name: 'Lịch bảo vệ mới' })).toBeTruthy()
+    expect(screen.getByText(/Nội dung đầy đủ/)).toBeTruthy()
+    expect(screen.queryByText('Mở liên quan')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Danh sách thông báo' })).toBeNull()
+    await waitFor(() => expect(mocks.read).toHaveBeenCalledWith(41))
+    await userEvent.click(screen.getByRole('button', { name: 'Đóng thông báo' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('không gọi đánh dấu đã đọc lần nữa khi xem thông báo đã đọc', async () => {
+    mocks.notifications.mockResolvedValue(page([{ id: 42, title: 'Đã đọc', content: 'Chi tiết', readAt: '2026-01-02T00:00:00Z', createdAt: '2026-01-01T00:00:00Z' }]))
+    mount(<Header onMenuClick={vi.fn()} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Có thông báo mới' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Đã đọc', exact: true }))
+    expect(await screen.findByRole('dialog', { name: 'Đã đọc' })).toBeTruthy()
+    expect(mocks.read).not.toHaveBeenCalled()
+  })
+
+  it('đồng bộ trạng thái đã đọc từ chuông sang trang thông báo đang mở', async () => {
+    const notification = { id: 43, title: 'Đồng bộ trạng thái', content: 'Nội dung', createdAt: '2026-01-01T00:00:00Z' }
+    mocks.notifications.mockResolvedValue(page([notification]))
+    mocks.read.mockResolvedValue({ ...notification, readAt: '2026-01-02T00:00:00Z' })
+    mount(<><Header onMenuClick={vi.fn()} /><AnnouncementsPage /></>)
+    await userEvent.click(screen.getByRole('tab', { name: 'Thông báo cá nhân' }))
+    const rowTitle = await screen.findByRole('button', { name: 'Đồng bộ trạng thái' })
+    expect(rowTitle.closest('tr')?.classList.contains('announcement-table__row--unread')).toBe(true)
+    await userEvent.click(await screen.findByRole('button', { name: 'Có thông báo mới' }))
+    await userEvent.click((await screen.findAllByRole('button', { name: 'Đồng bộ trạng thái' }))[0])
+    await waitFor(() => expect(rowTitle.closest('tr')?.classList.contains('announcement-table__row--unread')).toBe(false))
+  })
+
+  it('cho thử tải lại danh sách khi lỗi và hiển thị trạng thái trống', async () => {
+    mocks.notifications.mockRejectedValueOnce(new Error('Không tải được thông báo'))
+    mount(<Header onMenuClick={vi.fn()} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Có thông báo mới' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Thử lại' }))
+    expect(await screen.findByText('Chưa có thông báo.')).toBeTruthy()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })
