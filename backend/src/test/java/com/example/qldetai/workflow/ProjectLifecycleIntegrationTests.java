@@ -6,6 +6,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -154,7 +155,7 @@ class ProjectLifecycleIntegrationTests {
     void publishedResultQueuesPersonalizedScoreEmailsExactlyOnce() {
         configureResultEmail(true);
         var project = createAssignedProject("emailed-score", leaderStudent, secondStudent);
-        var catalog = createLockedCatalog("email-score", "Scored", AssessmentComponentType.OTHER, 1);
+        var catalog = createLockedCatalog("email-score", "Scored", AssessmentComponentType.OTHER);
         submitFullScore(project.id(), catalog, lecturerThree, null);
         var finalized = evaluationResultService.finalizeResult(project.id(), admin.getId());
         assertThat(emailOutbox.count()).isZero();
@@ -180,7 +181,7 @@ class ProjectLifecycleIntegrationTests {
     void disabledResultEmailDoesNotPreventPublicationOrQueueMessages() {
         configureResultEmail(false);
         var project = createAssignedProject("disabled-email", leaderStudent, secondStudent);
-        var catalog = createLockedCatalog("disabled-email", "Scored", AssessmentComponentType.OTHER, 1);
+        var catalog = createLockedCatalog("disabled-email", "Scored", AssessmentComponentType.OTHER);
         submitFullScore(project.id(), catalog, lecturerThree, null);
         var finalized = evaluationResultService.finalizeResult(project.id(), admin.getId());
         assertThat(evaluationResultService.publish(finalized.id(), admin.getId()).status().name()).isEqualTo("PUBLISHED");
@@ -191,7 +192,7 @@ class ProjectLifecycleIntegrationTests {
     void resultEmailUsesSnapshotMembersEvenIfCurrentMembershipChanges() {
         configureResultEmail(true);
         var project = createAssignedProject("snapshot-email", leaderStudent, secondStudent);
-        var catalog = createLockedCatalog("snapshot-email", "Scored", AssessmentComponentType.OTHER, 1);
+        var catalog = createLockedCatalog("snapshot-email", "Scored", AssessmentComponentType.OTHER);
         submitFullScore(project.id(), catalog, lecturerThree, null);
         var finalized = evaluationResultService.finalizeResult(project.id(), admin.getId());
         var projectEntity = projectAssignmentRepository.findById(project.id()).orElseThrow();
@@ -492,7 +493,7 @@ class ProjectLifecycleIntegrationTests {
     @Test
     void assessmentCatalogCanBeLockedBeforeEvaluatorAssignment() {
         LockedCatalog catalog =
-                createLockedCatalog("rv-01", "Chấm phản biện", AssessmentComponentType.REVIEW, 1);
+                createLockedCatalog("rv-01", "Chấm phản biện", AssessmentComponentType.REVIEW);
 
         assertThat(catalog.component().componentType()).isEqualTo(AssessmentComponentType.REVIEW);
         assertThat(catalog.component().status()).isEqualTo("LOCKED");
@@ -503,11 +504,100 @@ class ProjectLifecycleIntegrationTests {
     }
 
     @Test
+    void committeeConfigurationCanBeSavedOverHttp(@Autowired MockMvc mvc) throws Exception {
+        LockedCatalog catalog =
+                createLockedCatalog("committee-config", "Chấm hội đồng", AssessmentComponentType.COMMITTEE);
+        String body = """
+                {"periodId":%d,"name":"Hội đồng 1","rubricId":%d,"members":[
+                  {"lecturerId":%d,"roleName":"Chủ tịch"},
+                  {"lecturerId":%d,"roleName":"Thư ký"},
+                  {"lecturerId":%d,"roleName":"Ủy viên chuyên môn"}
+                ]}
+                """.formatted(
+                period.getId(),
+                catalog.rubric().id(),
+                lecturerThree.getId(),
+                lecturerFour.getId(),
+                lecturerFive.getId());
+
+        mvc.perform(post("/api/v1/evaluation-committees/configuration")
+                        .with(user(UserPrincipal.from(admin)))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("Hội đồng 1"))
+                .andExpect(jsonPath("$.data.rubricId").value(catalog.rubric().id()))
+                .andExpect(jsonPath("$.data.members[2].roleName").value("Ủy viên chuyên môn"));
+
+        List<EvaluationCommitteeResponse> savedCommittees =
+                evaluationCommitteeService.listCommittees(period.getId(), 0, 10).content();
+        assertThat(savedCommittees)
+                .singleElement()
+                .satisfies(committee -> {
+                    assertThat(committee.rubricId()).isEqualTo(catalog.rubric().id());
+                    assertThat(committee.members()).hasSize(3);
+                });
+        EvaluationCommitteeResponse created = savedCommittees.get(0);
+        String updatedBody = """
+                {"periodId":%d,"name":"Hội đồng đã cập nhật","rubricId":%d,"version":%d,"members":[
+                  {"lecturerId":%d,"roleName":"Chủ tịch"},
+                  {"lecturerId":%d,"roleName":"Thư ký"},
+                  {"lecturerId":%d,"roleName":"Ủy viên chuyên môn"}
+                ]}
+                """.formatted(
+                period.getId(),
+                catalog.rubric().id(),
+                created.version(),
+                lecturerThree.getId(),
+                lecturerFour.getId(),
+                lecturerFive.getId());
+
+        mvc.perform(put("/api/v1/evaluation-committees/{id}/configuration", created.id())
+                        .with(user(UserPrincipal.from(admin)))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(updatedBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("Hội đồng đã cập nhật"))
+                .andExpect(jsonPath("$.data.version").value(created.version() + 1));
+
+        String rosterOnlyUpdateBody = """
+                {"periodId":%d,"name":"Hội đồng đã cập nhật","rubricId":%d,"version":%d,"members":[
+                  {"lecturerId":%d,"roleName":"Chủ tịch"},
+                  {"lecturerId":%d,"roleName":"Thư ký"},
+                  {"lecturerId":%d,"roleName":"Ủy viên phản biện"}
+                ]}
+                """.formatted(
+                period.getId(),
+                catalog.rubric().id(),
+                created.version() + 1,
+                lecturerThree.getId(),
+                lecturerFour.getId(),
+                lecturerFive.getId());
+        mvc.perform(put("/api/v1/evaluation-committees/{id}/configuration", created.id())
+                        .with(user(UserPrincipal.from(admin)))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(rosterOnlyUpdateBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(created.version() + 2))
+                .andExpect(jsonPath("$.data.members[2].roleName").value("Ủy viên phản biện"));
+
+        mvc.perform(put("/api/v1/evaluation-committees/{id}/configuration", created.id())
+                        .with(user(UserPrincipal.from(admin)))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(updatedBody))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
     void committeeEvaluationAppearsInAssignmentAndDefenseReads() {
         ProjectAssignmentResponse assignment =
                 createAssignedProject("dt-defense-01", leaderStudent, secondStudent);
         LockedCatalog catalog =
-                createLockedCatalog("hd-01", "Chấm hội đồng", AssessmentComponentType.COMMITTEE, 3);
+                createLockedCatalog("hd-01", "Chấm hội đồng", AssessmentComponentType.COMMITTEE);
 
         Long committeeId =
                 evaluationCommitteeService.createCommittee(
@@ -589,7 +679,7 @@ class ProjectLifecycleIntegrationTests {
                 createAssignedProject("dt-review-gate-01", leaderStudent, secondStudent);
         LockedCatalog reviewCatalog =
                 createLockedCatalog(
-                        "review-gate-01", "Phản biện bắt buộc", AssessmentComponentType.REVIEW, 1);
+                        "review-gate-01", "Phản biện bắt buộc", AssessmentComponentType.REVIEW);
         evaluationService.assign(
                 new CreateEvaluationRequest(
                         assignment.id(),
@@ -636,7 +726,7 @@ class ProjectLifecycleIntegrationTests {
         ProjectAssignmentResponse assignment =
                 createAssignedProject("dt-grade-change-01", leaderStudent, secondStudent);
         LockedCatalog catalog =
-                createLockedCatalog("pb-01", "Chấm phản biện 1", AssessmentComponentType.REVIEW, 1);
+                createLockedCatalog("pb-01", "Chấm phản biện 1", AssessmentComponentType.REVIEW);
 
         Long evaluationId =
                 evaluationService.assign(
@@ -730,14 +820,12 @@ class ProjectLifecycleIntegrationTests {
                 createLockedCatalog(
                         "other-formula-01",
                         "Điểm thành phần một người chấm",
-                        AssessmentComponentType.OTHER,
-                        1);
+                        AssessmentComponentType.OTHER);
         LockedCatalog twoEvaluatorComponent =
                 createLockedCatalog(
                         "review-formula-01",
                         "Điểm thành phần hai người chấm",
-                        AssessmentComponentType.REVIEW,
-                        2);
+                        AssessmentComponentType.REVIEW);
 
         Long singleEvaluator =
                 evaluationService.assign(
@@ -839,7 +927,7 @@ class ProjectLifecycleIntegrationTests {
         var project = projectAssignmentRepository.findById(assigned.id()).orElseThrow();
         var catalog =
                 createLockedCatalog(
-                        "AUTH", "Authorization rubric", AssessmentComponentType.REVIEW, 1);
+                        "AUTH", "Authorization rubric", AssessmentComponentType.REVIEW);
         AcademicAppointment appointment = new AcademicAppointment();
         appointment.setLecturer(lecturerOne);
         appointment.setFaculty(faculty);
@@ -898,6 +986,29 @@ class ProjectLifecycleIntegrationTests {
     }
 
     @Test
+    void deanCanReadMilestonesForTheirFacultyOnly(@Autowired MockMvc mvc) throws Exception {
+        ProjectAssignmentResponse assigned =
+                createAssignedProject("MILESTONE-SCOPE", leaderStudent, secondStudent);
+        AcademicAppointment appointment = new AcademicAppointment();
+        appointment.setLecturer(lecturerFour);
+        appointment.setFaculty(faculty);
+        appointment.setPositionCode(PositionCode.DEAN);
+        appointment.setStartsAt(nowUtc().minusDays(1));
+        appointment.setAssignedBy(admin);
+        appointments.saveAndFlush(appointment);
+
+        UserPrincipal dean = UserPrincipal.from(lecturerFour.getUser());
+        String endpoint = "/api/v1/project-assignments/" + assigned.id() + "/milestones";
+        mvc.perform(get(endpoint).with(user(dean)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        appointment.setFaculty(createFaculty("OTHER"));
+        appointments.saveAndFlush(appointment);
+        mvc.perform(get(endpoint).with(user(dean))).andExpect(status().isForbidden());
+    }
+
+    @Test
     void regroupedEvaluationReadEndpointsRemainAvailable(@Autowired MockMvc mvc) throws Exception {
         UserPrincipal principal = UserPrincipal.from(admin);
         for (String resource :
@@ -953,7 +1064,7 @@ class ProjectLifecycleIntegrationTests {
     @Test
     void scoringRejectsExpiredDeadlinesAndCancelledEvaluations() {
         var project = createAssignedProject("deadline", leaderStudent, secondStudent);
-        var catalog = createLockedCatalog("deadline", "Deadline", AssessmentComponentType.OTHER, 1);
+        var catalog = createLockedCatalog("deadline", "Deadline", AssessmentComponentType.OTHER);
         Long evaluationId = evaluationService.assign(new CreateEvaluationRequest(project.id(),
                 catalog.rubric().id(), lecturerThree.getId(), null, nowUtc().plusDays(1)), admin.getId());
         var evaluation = evaluationRepository.findById(evaluationId).orElseThrow();
@@ -971,7 +1082,7 @@ class ProjectLifecycleIntegrationTests {
     @Test
     void reviewScoringHonorsPeriodDeadlineAndRejectsAssignmentsBeyondIt() {
         var project = createAssignedProject("review-deadline", leaderStudent, secondStudent);
-        var catalog = createLockedCatalog("review-deadline", "Review", AssessmentComponentType.REVIEW, 1);
+        var catalog = createLockedCatalog("review-deadline", "Review", AssessmentComponentType.REVIEW);
         assertThatThrownBy(() -> evaluationService.assign(new CreateEvaluationRequest(project.id(),
                 catalog.rubric().id(), lecturerThree.getId(), null, period.getReviewDeadlineAt().plusDays(1)), admin.getId()))
                 .isInstanceOf(BusinessRuleException.class).hasMessageContaining("cannot exceed");
@@ -985,25 +1096,22 @@ class ProjectLifecycleIntegrationTests {
     }
 
     @Test
-    void studentCannotCreateOrJoinAnotherPeriodWhileTheirGroupIsOpen() {
+    void studentCanCreateOrJoinAGroupInAnotherRegistrationPeriod() {
         var group = createActiveGroup("Existing", leaderStudent, secondStudent);
         studentGroupRepository.findById(group.id()).orElseThrow().setStatus(GroupStatus.LOCKED);
         var otherPeriod = createActivePeriod();
-        for (var state : List.of(RegistrationPeriodStatus.ACTIVE, RegistrationPeriodStatus.CLOSED,
-                RegistrationPeriodStatus.CANCELLED)) {
-            period.setStatus(state);
-            assertThatThrownBy(() -> groupService.create(new CreateGroupRequest(otherPeriod.getId(), "Other"),
-                    leaderStudent.getUser().getId())).isInstanceOf(BusinessRuleException.class)
-                    .hasMessageContaining("active group");
-        }
+
+        assertThat(groupService.create(new CreateGroupRequest(otherPeriod.getId(), "Other"),
+                leaderStudent.getUser().getId()).id()).isPositive();
         var otherGroup = groupService.create(new CreateGroupRequest(otherPeriod.getId(), "Other"),
                 thirdStudent.getUser().getId());
-        assertThatThrownBy(() -> groupService.addMember(otherGroup.id(),
-                new AddGroupMemberRequest(secondStudent.getStudentCode()), thirdStudent.getUser().getId()))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("active group");
-        studentGroupRepository.findById(group.id()).orElseThrow().setStatus(GroupStatus.CLOSED);
-        assertThat(groupService.create(new CreateGroupRequest(otherPeriod.getId(), "Next project"),
-                leaderStudent.getUser().getId()).id()).isPositive();
+        assertThat(groupService.addMember(otherGroup.id(),
+                new AddGroupMemberRequest(secondStudent.getStudentCode()), thirdStudent.getUser().getId()).id())
+                .isEqualTo(otherGroup.id());
+
+        assertThatThrownBy(() -> groupService.create(new CreateGroupRequest(otherPeriod.getId(), "Duplicate"),
+                leaderStudent.getUser().getId())).isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("active group");
     }
 
     @Test
@@ -1024,8 +1132,8 @@ class ProjectLifecycleIntegrationTests {
     @Test
     void finalizationRejectsAComponentWithNoAssignedEvaluator() {
         var project = createAssignedProject("missing-component", leaderStudent, secondStudent);
-        var scored = createLockedCatalog("scored", "Scored", AssessmentComponentType.OTHER, 1);
-        createLockedCatalog("missing", "Missing", AssessmentComponentType.REVIEW, 1);
+        var scored = createLockedCatalog("scored", "Scored", AssessmentComponentType.OTHER);
+        createLockedCatalog("missing", "Missing", AssessmentComponentType.REVIEW);
         submitFullScore(project.id(), scored, lecturerThree, null);
         assertThatThrownBy(() -> evaluationResultService.finalizeResult(project.id(), admin.getId()))
                 .isInstanceOf(BusinessRuleException.class).hasMessageContaining("evaluator assignment is missing");
@@ -1035,7 +1143,7 @@ class ProjectLifecycleIntegrationTests {
     @Test
     void onlyTheCorrespondingChairCanFinalizeACommitteeResultThroughHttp(@Autowired MockMvc mvc) throws Exception {
         var project = createAssignedProject("chair-only", leaderStudent, secondStudent);
-        var catalog = createLockedCatalog("committee", "Committee", AssessmentComponentType.COMMITTEE, 3);
+        var catalog = createLockedCatalog("committee", "Committee", AssessmentComponentType.COMMITTEE);
         Long committeeId = evaluationCommitteeService.createCommittee(
                 new CreateCommitteeRequest(period.getId(), "Council"), admin.getId());
         evaluationCommitteeService.addMember(committeeId,
@@ -1066,7 +1174,7 @@ class ProjectLifecycleIntegrationTests {
     @Test
     void resultListsAndDetailsAreScopedAndStudentsOnlyReadPublishedSnapshots(@Autowired MockMvc mvc) throws Exception {
         var project = createAssignedProject("scoped-results", leaderStudent, secondStudent);
-        var catalog = createLockedCatalog("scoped", "Scored", AssessmentComponentType.OTHER, 1);
+        var catalog = createLockedCatalog("scoped", "Scored", AssessmentComponentType.OTHER);
         submitFullScore(project.id(), catalog, lecturerThree, null);
         var finalized = evaluationResultService.finalizeResult(project.id(), admin.getId());
         assertThat(evaluationResultService.listResults(null, null, null, 0, 1,
@@ -1186,16 +1294,14 @@ class ProjectLifecycleIntegrationTests {
     private LockedCatalog createLockedCatalog(
             String code,
             String name,
-            AssessmentComponentType componentType,
-            int expectedEvaluators) {
+            AssessmentComponentType componentType) {
         AssessmentComponentResponse component =
                 evaluationService.createComponent(
                         new CreateAssessmentComponentRequest(
                                 period.getId(),
                                 unique(code),
                                 name,
-                                componentType,
-                                expectedEvaluators),
+                                componentType),
                         admin.getId());
         RubricResponse draftRubric =
                 evaluationService.createRubric(

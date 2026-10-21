@@ -38,6 +38,10 @@ public class EvaluationCommittee extends CreatedAtEntity {
     @JoinColumn(name = "faculty_id")
     private Faculty faculty;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rubric_id")
+    private Rubric rubric;
+
     @Column(nullable = false)
     private String name;
 

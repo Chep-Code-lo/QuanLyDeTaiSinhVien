@@ -669,7 +669,7 @@ export const AcademicManagementPage: React.FC = () => {
                 </div>
                 <div className="form-group">
                   <label className="form-label">
-                    Quy tắc nhóm thực hiện (để trống để dùng cấu hình hệ thống)
+                    Quy tắc nhóm thực hiện
                   </label>
                   <div className="grid-cols-2">
                     <div className="form-group">
@@ -733,7 +733,7 @@ export const AcademicManagementPage: React.FC = () => {
                 </div>
                 <div className="form-group">
                   <label className="form-label">
-                    Quy tắc hội đồng (để trống để dùng cấu hình hệ thống)
+                    Quy tắc hội đồng
                   </label>
                   <div className="grid-cols-2">
                     <div className="form-group">

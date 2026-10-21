@@ -409,7 +409,6 @@ export function EmailSettingsPage() {
     <div className="email-settings-page">
       <PageHeader
         title="Cấu hình email"
-        description={isAdmin ? 'Quản lý mẫu và gửi email đến người nhận đã chọn.' : 'Quản lý mẫu và gửi email đến sinh viên đang hướng dẫn.'}
       />
 
       <div className="email-settings__layout">

@@ -1,4 +1,4 @@
-import { apiClient } from './client'
+import { apiClient, fetchCsrfToken } from './client'
 import type { ApiResponse, PageResponse } from '../types/api'
 import type { GroupInvitationResponse, StudentGroupResponse } from '../types/domain'
 
@@ -8,8 +8,16 @@ export const groupApi = {
       .data.data,
   mine: async () =>
     (await apiClient.get<ApiResponse<StudentGroupResponse[]>>('/groups/mine')).data.data,
-  create: async (payload: { periodId: number; name: string }) =>
-    (await apiClient.post<ApiResponse<StudentGroupResponse>>('/groups', payload)).data.data,
+  create: async (payload: { periodId: number; name: string }) => {
+    // Refresh the token immediately before creating a group. This avoids using a
+    // stale token after the browser restores a long-lived student session.
+    const csrf = await fetchCsrfToken(true)
+    return (
+      await apiClient.post<ApiResponse<StudentGroupResponse>>('/groups', payload, {
+        headers: { [csrf.headerName]: csrf.token },
+      })
+    ).data.data
+  },
   removeMember: async (groupId: number, studentId: number) =>
     (
       await apiClient.delete<ApiResponse<StudentGroupResponse>>(

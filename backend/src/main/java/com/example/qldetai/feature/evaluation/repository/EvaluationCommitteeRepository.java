@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import java.util.Optional;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.domain.Specification;
@@ -22,4 +23,8 @@ public interface EvaluationCommitteeRepository
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select committee from EvaluationCommittee committee where committee.id = :id")
     Optional<EvaluationCommittee> findByIdForUpdate(Long id);
+
+    @Modifying
+    @Query("update EvaluationCommittee committee set committee.version = committee.version + 1 where committee.id = :id and committee.version = :version")
+    int advanceVersion(Long id, int version);
 }

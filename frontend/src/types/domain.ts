@@ -165,7 +165,6 @@ export interface CreateAssessmentComponentRequest {
   code: string
   name: string
   componentType: AssessmentComponentType
-  expectedEvaluators: number
 }
 
 export interface AssessmentComponentResponse {
@@ -175,7 +174,6 @@ export interface AssessmentComponentResponse {
   code: string
   name: string
   componentType: AssessmentComponentType
-  expectedEvaluators: number
   status: 'DRAFT' | 'LOCKED' | string
 }
 
@@ -222,6 +220,14 @@ export interface CreateEvaluationRequest {
   lecturerId: number
   defenseId?: number | null
   deadlineAt: string
+}
+
+export interface CreateDefenseRequest {
+  assignmentId: number
+  committeeId: number
+  location: string
+  startsAt: string
+  endsAt: string
 }
 
 export interface EvaluationAssignmentResponse {

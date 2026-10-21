@@ -68,7 +68,6 @@ export function TopicsPage() {
     <>
       <PageHeader
         title={student ? 'Danh sách đề tài đã công bố' : 'Đề tài & Dự án'}
-        description={student ? 'Chỉ hiển thị các đề tài đã được khoa công bố và có thể xem để đăng ký.' : undefined}
       />
       {canCreateTopic && (
         <RegistrationTopicForm onCreated={(topic) => setTopics((current) => [topic, ...current])} />

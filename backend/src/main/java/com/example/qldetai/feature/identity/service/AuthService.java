@@ -88,13 +88,13 @@ public class AuthService {
     }
 
     private String clientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        String candidate = forwardedFor == null || forwardedFor.isBlank()
-                ? request.getHeader("X-Real-IP")
-                : forwardedFor.split(",", 2)[0].trim();
-        if (candidate == null || candidate.isBlank()) {
-            candidate = request.getRemoteAddr();
+        // ForwardedHeaderFilter has already resolved the client address and removed
+        // X-Forwarded-For. X-Real-IP can still contain Nginx's Docker peer address.
+        String address = request.getRemoteAddr();
+        // Spring may represent a forwarded IPv6 address using URI brackets.
+        if (address != null && address.startsWith("[") && address.endsWith("]")) {
+            return address.substring(1, address.length() - 1);
         }
-        return candidate.length() <= 45 ? candidate : candidate.substring(0, 45);
+        return address;
     }
 }

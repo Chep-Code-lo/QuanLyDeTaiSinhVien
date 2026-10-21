@@ -41,7 +41,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest
+@SpringBootTest(properties = "server.forward-headers-strategy=framework")
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @AutoConfigureMockMvc
 @Transactional
@@ -104,6 +104,7 @@ class AuthIntegrationTests {
         MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
                         .with(csrf())
                         .header("X-Forwarded-For", "203.0.113.42, 10.0.0.1")
+                        .header("X-Real-IP", "172.18.0.1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"username":"admin@test.local","password":"TestPassword123!"}
@@ -121,6 +122,36 @@ class AuthIntegrationTests {
         mockMvc.perform(get("/api/v1/admin/users").session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].lastLoginIp").value("203.0.113.42"));
+    }
+
+    @Test
+    void loginRecordsForwardedIpv6InsteadOfDockerPeerAddress() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .with(csrf())
+                        .header("X-Forwarded-For", "2001:db8::42, 10.0.0.1")
+                        .header("X-Real-IP", "172.18.0.1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"admin@test.local","password":"TestPassword123!"}
+                                """))
+                .andExpect(status().isOk());
+        assertThat(userRepository.findByEmailIgnoreCase("admin@test.local").orElseThrow()
+                .getLastLoginIp()).isEqualTo("2001:db8::42");
+    }
+
+    @Test
+    void directLoginRecordsRemoteAddressInsteadOfUnprocessedRealIpHeader() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .with(csrf())
+                        .with(request -> { request.setRemoteAddr("192.168.1.42"); return request; })
+                        .header("X-Real-IP", "203.0.113.99")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"admin@test.local","password":"TestPassword123!"}
+                                """))
+                .andExpect(status().isOk());
+        assertThat(userRepository.findByEmailIgnoreCase("admin@test.local").orElseThrow()
+                .getLastLoginIp()).isEqualTo("192.168.1.42");
     }
 
     @Test

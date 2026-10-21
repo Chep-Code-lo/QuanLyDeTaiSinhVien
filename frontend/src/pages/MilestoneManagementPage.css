@@ -1,0 +1,25 @@
+.milestone-assignment-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-bottom: 10px;
+}
+
+.milestone-assignment-card__header .section-title--label {
+  margin: 0;
+}
+
+.milestone-assignment-card__header > .btn {
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .milestone-assignment-card__header {
+    flex-wrap: wrap;
+  }
+
+  .milestone-assignment-card__header > .btn {
+    width: 100%;
+  }
+}

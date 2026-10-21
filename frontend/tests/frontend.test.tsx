@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   showError: vi.fn(), showSuccess: vi.fn(),
   logout: vi.fn(),
   topics: vi.fn(), periods: vi.fn(), faculties: vi.fn(), departments: vi.fn(), createTopic: vi.fn(),
-  assignments: vi.fn(), rubrics: vi.fn(), components: vi.fn(), sheet: vi.fn(), save: vi.fn(),
+  assignments: vi.fn(), rubrics: vi.fn(), components: vi.fn(), createComponent: vi.fn(), sheet: vi.fn(), save: vi.fn(),
   notifications: vi.fn(), unread: vi.fn(), read: vi.fn(), announcements: vi.fn(),
   lecturers: vi.fn(),
 }))
@@ -29,7 +29,7 @@ vi.mock('../src/api/topics', () => ({ topicApi: { list: mocks.topics, createForR
 vi.mock('../src/api/lecturers', () => ({ lecturerApi: { list: mocks.lecturers } }))
 vi.mock('../src/api/academic', () => ({ academicApi: { getRegistrationPeriods: mocks.periods, getFaculties: mocks.faculties, getDepartments: mocks.departments } }))
 vi.mock('../src/api/evaluation', () => ({ evaluationApi: {
-  listAssignments: mocks.assignments, listRubrics: mocks.rubrics, listComponents: mocks.components,
+  listAssignments: mocks.assignments, listRubrics: mocks.rubrics, listComponents: mocks.components, createComponent: mocks.createComponent,
   getScoreSheet: mocks.sheet, saveScoreSheet: mocks.save,
 } }))
 vi.mock('../src/api/notifications', () => ({ notificationApi: { list: mocks.notifications, unreadCount: mocks.unread, markRead: mocks.read } }))
@@ -63,8 +63,10 @@ beforeEach(() => {
   mocks.faculties.mockResolvedValue([])
   mocks.departments.mockResolvedValue([])
   mocks.createTopic.mockResolvedValue({})
+  mocks.createComponent.mockReset()
+  mocks.createComponent.mockResolvedValue({ id: 4, periodId: 1, name: 'Thành phần mới', componentType: 'REVIEW', status: 'DRAFT' })
   mocks.assignments.mockResolvedValue(page([assignment]))
-  mocks.components.mockResolvedValue([{ id: 3, periodId: 1, name: 'Thành phần đã lưu', componentType: 'REVIEW', expectedEvaluators: 1, status: 'DRAFT' }])
+  mocks.components.mockResolvedValue([{ id: 3, periodId: 1, name: 'Thành phần đã lưu', componentType: 'REVIEW', status: 'DRAFT' }])
   mocks.rubrics.mockResolvedValue([rubric])
   mocks.sheet.mockResolvedValue(draft)
   mocks.save.mockResolvedValue({ ...draft, id: 6, version: 1, status: 'SUBMITTED' })
@@ -150,6 +152,21 @@ describe('Hồi quy frontend', () => {
     await userEvent.selectOptions(await screen.findByLabelText('Tiếp tục cấu hình đã lưu'), '3')
     expect(await screen.findByDisplayValue('Chất lượng sản phẩm')).toBeTruthy()
     expect(screen.getByRole('button', { name: /Tiếp tục: Khóa bộ tiêu chí/ })).toBeTruthy()
+  })
+
+  it('không cấu hình số người chấm khi tạo tiêu chuẩn đánh giá', async () => {
+    mocks.components.mockResolvedValue([])
+    mount(<AssessmentSetupWizardPage />)
+
+    expect(await screen.findByLabelText(/Tên thành phần/)).toBeTruthy()
+    expect(screen.queryByLabelText(/Số người chấm/)).toBeNull()
+    fireEvent.change(screen.getByLabelText(/Tên thành phần/), { target: { value: 'Đánh giá mới' } })
+    fireEvent.submit(screen.getByRole('button', { name: 'Tiếp tục: Tạo bộ tiêu chí' }).closest('form')!)
+
+    await waitFor(() => expect(mocks.createComponent).toHaveBeenCalledWith(expect.objectContaining({
+      periodId: 1, name: 'Đánh giá mới', componentType: 'REVIEW',
+    })))
+    expect(mocks.createComponent.mock.calls[0][0]).not.toHaveProperty('expectedEvaluators')
   })
 
   it('kiểm tra giới hạn điểm và nộp phiếu đúng phiên bản sau xác nhận', async () => {

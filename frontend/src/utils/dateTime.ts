@@ -36,8 +36,7 @@ export function formatDateTime(value: Date | string | number): string {
 export function formatDateInput(value: string, withTime = false): string {
   if (!value) return ''
   const [date, time] = value.split('T')
-  const hour = Number(time?.slice(0, 2) || 0)
-  const clock = `${pad(hour % 12 || 12)}:${time?.slice(3, 5) || '00'} ${hour >= 12 ? 'PM' : 'AM'}`
+  const clock = time?.slice(0, 5) || '00:00'
   return `${date.split('-').reverse().join('/')}${withTime ? ` ${clock}` : ''}`
 }
 
@@ -54,6 +53,7 @@ export function parseDateInput(value: string, withTime = false): string | null {
   const [day, month, year, hour, minute] = [dayText, monthText, yearText, hourText, minuteText].map(
     Number,
   )
+  const normalizedPeriod = period?.toUpperCase()
   const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
   const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
   if (
@@ -62,10 +62,10 @@ export function parseDateInput(value: string, withTime = false): string | null {
     month > 12 ||
     day < 1 ||
     day > days[month - 1] ||
-    (period ? hour < 1 || hour > 12 : hour > 23) ||
+    (period ? hour < 0 || hour > 12 || (hour === 0 && normalizedPeriod === 'PM') : hour > 23) ||
     minute > 59
   )
     return null
-  const canonicalHour = period ? (hour % 12) + (period.toUpperCase() === 'PM' ? 12 : 0) : hour
+  const canonicalHour = period ? (hour % 12) + (normalizedPeriod === 'PM' ? 12 : 0) : hour
   return `${yearText}-${pad(month)}-${pad(day)}${withTime ? `T${pad(canonicalHour)}:${pad(minute)}` : ''}`
 }

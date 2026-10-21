@@ -6,6 +6,9 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_as_cs
       - --default-time-zone=+00:00
+      # The idempotent schema migrations create triggers. MySQL requires this
+      # when binary logging is enabled, including for users with TRIGGER privilege.
+      - --log-bin-trust-function-creators=1
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root-password-local}
       MYSQL_DATABASE: ql_de_tai_sinh_vien

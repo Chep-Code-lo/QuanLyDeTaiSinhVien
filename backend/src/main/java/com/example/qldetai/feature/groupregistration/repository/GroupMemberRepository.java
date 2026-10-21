@@ -36,7 +36,7 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
     @Query(value = """
             select m.* from group_members m join student_groups g on g.id = m.group_id
             where m.student_id = :studentId and m.left_at is null
-              and (m.period_id = :periodId or g.status <> 'CLOSED')
+              and m.period_id = :periodId
             for update
             """, nativeQuery = true)
     List<GroupMember> findConflictingMemberships(Long periodId, Long studentId);

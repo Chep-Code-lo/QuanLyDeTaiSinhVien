@@ -1,4 +1,4 @@
-import { apiClient } from './client'
+import { apiClient, fetchCsrfToken } from './client'
 import type { ApiResponse, PageResponse } from '../types/api'
 import type {
   CreateRegistrationPeriodRequest,
@@ -47,9 +47,14 @@ export const academicApi = {
     return response.data.data
   },
   createRegistrationPeriod: async (payload: CreateRegistrationPeriodRequest) => {
+    // A dean can keep a session open for a long time. Refresh the CSRF token at
+    // the point of submission so a stale browser token is not reported as a
+    // misleading 403 permission error.
+    const csrf = await fetchCsrfToken(true)
     const response = await apiClient.post<ApiResponse<RegistrationPeriodResponse>>(
       '/registration-periods',
       payload,
+      { headers: { [csrf.headerName]: csrf.token } },
     )
     return response.data.data
   },
