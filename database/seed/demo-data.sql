@@ -312,9 +312,9 @@ INSERT INTO notifications (user_id, title, content, target_path, created_at, rea
 ((SELECT user_id FROM students WHERE id = @student_08_id), 'Kết quả khóa luận đã công bố', 'Kết quả Khóa luận tốt nghiệp của nhóm đã được công bố trên hệ thống.', '/results', DATE_SUB(@seed_now, INTERVAL 195 DAY), DATE_SUB(@seed_now, INTERVAL 194 DAY), 'demo-graduation-result'),
 (@head_user_id, 'Có đề tài sinh viên chờ duyệt', 'Đề tài DAMH-04 cần được xem xét trước khi công bố.', '/topics', DATE_SUB(@seed_now, INTERVAL 2 DAY), NULL, 'demo-pending-topic');
 
-INSERT INTO assessment_components (period_id, code, name, component_type, expected_evaluators, status) VALUES
-(@graduation_period_id, 'REVIEW', 'Phản biện độc lập', 'REVIEW', 1, 'DRAFT'),
-(@graduation_period_id, 'DEFENSE', 'Hội đồng bảo vệ', 'COMMITTEE', 3, 'DRAFT');
+INSERT INTO assessment_components (period_id, code, name, component_type, status) VALUES
+(@graduation_period_id, 'REVIEW', 'Phản biện độc lập', 'REVIEW', 'DRAFT'),
+(@graduation_period_id, 'DEFENSE', 'Hội đồng bảo vệ', 'COMMITTEE', 'DRAFT');
 SELECT id INTO @review_component_id FROM assessment_components WHERE period_id = @graduation_period_id AND code = 'REVIEW';
 SELECT id INTO @defense_component_id FROM assessment_components WHERE period_id = @graduation_period_id AND code = 'DEFENSE';
 

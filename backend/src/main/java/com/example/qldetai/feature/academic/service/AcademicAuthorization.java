@@ -35,19 +35,28 @@ public class AcademicAuthorization {
 
     public boolean canManageFaculty(Long facultyId, Authentication authentication) {
         UserPrincipal principal = principal(authentication);
-        return principal != null
+        return principal != null && canManageFaculty(facultyId, principal.id());
+    }
+
+    public boolean canManageFaculty(Long facultyId, Long userId) {
+        return facultyId != null
+                && userId != null
                 && academicAppointmentRepository.hasActiveFacultyAppointment(
-                        principal.id(), PositionCode.DEAN, facultyId, LocalDateTime.now(clock));
+                        userId, PositionCode.DEAN, facultyId, LocalDateTime.now(clock));
     }
 
     public boolean canManageDepartment(Long departmentId, Authentication authentication) {
         UserPrincipal principal = principal(authentication);
-        if (principal == null) {
+        return principal != null && canManageDepartment(departmentId, principal.id());
+    }
+
+    public boolean canManageDepartment(Long departmentId, Long userId) {
+        if (departmentId == null || userId == null) {
             return false;
         }
         LocalDateTime now = LocalDateTime.now(clock);
         if (academicAppointmentRepository.hasActiveDepartmentAppointment(
-                principal.id(), PositionCode.DEPARTMENT_HEAD, departmentId, now)) {
+                userId, PositionCode.DEPARTMENT_HEAD, departmentId, now)) {
             return true;
         }
         return departmentRepository
@@ -55,7 +64,7 @@ public class AcademicAuthorization {
                 .map(
                         department ->
                                 academicAppointmentRepository.hasActiveFacultyAppointment(
-                                        principal.id(),
+                                        userId,
                                         PositionCode.DEAN,
                                         department.getFaculty().getId(),
                                         now))

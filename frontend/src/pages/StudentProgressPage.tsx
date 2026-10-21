@@ -106,7 +106,6 @@ export function StudentProgressPage() {
     <>
       <PageHeader
         title="Tiến độ & báo cáo"
-        description="Chỉ trưởng nhóm được nộp báo cáo. Thành viên được xem bài nộp và phản hồi của nhóm."
       />
       <RemoteState loading={loading} error={error} retry={load} />
 

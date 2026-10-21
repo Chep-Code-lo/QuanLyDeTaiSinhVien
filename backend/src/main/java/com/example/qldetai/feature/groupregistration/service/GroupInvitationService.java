@@ -205,12 +205,6 @@ public class GroupInvitationService {
         requirePending(invitation);
         invitation.setStatus(GroupInvitationStatus.CANCELLED);
         invitation.setRespondedAt(LocalDateTime.now(clock));
-        notificationService.publish(
-                invitation.getInvitedStudent().getUser().getId(),
-                "group-invitation-cancelled-" + invitation.getId(),
-                "Lời mời vào nhóm đã bị hủy",
-                "Trưởng nhóm đã hủy lời mời tham gia nhóm " + group.getName() + ".",
-                "/groups");
         return toResponse(invitation);
     }
 

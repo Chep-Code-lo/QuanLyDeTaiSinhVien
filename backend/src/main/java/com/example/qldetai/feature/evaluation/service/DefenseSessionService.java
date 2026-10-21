@@ -170,7 +170,7 @@ public class DefenseSessionService {
             List<EvaluationAssignment> reviewerAssignments =
                     evaluations.findByAssignmentIdAndComponentIdAndStatus(
                             assignment.getId(), reviewComponent.getId(), EvaluationStatus.ACTIVE);
-            if (reviewerAssignments.size() != reviewComponent.getExpectedEvaluators()
+            if (reviewerAssignments.isEmpty()
                     || reviewerAssignments.stream()
                             .anyMatch(evaluation -> !hasCompletedReviewSheet(evaluation))) {
                 throw new BusinessRuleException(

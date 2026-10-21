@@ -138,7 +138,7 @@ public class EvaluationCommitteeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Committee was not found."));
     }
 
-    private EvaluationCommitteeResponse committee(EvaluationCommittee committee, List<CommitteeMember> currentMembers) {
+    EvaluationCommitteeResponse committee(EvaluationCommittee committee, List<CommitteeMember> currentMembers) {
         List<CommitteeMemberResponse> members =
                 currentMembers.stream()
                         .sorted(Comparator.comparingInt(CommitteeMember::getSlotNo))
@@ -150,7 +150,8 @@ public class EvaluationCommitteeService {
                                                 member.getLecturer().getLecturerCode(),
                                                 member.getLecturer().getUser().getFullName(),
                                                 member.getSlotNo(),
-                                                member.getCommitteeRole()))
+                                                member.getCommitteeRole(),
+                                                roleName(member)))
                         .toList();
         return new EvaluationCommitteeResponse(
                 committee.getId(),
@@ -164,6 +165,22 @@ public class EvaluationCommitteeService {
                 committee.getCreatedBy().getFullName(),
                 committee.getCreatedAt(),
                 committee.getVersion(),
-                members);
+                members,
+                committee.getRubric() == null ? null : committee.getRubric().getId());
+    }
+
+    EvaluationCommitteeResponse committee(EvaluationCommittee committee) {
+        return committee(committee, committeeMembers.findByCommitteeId(committee.getId()));
+    }
+
+    private static String roleName(CommitteeMember member) {
+        if (member.getRoleLabel() != null && !member.getRoleLabel().isBlank()) {
+            return member.getRoleLabel();
+        }
+        return switch (member.getCommitteeRole()) {
+            case CHAIR -> "Chủ tịch";
+            case SECRETARY -> "Thư ký";
+            case MEMBER -> "Ủy viên";
+        };
     }
 }

@@ -3,6 +3,7 @@ import type { ApiResponse, PageResponse } from '../types/api'
 import type {
   AssessmentComponentResponse,
   CreateAssessmentComponentRequest,
+  CreateDefenseRequest,
   CreateEvaluationRequest,
   CreateRubricRequest,
   DefenseSessionResponse,
@@ -111,6 +112,10 @@ export const evaluationApi = {
         params,
       },
     )
+    return response.data.data
+  },
+  scheduleDefense: async (payload: CreateDefenseRequest) => {
+    const response = await apiClient.post<ApiResponse<number>>('/defense-sessions', payload)
     return response.data.data
   },
 

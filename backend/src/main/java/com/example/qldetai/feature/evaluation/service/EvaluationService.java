@@ -108,19 +108,11 @@ public class EvaluationService {
         if (components.existsByPeriodIdAndCodeIgnoreCase(period.getId(), code)) {
             throw new ConflictException("This registration period already has an assessment component with that code.");
         }
-        if (request.componentType() == AssessmentComponentType.COMMITTEE
-                && (request.expectedEvaluators() < 3 || request.expectedEvaluators() > 5
-                        || request.expectedEvaluators() < period.getMinCommitteeMembers()
-                        || request.expectedEvaluators() > period.getMaxCommitteeMembers())) {
-            throw new BusinessRuleException("A committee component must use the evaluator range configured for its registration period.");
-        }
-
         AssessmentComponent component = new AssessmentComponent();
         component.setPeriod(period);
         component.setCode(code);
         component.setName(request.name().trim());
         component.setComponentType(request.componentType());
-        component.setExpectedEvaluators(request.expectedEvaluators());
         component.setStatus(STATUS_DRAFT);
         return component(components.save(component));
     }
@@ -270,9 +262,6 @@ public class EvaluationService {
             throw new BusinessRuleException("A supervisor cannot evaluate their own topic.");
         }
         List<EvaluationAssignment> activeEvaluations = evaluations.findActiveForUpdate(assignment.getId(), component.getId());
-        if (activeEvaluations.size() >= component.getExpectedEvaluators()) {
-            throw new ConflictException("This component already has enough evaluators.");
-        }
         if (activeEvaluations.stream().anyMatch(existing -> existing.getLecturer().getId().equals(lecturer.getId()))) {
             throw new ConflictException("This lecturer already evaluates this assessment component for the project.");
         }
@@ -450,7 +439,7 @@ public class EvaluationService {
             }
             List<EvaluationAssignment> reviewerAssignments = evaluations.findByAssignmentIdAndComponentIdAndStatus(
                     assignment.getId(), reviewComponent.getId(), EvaluationStatus.ACTIVE);
-            if (reviewerAssignments.size() != reviewComponent.getExpectedEvaluators()
+            if (reviewerAssignments.isEmpty()
                     || reviewerAssignments.stream().anyMatch(evaluation -> !hasCompletedScoreSheet(evaluation))) {
                 throw new BusinessRuleException(
                         "Complete every reviewer assignment and submitted review score before committee evaluation.");
@@ -523,7 +512,6 @@ public class EvaluationService {
                 component.getCode(),
                 component.getName(),
                 component.getComponentType(),
-                component.getExpectedEvaluators(),
                 component.getStatus());
     }
 

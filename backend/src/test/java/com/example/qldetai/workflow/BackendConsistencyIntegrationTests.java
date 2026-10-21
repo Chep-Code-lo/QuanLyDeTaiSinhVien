@@ -164,7 +164,7 @@ class BackendConsistencyIntegrationTests {
     }
 
     @Test
-    void simultaneousGroupCreationAcrossPeriodsCannotBypassOpenGroupRule() throws Exception {
+    void simultaneousGroupCreationAcrossPeriodsAllowsOneGroupPerPeriod() throws Exception {
         Long otherPeriod = tx.execute(status -> {
             RegistrationPeriod other = new RegistrationPeriod(); other.setFaculty(period.getFaculty());
             other.setSemester(period.getSemester()); other.setName("Other period"); other.setCreatedBy(admin);
@@ -173,9 +173,10 @@ class BackendConsistencyIntegrationTests {
             other.setRegistrationStartAt(period.getRegistrationStartAt()); other.setRegistrationEndAt(period.getRegistrationEndAt());
             return periods.save(other).getId();
         });
-        assertOneSuccess(race(() -> createGroup(leaderA), () -> groups.create(
-                new CreateGroupRequest(otherPeriod, "Other group"), leaderA.getUser().getId())));
-        assertThat(members.findByStudentIdAndLeftAtIsNullOrderByJoinedAtDesc(leaderA.getId())).hasSize(1);
+        List<Object> outcomes = race(() -> createGroup(leaderA), () -> groups.create(
+                new CreateGroupRequest(otherPeriod, "Other group"), leaderA.getUser().getId()));
+        assertThat(outcomes).allMatch(StudentGroupResponse.class::isInstance);
+        assertThat(members.findByStudentIdAndLeftAtIsNullOrderByJoinedAtDesc(leaderA.getId())).hasSize(2);
     }
 
     @Test
@@ -299,7 +300,7 @@ class BackendConsistencyIntegrationTests {
 
     @Test
     void simultaneousRubricsReceiveDistinctVersions() throws Exception {
-        Long component = component(1);
+        Long component = component();
         List<Object> outcomes = race(() -> rubric(component), () -> rubric(component));
         assertThat(outcomes).allMatch(RubricResponse.class::isInstance);
         assertThat(evaluation.listRubrics(component)).extracting(RubricResponse::versionNo).containsExactly(2, 1);
@@ -307,14 +308,14 @@ class BackendConsistencyIntegrationTests {
 
     @Test
     void rubricVersionUsesMaximumRatherThanRowCount() {
-        Long component = component(1); var first = rubric(component);
+        Long component = component(); var first = rubric(component);
         tx.executeWithoutResult(status -> rubrics.findById(first.id()).orElseThrow().setVersionNo(7));
         assertThat(rubric(component).versionNo()).isEqualTo(8);
     }
 
     @Test
     void invalidNestedCriteriaAreRejectedWithoutPartialRubric() {
-        Long component = component(1);
+        Long component = component();
         assertThatThrownBy(() -> evaluation.createRubric(new CreateRubricRequest(component, "Invalid",
                 List.of(new CriterionRequest("Content", "Description", BigDecimal.valueOf(-1), 1))), admin.getId()))
                 .isInstanceOf(BusinessRuleException.class);
@@ -324,21 +325,26 @@ class BackendConsistencyIntegrationTests {
     }
 
     @Test
-    void parallelEvaluatorAssignmentsRespectCapacity() throws Exception {
-        Long assignment = assignedProject(); var rubric = lockedRubric(1);
-        assertOneSuccess(race(() -> assign(assignment, rubric.id(), lecturerA), () -> assign(assignment, rubric.id(), lecturerB)));
-        assertThat(evaluations.countByAssignmentIdAndComponentIdAndStatus(assignment, rubric.componentId(), EvaluationStatus.ACTIVE)).isEqualTo(1);
+    void parallelDistinctEvaluatorAssignmentsAreBothKept() throws Exception {
+        Long assignment = assignedProject(); var rubric = lockedRubric();
+        List<Object> outcomes = race(
+                () -> assign(assignment, rubric.id(), lecturerA),
+                () -> assign(assignment, rubric.id(), lecturerB));
+        assertThat(outcomes).allMatch(Long.class::isInstance);
+        assertThat(evaluations.countByAssignmentIdAndComponentIdAndStatus(
+                        assignment, rubric.componentId(), EvaluationStatus.ACTIVE))
+                .isEqualTo(2);
     }
 
     @Test
     void parallelDuplicateEvaluatorIsRejectedEvenWithSpareCapacity() throws Exception {
-        Long assignment = assignedProject(); var rubric = lockedRubric(2);
+        Long assignment = assignedProject(); var rubric = lockedRubric();
         assertOneSuccess(race(() -> assign(assignment, rubric.id(), lecturerA), () -> assign(assignment, rubric.id(), lecturerA)));
     }
 
     @Test
     void draftDetailChangesAdvanceVersionAndRejectStaleSave() {
-        Long assignment = assignedProject(); var rubric = lockedRubric(1);
+        Long assignment = assignedProject(); var rubric = lockedRubric();
         Long evaluationId = assign(assignment, rubric.id(), lecturerA);
         var first = evaluation.saveSheet(evaluationId, score(rubric, 0, 5, false), lecturerA.getUser().getId());
         var second = evaluation.saveSheet(evaluationId, score(rubric, first.version(), 6, false), lecturerA.getUser().getId());
@@ -350,7 +356,7 @@ class BackendConsistencyIntegrationTests {
 
     @Test
     void simultaneousFirstScoreSavesCannotMixDetails() throws Exception {
-        Long assignment = assignedProject(); var rubric = lockedRubric(1);
+        Long assignment = assignedProject(); var rubric = lockedRubric();
         Long evaluationId = assign(assignment, rubric.id(), lecturerA);
         assertOneSuccess(race(() -> evaluation.saveSheet(evaluationId, score(rubric, 0, 5, false), lecturerA.getUser().getId()),
                 () -> evaluation.saveSheet(evaluationId, score(rubric, 0, 8, false), lecturerA.getUser().getId())));
@@ -362,7 +368,7 @@ class BackendConsistencyIntegrationTests {
 
     @Test
     void invalidScoresDoNotErasePreviouslySavedDetails() {
-        Long assignment = assignedProject(); var rubric = lockedRubric(1);
+        Long assignment = assignedProject(); var rubric = lockedRubric();
         Long evaluationId = assign(assignment, rubric.id(), lecturerA);
         var first = evaluation.saveSheet(evaluationId, score(rubric, 0, 5, false), lecturerA.getUser().getId());
         assertThatThrownBy(() -> evaluation.saveSheet(evaluationId, score(rubric, first.version(), -1, false), lecturerA.getUser().getId()))
@@ -372,7 +378,7 @@ class BackendConsistencyIntegrationTests {
 
     @Test
     void simultaneousFinalizationCreatesOnlyOneVersion() throws Exception {
-        Long assignment = assignedProject(); var rubric = lockedRubric(1);
+        Long assignment = assignedProject(); var rubric = lockedRubric();
         Long evaluationId = assign(assignment, rubric.id(), lecturerA);
         evaluation.saveSheet(evaluationId, score(rubric, 0, 8, true), lecturerA.getUser().getId());
         assertOneSuccess(race(() -> results.finalizeResult(assignment, admin.getId()), () -> results.finalizeResult(assignment, admin.getId())));
@@ -403,7 +409,7 @@ class BackendConsistencyIntegrationTests {
 
     @Test
     void concurrentGradeChangeReviewsCannotOverwriteDecision() throws Exception {
-        Long assignment = assignedProject(); var rubric = lockedRubric(1);
+        Long assignment = assignedProject(); var rubric = lockedRubric();
         Long evaluationId = assign(assignment, rubric.id(), lecturerA);
         var sheet = evaluation.saveSheet(evaluationId, score(rubric, 0, 8, true), lecturerA.getUser().getId());
         Long change = gradeChanges.requestChange(sheet.id(), new CreateGradeChangeRequest("Correction"), lecturerA.getUser().getId());
@@ -449,7 +455,7 @@ class BackendConsistencyIntegrationTests {
 
     @Test
     void evaluationListBatchesSheetsAndRetainsPagination() {
-        Long assignment = assignedProject(); var rubric = lockedRubric(2);
+        Long assignment = assignedProject(); var rubric = lockedRubric();
         assign(assignment, rubric.id(), lecturerA); assign(assignment, rubric.id(), lecturerB);
         var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
         tx.executeWithoutResult(status -> {
@@ -462,7 +468,7 @@ class BackendConsistencyIntegrationTests {
 
     @Test
     void rubricAndGroupListsUseBoundedQueryCounts() {
-        Long component = component(1); rubric(component); rubric(component); rubric(component);
+        Long component = component(); rubric(component); rubric(component); rubric(component);
         activeGroup(leaderA, member); activeGroup(leaderB, extra);
         var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
         tx.executeWithoutResult(status -> {
@@ -505,8 +511,9 @@ class BackendConsistencyIntegrationTests {
         return projectRepository.findByRegistrationId(registration.id()).orElseThrow().getId();
     }
 
-    private Long component(int evaluators) {
-        return evaluation.createComponent(new CreateAssessmentComponentRequest(period.getId(), unique(), "Audit component", AssessmentComponentType.OTHER, evaluators), admin.getId()).id();
+    private Long component() {
+        return evaluation.createComponent(new CreateAssessmentComponentRequest(
+                period.getId(), unique(), "Audit component", AssessmentComponentType.OTHER), admin.getId()).id();
     }
 
     private CriterionRequest criterion(int order) { return new CriterionRequest("Content", "Description", BigDecimal.TEN, order); }
@@ -514,8 +521,8 @@ class BackendConsistencyIntegrationTests {
         return evaluation.createRubric(new CreateRubricRequest(component, "Audit rubric", List.of(criterion(1))), admin.getId());
     }
 
-    private RubricResponse lockedRubric(int evaluators) {
-        Long component = component(evaluators); var rubric = rubric(component);
+    private RubricResponse lockedRubric() {
+        Long component = component(); var rubric = rubric(component);
         rubric = evaluation.lockRubric(rubric.id(), admin.getId()); evaluation.lockComponent(component, admin.getId());
         return rubric;
     }

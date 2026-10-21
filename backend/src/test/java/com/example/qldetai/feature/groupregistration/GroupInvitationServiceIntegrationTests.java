@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.qldetai.exception.BusinessRuleException;
+import com.example.qldetai.feature.communication.repository.NotificationRepository;
 import com.example.qldetai.feature.academic.domain.Department;
 import com.example.qldetai.feature.academic.domain.Faculty;
 import com.example.qldetai.feature.academic.domain.ProjectType;
@@ -76,6 +77,7 @@ class GroupInvitationServiceIntegrationTests {
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
+    private final NotificationRepository notificationRepository;
     private final TestClock clock;
 
     private Faculty faculty;
@@ -97,6 +99,7 @@ class GroupInvitationServiceIntegrationTests {
             RoleRepository roleRepository,
             UserRepository userRepository,
             StudentRepository studentRepository,
+            NotificationRepository notificationRepository,
             TestClock clock) {
         this.invitationService = invitationService;
         this.groupService = groupService;
@@ -110,6 +113,7 @@ class GroupInvitationServiceIntegrationTests {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.studentRepository = studentRepository;
+        this.notificationRepository = notificationRepository;
         this.clock = clock;
     }
 
@@ -181,6 +185,24 @@ class GroupInvitationServiceIntegrationTests {
     }
 
     @Test
+    void cancellingInvitationDoesNotNotifyTheInvitedStudent() {
+        StudentGroupResponse group = createGroup();
+        GroupInvitationResponse invitation = createInvitation(group, now().plusMinutes(30));
+        Long recipientId = invitee.getUser().getId();
+        long unreadBefore = notificationRepository.countByUserIdAndReadAtIsNull(recipientId);
+
+        GroupInvitationResponse cancelled = invitationService.cancel(invitation.id(), leader.getUser().getId());
+
+        assertThat(cancelled.status()).isEqualTo(GroupInvitationStatus.CANCELLED);
+        assertThat(cancelled.respondedAt()).isNotNull();
+        assertThat(notificationRepository.countByUserIdAndReadAtIsNull(recipientId)).isEqualTo(unreadBefore);
+        assertThat(notificationRepository.existsByUserIdAndEventKey(recipientId,
+                "group-invitation-cancelled-" + invitation.id())).isFalse();
+        assertThat(notificationRepository.existsByUserIdAndEventKey(recipientId,
+                "group-invitation-" + invitation.id())).isTrue();
+    }
+
+    @Test
     void rejectingInvitationLeavesTheInviteeOutsideTheGroup() {
         StudentGroupResponse group = createGroup();
         GroupInvitationResponse invitation = createInvitation(group, now().plusMinutes(30));
@@ -236,7 +258,7 @@ class GroupInvitationServiceIntegrationTests {
     }
 
     @Test
-    void acceptingInvitationRechecksMembershipAcrossPeriods() {
+    void acceptingInvitationAllowsMembershipInAnotherRegistrationPeriod() {
         StudentGroupResponse group = createGroup();
         GroupInvitationResponse invitation = createInvitation(group, now().plusMinutes(30));
         RegistrationPeriod other = new RegistrationPeriod();
@@ -254,13 +276,12 @@ class GroupInvitationServiceIntegrationTests {
         other = periodRepository.saveAndFlush(other);
         StudentGroupResponse concurrent = groupService.create(
                 new CreateGroupRequest(other.getId(), "Concurrent group"), invitee.getUser().getId());
-        assertThatThrownBy(() -> invitationService.accept(invitation.id(), invitee.getUser().getId()))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("active group");
-        assertThat(groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(group.id(), invitee.getId()))
-                .isEmpty();
-        studentGroupRepository.findById(concurrent.id()).orElseThrow().setStatus(GroupStatus.CLOSED);
         assertThat(invitationService.accept(invitation.id(), invitee.getUser().getId()).status())
                 .isEqualTo(GroupInvitationStatus.ACCEPTED);
+        assertThat(groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(group.id(), invitee.getId()))
+                .isPresent();
+        assertThat(groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(concurrent.id(), invitee.getId()))
+                .isPresent();
     }
 
     private StudentGroupResponse createGroup() {

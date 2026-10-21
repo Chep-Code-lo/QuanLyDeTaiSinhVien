@@ -1,6 +1,8 @@
 .portal-shell .announcement-tabs { display: flex; align-items: stretch; margin-bottom: 0; }
 .portal-shell .announcement-panel { gap: 10px; }
 .portal-shell .announcement-panel > .page-card { margin-bottom: 0; }
+.portal-shell .announcement-management-card,
+.portal-shell .announcement-inbox-card { border-radius: 0; }
 .portal-shell .announcement-management-card { padding-block: 18px; }
 .announcement-tabs__tab { min-width: 205px; min-height: 44px; padding: 11px 25px; border: 1px solid #cfdaed; border-bottom: 0; border-radius: 10px 10px 0 0; background: #eaf0f7; color: #4c6087; font-size: 14px; font-weight: 700; transition: background 150ms, color 150ms, border-color 150ms; }
 .announcement-tabs__tab[aria-selected=true] { border-color: #1b4c8d; background: linear-gradient(110deg, #205ba1, #173f79); color: #fff; }

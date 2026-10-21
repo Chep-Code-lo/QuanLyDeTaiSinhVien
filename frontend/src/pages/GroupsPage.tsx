@@ -1,6 +1,7 @@
 import { DateTimeInput } from '../components/DateTimeInput'
 import { AnimatedSelect } from '../components/AnimatedSelect'
 import { useEffect, useState } from 'react'
+import { isAxiosError } from 'axios'
 import { academicApi } from '../api/academic'
 import { allPages } from '../api/student'
 import { groupApi } from '../api/groups'
@@ -34,12 +35,27 @@ const invitationMessages: Record<string, string> = {
     'Chỉ có thể mời sinh viên khi đợt đăng ký đang hoạt động.',
   'Group invitations are only available during the registration window.':
     'Chỉ có thể mời sinh viên trong thời gian mở đăng ký.',
+  'Student already belongs to an active group.':
+    'Bạn đã thuộc một nhóm đang hoạt động trong đợt đăng ký này.',
+  'Student groups can only be created in an active registration period.':
+    'Chỉ có thể tạo nhóm trong đợt đăng ký đang hoạt động.',
+  'Student groups can only be managed during the registration window.':
+    'Chỉ có thể tạo nhóm trong thời gian mở đăng ký.',
+  'Student must belong to the same faculty as the registration period.':
+    'Bạn cần thuộc cùng khoa với đợt đăng ký để tạo nhóm.',
 }
 
-const messageOf = (error: any) => {
+const messageOf = (error: unknown) => {
+  if (!isAxiosError(error)) return 'Không thể thực hiện thao tác. Vui lòng thử lại.'
   if (error.response?.status === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
   if (error.response?.status === 403) return 'Tài khoản không có quyền thực hiện thao tác này.'
-  const message = error.response?.data?.message
+  if (!error.response) {
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      return 'Máy chủ phản hồi quá lâu. Vui lòng thử lại.'
+    }
+    return 'Không kết nối được máy chủ. Hãy kiểm tra mạng rồi thử lại.'
+  }
+  const message = error.response.data?.message
   return invitationMessages[message] || message || 'Không thể thực hiện thao tác. Vui lòng thử lại.'
 }
 
@@ -64,6 +80,7 @@ export function GroupsPage() {
   const [codes, setCodes] = useState<Record<number, string>>({})
   const [expiresAt, setExpiresAt] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
   const student = hasRole('STUDENT')
 
@@ -123,7 +140,9 @@ export function GroupsPage() {
 
   const create = async (event: React.FormEvent) => {
     event.preventDefault()
+    if (creating) return
     if (!periodId || !name.trim()) return showError('Hãy chọn đợt đăng ký và nhập tên nhóm.')
+    setCreating(true)
     try {
       await groupApi.create({ periodId, name: name.trim() })
       setName('')
@@ -131,6 +150,8 @@ export function GroupsPage() {
       await load()
     } catch (error) {
       showError(messageOf(error))
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -274,7 +295,9 @@ export function GroupsPage() {
               placeholder="Tên nhóm"
               required
             />
-            <button className="btn btn-primary">Tạo nhóm</button>
+            <button className="btn btn-primary" type="submit" disabled={creating}>
+              {creating ? 'Đang tạo...' : 'Tạo nhóm'}
+            </button>
           </form>
         </section>
       ) : (
@@ -402,19 +425,21 @@ export function GroupsPage() {
                       {invitations.length > 0 && (
                         <div className="stack-list">
                           {invitations.map((invitation) => (
-                            <div key={invitation.id} className="member-list">
-                              <span>
-                                {invitation.invitedStudentName} · {invitation.invitedStudentCode} ·{' '}
-                                <StatusBadge status={invitation.status} />
+                            <div key={invitation.id} className="member-list group-invitation-row">
+                              <span className="group-invitation-row__student">
+                                {invitation.invitedStudentName} · {invitation.invitedStudentCode}
                               </span>
-                              {invitation.status === 'PENDING' && (
-                                <button
-                                  className="text-button"
-                                  onClick={() => cancelInvitation(invitation)}
-                                >
-                                  Hủy lời mời
-                                </button>
-                              )}
+                              <span className="group-invitation-row__actions">
+                                <StatusBadge status={invitation.status} />
+                                {invitation.status === 'PENDING' && (
+                                  <button
+                                    className="text-button"
+                                    onClick={() => cancelInvitation(invitation)}
+                                  >
+                                    Hủy lời mời
+                                  </button>
+                                )}
+                              </span>
                             </div>
                           ))}
                         </div>

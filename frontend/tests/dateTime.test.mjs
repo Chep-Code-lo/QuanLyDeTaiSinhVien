@@ -8,22 +8,24 @@ import {
   parseUtcDateTime,
 } from '../src/utils/dateTime.ts'
 
-test('input dates always use day/month/year without changing their local hour', () => {
-  assert.equal(formatDateInput('2026-10-22T17:21', true), '22/10/2026 05:21 PM')
+test('input dates always use day/month/year and a 24-hour clock without changing their local hour', () => {
+  assert.equal(formatDateInput('2026-10-22T17:21', true), '22/10/2026 17:21')
   assert.equal(parseDateInput('22/10/2026 17:21', true), '2026-10-22T17:21')
   assert.equal(parseDateInput('02/03/2026 07:05', true), '2026-03-02T07:05')
-  assert.equal(formatDateInput(parseDateInput('2/3/2026 7:05', true), true), '02/03/2026 07:05 AM')
+  assert.equal(formatDateInput(parseDateInput('2/3/2026 7:05', true), true), '02/03/2026 07:05')
   assert.equal(formatDateInput('2026-11-15'), '15/11/2026')
   assert.equal(parseDateInput('15/11/2026'), '2026-11-15')
 })
 
-test('AM/PM inputs preserve noon, midnight and afternoon API hours', () => {
-  assert.equal(formatDateInput('2026-10-22T00:00', true), '22/10/2026 12:00 AM')
-  assert.equal(formatDateInput('2026-10-22T12:00', true), '22/10/2026 12:00 PM')
+test('the 24-hour input accepts midnight while retaining pasted AM/PM compatibility', () => {
+  assert.equal(formatDateInput('2026-10-22T00:00', true), '22/10/2026 00:00')
+  assert.equal(formatDateInput('2026-10-22T12:00', true), '22/10/2026 12:00')
+  assert.equal(parseDateInput('22/10/2026 00:00', true), '2026-10-22T00:00')
   assert.equal(parseDateInput('22/10/2026 12:00 AM', true), '2026-10-22T00:00')
   assert.equal(parseDateInput('22/10/2026 12:00 PM', true), '2026-10-22T12:00')
   assert.equal(parseDateInput('22/10/2026 05:21 pm', true), '2026-10-22T17:21')
-  assert.equal(parseDateInput('22/10/2026 00:00 AM', true), null)
+  assert.equal(parseDateInput('22/10/2026 00:00 AM', true), '2026-10-22T00:00')
+  assert.equal(parseDateInput('22/10/2026 00:00 PM', true), null)
   assert.equal(parseDateInput('22/10/2026 13:00 PM', true), null)
 })
 

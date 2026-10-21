@@ -124,7 +124,7 @@ export function UserManagementPage() {
 
   return (
     <div className="user-management-page">
-      <PageHeader title="Quản lý tài khoản" description="Theo dõi và quản lý các tài khoản đang hoạt động trên hệ thống." />
+      <PageHeader title="Quản lý tài khoản" />
 
       <section className="page-card">
         <div className="user-management__heading">

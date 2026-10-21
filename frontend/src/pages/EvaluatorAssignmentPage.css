@@ -18,6 +18,19 @@
 .ea-field small { color: #000; font-size: 14px; line-height: 1.4; }
 .ea-members { margin-top: 22px; padding-top: 15px; border-top: 1px solid #e0e7f1; }
 .ea-members h2 { margin-bottom: 9px; }
+.ea-defense-schedule { margin-top: 22px; padding: 17px; border: 1px solid #cdddf2; border-radius: 8px; background: #f7fbff; }
+.ea-defense-schedule__heading { margin-bottom: 14px; }
+.ea-defense-schedule__heading h2 { margin-bottom: 4px; }
+.ea-defense-schedule__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px 20px; }
+.ea-defense-schedule__project { grid-column: 1 / -1; }
+.ea-defense-schedule__actions { display: flex; justify-content: flex-end; margin-top: 15px; }
+.ea-defense-schedule__actions .btn { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; }
+.ea-defense-schedule__sessions { margin-top: 16px; padding-top: 13px; border-top: 1px solid #d6e2f0; color: #000; }
+.ea-defense-schedule__sessions > strong { display: block; margin-bottom: 7px; font-size: 13px; }
+.ea-defense-schedule__sessions ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ea-defense-schedule__sessions li { display: flex; flex-direction: column; gap: 3px; padding: 9px 11px; border: 1px solid #dbe6f2; border-radius: 5px; background: #fff; }
+.ea-defense-schedule__sessions span { font-weight: 600; }
+.ea-defense-schedule__sessions small { color: #000; }
 .ea-members-table { border: 1px solid #dce2ec; border-radius: 7px; }
 .ea-member-head, .ea-member-row { display: grid; grid-template-columns: minmax(125px, 22%) minmax(0, 1fr); }
 .ea-member-head { background: #eaf0f6; border-radius: 7px 7px 0 0; font-size: 13px; font-weight: 700; color: #000; }
@@ -103,6 +116,11 @@
   .ea-card { padding: 18px 14px 0; }
   .ea-grid { grid-template-columns: 1fr; }
   .ea-card h2 { font-size: 18px; }
+  .ea-defense-schedule { padding: 14px; }
+  .ea-defense-schedule__grid { grid-template-columns: 1fr; }
+  .ea-defense-schedule__project { grid-column: auto; }
+  .ea-defense-schedule__actions { justify-content: stretch; }
+  .ea-defense-schedule__actions .btn { width: 100%; justify-content: center; }
   .ea-member-head, .ea-member-row { grid-template-columns: 90px minmax(0, 1fr); }
   .ea-member-head > span { padding: 10px; font-size: 13px; }
   .ea-member-row > span { padding: 10px; font-size: 14px; }

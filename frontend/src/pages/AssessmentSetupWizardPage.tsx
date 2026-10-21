@@ -30,7 +30,6 @@ export function AssessmentSetupWizardPage() {
   const [rubric, setRubric] = useState<RubricResponse | null>(null)
   const [name, setName] = useState('')
   const [componentType, setComponentType] = useState<AssessmentComponentType>('REVIEW')
-  const [evaluators, setEvaluators] = useState(1)
   const [criteria, setCriteria] = useState<AssessmentCriterion[]>(defaultAssessmentCriteria)
   const [rubricName, setRubricName] = useState('')
   const [loadingPeriods, setLoadingPeriods] = useState(true)
@@ -92,7 +91,7 @@ export function AssessmentSetupWizardPage() {
   const resetSelection = () => {
     setLoadingRubric(false); setLoadError('')
     setComponent(null); setRubric(null); setName('')
-    setComponentType('REVIEW'); setEvaluators(1); setCriteria(defaultAssessmentCriteria())
+    setComponentType('REVIEW'); setCriteria(defaultAssessmentCriteria())
     setRubricName(''); setCheckedRubric(false); setCheckedComponent(false)
     setDetailsVisible(false); setStep(1)
   }
@@ -101,14 +100,14 @@ export function AssessmentSetupWizardPage() {
     event.preventDefault()
     if (busy) return
     if (component) { setStep(component.status === 'LOCKED' || rubric?.status === 'LOCKED' ? 4 : 2); return }
-    if (!periodId || !name.trim() || !Number.isInteger(evaluators) || evaluators < 1 || evaluators > 10) {
-      showError('Vui lòng điền tên thành phần và số người chấm từ 1 đến 10.'); return
+    if (!periodId || !name.trim()) {
+      showError('Vui lòng chọn đợt đăng ký và nhập tên thành phần.'); return
     }
     setBusy(true)
     try {
       const created = await evaluationApi.createComponent({
         periodId, name: name.trim(), code: `${componentType}_${Date.now().toString(36).toUpperCase()}`,
-        componentType, expectedEvaluators: evaluators,
+        componentType,
       })
       setComponent(created)
       setComponents(items => [...items, created])
@@ -231,7 +230,7 @@ export function AssessmentSetupWizardPage() {
               if (!saved) return
               setLoadError(''); setRubric(null); setCheckedRubric(false); setCheckedComponent(false)
               setComponent(saved); setName(saved.name); setComponentType(saved.componentType)
-              setEvaluators(saved.expectedEvaluators); setLoadingRubric(true)
+              setLoadingRubric(true)
             }}>
               <option value="">Tạo mới hoặc chọn thành phần đã lưu</option>
               {components.map(item => <option key={item.id} value={item.id}>{item.name} · {item.status === 'LOCKED' ? 'Đã khóa' : 'Bản nháp'}</option>)}
@@ -239,19 +238,13 @@ export function AssessmentSetupWizardPage() {
           </div>}
           <div className="assessment-field"><label htmlFor="assessment-name">Tên thành phần <span>*</span></label><input id="assessment-name" value={name} onChange={(event) => setName(event.target.value)} required maxLength={150}
             disabled={!!component || busy} placeholder="Ví dụ: Đánh giá phản biện đồ án" /></div>
-          <div className="assessment-field-grid">
-            <div className="assessment-field"><label htmlFor="assessment-type">Hình thức <span>*</span></label><AnimatedSelect id="assessment-type" value={componentType} disabled={!!component || busy} onChange={(event) => {
-              const type = event.target.value as AssessmentComponentType
-              setComponentType(type)
-              if (type === 'REVIEW') setEvaluators(1)
+          <div className="assessment-field"><label htmlFor="assessment-type">Hình thức <span>*</span></label><AnimatedSelect id="assessment-type" value={componentType} disabled={!!component || busy} onChange={(event) => {
+              setComponentType(event.target.value as AssessmentComponentType)
             }}>
               <option value="REVIEW">Phản biện độc lập</option><option value="COMMITTEE">Hội đồng chấm bảo vệ</option><option value="OTHER">Hình thức khác</option>
             </AnimatedSelect></div>
-            <div className="assessment-field"><label htmlFor="assessment-evaluators">Số người chấm <span>*</span></label><input id="assessment-evaluators" type="number" min={1} max={10} step={1} required value={Number.isNaN(evaluators) ? '' : evaluators}
-              disabled={!!component || busy} onChange={(event) => setEvaluators(event.target.valueAsNumber)} /></div>
-          </div>
-          {componentType === 'COMMITTEE' && <p className="assessment-help">Số người chấm cần nằm trong giới hạn hội đồng của đợt đăng ký. Khi phân công, thành phần này cần gắn với phiên bảo vệ.</p>}
-          <dl className="assessment-fixed-rule"><dt>Cách tổng hợp điểm (cố định)</dt><dd>Trung bình cộng điểm các giảng viên trong từng thành phần. Điểm cuối là trung bình cộng điểm các thành phần.</dd></dl>
+          {componentType === 'COMMITTEE' && <p className="assessment-help">Khi phân công, thành phần này cần gắn với phiên bảo vệ và các thành viên của hội đồng.</p>}
+          <dl className="assessment-fixed-rule"><dt>Cách tổng hợp điểm (cố định)</dt><dd>Trung bình cộng điểm các giảng viên thực tế được phân công trong từng thành phần. Điểm cuối là trung bình cộng điểm các thành phần.</dd></dl>
           {component && <p className="assessment-help">Thành phần đã được lưu. Chọn “Tiếp tục” để xem cấu hình.</p>}
         </div><footer className="assessment-actions assessment-actions--end"><button className="assessment-button assessment-button--primary" type="submit" disabled={busy || !periodId || !!loadError}>
           {busy ? 'Đang lưu…' : componentLocked || rubricLocked ? 'Tiếp tục: Khóa thành phần' : 'Tiếp tục: Tạo bộ tiêu chí'}</button></footer></form>
@@ -283,7 +276,7 @@ export function AssessmentSetupWizardPage() {
         <dl className="assessment-summary">
           <div><dt>Đợt đăng ký</dt><dd>{periodName}<span className={`assessment-status ${componentLocked ? 'assessment-status--success' : ''}`}>{componentLocked ? 'Đã khóa' : 'Chờ xác nhận'}</span></dd></div>
           <div><dt>Tên thành phần</dt><dd>{component.name}</dd></div><div><dt>Hình thức đánh giá</dt><dd>{componentTypeLabel(component.componentType)}</dd></div>
-          <div><dt>Số người chấm</dt><dd>{component.expectedEvaluators} giảng viên</dd></div><div><dt>Cách tổng hợp điểm</dt><dd>Trung bình cộng điểm các giảng viên (cố định)</dd></div>
+          <div><dt>Cách tổng hợp điểm</dt><dd>Trung bình cộng điểm các giảng viên đã được phân công.</dd></div>
           <div><dt>Bộ tiêu chí</dt><dd>{rubric ? `${criteria.length} nhóm · ${childCount} tiêu chí con · ${scoreLabel(total)} điểm` : 'Chưa có bộ tiêu chí'}
             {rubric && <button type="button" className="assessment-text-button" onClick={() => { setDetailsVisible(true); setStep(3) }}><FileText size={17} />Xem bộ tiêu chí</button>}</dd></div>
         </dl>

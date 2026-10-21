@@ -35,12 +35,6 @@ SELECT assignment_id, component_id, lecturer_id, COUNT(*) AS duplicates
 FROM evaluation_assignments WHERE status = 'ACTIVE'
 GROUP BY assignment_id, component_id, lecturer_id HAVING COUNT(*) > 1;
 
-SELECT e.assignment_id, e.component_id, COUNT(*) AS active_evaluators, c.expected_evaluators
-FROM evaluation_assignments e JOIN assessment_components c ON c.id = e.component_id
-WHERE e.status = 'ACTIVE'
-GROUP BY e.assignment_id, e.component_id, c.expected_evaluators
-HAVING COUNT(*) > c.expected_evaluators;
-
 SELECT evaluation_id, COUNT(*) AS duplicates FROM score_sheets
 GROUP BY evaluation_id HAVING COUNT(*) > 1;
 

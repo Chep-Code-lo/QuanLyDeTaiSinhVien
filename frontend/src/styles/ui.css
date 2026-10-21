@@ -31,6 +31,9 @@
 div.member-list { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line-border); }
 .member-list li > span { min-width: 0; overflow-wrap: anywhere; }
 .member-list .text-button { flex-shrink: 0; }
+.portal-shell .member-list.group-invitation-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.group-invitation-row__student { min-width: 0; overflow-wrap: anywhere; }
+.group-invitation-row__actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; white-space: nowrap; }
 .autocomplete-selected .selected-info { min-width: 0; overflow-wrap: anywhere; }
 .btn-clear { flex-shrink: 0; width: 28px; height: 28px; padding: 0; border-radius: 6px; }
 .btn-clear:hover { background: #fff; }

@@ -9,6 +9,7 @@ import { MilestoneBoard } from '../components/MilestoneBoard'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import './MilestoneManagementPage.css'
 import type {
   MilestoneResponse,
   MilestoneType,
@@ -222,28 +223,30 @@ export const MilestoneManagementPage: React.FC = () => {
         <div>
           <h1>Tiến độ &amp; Mốc báo cáo</h1>
         </div>
-        {isLecturerOrAdmin && selectedAssignmentId && (
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={selectedAssignment?.status !== 'IN_PROGRESS'}
-            onClick={() => {
-              setEditingMilestone(null)
-              setNewMilestone({ title: '', milestoneType: 'PROGRESS', description: '', dueAt: '' })
-              setIsCreateModalOpen(true)
-            }}
-          >
-            + Tạo mốc tiến độ mới
-          </button>
-        )}
       </div>
 
       {/* Select Assignment Selector */}
       <div className="page-card mb-6">
-        <div className="form-group mb-0">
+        <div className="milestone-assignment-card__header">
           <label className="section-title section-title--label" htmlFor="milestone-assignment">
             Chọn Đề tài / Dự án Phân công:
           </label>
+          {isLecturerOrAdmin && selectedAssignmentId && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={selectedAssignment?.status !== 'IN_PROGRESS'}
+              onClick={() => {
+                setEditingMilestone(null)
+                setNewMilestone({ title: '', milestoneType: 'PROGRESS', description: '', dueAt: '' })
+                setIsCreateModalOpen(true)
+              }}
+            >
+              + Tạo mốc tiến độ mới
+            </button>
+          )}
+        </div>
+        <div className="form-group mb-0">
           <AnimatedSelect
             id="milestone-assignment"
             className="form-select font-semibold"

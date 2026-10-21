@@ -207,9 +207,12 @@ public class EvaluationResultService {
                 throw new BusinessRuleException("All required assessment components must be locked before finalization.");
             }
             List<EvaluationAssignment> componentEvaluations = byComponent.getOrDefault(component.getId(), List.of());
-            if (componentEvaluations.size() != component.getExpectedEvaluators()) {
+            if (componentEvaluations.isEmpty()) {
                 throw new BusinessRuleException(
                         "Cannot finalize while a required evaluator assignment is missing.");
+            }
+            if (component.getComponentType() == AssessmentComponentType.COMMITTEE) {
+                requireCompleteCommitteeRoster(assignment, componentEvaluations);
             }
             List<BigDecimal> componentScores = new java.util.ArrayList<>();
             for (EvaluationAssignment evaluation : componentEvaluations) {
@@ -288,6 +291,29 @@ public class EvaluationResultService {
         if (!principal.roles().contains(RoleCode.ADMIN)
                 && !projectAuthorization.canManageAssignment(assignment.getId(), authentication)) {
             throw new AccessDeniedException("Only this project's academic manager can finalize a result without a committee.");
+        }
+    }
+
+    private void requireCompleteCommitteeRoster(
+            ProjectAssignment assignment, List<EvaluationAssignment> componentEvaluations) {
+        var defense = defenses.findByAssignmentId(assignment.getId())
+                .filter(item -> item.getStatus() != DefenseStatus.CANCELLED)
+                .orElseThrow(
+                        () -> new BusinessRuleException(
+                                "Cannot finalize without an active defense session."));
+        Set<Long> memberIds = committeeMembers.findByCommitteeId(defense.getCommittee().getId()).stream()
+                .map(member -> member.getLecturer().getId())
+                .collect(java.util.stream.Collectors.toSet());
+        Set<Long> evaluatorIds = componentEvaluations.stream()
+                .filter(evaluation -> evaluation.getDefense() != null
+                        && defense.getId().equals(evaluation.getDefense().getId()))
+                .map(evaluation -> evaluation.getLecturer().getId())
+                .collect(java.util.stream.Collectors.toSet());
+        if (memberIds.isEmpty()
+                || evaluatorIds.size() != componentEvaluations.size()
+                || !evaluatorIds.equals(memberIds)) {
+            throw new BusinessRuleException(
+                    "Cannot finalize while a committee member assignment is missing.");
         }
     }
 

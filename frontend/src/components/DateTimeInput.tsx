@@ -25,15 +25,14 @@ const dateSegments = [
   { start: 0, end: 2, placeholder: 'dd', max: 31, min: 1 },
   { start: 3, end: 5, placeholder: 'mm', max: 12, min: 1 },
   { start: 6, end: 10, placeholder: 'yyyy', max: 9999, min: 1 },
-  { start: 11, end: 13, placeholder: '--', max: 12, min: 1 },
+  { start: 11, end: 13, placeholder: '--', max: 23, min: 0 },
   { start: 14, end: 16, placeholder: '--', max: 59, min: 0 },
-  { start: 17, end: 19, placeholder: '--', max: 0, min: 0 },
 ] as const
 
 function readSegments(text: string, withTime: boolean) {
-  return dateSegments.slice(0, withTime ? 6 : 3).map((segment, index) => {
+  return dateSegments.slice(0, withTime ? 5 : 3).map((segment) => {
     const part = text.slice(segment.start, segment.end)
-    return (index === 5 ? /^(AM|PM)$/i : /^\d+$/).test(part) ? part.toUpperCase() : ''
+    return /^\d+$/.test(part) ? part : ''
   })
 }
 
@@ -44,7 +43,7 @@ function segmentText(parts: string[], withTime: boolean) {
       ? part.padStart(dateSegments[index].end - dateSegments[index].start, '0')
       : dateSegments[index].placeholder,
   )
-  return `${filled[0]}/${filled[1]}/${filled[2]}${withTime ? ` ${filled[3]}:${filled[4]} ${filled[5]}` : ''}`
+  return `${filled[0]}/${filled[1]}/${filled[2]}${withTime ? ` ${filled[3]}:${filled[4]}` : ''}`
 }
 
 export function DateTimeInput({
@@ -68,8 +67,8 @@ export function DateTimeInput({
   const pendingSelection = useRef<number | null>(null)
   const digitBuffer = useRef({ index: -1, text: '' })
   const justAdvanced = useRef(false)
-  const formatHint = withTime ? 'dd/mm/yyyy --:-- --' : 'dd/mm/yyyy'
-  const segmentCount = withTime ? 6 : 3
+  const formatHint = withTime ? 'dd/mm/yyyy HH:mm' : 'dd/mm/yyyy'
+  const segmentCount = withTime ? 5 : 3
 
   const selectSegment = (index: number) => {
     const target = Math.max(0, Math.min(segmentCount - 1, index))
@@ -96,7 +95,7 @@ export function DateTimeInput({
     (text: string, parsed: string | null) => {
       if (!text) return ''
       if (!parsed)
-        return `Vui lòng nhập ngày hợp lệ theo định dạng ${withTime ? 'dd/mm/yyyy hh:mm AM/PM' : formatHint}.`
+        return `Vui lòng nhập ngày hợp lệ theo định dạng ${formatHint}.`
       if (min && parsed < min)
         return `Vui lòng chọn thời điểm từ ${formatDateInput(min, withTime)} trở đi.`
       if (max && parsed > max)
@@ -133,15 +132,6 @@ export function DateTimeInput({
     const parts = replaceAll
       ? (Array(segmentCount).fill('') as string[])
       : readSegments(draft, withTime)
-    if (index === 5) {
-      if (!/^[ap]$/i.test(character)) return
-      parts[index] = character.toUpperCase() === 'A' ? 'AM' : 'PM'
-      digitBuffer.current = { index: -1, text: '' }
-      justAdvanced.current = false
-      updateDraft(segmentText(parts, withTime))
-      selectSegment(index)
-      return
-    }
     if (!/^\d$/.test(character)) return
     const definition = dateSegments[index]
     const width = definition.end - definition.start
@@ -212,7 +202,7 @@ export function DateTimeInput({
           const all =
             event.currentTarget.selectionStart === 0 &&
             event.currentTarget.selectionEnd === event.currentTarget.value.length
-          if (/^\d$/.test(event.key) || (index === 5 && /^[ap]$/i.test(event.key))) {
+          if (/^\d$/.test(event.key)) {
             event.preventDefault()
             typeCharacter(event.key, all ? 0 : index, all)
           } else if (event.key === 'Backspace' || event.key === 'Delete') {
@@ -236,20 +226,17 @@ export function DateTimeInput({
             event.preventDefault()
             const parts = readSegments(draft, withTime)
             const definition = dateSegments[index]
-            if (index === 5) parts[index] = parts[index] === 'AM' ? 'PM' : 'AM'
-            else {
-              const step = event.key === 'ArrowUp' ? 1 : -1
-              const number =
-                Number(parts[index] || (index === 2 ? new Date().getFullYear() : definition.min)) +
-                step
-              const adjusted =
-                number > definition.max
-                  ? definition.min
-                  : number < definition.min
-                    ? definition.max
-                    : number
-              parts[index] = String(adjusted).padStart(definition.end - definition.start, '0')
-            }
+            const step = event.key === 'ArrowUp' ? 1 : -1
+            const number =
+              Number(parts[index] || (index === 2 ? new Date().getFullYear() : definition.min)) +
+              step
+            const adjusted =
+              number > definition.max
+                ? definition.min
+                : number < definition.min
+                  ? definition.max
+                  : number
+            parts[index] = String(adjusted).padStart(definition.end - definition.start, '0')
             digitBuffer.current = { index: -1, text: '' }
             justAdvanced.current = false
             updateDraft(segmentText(parts, withTime))

@@ -5,6 +5,8 @@ import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.AddCommitteeMemberRequest;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.CreateCommitteeRequest;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.EvaluationCommitteeResponse;
+import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.SaveCommitteeRequest;
+import com.example.qldetai.feature.evaluation.service.CommitteeConfigurationService;
 import com.example.qldetai.feature.evaluation.service.EvaluationCommitteeService;
 import com.example.qldetai.security.UserPrincipal;
 
@@ -19,6 +21,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -34,6 +37,26 @@ import lombok.RequiredArgsConstructor;
 public class EvaluationCommitteeController {
 
     private final EvaluationCommitteeService service;
+    private final CommitteeConfigurationService configurationService;
+
+    @PostMapping("/evaluation-committees/configuration")
+    @PreAuthorize(
+            "hasRole('ADMIN') or @academicAuthorization.canManagePeriod(#request.periodId, authentication)")
+    public ApiResponse<EvaluationCommitteeResponse> createConfiguration(
+            @Valid @RequestBody SaveCommitteeRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(configurationService.save(null, request, principal.id()));
+    }
+
+    @PutMapping("/evaluation-committees/{id}/configuration")
+    @PreAuthorize(
+            "hasRole('ADMIN') or @evaluationAuthorization.canManageCommittee(#id, authentication)")
+    public ApiResponse<EvaluationCommitteeResponse> updateConfiguration(
+            @PathVariable Long id,
+            @Valid @RequestBody SaveCommitteeRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(configurationService.save(id, request, principal.id()));
+    }
 
 
     @GetMapping("/evaluation-committees")

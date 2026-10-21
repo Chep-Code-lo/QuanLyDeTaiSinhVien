@@ -25,8 +25,7 @@ public final class EvaluationDtos {
             @NotNull Long periodId,
             @NotBlank @Size(max = 30) String code,
             @NotBlank @Size(max = 150) String name,
-            @NotNull AssessmentComponentType componentType,
-            @Min(1) @Max(10) int expectedEvaluators) {
+            @NotNull AssessmentComponentType componentType) {
     }
 
     public record AssessmentComponentResponse(
@@ -36,7 +35,6 @@ public final class EvaluationDtos {
             String code,
             String name,
             AssessmentComponentType componentType,
-            int expectedEvaluators,
             String status) {
     }
 
