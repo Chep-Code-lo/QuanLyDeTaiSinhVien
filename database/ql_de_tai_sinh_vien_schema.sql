@@ -48,6 +48,7 @@ CREATE TABLE `users` (
   `phone` VARCHAR(20) NULL DEFAULT NULL COMMENT 'Số điện thoại',
   `status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE, LOCKED, DISABLED; mặc định ACTIVE',
   `last_login_at` DATETIME(6) NULL DEFAULT NULL COMMENT 'Lần đăng nhập gần nhất',
+  `last_login_ip` VARCHAR(45) NULL DEFAULT NULL COMMENT 'Địa chỉ IP ở lần đăng nhập gần nhất',
   `created_at` DATETIME(6) NOT NULL COMMENT 'Thời gian tạo UTC',
   `updated_at` DATETIME(6) NOT NULL COMMENT 'Lần cập nhật UTC',
   `version` INT NOT NULL DEFAULT 0 COMMENT 'Mặc định 0; tăng khi cập nhật',

@@ -1,5 +1,4 @@
 import { apiClient } from './client'
-import { getItFaculty } from '../config/facultyScope'
 import type { ApiResponse, PageResponse } from '../types/api'
 import type { AnnouncementResponse, AnnouncementStatus } from '../types/domain'
 
@@ -14,7 +13,7 @@ export const announcementApi = {
   list: async (params: { facultyId?: number; page?: number; size?: number } = {}) =>
     (
       await apiClient.get<ApiResponse<PageResponse<AnnouncementResponse>>>('/announcements', {
-        params: { ...params, facultyId: params.facultyId ?? (await getItFaculty()).id },
+        params,
       })
     ).data.data,
   listForManagement: async (params: {

@@ -88,7 +88,6 @@ public class GradeChangeService {
         changeRequest.setSheet(sheet);
         changeRequest.setRequestedBy(actorAccess.user(actorId));
         changeRequest.setReason(request.reason().trim());
-        changeRequest.setCreatedAt(LocalDateTime.now(clock));
         return changes.save(changeRequest).getId();
     }
 

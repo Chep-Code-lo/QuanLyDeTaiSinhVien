@@ -108,6 +108,15 @@ public class StoredFileService {
                 storedFile.getSizeBytes());
     }
 
+    @Transactional(readOnly = true)
+    public DownloadedFile preview(Long id) {
+        DownloadedFile file = download(id);
+        if (!isPreviewable(file.mimeType())) {
+            throw new BusinessRuleException("This file type cannot be previewed. Please download it instead.");
+        }
+        return file;
+    }
+
     private StoredFileResponse toResponse(StoredFile storedFile) {
         return new StoredFileResponse(
                 storedFile.getId(),
@@ -155,6 +164,17 @@ public class StoredFileService {
             return MediaType.APPLICATION_OCTET_STREAM_VALUE;
         }
         return contentType.toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isPreviewable(String mimeType) {
+        try {
+            MediaType mediaType = MediaType.parseMediaType(mimeType);
+            return mediaType.isCompatibleWith(MediaType.APPLICATION_PDF)
+                    || "image".equalsIgnoreCase(mediaType.getType())
+                    || mediaType.isCompatibleWith(MediaType.TEXT_PLAIN);
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
     }
 
     private MessageDigest sha256() {

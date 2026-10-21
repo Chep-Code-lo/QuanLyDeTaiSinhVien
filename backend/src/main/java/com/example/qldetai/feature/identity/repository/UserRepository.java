@@ -20,7 +20,21 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmailIgnoreCase(String email);
 
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, Long id);
+
     boolean existsByIdAndStatus(Long id, com.example.qldetai.feature.identity.domain.UserStatus status);
+
+    @EntityGraph(attributePaths = {"userRoles", "userRoles.role"})
+    @Query("""
+            select u from User u
+            where u.status <> com.example.qldetai.feature.identity.domain.UserStatus.DISABLED
+              and (
+                :search = ''
+                or lower(u.email) like lower(concat('%', :search, '%'))
+                or lower(u.fullName) like lower(concat('%', :search, '%'))
+              )
+            """)
+    Page<User> searchVisibleForAdmin(@Param("search") String search, Pageable pageable);
 
     @Query("""
             select distinct u from User u

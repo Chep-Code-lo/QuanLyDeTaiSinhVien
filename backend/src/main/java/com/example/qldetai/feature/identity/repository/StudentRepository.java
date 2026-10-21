@@ -35,4 +35,6 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     List<Student> findActiveByFacultyId(@Param("facultyId") Long facultyId);
 
     boolean existsByStudentCodeIgnoreCase(String studentCode);
+
+    boolean existsByStudentCodeIgnoreCaseAndIdNot(String studentCode, Long id);
 }

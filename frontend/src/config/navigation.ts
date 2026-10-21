@@ -1,4 +1,4 @@
-import { Bell, BookOpen, Building2, CalendarCheck, ClipboardCheck, Flag, Home, ListChecks, ShieldCheck, UserRound, UsersRound, type LucideIcon } from 'lucide-react'
+import { Bell, BookOpen, Building2, CalendarCheck, ClipboardCheck, Flag, Home, ListChecks, Mail, ShieldCheck, UserRound, UsersRound, type LucideIcon } from 'lucide-react'
 import type { PositionCode, RoleCode } from '../types/domain'
 
 export type NavigationItem = {
@@ -28,11 +28,12 @@ export const navigationItems: NavigationItem[] = [
   },
   {
     icon: ShieldCheck,
-    label: 'Gán Chức vụ (Admin)',
+    label: 'Bổ nhiệm chức vụ',
     to: '/admin-appointments',
     adminOnly: true,
   },
-  { icon: UserRound, label: 'Tạo tài khoản', to: '/admin-users/new', adminOnly: true },
+  { icon: UserRound, label: 'Quản lý tài khoản', to: '/admin-users', adminOnly: true },
+  { icon: Mail, label: 'Cấu hình email', to: '/email-settings', adminOnly: true },
   { icon: CalendarCheck, label: 'Lịch bảo vệ & Kết quả', to: '/results', roles: ['STUDENT'] },
   { icon: UserRound, label: 'Tài khoản', to: '/account' },
   { icon: Bell, label: 'Thông báo', to: '/announcements' },

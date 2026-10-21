@@ -58,7 +58,7 @@ public class EmailOutboxService {
             EmailTemplateRenderer.RenderedEmail rendered = templateRenderer.render(
                     context.eventType(), setting.getSubjectTemplate(), setting.getBodyTemplate(), variables);
             EmailOutbox outbox = newOutbox(setting, context, recipient, rendered, context.eventKey(), now);
-            insertIfAbsent(outbox);
+            insertIfAbsent(outbox, now);
         }
     }
 
@@ -174,11 +174,10 @@ public class EmailOutboxService {
         outbox.setCreatedBy(context.actorUserId() == null
                 ? null
                 : userRepository.getReferenceById(context.actorUserId()));
-        outbox.setCreatedAt(now);
         return outbox;
     }
 
-    private void insertIfAbsent(EmailOutbox outbox) {
+    private void insertIfAbsent(EmailOutbox outbox, LocalDateTime createdAt) {
         outboxRepository.insertIfAbsent(
                 outbox.getEventType().name(),
                 outbox.getEventKey(),
@@ -202,7 +201,7 @@ public class EmailOutboxService {
                 outbox.getResolvedScopeType().name(),
                 outbox.getResolvedScopeId(),
                 outbox.getCreatedBy() == null ? null : outbox.getCreatedBy().getId(),
-                outbox.getCreatedAt());
+                createdAt);
     }
 
     private record DeliveryPayload(

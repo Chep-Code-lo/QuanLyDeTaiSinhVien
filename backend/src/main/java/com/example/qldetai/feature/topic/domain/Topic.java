@@ -1,5 +1,6 @@
 package com.example.qldetai.feature.topic.domain;
 
+import com.example.qldetai.common.persistence.AuditedEntity;
 import com.example.qldetai.feature.academic.domain.Department;
 import com.example.qldetai.feature.academic.domain.Faculty;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriod;
@@ -27,7 +28,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class Topic {
+public class Topic extends AuditedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -85,12 +86,6 @@ public class Topic {
 
     @Column(name = "published_at")
     private LocalDateTime publishedAt;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
 
     @Version
     @Column(nullable = false)

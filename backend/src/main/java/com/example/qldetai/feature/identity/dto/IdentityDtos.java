@@ -5,6 +5,7 @@ import com.example.qldetai.feature.identity.domain.RoleCode;
 import com.example.qldetai.feature.identity.domain.UserStatus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -62,6 +63,15 @@ public final class IdentityDtos {
             @Valid LecturerProfileInput lecturer) {
     }
 
+    public record UpdateUserRequest(
+            @NotNull @Min(0) Integer version,
+            @NotBlank @Email @Size(max = 254) String email,
+            @NotBlank @Size(max = 150) String fullName,
+            @Size(max = 20) String phone,
+            @Valid StudentProfileInput student,
+            @Valid LecturerProfileInput lecturer) {
+    }
+
     public record UpdateUserStatusRequest(@NotNull UserStatus status) {
     }
 
@@ -78,6 +88,7 @@ public final class IdentityDtos {
             StudentProfileResponse student,
             LecturerProfileResponse lecturer,
             LocalDateTime lastLoginAt,
+            String lastLoginIp,
             LocalDateTime createdAt,
             int version) {
     }

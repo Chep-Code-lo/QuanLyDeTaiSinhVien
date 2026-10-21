@@ -39,11 +39,13 @@ services:
       MYSQL_PWD: ${MYSQL_APP_PASSWORD:-change-me-local}
     volumes:
       - ./database/migrations:/migrations:ro
-    entrypoint: ["/bin/sh", "-c"]
+    entrypoint: ["/bin/sh", "-ec"]
     command:
-      - >-
-        exec mysql --protocol=TCP -h mysql -u "$$MYSQL_APP_USER" ql_de_tai_sinh_vien
-        < /migrations/001-email-notifications.sql
+      - |
+        for migration in /migrations/*.sql; do
+          [ -f "$$migration" ] || continue
+          mysql --protocol=TCP -h mysql -u "$$MYSQL_APP_USER" ql_de_tai_sinh_vien < "$$migration"
+        done
 
   backend:
     build:

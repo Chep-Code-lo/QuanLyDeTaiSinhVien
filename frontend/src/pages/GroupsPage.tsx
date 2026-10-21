@@ -329,7 +329,10 @@ export function GroupsPage() {
                         {group.periodName} · {group.members.length} thành viên
                       </span>
                     </div>
-                    <StatusBadge status={group.status} />
+                    <StatusBadge
+                      status={group.status}
+                      label={student && group.status === 'LOCKED' ? 'Đã khóa' : undefined}
+                    />
                   </div>
                   <ul className="member-list">
                     {group.members.map((member) => (

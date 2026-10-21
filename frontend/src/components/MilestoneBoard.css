@@ -80,6 +80,12 @@
 .milestone-board__report-heading { flex-wrap: wrap; }
 .milestone-board__report time { display: block; margin-top: 5px; color: #64748b; font-size: 11px; }
 .milestone-board__report p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.milestone-board__report-file { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 10px; color: #53657f; }
+.milestone-board__report-file > span { display: inline-flex; align-items: center; gap: 5px; overflow-wrap: anywhere; }
+.milestone-board__file-actions { display: inline-flex; flex-wrap: wrap; gap: 7px; }
+.milestone-board__file-action { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 5px 8px; border: 1px solid #d7e1f1; border-radius: 5px; color: #315b9f; background: #fff; font: inherit; font-size: 12px; font-weight: 650; line-height: 1; text-decoration: none; cursor: pointer; transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease; }
+.milestone-board__file-action:hover:not(:disabled) { border-color: #9ebcf0; color: #174c99; background: #edf4ff; }
+.milestone-board__file-action:disabled { opacity: .58; cursor: not-allowed; }
 .milestone-board__feedback { margin-top: 10px; padding: 10px; border-radius: 5px; background: #edf4ff; white-space: pre-wrap; overflow-wrap: anywhere; }
 .milestone-board__sidebar { display: grid; gap: 12px; }
 .milestone-board__calendar { padding: 13px 10px 11px; }

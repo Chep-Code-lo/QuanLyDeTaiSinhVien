@@ -15,7 +15,6 @@ export function Header({ onMenuClick }: HeaderProps) {
   const management = hasRole('ADMIN') || hasRole('LECTURER')
   const { showSuccess, showError } = useToast()
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
   const [unread, setUnread] = useState<number | null>(null)
   const [loggingOut, setLoggingOut] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -64,11 +63,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   return (
     <header className="topbar">
       <button className="topbar__menu" type="button" onClick={onMenuClick} aria-label="Mở menu điều hướng"><Menu size={22} aria-hidden="true" /></button>
-      {management ? <div className="topbar__school">Trường Đại học Công nghệ Kỹ thuật TP.HCM</div> : <form className="topbar__search" onSubmit={e=>{e.preventDefault();navigate(`/topics?q=${encodeURIComponent(search.trim())}`)}}>
-        <span aria-hidden="true">⌕</span>
-        <input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Tìm đề tài, bộ môn, GVHD..." aria-label="Tìm kiếm đề tài" />
-        <button className="text-button" type="submit">Tìm</button>
-      </form>}
+      <div className="topbar__school">Trường Đại học Công nghệ Kỹ thuật TP.HCM</div>
       <div className="topbar__actions flex items-center gap-3">
         {user ? (
           <>

@@ -112,6 +112,7 @@ Response đăng nhập không có `accessToken`:
 |---|---|---|---|
 | GET/POST | `/admin/users` | `ADMIN` | Danh sách/tạo tài khoản |
 | GET | `/admin/users/{id}` | `ADMIN` | Chi tiết tài khoản |
+| DELETE | `/admin/users/{id}` | `ADMIN` | Vô hiệu hóa tài khoản, giữ dữ liệu lịch sử |
 | PATCH | `/admin/users/{id}/status` | `ADMIN` | `ACTIVE`, `LOCKED`, `DISABLED` |
 | PUT | `/admin/users/{id}/roles` | `ADMIN` | Thay danh sách role |
 | GET | `/lecturers` | Đã đăng nhập | Danh bạ giảng viên, hỗ trợ `search`, `facultyId`, `departmentId`, `page`, `size` |
@@ -119,6 +120,7 @@ Response đăng nhập không có `accessToken`:
 | PATCH | `/admin/academic-appointments/{id}/end` | `ADMIN` | Kết thúc nhiệm vụ |
 
 Khi tạo tài khoản có role `STUDENT` hoặc `LECTURER`, request phải kèm đúng hồ sơ tương ứng. Mật khẩu được băm BCrypt; API không trả `password_hash`.
+Danh sách tài khoản trả thêm `createdAt`, `lastLoginAt` và `lastLoginIp`; tài khoản bị xóa được vô hiệu hóa để giữ toàn vẹn dữ liệu học vụ.
 
 `GET /lecturers` chỉ trả về giảng viên có tài khoản `ACTIVE`. Response mỗi item gồm:
 

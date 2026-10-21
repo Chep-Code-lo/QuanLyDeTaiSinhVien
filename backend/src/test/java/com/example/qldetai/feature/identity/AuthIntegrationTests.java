@@ -1,8 +1,11 @@
 package com.example.qldetai.feature.identity;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,11 +18,13 @@ import com.example.qldetai.feature.identity.domain.Lecturer;
 import com.example.qldetai.feature.identity.domain.PositionCode;
 import com.example.qldetai.feature.identity.domain.Role;
 import com.example.qldetai.feature.identity.domain.RoleCode;
+import com.example.qldetai.feature.identity.domain.Student;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.domain.UserStatus;
 import com.example.qldetai.feature.identity.repository.AcademicAppointmentRepository;
 import com.example.qldetai.feature.identity.repository.LecturerRepository;
 import com.example.qldetai.feature.identity.repository.RoleRepository;
+import com.example.qldetai.feature.identity.repository.StudentRepository;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -50,6 +55,7 @@ class AuthIntegrationTests {
     private final FacultyRepository facultyRepository;
     private final DepartmentRepository departmentRepository;
     private final LecturerRepository lecturerRepository;
+    private final StudentRepository studentRepository;
     private final AcademicAppointmentRepository academicAppointmentRepository;
 
     AuthIntegrationTests(
@@ -61,6 +67,7 @@ class AuthIntegrationTests {
             FacultyRepository facultyRepository,
             DepartmentRepository departmentRepository,
             LecturerRepository lecturerRepository,
+            StudentRepository studentRepository,
             AcademicAppointmentRepository academicAppointmentRepository) {
         this.mockMvc = mockMvc;
         this.userRepository = userRepository;
@@ -70,6 +77,7 @@ class AuthIntegrationTests {
         this.facultyRepository = facultyRepository;
         this.departmentRepository = departmentRepository;
         this.lecturerRepository = lecturerRepository;
+        this.studentRepository = studentRepository;
         this.academicAppointmentRepository = academicAppointmentRepository;
     }
 
@@ -95,6 +103,7 @@ class AuthIntegrationTests {
     void loginCreatesSessionAndAllowsAdminAccess() throws Exception {
         MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
                         .with(csrf())
+                        .header("X-Forwarded-For", "203.0.113.42, 10.0.0.1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"username":"admin@test.local","password":"TestPassword123!"}
@@ -110,7 +119,8 @@ class AuthIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.fullName").value("Test Admin"));
         mockMvc.perform(get("/api/v1/admin/users").session(session))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].lastLoginIp").value("203.0.113.42"));
     }
 
     @Test
@@ -219,6 +229,80 @@ class AuthIntegrationTests {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void adminCanDeleteAnotherAccountWithoutRemovingHistoricalData() throws Exception {
+        String targetEmail = createUserWithRole("delete-target", RoleCode.STUDENT);
+        User target = userRepository.findByEmailIgnoreCase(targetEmail).orElseThrow();
+        MockHttpSession session = login("admin@test.local", "TestPassword123!");
+
+        mockMvc.perform(delete("/api/v1/admin/users/{id}", target.getId())
+                        .with(csrf())
+                        .session(session))
+                .andExpect(status().isNoContent());
+
+        assertThat(userRepository.findById(target.getId()).orElseThrow().getStatus())
+                .isEqualTo(UserStatus.DISABLED);
+        mockMvc.perform(get("/api/v1/admin/users").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1));
+    }
+
+    @Test
+    void adminCanUpdateAccountAndStudentProfile() throws Exception {
+        Faculty faculty = createFaculty("UPDATE");
+        Department oldDepartment = createDepartment(faculty, "OLD");
+        Department newDepartment = createDepartment(faculty, "NEW");
+        Student student = createStudent("update-target", "SVOLD", "Sinh Vien Cu", oldDepartment);
+        User target = student.getUser();
+        MockHttpSession session = login("admin@test.local", "TestPassword123!");
+
+        mockMvc.perform(put("/api/v1/admin/users/{id}", target.getId())
+                        .with(csrf())
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "version": %d,
+                                  "email": "sinhvien.capnhat@test.local",
+                                  "fullName": "Sinh Vien Da Cap Nhat",
+                                  "phone": "0909000000",
+                                  "student": {
+                                    "departmentId": %d,
+                                    "studentCode": "SVMOI",
+                                    "className": "DHKTPM18A",
+                                    "cohort": "2026"
+                                  },
+                                  "lecturer": null
+                                }
+                                """.formatted(target.getVersion(), newDepartment.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.email").value("sinhvien.capnhat@test.local"))
+                .andExpect(jsonPath("$.data.fullName").value("Sinh Vien Da Cap Nhat"))
+                .andExpect(jsonPath("$.data.student.studentCode").value("SVMOI"))
+                .andExpect(jsonPath("$.data.student.departmentId").value(newDepartment.getId()));
+
+        User updatedUser = userRepository.findById(target.getId()).orElseThrow();
+        Student updatedStudent = studentRepository.findById(student.getId()).orElseThrow();
+        assertThat(updatedUser.getPhone()).isEqualTo("0909000000");
+        assertThat(updatedStudent.getClassName()).isEqualTo("DHKTPM18A");
+        assertThat(updatedStudent.getCohort()).isEqualTo("2026");
+        assertThat(updatedStudent.getDepartment().getId()).isEqualTo(newDepartment.getId());
+    }
+
+    @Test
+    void adminCannotDeleteOwnAccount() throws Exception {
+        User admin = userRepository.findByEmailIgnoreCase("admin@test.local").orElseThrow();
+        MockHttpSession session = login("admin@test.local", "TestPassword123!");
+
+        mockMvc.perform(delete("/api/v1/admin/users/{id}", admin.getId())
+                        .with(csrf())
+                        .session(session))
+                .andExpect(status().isBadRequest());
+
+        assertThat(userRepository.findById(admin.getId()).orElseThrow().getStatus())
+                .isEqualTo(UserStatus.ACTIVE);
+    }
+
     private MockHttpSession login(String username, String password) throws Exception {
         MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
                         .with(csrf())
@@ -284,6 +368,29 @@ class AuthIntegrationTests {
         lecturer.setAcademicDegree("TS");
         lecturer.setSpecialization("Software Engineering");
         return lecturerRepository.saveAndFlush(lecturer);
+    }
+
+    private Student createStudent(String emailPrefix, String studentCodePrefix, String fullName, Department department) {
+        Role studentRole = roleRepository.findByCode(RoleCode.STUDENT).orElseThrow();
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        User user = new User();
+        user.setEmail(emailPrefix + "@test.local");
+        user.setPasswordHash(passwordEncoder.encode("TestPassword123!"));
+        user.setFullName(fullName);
+        user.setStatus(UserStatus.ACTIVE);
+        user.setCreatedAt(now);
+        user.setUpdatedAt(now);
+        user.replaceRoles(Set.of(studentRole), now);
+        user = userRepository.saveAndFlush(user);
+
+        Student student = new Student();
+        student.setUser(user);
+        student.setDepartment(department);
+        student.setStudentCode(uniqueCode(studentCodePrefix, 20));
+        student.setClassName("DHKTPM17A");
+        student.setCohort("2025");
+        return studentRepository.saveAndFlush(student);
     }
 
     private void createAppointment(Lecturer lecturer, Faculty faculty, Department department, PositionCode positionCode) {

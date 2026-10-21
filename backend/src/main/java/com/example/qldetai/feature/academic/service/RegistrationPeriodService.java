@@ -1,6 +1,6 @@
 package com.example.qldetai.feature.academic.service;
 
-import com.example.qldetai.aspect.BusinessAudit;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ConflictException;
@@ -100,7 +100,6 @@ public class RegistrationPeriodService {
                 request.registrationStartAt(), request.registrationEndAt(), request.reviewDeadlineAt(), request.defenseDate(), rules);
         period.setStatus(RegistrationPeriodStatus.DRAFT);
         period.setCreatedBy(creator);
-        period.setCreatedAt(LocalDateTime.now(clock));
         return toResponse(registrationPeriodRepository.save(period));
     }
 

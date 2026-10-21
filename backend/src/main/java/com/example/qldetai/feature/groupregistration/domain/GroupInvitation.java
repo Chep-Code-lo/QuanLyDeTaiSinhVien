@@ -1,5 +1,6 @@
 package com.example.qldetai.feature.groupregistration.domain;
 
+import com.example.qldetai.common.persistence.CreatedAtEntity;
 import com.example.qldetai.feature.identity.domain.Student;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -23,7 +24,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class GroupInvitation {
+public class GroupInvitation extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,9 +45,6 @@ public class GroupInvitation {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private GroupInvitationStatus status = GroupInvitationStatus.PENDING;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
 
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;

@@ -143,6 +143,16 @@ Ghi chú:
 - Frontend container reverse proxy `/api/*` sang backend nên không cần chỉnh `VITE_API_BASE_URL` khi chạy compose.
 - Nếu muốn import lại schema từ đầu, chạy `docker compose down -v` rồi `docker compose up --build`.
 
+### Gửi thông báo qua email
+
+SMTP chỉ được cấu hình trong `.env`; không đưa `MAIL_USERNAME` hoặc `MAIL_PASSWORD` vào mã nguồn hay frontend. Sau khi điền các biến `MAIL_*`, đặt `EMAIL_ENABLED=true` rồi dựng lại container:
+
+```powershell
+docker compose up --build -d
+```
+
+Đăng nhập bằng tài khoản quản trị, mở **Cấu hình email**, bật từng loại thông báo cần dùng, lưu mẫu thư và chọn **Gửi thử**. Thư kiểm tra chỉ gửi đến email của tài khoản đang đăng nhập; trạng thái giao hàng hiển thị trong **Nhật ký gửi email**.
+
 ### Reset dữ liệu demo
 
 Khi không cần giữ dữ liệu local, reset toàn bộ dữ liệu Docker rồi khởi tạo lại

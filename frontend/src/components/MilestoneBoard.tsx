@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
   ArrowDownUp, CalendarDays, ChevronLeft, ChevronRight,
-  FileText, Paperclip, PencilLine, Send, Users,
+  Download, Eye, FileText, Paperclip, PencilLine, Send, Users,
 } from 'lucide-react'
+import { errorMessage, studentApi } from '../api/student'
 import { AnimatedSelect } from './AnimatedSelect'
 import { StatusBadge } from './StatusBadge'
+import { useToast } from '../context/ToastContext'
 import { formatDate, formatDateTime, parseUtcDateTime } from '../utils/dateTime'
 import { milestoneCalendarDays, milestoneDayKey, milestoneDeadline } from '../utils/milestoneSchedule'
 import type { MilestoneResponse, SubmissionResponse } from '../types/domain'
@@ -28,8 +30,10 @@ export function MilestoneBoard({
   milestones, loading, hasAssignment, canManage, canEdit, reminding,
   onEdit, onFeedback, onRemind, error, onRetry,
 }: MilestoneBoardProps) {
+  const { showError } = useToast()
   const [sort, setSort] = useState('deadline-asc')
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [downloadingFileId, setDownloadingFileId] = useState<number | null>(null)
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [now, setNow] = useState(() => new Date())
@@ -45,6 +49,17 @@ export function MilestoneBoard({
     .sort((a, b) => parseUtcDateTime(a.dueAt).getTime() - parseUtcDateTime(b.dueAt).getTime())
   const pending = upcoming.filter((m) => !m.submissions?.length)
   const today = milestoneDayKey(now)
+  const handleDownload = async (fileId: number, fileName: string) => {
+    if (downloadingFileId) return
+    setDownloadingFileId(fileId)
+    try {
+      await studentApi.download(fileId, fileName)
+    } catch (error) {
+      showError(errorMessage(error))
+    } finally {
+      setDownloadingFileId(null)
+    }
+  }
   const focusMilestone = (milestone: MilestoneResponse) => {
     setSelectedDay(milestoneDayKey(parseUtcDateTime(milestone.dueAt)))
     document.getElementById(`milestone-card-${milestone.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -149,7 +164,23 @@ export function MilestoneBoard({
                             </div>
                             <time dateTime={report.submittedAt}>{formatDateTime(report.submittedAt)}</time>
                             {report.note && <p>{report.note}</p>}
-                            {report.file && <p><Paperclip size={14} aria-hidden="true" /> {report.file.originalName} · {(report.file.sizeBytes / 1024).toFixed(1)} KB</p>}
+                            {report.file && <div className="milestone-board__report-file">
+                              <span><Paperclip size={14} aria-hidden="true" /> {report.file.originalName} · {(report.file.sizeBytes / 1024).toFixed(1)} KB</span>
+                              <div className="milestone-board__file-actions">
+                                {canPreviewFile(report.file.mimeType) && <a
+                                  className="milestone-board__file-action"
+                                  href={`/api/v1/files/${report.file.id}/preview`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                ><Eye size={14} aria-hidden="true" />Xem trước</a>}
+                                <button
+                                  type="button"
+                                  className="milestone-board__file-action"
+                                  disabled={downloadingFileId === report.file!.id}
+                                  onClick={() => void handleDownload(report.file!.id, report.file!.originalName)}
+                                ><Download size={14} aria-hidden="true" />{downloadingFileId === report.file!.id ? 'Đang tải...' : 'Tải xuống'}</button>
+                              </div>
+                            </div>}
                             {(report.feedback ?? []).map((feedback) => <div key={feedback.id} className="milestone-board__feedback"><strong>{feedback.lecturerName}:</strong> {feedback.content}<time dateTime={feedback.createdAt}>{formatDateTime(feedback.createdAt)}</time></div>)}
                           </div>
                         ))}
@@ -214,4 +245,8 @@ export function MilestoneBoard({
       </aside>
     </div>
   )
+}
+
+function canPreviewFile(mimeType: string): boolean {
+  return mimeType === 'application/pdf' || mimeType.startsWith('image/') || mimeType.startsWith('text/')
 }

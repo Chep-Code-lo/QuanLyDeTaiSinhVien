@@ -17,14 +17,6 @@ import type {
   SemesterResponse,
 } from '../types/domain'
 
-const DEFAULT_PERIOD_RULES = {
-  minGroupMembers: 1,
-  maxGroupMembers: 3,
-  invitationExpiryHours: 72,
-  minCommitteeMembers: 3,
-  maxCommitteeMembers: 5,
-} as const
-
 type NextPeriodStatus = 'ACTIVE' | 'CLOSED'
 
 const nextPeriodStatus = (status: RegistrationPeriodResponse['status']): NextPeriodStatus | null => {
@@ -39,6 +31,8 @@ const periodStatusActionLabel = (status: NextPeriodStatus) => (status === 'ACTIV
 export const AcademicManagementPage: React.FC = () => {
   const { user, hasRole, hasAppointment } = useAuth()
   const { showSuccess, showError } = useToast()
+  const isDean = hasAppointment('DEAN')
+  const isAdmin = hasRole('ADMIN')
 
   // Registration Periods state
   const [periods, setPeriods] = useState<RegistrationPeriodResponse[]>([])
@@ -54,6 +48,14 @@ export const AcademicManagementPage: React.FC = () => {
   // Catalog state
   const [faculties, setFaculties] = useState<FacultyResponse[]>([])
   const [semesters, setSemesters] = useState<SemesterResponse[]>([])
+  const managedFaculties = faculties.filter(
+    (faculty) =>
+      isAdmin ||
+      user?.activeAppointments.some(
+        (appointment) =>
+          appointment.positionCode === 'DEAN' && appointment.facultyId === faculty.id,
+      ),
+  )
 
   // Form State for Registration Period creation
   const [newPeriod, setNewPeriod] = useState<CreateRegistrationPeriodRequest>({
@@ -67,7 +69,6 @@ export const AcademicManagementPage: React.FC = () => {
     registrationEndAt: '',
     reviewDeadlineAt: null,
     defenseDate: null,
-    ...DEFAULT_PERIOD_RULES,
   })
   const requiresReview = newPeriod.projectType === 'SPECIALIZED' || newPeriod.projectType === 'GRADUATION'
   const requiresDefense = newPeriod.projectType === 'GRADUATION'
@@ -106,23 +107,8 @@ export const AcademicManagementPage: React.FC = () => {
       .getFaculties()
       .then(setFaculties)
       .catch((error) => showError(error.message))
-    academicApi.getSemesters().then((res) => {
-      setSemesters(res)
-      if (res.length > 0) {
-        setNewPeriod((prev) => ({ ...prev, semesterId: res[0].id }))
-      }
-    })
+    academicApi.getSemesters().then(setSemesters)
   }, [])
-
-  // This portal always creates periods for the configured IT faculty.
-  useEffect(() => {
-    if (faculties.length > 0 && newPeriod.facultyId === 0) {
-      setNewPeriod((prev) => ({
-        ...prev,
-        facultyId: faculties[0].id,
-      }))
-    }
-  }, [faculties, user])
 
   // Load registration periods
   const loadRegistrationPeriods = () => {
@@ -143,7 +129,7 @@ export const AcademicManagementPage: React.FC = () => {
     e.preventDefault()
     if (submittingPeriod) return
     if (!newPeriod.facultyId) {
-      showError('Chưa tải được cấu hình Khoa CNTT. Vui lòng tải lại trang.')
+      showError('Vui lòng chọn khoa quản lý đợt đăng ký.')
       return
     }
     if (requiresReview && !newPeriod.reviewDeadlineAt) {
@@ -171,11 +157,41 @@ export const AcademicManagementPage: React.FC = () => {
       if (field instanceof HTMLInputElement) field.focus()
       return
     }
-    if (newPeriod.minGroupMembers > newPeriod.maxGroupMembers) {
+    const hasCustomGroupSize =
+      newPeriod.minGroupMembers !== undefined || newPeriod.maxGroupMembers !== undefined
+    if (
+      hasCustomGroupSize &&
+      (newPeriod.minGroupMembers === undefined || newPeriod.maxGroupMembers === undefined)
+    ) {
+      showError(
+        'Hãy nhập đủ số thành viên tối thiểu và tối đa của nhóm, hoặc để trống để dùng cấu hình hệ thống.',
+      )
+      return
+    }
+    if (
+      newPeriod.minGroupMembers !== undefined &&
+      newPeriod.maxGroupMembers !== undefined &&
+      newPeriod.minGroupMembers > newPeriod.maxGroupMembers
+    ) {
       showError('Số thành viên tối thiểu của nhóm không được lớn hơn số tối đa.')
       return
     }
-    if (newPeriod.minCommitteeMembers > newPeriod.maxCommitteeMembers) {
+    const hasCustomCommitteeSize =
+      newPeriod.minCommitteeMembers !== undefined || newPeriod.maxCommitteeMembers !== undefined
+    if (
+      hasCustomCommitteeSize &&
+      (newPeriod.minCommitteeMembers === undefined || newPeriod.maxCommitteeMembers === undefined)
+    ) {
+      showError(
+        'Hãy nhập đủ số thành viên tối thiểu và tối đa của hội đồng, hoặc để trống để dùng cấu hình hệ thống.',
+      )
+      return
+    }
+    if (
+      newPeriod.minCommitteeMembers !== undefined &&
+      newPeriod.maxCommitteeMembers !== undefined &&
+      newPeriod.minCommitteeMembers > newPeriod.maxCommitteeMembers
+    ) {
       showError('Số thành viên tối thiểu của hội đồng không được lớn hơn số tối đa.')
       return
     }
@@ -198,8 +214,8 @@ export const AcademicManagementPage: React.FC = () => {
       setPeriods((prev) => [created, ...prev])
       setIsPeriodModalOpen(false)
       setNewPeriod({
-        facultyId: faculties[0]?.id || 0,
-        semesterId: semesters[0]?.id || 0,
+        facultyId: 0,
+        semesterId: 0,
         name: '',
         projectType: 'COURSE',
         proposalStartAt: '',
@@ -208,7 +224,6 @@ export const AcademicManagementPage: React.FC = () => {
         registrationEndAt: '',
         reviewDeadlineAt: null,
         defenseDate: null,
-        ...DEFAULT_PERIOD_RULES,
       })
     } catch (err: any) {
       showError('Lỗi tạo đợt đăng ký: ' + (err.response?.data?.message || err.message))
@@ -235,9 +250,6 @@ export const AcademicManagementPage: React.FC = () => {
       setChangingPeriodStatus(false)
     }
   }
-
-  const isDean = hasAppointment('DEAN')
-  const isAdmin = hasRole('ADMIN')
 
   return (
     <div className="academic-management-page">
@@ -396,6 +408,31 @@ export const AcademicManagementPage: React.FC = () => {
             <form onSubmit={handleCreatePeriod}>
               <div className="modal-body py-4 space-y-4">
                 <div className="form-group">
+                  <label className="form-label" htmlFor="period-faculty">
+                    Khoa quản lý <span className="text-red">*</span>
+                  </label>
+                  <AnimatedSelect
+                    id="period-faculty"
+                    className="form-select"
+                    value={newPeriod.facultyId || ''}
+                    onChange={(event) =>
+                      setNewPeriod({
+                        ...newPeriod,
+                        facultyId: Number(event.target.value) || 0,
+                      })
+                    }
+                    required
+                  >
+                    <option value="">-- Chọn khoa --</option>
+                    {managedFaculties.map((faculty) => (
+                      <option key={faculty.id} value={faculty.id}>
+                        {faculty.name} ({faculty.code})
+                      </option>
+                    ))}
+                  </AnimatedSelect>
+                </div>
+
+                <div className="form-group">
                   <label className="form-label" htmlFor="period-name">
                     Tên Đợt Đăng Ký <span className="text-red">*</span>
                   </label>
@@ -427,6 +464,7 @@ export const AcademicManagementPage: React.FC = () => {
                     }
                     required
                   >
+                    <option value="">-- Chọn học kỳ --</option>
                     {semesters.map((s) => (
                       <option key={s.id} value={s.id}>
                         Học kỳ {s.semesterNo} - {s.academicYear}
@@ -630,7 +668,9 @@ export const AcademicManagementPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Quy tắc nhóm thực hiện</label>
+                  <label className="form-label">
+                    Quy tắc nhóm thực hiện (để trống để dùng cấu hình hệ thống)
+                  </label>
                   <div className="grid-cols-2">
                     <div className="form-group">
                       <label className="form-label">
@@ -642,14 +682,13 @@ export const AcademicManagementPage: React.FC = () => {
                         max="10"
                         step="1"
                         className="form-input"
-                        value={newPeriod.minGroupMembers}
+                        value={newPeriod.minGroupMembers ?? ''}
                         onChange={(e) =>
                           setNewPeriod({
                             ...newPeriod,
-                            minGroupMembers: Number(e.target.value),
+                            minGroupMembers: e.target.value ? Number(e.target.value) : undefined,
                           })
                         }
-                        required
                       />
                     </div>
                     <div className="form-group">
@@ -662,21 +701,20 @@ export const AcademicManagementPage: React.FC = () => {
                         max="10"
                         step="1"
                         className="form-input"
-                        value={newPeriod.maxGroupMembers}
+                        value={newPeriod.maxGroupMembers ?? ''}
                         onChange={(e) =>
                           setNewPeriod({
                             ...newPeriod,
-                            maxGroupMembers: Number(e.target.value),
+                            maxGroupMembers: e.target.value ? Number(e.target.value) : undefined,
                           })
                         }
-                        required
                       />
                     </div>
                   </div>
                 </div>
                 <div className="form-group">
                   <label className="form-label">
-                    Thời hạn lời mời tham gia nhóm (giờ) <span className="text-red">*</span>
+                    Thời hạn lời mời tham gia nhóm (giờ)
                   </label>
                   <input
                     type="number"
@@ -684,18 +722,19 @@ export const AcademicManagementPage: React.FC = () => {
                     max="720"
                     step="1"
                     className="form-input"
-                    value={newPeriod.invitationExpiryHours}
+                    value={newPeriod.invitationExpiryHours ?? ''}
                     onChange={(e) =>
                       setNewPeriod({
                         ...newPeriod,
-                        invitationExpiryHours: Number(e.target.value),
+                        invitationExpiryHours: e.target.value ? Number(e.target.value) : undefined,
                       })
                     }
-                    required
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Quy tắc hội đồng</label>
+                  <label className="form-label">
+                    Quy tắc hội đồng (để trống để dùng cấu hình hệ thống)
+                  </label>
                   <div className="grid-cols-2">
                     <div className="form-group">
                       <label className="form-label">
@@ -703,18 +742,17 @@ export const AcademicManagementPage: React.FC = () => {
                       </label>
                       <input
                         type="number"
-                        min="1"
-                        max="10"
+                        min="3"
+                        max="5"
                         step="1"
                         className="form-input"
-                        value={newPeriod.minCommitteeMembers}
+                        value={newPeriod.minCommitteeMembers ?? ''}
                         onChange={(e) =>
                           setNewPeriod({
                             ...newPeriod,
-                            minCommitteeMembers: Number(e.target.value),
+                            minCommitteeMembers: e.target.value ? Number(e.target.value) : undefined,
                           })
                         }
-                        required
                       />
                     </div>
                     <div className="form-group">
@@ -723,18 +761,17 @@ export const AcademicManagementPage: React.FC = () => {
                       </label>
                       <input
                         type="number"
-                        min="1"
-                        max="10"
+                        min="3"
+                        max="5"
                         step="1"
                         className="form-input"
-                        value={newPeriod.maxCommitteeMembers}
+                        value={newPeriod.maxCommitteeMembers ?? ''}
                         onChange={(e) =>
                           setNewPeriod({
                             ...newPeriod,
-                            maxCommitteeMembers: Number(e.target.value),
+                            maxCommitteeMembers: e.target.value ? Number(e.target.value) : undefined,
                           })
                         }
-                        required
                       />
                     </div>
                   </div>

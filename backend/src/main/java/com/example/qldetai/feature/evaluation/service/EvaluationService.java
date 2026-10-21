@@ -1,6 +1,6 @@
 package com.example.qldetai.feature.evaluation.service;
 
-import com.example.qldetai.aspect.BusinessAudit;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ConflictException;
@@ -167,7 +167,6 @@ public class EvaluationService {
         rubric.setName(request.name().trim());
         rubric.setVersionNo((int) rubrics.countByComponentId(component.getId()) + 1);
         rubric.setStatus(STATUS_DRAFT);
-        rubric.setCreatedAt(LocalDateTime.now(clock));
         rubric = rubrics.save(rubric);
 
         for (CriterionRequest criterionRequest : request.criteria()) {

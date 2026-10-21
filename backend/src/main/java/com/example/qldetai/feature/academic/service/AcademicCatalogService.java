@@ -1,6 +1,6 @@
 package com.example.qldetai.feature.academic.service;
 
-import com.example.qldetai.aspect.BusinessAudit;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ConflictException;
 import com.example.qldetai.exception.ResourceNotFoundException;

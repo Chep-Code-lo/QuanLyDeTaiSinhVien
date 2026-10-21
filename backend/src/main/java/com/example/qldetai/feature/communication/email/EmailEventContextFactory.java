@@ -19,6 +19,7 @@ import com.example.qldetai.feature.topic.domain.TopicReview;
 import com.example.qldetai.feature.topic.domain.TopicReviewDecision;
 import com.example.qldetai.feature.topic.repository.TopicReviewRepository;
 import com.example.qldetai.feature.topic.repository.TopicSupervisorRepository;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
@@ -144,11 +145,19 @@ public class EmailEventContextFactory {
     }
 
     public EmailEventContext deadlineReminder(Milestone milestone, int reminderHours) {
+        return deadlineReminder(milestone, "deadline-reminder:" + milestone.getId() + ":" + reminderHours);
+    }
+
+    public EmailEventContext manualDeadlineReminder(Milestone milestone, LocalDate reminderDate) {
+        return deadlineReminder(milestone, "manual-deadline-reminder:" + milestone.getId() + ":" + reminderDate);
+    }
+
+    private EmailEventContext deadlineReminder(Milestone milestone, String eventKey) {
         ProjectAssignment assignment = milestone.getAssignment();
         Topic topic = assignment.getTopic();
         return context(
                 EmailNotificationEventType.DEADLINE_REMINDER,
-                "deadline-reminder:" + milestone.getId() + ":" + reminderHours,
+                eventKey,
                 assignment.getPeriod(),
                 assignment.getGroup().getId(),
                 topic,

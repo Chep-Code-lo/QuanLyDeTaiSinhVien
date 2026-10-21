@@ -2,6 +2,7 @@ package com.example.qldetai.feature.progress.controller;
 
 import com.example.qldetai.common.api.ApiResponse;
 import com.example.qldetai.feature.progress.dto.ProgressDtos.*;
+import com.example.qldetai.feature.progress.service.MilestoneReminderService;
 import com.example.qldetai.feature.progress.service.ProgressService;
 import com.example.qldetai.security.UserPrincipal;
 
@@ -21,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ProgressController {
     private final ProgressService service;
+    private final MilestoneReminderService milestoneReminderService;
 
 
     @PostMapping("/milestones")
@@ -35,10 +37,25 @@ public class ProgressController {
                 .body(ApiResponse.success("Milestone created.", r));
     }
 
+    @PutMapping("/milestones/{id}")
+    @PreAuthorize("hasRole('ADMIN') or @progressAuthorization.canManageMilestone(#id, authentication)")
+    public ApiResponse<MilestoneResponse> update(
+            @PathVariable Long id, @Valid @RequestBody UpdateMilestoneRequest request) {
+        return ApiResponse.success("Milestone updated.", service.update(id, request));
+    }
+
     @GetMapping("/project-assignments/{assignmentId}/milestones")
     public ApiResponse<List<MilestoneResponse>> list(
             @PathVariable Long assignmentId, @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(service.list(assignmentId, principal.id()));
+    }
+
+    @PostMapping("/project-assignments/{assignmentId}/milestones/reminders")
+    @PreAuthorize(
+            "hasRole('ADMIN') or @projectAuthorization.canManageAssignment(#assignmentId, authentication)")
+    public ApiResponse<MilestoneReminderResponse> sendReminder(@PathVariable Long assignmentId) {
+        return ApiResponse.success(
+                "Deadline reminder sent.", milestoneReminderService.send(assignmentId));
     }
 
     @PostMapping("/milestones/{id}/submissions")

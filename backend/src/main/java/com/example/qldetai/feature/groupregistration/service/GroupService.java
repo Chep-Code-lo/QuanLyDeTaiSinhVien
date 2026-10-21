@@ -1,6 +1,6 @@
 package com.example.qldetai.feature.groupregistration.service;
 
-import com.example.qldetai.aspect.BusinessAudit;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ResourceNotFoundException;
@@ -96,7 +96,6 @@ public class GroupService {
         group.setName(request.name().trim());
         group.setStatus(GroupStatus.FORMING);
         group.setCreatedBy(creator);
-        group.setCreatedAt(now);
         group = studentGroupRepository.save(group);
 
         GroupMember leader = new GroupMember();

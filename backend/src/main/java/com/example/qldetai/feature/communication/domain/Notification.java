@@ -1,5 +1,6 @@
 package com.example.qldetai.feature.communication.domain;
 
+import com.example.qldetai.common.persistence.CreatedAtEntity;
 import com.example.qldetai.feature.identity.domain.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -20,7 +21,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class Notification {
+public class Notification extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,9 +39,6 @@ public class Notification {
 
     @Column(name = "target_path", length = 500)
     private String targetPath;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
 
     @Column(name = "read_at")
     private LocalDateTime readAt;

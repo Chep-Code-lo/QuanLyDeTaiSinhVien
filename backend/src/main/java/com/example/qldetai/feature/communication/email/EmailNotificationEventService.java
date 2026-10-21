@@ -11,6 +11,7 @@ import com.example.qldetai.feature.topic.domain.Topic;
 import com.example.qldetai.feature.topic.domain.TopicReview;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
@@ -56,6 +57,11 @@ public class EmailNotificationEventService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void registrationOpened(RegistrationPeriod period, User actor) {
         enqueue(contextFactory.registrationOpened(period, actor));
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void manualDeadlineReminder(Milestone milestone, LocalDate reminderDate) {
+        enqueue(contextFactory.manualDeadlineReminder(milestone, reminderDate));
     }
 
     /** Scheduler entry point. The idempotent event key includes the configured reminder threshold. */

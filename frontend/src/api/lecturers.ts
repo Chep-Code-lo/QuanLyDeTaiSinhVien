@@ -1,5 +1,4 @@
 import { apiClient } from './client'
-import { getItFaculty } from '../config/facultyScope'
 import type { ApiResponse, PageResponse } from '../types/api'
 import type { LecturerDirectoryResponse } from '../types/domain'
 
@@ -16,7 +15,7 @@ export const lecturerApi = {
     const response = await apiClient.get<ApiResponse<PageResponse<LecturerDirectoryResponse>>>(
       '/lecturers',
       {
-        params: { ...params, facultyId: params.facultyId ?? (await getItFaculty()).id },
+        params,
       },
     )
     return response.data.data

@@ -15,6 +15,7 @@ import com.example.qldetai.feature.identity.repository.StudentRepository;
 import com.example.qldetai.feature.identity.service.UserProfileService;
 
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -29,7 +30,11 @@ class UserProfileServiceTests {
             mock(AcademicAppointmentRepository.class);
     private final UserProfileService profiles =
             new UserProfileService(
-                    students, lecturers, appointments, new IdentityMapper(), Clock.systemUTC());
+                    students,
+                    lecturers,
+                    appointments,
+                    Mappers.getMapper(IdentityMapper.class),
+                    Clock.systemUTC());
 
     @Test
     void batchProfilesAreMatchedByUserIdAndPreservePagination() {

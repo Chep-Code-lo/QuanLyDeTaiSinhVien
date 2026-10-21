@@ -65,7 +65,6 @@ public class NotificationService {
         notification.setTitle(title);
         notification.setContent(content);
         notification.setTargetPath(targetPath);
-        notification.setCreatedAt(LocalDateTime.now(clock));
         notificationRepository.save(notification);
     }
 

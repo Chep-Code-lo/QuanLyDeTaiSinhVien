@@ -13,12 +13,16 @@ const mocks = vi.hoisted(() => ({
   periods: [] as RegistrationPeriodResponse[],
 }))
 vi.mock('../src/context/AuthContext', () => ({ useAuth: () => ({
-  user: { id: 1, activeAppointments: [] }, hasRole: () => false,
+  user: {
+    id: 1,
+    activeAppointments: [{ id: 1, facultyId: 1, positionCode: 'DEAN' }],
+  },
+  hasRole: () => false,
   hasAppointment: (code: string) => mocks.dean && code === 'DEAN',
 }) }))
 vi.mock('../src/context/ToastContext', () => ({ useToast: () => ({ showError: mocks.error, showSuccess: mocks.success }) }))
 vi.mock('../src/api/academic', () => ({ academicApi: {
-  getFaculties: async () => [{ id: 1, name: 'Khoa CNTT' }],
+  getFaculties: async () => [{ id: 1, code: 'CNTT', name: 'Khoa CNTT' }],
   getSemesters: async () => [{ id: 2, semesterNo: 1, academicYear: '2099-2100' }],
   getRegistrationPeriods: async () => ({ content: mocks.periods, totalPages: 0 }),
   createRegistrationPeriod: mocks.create,
@@ -28,6 +32,9 @@ vi.mock('../src/api/academic', () => ({ academicApi: {
 beforeEach(() => {
   mocks.dean = true
   mocks.periods = []
+  mocks.create.mockReset()
+  mocks.error.mockReset()
+  mocks.success.mockReset()
   mocks.create.mockImplementation(async payload => ({ ...payload, id: 1, version: 0, status: 'DRAFT' }))
   mocks.changeStatus.mockImplementation(async (_id, payload) => ({
     ...registrationPeriod('CLOSED'),
@@ -41,6 +48,8 @@ async function openForm(type: string) {
   render(<AcademicManagementPage />)
   await userEvent.click(screen.getByRole('button', { name: /Tạo Đợt Đăng Ký Mới/ }))
   await waitFor(() => expect(screen.getAllByRole('option').some(option => option.getAttribute('value') === '2')).toBe(true))
+  await userEvent.selectOptions(screen.getByLabelText(/Khoa quản lý/), '1')
+  await userEvent.selectOptions(screen.getByLabelText(/Học kỳ áp dụng/), '2')
   await userEvent.selectOptions(screen.getByLabelText(/Loại đợt/), type)
   fireEvent.change(screen.getByLabelText(/Tên Đợt Đăng Ký/), { target: { value: 'Đợt thử nghiệm' } })
   const times = [
@@ -104,6 +113,12 @@ describe('Trưởng khoa tạo đợt đăng ký', () => {
       reviewDeadlineAt: review ? new Date('2099-02-25T08:00').toISOString() : null,
       defenseDate: type === 'GRADUATION' ? '2099-02-28' : null,
     })))
+    const [payload] = mocks.create.mock.calls.at(-1)!
+    expect(payload).not.toHaveProperty('minGroupMembers')
+    expect(payload).not.toHaveProperty('maxGroupMembers')
+    expect(payload).not.toHaveProperty('invitationExpiryHours')
+    expect(payload).not.toHaveProperty('minCommitteeMembers')
+    expect(payload).not.toHaveProperty('maxCommitteeMembers')
     expect(mocks.error).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).toBeNull()
     if (type === 'GRADUATION') expect(screen.getByText('28/02/2099')).toBeTruthy()

@@ -1,5 +1,6 @@
 package com.example.qldetai.feature.communication.email;
 
+import com.example.qldetai.common.persistence.UpdatedAtEntity;
 import com.example.qldetai.feature.identity.domain.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,7 +15,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
-import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -28,7 +28,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class EmailNotificationSetting {
+public class EmailNotificationSetting extends UpdatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -73,9 +73,6 @@ public class EmailNotificationSetting {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "updated_by", nullable = false)
     private User updatedBy;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
 
     @Version
     @Column(nullable = false)

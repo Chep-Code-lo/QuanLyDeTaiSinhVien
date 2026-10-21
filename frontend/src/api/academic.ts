@@ -1,5 +1,4 @@
 import { apiClient } from './client'
-import { getItFaculty } from '../config/facultyScope'
 import type { ApiResponse, PageResponse } from '../types/api'
 import type {
   CreateRegistrationPeriodRequest,
@@ -12,17 +11,19 @@ import type {
 } from '../types/domain'
 
 export const academicApi = {
-  getFaculties: async () => [await getItFaculty()],
+  getFaculties: async () => {
+    const response = await apiClient.get<ApiResponse<FacultyResponse[]>>('/faculties')
+    return response.data.data
+  },
   createFaculty: async (payload: { code: string; name: string }) => {
     const response = await apiClient.post<ApiResponse<FacultyResponse>>('/faculties', payload)
     return response.data.data
   },
   getDepartments: async (facultyId?: number) => {
-    const scopeId = facultyId ?? (await getItFaculty()).id
     const response = await apiClient.get<ApiResponse<DepartmentResponse[]>>('/departments', {
-      params: { facultyId: scopeId },
+      params: { facultyId },
     })
-    return response.data.data.filter((department) => department.facultyId === scopeId)
+    return response.data.data
   },
   createDepartment: async (payload: { facultyId: number; code: string; name: string }) => {
     const response = await apiClient.post<ApiResponse<DepartmentResponse>>('/departments', payload)
@@ -37,11 +38,10 @@ export const academicApi = {
     return response.data.data
   },
   getRegistrationPeriods: async (facultyId?: number, page = 0, size = 20) => {
-    const scopeId = facultyId ?? (await getItFaculty()).id
     const response = await apiClient.get<ApiResponse<PageResponse<RegistrationPeriodResponse>>>(
       '/registration-periods',
       {
-        params: { facultyId: scopeId, page, size },
+        params: { facultyId, page, size },
       },
     )
     return response.data.data

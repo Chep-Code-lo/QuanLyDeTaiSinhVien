@@ -17,6 +17,8 @@ interface LecturerAutocompleteProps {
   required?: boolean
   label?: string
   error?: string
+  facultyId?: number
+  departmentId?: number
 }
 
 export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
@@ -31,6 +33,8 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
   required = false,
   label,
   error,
+  facultyId,
+  departmentId,
 }) => {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<LecturerDirectoryResponse[]>([])
@@ -58,7 +62,7 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
     }
     if (value && (!selectedLecturer || selectedLecturer.id !== value)) {
       setSelectedLecturer(null)
-      allPages(page => lecturerApi.list({ page, size: 100 }))
+      allPages(page => lecturerApi.list({ facultyId, departmentId, page, size: 100 }))
         .then((res) => {
           const found = res.find((l) => l.id === value)
           if (active && found) {
@@ -70,7 +74,7 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
       setSelectedLecturer(null)
     }
     return () => { active = false }
-  }, [value, selectedLecturer, selectedOption])
+  }, [value, selectedLecturer, selectedOption, facultyId, departmentId])
 
   // Search with debounce
   useEffect(() => {
@@ -81,7 +85,7 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
     const timer = setTimeout(() => {
       setLoading(true)
       lecturerApi
-        .list({ search: query, size: 20 })
+        .list({ search: query, facultyId, departmentId, size: 20 })
         .then((res) => {
           if (active) setResults(res.content)
         })
@@ -94,7 +98,7 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
     }, 300)
 
     return () => { active = false; clearTimeout(timer) }
-  }, [query, isOpen])
+  }, [query, isOpen, facultyId, departmentId])
 
   const handleSelect = (lecturer: LecturerDirectoryResponse) => {
     setSelectedLecturer(lecturer)

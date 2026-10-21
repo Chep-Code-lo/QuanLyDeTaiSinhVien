@@ -1,27 +1,20 @@
-package com.example.qldetai.aspect;
+package com.example.qldetai.common.audit;
 
 import com.example.qldetai.feature.communication.domain.AuditLog;
-import com.example.qldetai.feature.communication.repository.AuditLogRepository;
 import com.example.qldetai.feature.communication.domain.AuditOutcome;
+import com.example.qldetai.feature.communication.repository.AuditLogRepository;
 import com.example.qldetai.feature.identity.repository.UserRepository;
-import java.time.Clock;
-import java.time.LocalDateTime;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AuditLogWriter {
 
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
-    private final Clock clock;
-
-    public AuditLogWriter(AuditLogRepository auditLogRepository, UserRepository userRepository, Clock clock) {
-        this.auditLogRepository = auditLogRepository;
-        this.userRepository = userRepository;
-        this.clock = clock;
-    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void write(
@@ -40,7 +33,6 @@ public class AuditLogWriter {
         log.setOutcome(outcome);
         log.setRequestId(requestId);
         log.setDurationMs(durationMs);
-        log.setCreatedAt(LocalDateTime.now(clock));
         auditLogRepository.save(log);
     }
 }

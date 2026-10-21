@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Bell, BookOpen, Check, Clock, FolderOpen, ListChecks } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { dashboardApi } from '../api/dashboard'
@@ -15,6 +15,8 @@ const topicTypes = [
   { type: 'RESEARCH', label: 'Nghiên cứu khoa học', color: '#f59e0b', dot: 'yellow' },
   { type: 'COURSE', label: 'Đề tài môn học', color: '#cbd5e1', dot: 'slate' },
 ] as const
+type TopicType = (typeof topicTypes)[number]['type']
+type TooltipPosition = { x: number; y: number; side: 'left' | 'right' }
 const number = (value: number) => value.toLocaleString('vi-VN')
 const dateTime = (value: string) => formatDateTime(value)
 
@@ -25,6 +27,9 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [revision, setRevision] = useState(0)
+  const [hoveredTopicType, setHoveredTopicType] = useState<TopicType | null>(null)
+  const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null)
+  const chartWrapperRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let active = true
@@ -64,14 +69,45 @@ export function DashboardPage() {
     count: summary?.topicTypes.find((item) => item.projectType === type.type)?.count ?? 0,
   }))
   let chartOffset = 0
-  const chartStops = counts.map((item) => {
-    const start = chartOffset
-    chartOffset += summary?.totalTopics ? (item.count / summary.totalTopics) * 100 : 0
-    return `${item.color} ${start}% ${chartOffset}%`
+  const chartSegments = counts.map((item) => {
+    const percentage = summary?.totalTopics ? (item.count / summary.totalTopics) * 100 : 0
+    const segment = { ...item, percentage, offset: chartOffset }
+    chartOffset += percentage
+    return segment
   })
-  const chartBackground = summary?.totalTopics
-    ? `conic-gradient(${chartStops.join(', ')})`
-    : '#e2e8f0'
+  const updateTooltipPosition = (clientX: number, clientY: number) => {
+    const bounds = chartWrapperRef.current?.getBoundingClientRect()
+    if (!bounds) return
+
+    const x = Math.max(0, Math.min(clientX - bounds.left, bounds.width))
+    const y = Math.max(0, Math.min(clientY - bounds.top, bounds.height))
+    setTooltipPosition({ x, y, side: x > bounds.width / 2 ? 'left' : 'right' })
+  }
+  const focusTopicSegment = (segment: (typeof chartSegments)[number]) => {
+    const bounds = chartWrapperRef.current?.getBoundingClientRect()
+    setHoveredTopicType(segment.type)
+    if (!bounds) return
+
+    const angle = ((segment.offset + segment.percentage / 2) / 100) * Math.PI * 2 - Math.PI / 2
+    const radius = Math.min(bounds.width, bounds.height) * 0.42
+    const x = bounds.width / 2 + radius * Math.cos(angle)
+    const y = bounds.height / 2 + radius * Math.sin(angle)
+    setTooltipPosition({ x, y, side: x > bounds.width / 2 ? 'left' : 'right' })
+  }
+  const clearHoveredTopic = () => {
+    setHoveredTopicType(null)
+    setTooltipPosition(null)
+  }
+  const hoveredTopic = counts.find((item) => item.type === hoveredTopicType)
+  const hoveredPercentage =
+    summary?.totalTopics && hoveredTopic
+      ? Math.round((hoveredTopic.count / summary.totalTopics) * 100)
+      : 0
+  const chartTooltip = hoveredTopic
+    ? `${number(hoveredTopic.count)} đề tài · ${hoveredPercentage}% tổng số`
+    : summary
+      ? `${number(summary.totalTopics)} đề tài thuộc ${number(counts.filter((item) => item.count > 0).length)} loại hình`
+      : 'Đang tải dữ liệu thống kê'
   const metrics = [
     {
       label: 'Tổng đề tài',
@@ -172,16 +208,71 @@ export function DashboardPage() {
           </div>
           <div className="chart-layout">
             <div
-              className="donut"
-              style={{ background: chartBackground }}
-              role="img"
-              aria-label={
-                summary ? `Tổng ${number(summary.totalTopics)} đề tài theo loại` : 'Chưa có số liệu'
-              }
+              ref={chartWrapperRef}
+              className={`donut-wrapper${hoveredTopic ? ' donut-wrapper--segment-active' : ''}`}
             >
-              <div>
-                <strong>{summary ? number(summary.totalTopics) : '—'}</strong>
-                <span>Đề tài</span>
+              <svg
+                className="donut"
+                viewBox="0 0 100 100"
+                width="166"
+                height="166"
+                preserveAspectRatio="xMidYMid meet"
+                shapeRendering="geometricPrecision"
+                role="group"
+                aria-label="Biểu đồ phân bố đề tài theo loại"
+              >
+                <g transform="rotate(-90 50 50)">
+                  <circle className="donut__track" cx="50" cy="50" r="42" fill="none" strokeWidth="16" />
+                  {chartSegments.filter((item) => item.percentage > 0).map((item) => (
+                    <circle
+                      key={item.type}
+                      className={`donut__segment${hoveredTopicType === item.type ? ' donut__segment--active' : ''}`}
+                      cx="50"
+                      cy="50"
+                      r="42"
+                      fill="none"
+                      stroke={item.color}
+                      strokeWidth="16"
+                      pathLength="100"
+                      strokeDasharray={`${item.percentage} ${100 - item.percentage}`}
+                      strokeDashoffset={-item.offset}
+                      tabIndex={0}
+                      role="img"
+                      aria-label={`${item.label}: ${number(item.count)} đề tài`}
+                      aria-describedby="dashboard-topic-chart-tooltip"
+                      onPointerEnter={(event) => {
+                        setHoveredTopicType(item.type)
+                        updateTooltipPosition(event.clientX, event.clientY)
+                      }}
+                      onPointerMove={(event) => updateTooltipPosition(event.clientX, event.clientY)}
+                      onPointerLeave={clearHoveredTopic}
+                      onFocus={() => focusTopicSegment(item)}
+                      onBlur={clearHoveredTopic}
+                    />
+                  ))}
+                </g>
+                <circle className="donut__center" cx="50" cy="50" r="34" />
+                <text className="donut__value" x="50" y="47" textAnchor="middle" dominantBaseline="middle">
+                  {summary ? number(summary.totalTopics) : '—'}
+                </text>
+                <text className="donut__label" x="50" y="62" textAnchor="middle" dominantBaseline="middle">
+                  Đề tài
+                </text>
+              </svg>
+              <div
+                className={`donut__tooltip${tooltipPosition?.side === 'left' ? ' donut__tooltip--left' : ''}`}
+                id="dashboard-topic-chart-tooltip"
+                role="tooltip"
+                style={tooltipPosition ? { left: `${tooltipPosition.x}px`, top: `${tooltipPosition.y}px` } : undefined}
+              >
+                <strong>
+                  {hoveredTopic
+                    ? hoveredTopic.label
+                    : summary
+                      ? `Tổng ${number(summary.totalTopics)} đề tài`
+                      : 'Đang tải số liệu'}
+                </strong>
+                <span>{chartTooltip}</span>
               </div>
             </div>
             <ul className="chart-legend">

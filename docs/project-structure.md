@@ -3,12 +3,17 @@
 ```text
 QuanLyDeTaiSinhVien/
 ├── backend/                 # Spring Boot API, chia theo feature
+│   └── src/main/java/com/example/qldetai/
+│       ├── common/audit/    # Audit nghiệp vụ và ghi audit log
+│       ├── common/observability/ # Logging cuộc gọi service chậm
+│       ├── common/persistence/ # Base entity và callback timestamp JPA
+│       └── feature/         # Controller, service, domain, DTO theo nghiệp vụ
 ├── database/
 │   ├── migrations/          # Các migration MySQL có version
 │   ├── seed/                # Dữ liệu và thao tác dành cho môi trường demo
 │   └── ql_de_tai_sinh_vien_schema.sql
+├── docker-compose.yml        # Khởi chạy các dịch vụ bằng Docker Compose
 ├── docs/                    # Hợp đồng API, hướng dẫn và tài liệu dự án
-├── docker/                  # Bootstrap container
 ├── frontend/
 │   ├── public/              # Tài nguyên tĩnh
 │   ├── src/
@@ -37,3 +42,5 @@ Quy ước khi thêm mã mới:
   `styles/`.
 - Dữ liệu demo chỉ được nạp khi MySQL khởi tạo volume mới; mọi tệp seed phải
   ghi rõ phạm vi local và cách reset dữ liệu trong phần đầu tệp hoặc README.
+- Cross-cutting concern đặt trong `common/` theo trách nhiệm; không tạo lại
+  thư mục `aspect/` chung chung.

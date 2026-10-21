@@ -11,7 +11,8 @@ const StudentResultsPage = lazy(() => import('../pages/StudentResultsPage').then
 const AcademicAppointmentsPage = lazy(() => import('../pages/AcademicAppointmentsPage').then(module => ({ default: module.AcademicAppointmentsPage })))
 const AcademicManagementPage = lazy(() => import('../pages/AcademicManagementPage').then(module => ({ default: module.AcademicManagementPage })))
 const AccountPage = lazy(() => import('../pages/AccountPage').then(module => ({ default: module.AccountPage })))
-const CreateAccountPage = lazy(() => import('../pages/CreateAccountPage').then(module => ({ default: module.CreateAccountPage })))
+const UserManagementPage = lazy(() => import('../pages/UserManagementPage').then(module => ({ default: module.UserManagementPage })))
+const EmailSettingsPage = lazy(() => import('../pages/EmailSettingsPage').then(module => ({ default: module.EmailSettingsPage })))
 const AssessmentSetupWizardPage = lazy(() => import('../pages/AssessmentSetupWizardPage').then(module => ({ default: module.AssessmentSetupWizardPage })))
 const DashboardPage = lazy(() => import('../pages/DashboardPage').then(module => ({ default: module.DashboardPage })))
 const EvaluatorAssignmentPage = lazy(() => import('../pages/EvaluatorAssignmentPage').then(module => ({ default: module.EvaluatorAssignmentPage })))
@@ -36,11 +37,7 @@ function PublicHomeRoute() {
 
 export function AppRoutes() {
   const { hasRole } = useAuth()
-
-  const student =
-    hasRole('STUDENT') &&
-    !hasRole('ADMIN') &&
-    !hasRole('LECTURER')
+  const student = hasRole('STUDENT') && !hasRole('ADMIN') && !hasRole('LECTURER')
 
   return (
     <Suspense fallback={<div className="content-state" role="status"><span className="spinner" /></div>}>
@@ -51,7 +48,7 @@ export function AppRoutes() {
       {/* Authenticated Layout */}
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route path="dashboard" element={student ? <Navigate to="/announcements" replace /> : <DashboardPage />} />
+          <Route path="dashboard" element={<DashboardPage />} />
           <Route path="topics" element={<TopicsPage />} />
           <Route path="groups" element={<GroupsPage />} />
           <Route path="registrations" element={<RegistrationsPage />} />
@@ -100,9 +97,11 @@ export function AppRoutes() {
           {/* Admin Only Routes */}
           <Route element={<ProtectedRoute roles={['ADMIN']} />}>
             <Route
-              path="admin-users/new"
-              element={<CreateAccountPage />}
+              path="admin-users"
+              element={<UserManagementPage />}
             />
+            <Route path="admin-users/new" element={<Navigate to="/admin-users" replace />} />
+            <Route path="email-settings" element={<EmailSettingsPage />} />
             <Route
               path="admin-appointments"
               element={<AcademicAppointmentsPage />}

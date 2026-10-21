@@ -65,9 +65,6 @@ export const AcademicAppointmentsPage: React.FC = () => {
       .getFaculties()
       .then((res) => {
         setFaculties(res)
-        if (res.length > 0) {
-          setNewAppointment((prev) => ({ ...prev, facultyId: res[0].id }))
-        }
       })
       .catch((error) => showError(error.message))
   }, [loadAppointments, showError])
@@ -103,7 +100,7 @@ export const AcademicAppointmentsPage: React.FC = () => {
       setIsModalOpen(false)
       setNewAppointment({
         lecturerId: null,
-        facultyId: faculties[0]?.id || 0,
+        facultyId: 0,
         departmentId: null,
         positionCode: 'DEAN',
         startsAt: toLocalDateTimeInput(new Date()),
@@ -254,12 +251,41 @@ export const AcademicAppointmentsPage: React.FC = () => {
             <form onSubmit={handleCreateAppointment}>
               <div className="modal-body py-4 space-y-4">
                 <div className="form-group">
+                  <label className="form-label" htmlFor="appointment-faculty">
+                    Khoa phụ trách <span className="text-red">*</span>
+                  </label>
+                  <AnimatedSelect
+                    id="appointment-faculty"
+                    className="form-select"
+                    value={newAppointment.facultyId || ''}
+                    onChange={(event) =>
+                      setNewAppointment((current) => ({
+                        ...current,
+                        facultyId: Number(event.target.value) || 0,
+                        departmentId: null,
+                        lecturerId: null,
+                      }))
+                    }
+                    required
+                  >
+                    <option value="">-- Chọn khoa --</option>
+                    {faculties.map((faculty) => (
+                      <option key={faculty.id} value={faculty.id}>
+                        {faculty.name} ({faculty.code})
+                      </option>
+                    ))}
+                  </AnimatedSelect>
+                </div>
+
+                <div className="form-group">
                   <LecturerAutocomplete
                     label="Giảng viên được bổ nhiệm"
                     required
                     value={newAppointment.lecturerId}
                     onChange={(id) => setNewAppointment({ ...newAppointment, lecturerId: id })}
                     placeholder="Tìm giảng viên theo tên, mã..."
+                    facultyId={newAppointment.facultyId || undefined}
+                    disabled={!newAppointment.facultyId}
                   />
                 </div>
 

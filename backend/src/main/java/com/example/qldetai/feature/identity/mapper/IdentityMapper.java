@@ -5,6 +5,7 @@ import com.example.qldetai.feature.identity.domain.Lecturer;
 import com.example.qldetai.feature.identity.domain.RoleCode;
 import com.example.qldetai.feature.identity.domain.Student;
 import com.example.qldetai.feature.identity.domain.User;
+import com.example.qldetai.feature.identity.domain.UserRole;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.AppointmentResponse;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.CurrentUserResponse;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.LecturerDirectoryResponse;
@@ -12,91 +13,74 @@ import com.example.qldetai.feature.identity.dto.IdentityDtos.LecturerProfileResp
 import com.example.qldetai.feature.identity.dto.IdentityDtos.StudentProfileResponse;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UserResponse;
 
-import org.springframework.stereotype.Component;
-
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.Named;
+import org.mapstruct.ReportingPolicy;
 
-@Component
-public class IdentityMapper {
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
+public interface IdentityMapper {
 
-    public CurrentUserResponse toCurrentUser(
-            User user, Student student, Lecturer lecturer, List<AcademicAppointment> appointments) {
-        return new CurrentUserResponse(
-                user.getId(),
-                user.getFullName(),
-                user.getEmail(),
-                roleCodes(user),
-                student == null ? null : toStudent(student),
-                lecturer == null ? null : toLecturer(lecturer),
-                appointments.stream().map(this::toAppointment).toList());
-    }
+    @Mapping(target = "id", source = "user.id")
+    @Mapping(target = "fullName", source = "user.fullName")
+    @Mapping(target = "username", source = "user.email")
+    @Mapping(target = "roles", source = "user.userRoles", qualifiedByName = "roleCodes")
+    @Mapping(target = "student", source = "student")
+    @Mapping(target = "lecturer", source = "lecturer")
+    @Mapping(target = "activeAppointments", source = "appointments")
+    CurrentUserResponse toCurrentUser(
+            User user, Student student, Lecturer lecturer, List<AcademicAppointment> appointments);
 
-    public UserResponse toUser(User user, Student student, Lecturer lecturer) {
-        return new UserResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getFullName(),
-                user.getPhone(),
-                user.getStatus(),
-                roleCodes(user),
-                student == null ? null : toStudent(student),
-                lecturer == null ? null : toLecturer(lecturer),
-                user.getLastLoginAt(),
-                user.getCreatedAt(),
-                user.getVersion());
-    }
+    @Mapping(target = "id", source = "user.id")
+    @Mapping(target = "email", source = "user.email")
+    @Mapping(target = "fullName", source = "user.fullName")
+    @Mapping(target = "phone", source = "user.phone")
+    @Mapping(target = "status", source = "user.status")
+    @Mapping(target = "roles", source = "user.userRoles", qualifiedByName = "roleCodes")
+    @Mapping(target = "student", source = "student")
+    @Mapping(target = "lecturer", source = "lecturer")
+    @Mapping(target = "lastLoginAt", source = "user.lastLoginAt")
+    @Mapping(target = "lastLoginIp", source = "user.lastLoginIp")
+    @Mapping(target = "createdAt", source = "user.createdAt")
+    @Mapping(target = "version", source = "user.version")
+    UserResponse toUser(User user, Student student, Lecturer lecturer);
 
-    public AppointmentResponse toAppointment(AcademicAppointment appointment) {
-        Lecturer lecturer = appointment.getLecturer();
-        return new AppointmentResponse(
-                appointment.getId(),
-                lecturer.getId(),
-                lecturer.getLecturerCode(),
-                lecturer.getUser().getFullName(),
-                appointment.getFaculty().getId(),
-                appointment.getDepartment() == null ? null : appointment.getDepartment().getId(),
-                appointment.getPositionCode(),
-                appointment.getStartsAt(),
-                appointment.getEndsAt());
-    }
+    @Mapping(target = "lecturerId", source = "lecturer.id")
+    @Mapping(target = "lecturerCode", source = "lecturer.lecturerCode")
+    @Mapping(target = "lecturerName", source = "lecturer.user.fullName")
+    @Mapping(target = "facultyId", source = "faculty.id")
+    @Mapping(target = "departmentId", source = "department.id")
+    AppointmentResponse toAppointment(AcademicAppointment appointment);
 
-    public LecturerDirectoryResponse toLecturerDirectory(Lecturer lecturer) {
-        return new LecturerDirectoryResponse(
-                lecturer.getId(),
-                lecturer.getUser().getId(),
-                lecturer.getLecturerCode(),
-                lecturer.getUser().getFullName(),
-                lecturer.getAcademicDegree(),
-                lecturer.getSpecialization(),
-                lecturer.getDepartment().getFaculty().getId(),
-                lecturer.getDepartment().getFaculty().getName(),
-                lecturer.getDepartment().getId(),
-                lecturer.getDepartment().getName());
-    }
+    @Mapping(target = "userId", source = "user.id")
+    @Mapping(target = "fullName", source = "user.fullName")
+    @Mapping(target = "facultyId", source = "department.faculty.id")
+    @Mapping(target = "facultyName", source = "department.faculty.name")
+    @Mapping(target = "departmentId", source = "department.id")
+    @Mapping(target = "departmentName", source = "department.name")
+    LecturerDirectoryResponse toLecturerDirectory(Lecturer lecturer);
 
-    private Set<RoleCode> roleCodes(User user) {
-        return user.getUserRoles().stream()
-                .map(userRole -> userRole.getRole().getCode())
-                .collect(Collectors.toUnmodifiableSet());
-    }
+    @Mapping(target = "departmentId", source = "department.id")
+    StudentProfileResponse toStudent(Student student);
 
-    private StudentProfileResponse toStudent(Student student) {
-        return new StudentProfileResponse(
-                student.getId(),
-                student.getStudentCode(),
-                student.getClassName(),
-                student.getCohort(),
-                student.getDepartment().getId());
-    }
+    @Mapping(target = "departmentId", source = "department.id")
+    LecturerProfileResponse toLecturer(Lecturer lecturer);
 
-    private LecturerProfileResponse toLecturer(Lecturer lecturer) {
-        return new LecturerProfileResponse(
-                lecturer.getId(),
-                lecturer.getLecturerCode(),
-                lecturer.getAcademicDegree(),
-                lecturer.getSpecialization(),
-                lecturer.getDepartment().getId());
+    @Named("roleCodes")
+    default Set<RoleCode> toRoleCodes(Set<UserRole> userRoles) {
+        if (userRoles == null || userRoles.isEmpty()) {
+            return Set.of();
+        }
+
+        Set<RoleCode> roleCodes = new LinkedHashSet<>();
+        for (UserRole userRole : userRoles) {
+            if (userRole != null && userRole.getRole() != null) {
+                roleCodes.add(userRole.getRole().getCode());
+            }
+        }
+        return Set.copyOf(roleCodes);
     }
 }

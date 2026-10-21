@@ -57,8 +57,9 @@ public class AuthService {
 
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
         User user = requireUser(principal.id());
-        user.setLastLoginAt(LocalDateTime.now(clock));
-        user.setUpdatedAt(LocalDateTime.now(clock));
+        LocalDateTime now = LocalDateTime.now(clock);
+        user.setLastLoginAt(now);
+        user.setLastLoginIp(clientIp(httpRequest));
         return new LoginResponse(userProfileService.toCurrentUser(user));
     }
 
@@ -78,12 +79,22 @@ public class AuthService {
                     "The new password must differ from the current password.");
         }
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
-        user.setUpdatedAt(LocalDateTime.now(clock));
     }
 
     private User requireUser(Long userId) {
         return userRepository
                 .findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User account was not found."));
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        String candidate = forwardedFor == null || forwardedFor.isBlank()
+                ? request.getHeader("X-Real-IP")
+                : forwardedFor.split(",", 2)[0].trim();
+        if (candidate == null || candidate.isBlank()) {
+            candidate = request.getRemoteAddr();
+        }
+        return candidate.length() <= 45 ? candidate : candidate.substring(0, 45);
     }
 }

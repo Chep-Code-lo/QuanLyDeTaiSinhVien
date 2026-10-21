@@ -86,7 +86,6 @@ public class EmailOutboxDeliveryStateService {
         log.setAttemptNo(message.getAttemptCount());
         log.setStatus(status);
         log.setErrorMessage(error);
-        log.setCreatedAt(now);
         deliveryLogRepository.save(log);
     }
 

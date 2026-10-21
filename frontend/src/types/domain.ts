@@ -1,7 +1,7 @@
 export type RoleCode = 'STUDENT' | 'LECTURER' | 'ADMIN'
 export type PositionCode = 'DEAN' | 'DEPARTMENT_HEAD'
 
-export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'LOCKED'
+export type UserStatus = 'ACTIVE' | 'DISABLED' | 'LOCKED'
 
 export interface StudentProfileResponse {
   id: number
@@ -29,6 +29,7 @@ export interface UserResponse {
   student?: StudentProfileResponse
   lecturer?: LecturerProfileResponse
   lastLoginAt?: string
+  lastLoginIp?: string
   createdAt: string
   version: number
 }
@@ -42,6 +43,15 @@ export type CreateUserRequest = {
   | { roles: ['STUDENT']; student: Omit<StudentProfileResponse, 'id'>; lecturer?: never }
   | { roles: ['LECTURER']; lecturer: Omit<LecturerProfileResponse, 'id'>; student?: never }
 )
+
+export interface UpdateUserRequest {
+  version: number
+  email: string
+  fullName: string
+  phone?: string
+  student?: Omit<StudentProfileResponse, 'id'>
+  lecturer?: Omit<LecturerProfileResponse, 'id'>
+}
 
 export interface AppointmentResponse {
   id: number
@@ -342,11 +352,11 @@ export interface CreateRegistrationPeriodRequest {
   registrationEndAt: string
   reviewDeadlineAt?: string | null
   defenseDate?: string | null
-  minGroupMembers: number
-  maxGroupMembers: number
-  invitationExpiryHours: number
-  minCommitteeMembers: number
-  maxCommitteeMembers: number
+  minGroupMembers?: number
+  maxGroupMembers?: number
+  invitationExpiryHours?: number
+  minCommitteeMembers?: number
+  maxCommitteeMembers?: number
 }
 
 export interface UpdateRegistrationPeriodRequest {
@@ -394,6 +404,102 @@ export interface NotificationResponse {
   content: string
   targetPath?: string
   readAt?: string
+  createdAt: string
+}
+
+export type NotificationScopeType = 'SYSTEM' | 'FACULTY' | 'LECTURER'
+export type EmailNotificationEventType =
+  | 'TASK_ASSIGNED'
+  | 'TOPIC_APPROVED'
+  | 'TOPIC_REJECTED'
+  | 'DEADLINE_REMINDER'
+  | 'REGISTRATION_OPENED'
+export type EmailRecipientGroup =
+  | 'DIRECT_PARTICIPANTS'
+  | 'FACULTY_STUDENTS'
+  | 'FACULTY_LECTURERS'
+  | 'GROUP_STUDENTS'
+  | 'TOPIC_STUDENTS'
+  | 'SUPERVISORS'
+  | 'ADMINS'
+export type EmailOutboxStatus = 'PENDING' | 'SENDING' | 'SENT' | 'FAILED'
+
+export interface EmailNotificationSettingResponse {
+  id?: number
+  eventType: EmailNotificationEventType
+  enabled: boolean
+  senderName: string
+  fromEmail: string
+  replyToEmail?: string
+  subjectTemplate: string
+  bodyTemplate: string
+  recipientGroups: EmailRecipientGroup[]
+  reminderHours?: number
+  scopeType: NotificationScopeType
+  scopeId: number
+  updatedBy?: number
+  updatedByName?: string
+  updatedAt?: string
+  version: number
+  allowedVariables: string[]
+}
+
+export interface UpdateEmailNotificationSettingRequest {
+  scopeType: NotificationScopeType
+  scopeId: number
+  enabled: boolean
+  senderName: string
+  fromEmail?: string
+  replyToEmail?: string
+  subjectTemplate: string
+  bodyTemplate: string
+  recipientGroups: EmailRecipientGroup[]
+  reminderHours?: number
+}
+
+export interface PreviewEmailNotificationSettingRequest {
+  scopeType: NotificationScopeType
+  scopeId: number
+  senderName?: string
+  fromEmail?: string
+  replyToEmail?: string
+  subjectTemplate?: string
+  bodyTemplate?: string
+}
+
+export interface EmailPreviewResponse {
+  eventType: EmailNotificationEventType
+  senderName: string
+  fromEmail: string
+  replyToEmail?: string
+  subject: string
+  body: string
+  allowedVariables: string[]
+  sampleDataUsed: boolean
+}
+
+export interface EmailTestQueuedResponse {
+  outboxId: number
+  recipientEmail: string
+  status: EmailOutboxStatus
+}
+
+export interface EmailLogResponse {
+  id: number
+  eventType: EmailNotificationEventType
+  eventKey: string
+  recipientName: string
+  recipientEmail: string
+  subject: string
+  status: EmailOutboxStatus
+  attemptCount: number
+  nextAttemptAt?: string
+  sentAt?: string
+  lastError?: string
+  facultyId?: number
+  relatedTopicId?: number
+  relatedGroupId?: number
+  relatedAssignmentId?: number
   createdAt: string
 }
 

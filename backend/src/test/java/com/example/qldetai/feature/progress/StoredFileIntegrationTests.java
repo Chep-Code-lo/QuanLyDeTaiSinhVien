@@ -1,6 +1,7 @@
 package com.example.qldetai.feature.progress;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -119,6 +120,12 @@ class StoredFileIntegrationTests {
         mockMvc.perform(get("/api/v1/files/{id}/download", storedFileId).session(session))
                 .andExpect(status().isOk())
                 .andExpect(header().exists(HttpHeaders.CONTENT_DISPOSITION))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF))
+                .andExpect(content().bytes(fileBytes));
+
+        mockMvc.perform(get("/api/v1/files/{id}/preview", storedFileId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("inline")))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF))
                 .andExpect(content().bytes(fileBytes));
     }

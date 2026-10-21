@@ -1,5 +1,6 @@
 package com.example.qldetai.feature.groupregistration.domain;
 
+import com.example.qldetai.common.persistence.CreatedAtEntity;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriod;
 import com.example.qldetai.feature.identity.domain.Student;
 import jakarta.persistence.Column;
@@ -14,7 +15,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
-import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -24,7 +24,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class StudentGroup {
+public class StudentGroup extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,9 +44,6 @@ public class StudentGroup {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by", nullable = false)
     private Student createdBy;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
 
     @Version
     @Column(nullable = false)

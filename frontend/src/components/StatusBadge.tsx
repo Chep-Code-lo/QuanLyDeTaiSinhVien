@@ -45,7 +45,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label }) => {
       case 'DRAFT':
         return 'Nháp'
       case 'LOCKED':
-        return 'Đã khóa 🔒'
+        return 'Đã khóa'
       case 'OPEN':
         return 'Mở'
       case 'SUBMITTED':

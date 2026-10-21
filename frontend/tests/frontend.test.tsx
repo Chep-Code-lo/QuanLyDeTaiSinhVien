@@ -87,10 +87,10 @@ describe('Hồi quy frontend', () => {
     expect(mocks.showError).toHaveBeenCalled()
   })
 
-  it('hiển thị biểu tượng SVG và nút tạo tài khoản không có href cho admin', () => {
+  it('hiển thị biểu tượng SVG và nút quản lý tài khoản không có href cho admin', () => {
     const { container } = mount(<Sidebar onNavigate={vi.fn()} />)
     expect(container.querySelectorAll('.sidebar__icon svg').length).toBeGreaterThan(10)
-    expect(screen.getByRole('button', { name: 'Tạo tài khoản' }).hasAttribute('href')).toBe(false)
+    expect(screen.getByRole('button', { name: 'Quản lý tài khoản' }).hasAttribute('href')).toBe(false)
   })
 
   it('tìm từ URL trên tất cả các trang đề tài, kể cả dữ liệu trang sau', async () => {

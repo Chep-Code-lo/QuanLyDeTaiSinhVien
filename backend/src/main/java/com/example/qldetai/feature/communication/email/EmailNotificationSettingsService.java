@@ -126,7 +126,6 @@ public class EmailNotificationSettingsService {
         setting.setRecipientGroups(encodeRecipientGroups(request.recipientGroups()));
         setting.setReminderHours(request.reminderHours());
         setting.setUpdatedBy(actor);
-        setting.setUpdatedAt(LocalDateTime.now(clock));
         return toResponse(settingRepository.save(setting));
     }
 

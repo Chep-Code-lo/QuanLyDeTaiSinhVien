@@ -1,4 +1,4 @@
-package com.example.qldetai.aspect;
+package com.example.qldetai.common.audit;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

@@ -1,6 +1,6 @@
 package com.example.qldetai.feature.evaluation.service;
 
-import com.example.qldetai.aspect.BusinessAudit;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ConflictException;
@@ -83,7 +83,6 @@ public class EvaluationCommitteeService {
         committee.setFaculty(period.getFaculty());
         committee.setName(request.name().trim());
         committee.setCreatedBy(actorAccess.user(actorId));
-        committee.setCreatedAt(LocalDateTime.now(clock));
         return committees.save(committee).getId();
     }
 

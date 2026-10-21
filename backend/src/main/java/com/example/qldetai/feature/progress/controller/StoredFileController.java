@@ -49,16 +49,30 @@ public class StoredFileController {
     @GetMapping("/{id}/download")
     @PreAuthorize("@storedFileAuthorization.canView(#id, authentication)")
     public ResponseEntity<Resource> download(@PathVariable Long id) {
-        StoredFileService.DownloadedFile file = storedFileService.download(id);
+        return fileResponse(storedFileService.download(id), true);
+    }
+
+    @GetMapping("/{id}/preview")
+    @PreAuthorize("@storedFileAuthorization.canView(#id, authentication)")
+    public ResponseEntity<Resource> preview(@PathVariable Long id) {
+        return fileResponse(storedFileService.preview(id), false);
+    }
+
+    private ResponseEntity<Resource> fileResponse(
+            StoredFileService.DownloadedFile file, boolean attachment) {
+        ContentDisposition contentDisposition = attachment
+                ? ContentDisposition.attachment()
+                        .filename(file.originalName(), StandardCharsets.UTF_8)
+                        .build()
+                : ContentDisposition.inline()
+                        .filename(file.originalName(), StandardCharsets.UTF_8)
+                        .build();
         return ResponseEntity.ok()
                 .contentType(contentType(file.mimeType()))
                 .contentLength(file.sizeBytes())
                 .header(
                         HttpHeaders.CONTENT_DISPOSITION,
-                        ContentDisposition.attachment()
-                                .filename(file.originalName(), StandardCharsets.UTF_8)
-                                .build()
-                                .toString())
+                        contentDisposition.toString())
                 .body(new FileSystemResource(file.path()));
     }
 

@@ -10,7 +10,6 @@ import { ConfirmModal } from '../components/ConfirmModal'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import type {
-  CreateMilestoneRequest,
   MilestoneResponse,
   MilestoneType,
   ProjectAssignmentResponse,
@@ -118,16 +117,15 @@ export const MilestoneManagementPage: React.FC = () => {
       const dueAt = editingMilestone && newMilestone.dueAt === toLocalDateTimeInput(parseUtcDateTime(editingMilestone.dueAt))
         ? parseUtcDateTime(editingMilestone.dueAt).toISOString()
         : new Date(newMilestone.dueAt).toISOString()
-      const payload: CreateMilestoneRequest = {
-        assignmentId: selectedAssignmentId,
+      const milestoneDetails = {
         title: newMilestone.title.trim(),
         milestoneType: newMilestone.milestoneType,
         description: newMilestone.description.trim(),
         dueAt,
       }
       const saved = editingMilestone
-        ? await milestoneApi.update(editingMilestone.id, { ...payload, version: editingMilestone.version })
-        : await milestoneApi.create(payload)
+        ? await milestoneApi.update(editingMilestone.id, { version: editingMilestone.version, ...milestoneDetails })
+        : await milestoneApi.create({ assignmentId: selectedAssignmentId, ...milestoneDetails })
       showSuccess(editingMilestone ? 'Đã cập nhật mốc báo cáo.' : 'Tạo mốc tiến độ thành công!')
       setMilestones((prev) => editingMilestone
         ? prev.map((milestone) => milestone.id === saved.id ? saved : milestone)
@@ -158,9 +156,11 @@ export const MilestoneManagementPage: React.FC = () => {
     setReminding(true)
     try {
       const result = await milestoneApi.remind(selectedAssignmentId)
-      showSuccess(result.recipientCount > 0
-        ? `Đã gửi nhắc hạn ${result.milestoneCount} mốc báo cáo cho ${result.recipientCount} sinh viên.`
-        : 'Không có mốc báo cáo chưa nộp cần nhắc hạn.')
+      showSuccess(result.milestoneCount === 0
+        ? 'Không có mốc báo cáo sắp tới chưa nộp cần nhắc hạn.'
+        : result.recipientCount === 0
+          ? 'Nhóm chưa có thành viên đang hoạt động để nhận nhắc hạn.'
+          : `Đã gửi nhắc hạn ${result.milestoneCount} mốc báo cáo cho ${result.recipientCount} sinh viên.`)
       setReminderOpen(false)
     } catch (error: any) {
       showError(error.response?.data?.message || 'Không thể gửi nhắc hạn. Vui lòng thử lại.')

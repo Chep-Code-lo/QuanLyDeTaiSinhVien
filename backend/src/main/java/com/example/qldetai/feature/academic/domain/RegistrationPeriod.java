@@ -1,5 +1,6 @@
 package com.example.qldetai.feature.academic.domain;
 
+import com.example.qldetai.common.persistence.CreatedAtEntity;
 import com.example.qldetai.feature.identity.domain.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -24,7 +25,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class RegistrationPeriod {
+public class RegistrationPeriod extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -86,9 +87,6 @@ public class RegistrationPeriod {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
 
     @Version
     @Column(nullable = false)

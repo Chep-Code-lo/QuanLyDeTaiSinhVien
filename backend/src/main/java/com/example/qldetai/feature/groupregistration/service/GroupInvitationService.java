@@ -1,6 +1,6 @@
 package com.example.qldetai.feature.groupregistration.service;
 
-import com.example.qldetai.aspect.BusinessAudit;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ResourceNotFoundException;
@@ -110,7 +110,6 @@ public class GroupInvitationService {
         invitation.setInvitedStudent(invitedStudent);
         invitation.setInvitedBy(actor);
         invitation.setStatus(GroupInvitationStatus.PENDING);
-        invitation.setCreatedAt(now);
         invitation.setExpiresAt(request.expiresAt());
         invitation = groupInvitationRepository.save(invitation);
 

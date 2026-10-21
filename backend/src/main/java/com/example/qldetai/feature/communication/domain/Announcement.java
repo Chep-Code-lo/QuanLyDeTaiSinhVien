@@ -1,5 +1,6 @@
 package com.example.qldetai.feature.communication.domain;
 
+import com.example.qldetai.common.persistence.CreatedAtEntity;
 import com.example.qldetai.feature.academic.domain.Faculty;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.progress.domain.StoredFile;
@@ -25,7 +26,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class Announcement {
+public class Announcement extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -52,9 +53,6 @@ public class Announcement {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private AnnouncementStatus status = AnnouncementStatus.DRAFT;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
 
     @Column(name = "published_at")
     private LocalDateTime publishedAt;

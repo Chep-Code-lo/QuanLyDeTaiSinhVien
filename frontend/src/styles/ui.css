@@ -21,6 +21,8 @@
 .appointments-list-header h2 { margin: 0; }
 .registration-period-status { white-space: nowrap; }
 .academic-appointments-page .data-table { min-width: 760px; }
+.academic-appointments-page .data-table th,
+.academic-appointments-page .data-table td { text-align: center; vertical-align: middle; }
 .account-layout .page-card { margin-bottom: 0; }
 .account-profile h2 { font-size: 20px; overflow-wrap: anywhere; }
 .account-profile p, .account-profile dd { overflow-wrap: anywhere; }

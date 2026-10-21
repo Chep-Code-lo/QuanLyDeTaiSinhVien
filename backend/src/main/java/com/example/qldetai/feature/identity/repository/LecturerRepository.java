@@ -35,6 +35,8 @@ public interface LecturerRepository extends JpaRepository<Lecturer, Long> {
 
     boolean existsByLecturerCodeIgnoreCase(String lecturerCode);
 
+    boolean existsByLecturerCodeIgnoreCaseAndIdNot(String lecturerCode, Long id);
+
     @EntityGraph(attributePaths = {"user", "department", "department.faculty"})
     @Query(
             """

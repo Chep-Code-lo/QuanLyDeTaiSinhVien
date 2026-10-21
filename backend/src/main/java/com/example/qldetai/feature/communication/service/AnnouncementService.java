@@ -1,6 +1,6 @@
 package com.example.qldetai.feature.communication.service;
 
-import com.example.qldetai.aspect.BusinessAudit;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ResourceNotFoundException;
@@ -75,7 +75,6 @@ public class AnnouncementService {
         announcement.setFaculty(faculty);
         announcement.setCreatedBy(creator);
         announcement.setStatus(AnnouncementStatus.DRAFT);
-        announcement.setCreatedAt(LocalDateTime.now(clock));
         apply(announcement, request.title(), request.content(), request.attachmentFileId());
         return toResponse(announcementRepository.save(announcement));
     }

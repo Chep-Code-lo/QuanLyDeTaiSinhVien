@@ -1,15 +1,15 @@
-package com.example.qldetai.aspect;
+package com.example.qldetai.common.audit;
 
 import com.example.qldetai.config.RequestIdFilter;
 import com.example.qldetai.feature.communication.domain.AuditOutcome;
 import com.example.qldetai.security.UserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.core.Authentication;
@@ -22,16 +22,12 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Aspect
 @Component
+@Slf4j
+@RequiredArgsConstructor
 @Order(Ordered.LOWEST_PRECEDENCE - 1)
 public class BusinessAuditAspect {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(BusinessAuditAspect.class);
-
     private final AuditLogWriter writer;
-
-    public BusinessAuditAspect(AuditLogWriter writer) {
-        this.writer = writer;
-    }
 
     @Around("@annotation(audit)")
     public Object audit(ProceedingJoinPoint joinPoint, BusinessAudit audit) throws Throwable {
@@ -81,7 +77,7 @@ public class BusinessAuditAspect {
         try {
             writer.write(actorId, audit.action(), audit.entityType(), entityId, outcome, requestId, durationMs);
         } catch (RuntimeException exception) {
-            LOGGER.error("Unable to persist business audit log for {}.", audit.action(), exception);
+            log.error("Unable to persist business audit log for {}.", audit.action(), exception);
         }
     }
 

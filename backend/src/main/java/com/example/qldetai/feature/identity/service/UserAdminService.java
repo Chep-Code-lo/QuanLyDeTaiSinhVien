@@ -1,6 +1,6 @@
 package com.example.qldetai.feature.identity.service;
 
-import com.example.qldetai.aspect.BusinessAudit;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ConflictException;
@@ -16,6 +16,7 @@ import com.example.qldetai.feature.identity.domain.UserStatus;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.CreateUserRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.LecturerProfileInput;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.StudentProfileInput;
+import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserRolesRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserStatusRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UserResponse;
@@ -56,12 +57,7 @@ public class UserAdminService {
     public PageResponse<UserResponse> list(String search, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         String query = search == null ? "" : search.trim();
-        Page<User> users =
-                query.isBlank()
-                        ? userRepository.findAll(pageable)
-                        : userRepository
-                                .findByEmailContainingIgnoreCaseOrFullNameContainingIgnoreCase(
-                                        query, query, pageable);
+        Page<User> users = userRepository.searchVisibleForAdmin(query, pageable);
         return PageResponse.from(userProfileService.toUsers(users));
     }
 
@@ -86,8 +82,6 @@ public class UserAdminService {
         user.setFullName(request.fullName().trim());
         user.setPhone(normalizeNullable(request.phone()));
         user.setStatus(UserStatus.ACTIVE);
-        user.setCreatedAt(now);
-        user.setUpdatedAt(now);
         user.replaceRoles(requireRoles(request.roles()), now);
         user = userRepository.save(user);
 
@@ -101,12 +95,59 @@ public class UserAdminService {
     }
 
     @Transactional
+    @BusinessAudit(action = "USER_UPDATE", entityType = "USER", entityIdArgument = 0)
+    public UserResponse update(Long id, UpdateUserRequest request) {
+        User user = requireUser(id);
+        if (user.getVersion() != request.version()) {
+            throw new ConflictException("The account information was updated by another user. Refresh and try again.");
+        }
+
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
+        if (userRepository.existsByEmailIgnoreCaseAndIdNot(email, id)) {
+            throw new ConflictException("Email is already in use.");
+        }
+
+        Student student = studentRepository.findByUserId(id).orElse(null);
+        Lecturer lecturer = lecturerRepository.findByUserId(id).orElse(null);
+        validateProfileUpdate(student, lecturer, request);
+
+        user.setEmail(email);
+        user.setFullName(request.fullName().trim());
+        user.setPhone(normalizeNullable(request.phone()));
+        if (student != null) {
+            updateStudent(student, request.student());
+        }
+        if (lecturer != null) {
+            updateLecturer(lecturer, request.lecturer());
+        }
+        user.setUpdatedAt(LocalDateTime.now(clock));
+        return userProfileService.toUser(userRepository.saveAndFlush(user));
+    }
+
+    @Transactional
     @BusinessAudit(action = "USER_STATUS_UPDATE", entityType = "USER", entityIdArgument = 0)
     public UserResponse updateStatus(Long id, UpdateUserStatusRequest request) {
         User user = requireUser(id);
         user.setStatus(request.status());
-        user.setUpdatedAt(LocalDateTime.now(clock));
         return userProfileService.toUser(user);
+    }
+
+    @Transactional
+    @BusinessAudit(action = "USER_DELETE", entityType = "USER", entityIdArgument = 0)
+    public void delete(Long id, Long actorId) {
+        if (id.equals(actorId)) {
+            throw new BusinessRuleException("You cannot delete the account currently in use.");
+        }
+
+        User user = requireUser(id);
+        if (user.getStatus() == UserStatus.DISABLED) {
+            return;
+        }
+        if (hasRole(user, RoleCode.ADMIN) && userRepository.findActiveAdministrators().size() <= 1) {
+            throw new BusinessRuleException("At least one active administrator account is required.");
+        }
+
+        user.setStatus(UserStatus.DISABLED);
     }
 
     @Transactional
@@ -134,7 +175,6 @@ public class UserAdminService {
         }
         LocalDateTime now = LocalDateTime.now(clock);
         user.replaceRoles(requireRoles(request.roles()), now);
-        user.setUpdatedAt(now);
         return userProfileService.toUser(user);
     }
 
@@ -164,6 +204,28 @@ public class UserAdminService {
         return lecturer;
     }
 
+    private void updateStudent(Student student, StudentProfileInput input) {
+        String studentCode = input.studentCode().trim().toUpperCase(Locale.ROOT);
+        if (studentRepository.existsByStudentCodeIgnoreCaseAndIdNot(studentCode, student.getId())) {
+            throw new ConflictException("Student code is already in use.");
+        }
+        student.setDepartment(requireDepartment(input.departmentId()));
+        student.setStudentCode(studentCode);
+        student.setClassName(input.className().trim());
+        student.setCohort(input.cohort().trim());
+    }
+
+    private void updateLecturer(Lecturer lecturer, LecturerProfileInput input) {
+        String lecturerCode = input.lecturerCode().trim().toUpperCase(Locale.ROOT);
+        if (lecturerRepository.existsByLecturerCodeIgnoreCaseAndIdNot(lecturerCode, lecturer.getId())) {
+            throw new ConflictException("Lecturer code is already in use.");
+        }
+        lecturer.setDepartment(requireDepartment(input.departmentId()));
+        lecturer.setLecturerCode(lecturerCode);
+        lecturer.setAcademicDegree(normalizeNullable(input.academicDegree()));
+        lecturer.setSpecialization(normalizeNullable(input.specialization()));
+    }
+
     private void validateProfiles(
             Set<RoleCode> roles, StudentProfileInput student, LecturerProfileInput lecturer) {
         if (roles.contains(RoleCode.STUDENT) != (student != null)) {
@@ -173,6 +235,15 @@ public class UserAdminService {
         if (roles.contains(RoleCode.LECTURER) != (lecturer != null)) {
             throw new BusinessRuleException(
                     "The LECTURER role and lecturer profile must be supplied together.");
+        }
+    }
+
+    private void validateProfileUpdate(Student student, Lecturer lecturer, UpdateUserRequest request) {
+        if ((student != null) != (request.student() != null)) {
+            throw new BusinessRuleException("The student profile cannot be added or removed while editing the account.");
+        }
+        if ((lecturer != null) != (request.lecturer() != null)) {
+            throw new BusinessRuleException("The lecturer profile cannot be added or removed while editing the account.");
         }
     }
 
@@ -194,6 +265,11 @@ public class UserAdminService {
         return departmentRepository
                 .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Department was not found."));
+    }
+
+    private boolean hasRole(User user, RoleCode roleCode) {
+        return user.getUserRoles().stream()
+                .anyMatch(userRole -> userRole.getRole().getCode() == roleCode);
     }
 
     private String normalizeNullable(String value) {

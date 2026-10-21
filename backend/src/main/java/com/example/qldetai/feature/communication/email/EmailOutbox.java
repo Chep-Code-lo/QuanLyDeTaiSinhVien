@@ -1,5 +1,6 @@
 package com.example.qldetai.feature.communication.email;
 
+import com.example.qldetai.common.persistence.CreatedAtEntity;
 import com.example.qldetai.feature.identity.domain.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -27,7 +28,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class EmailOutbox {
+public class EmailOutbox extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -113,6 +114,4 @@ public class EmailOutbox {
     @JoinColumn(name = "created_by")
     private User createdBy;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
 }

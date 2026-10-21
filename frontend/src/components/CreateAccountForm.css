@@ -1,0 +1,48 @@
+.create-account-form__fields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.create-account-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 24px;
+  margin-bottom: 16px;
+}
+.create-account-form small {
+  display: block;
+  margin-top: 6px;
+  color: var(--ink-500);
+}
+.create-account-form__notice {
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid var(--line-border);
+  border-radius: 10px;
+  color: var(--ink-700);
+  background: #f8fafc;
+}
+.create-account-form__notice p {
+  margin: 0;
+  font-size: 14px;
+}
+.create-account-form__notice .btn {
+  margin-top: 12px;
+}
+.create-account-form__error {
+  margin: 0 0 16px;
+  color: #b91c1c;
+}
+.create-account-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-border);
+}
+@media (max-width: 640px) {
+  .create-account-form__grid {
+    grid-template-columns: 1fr;
+  }
+}

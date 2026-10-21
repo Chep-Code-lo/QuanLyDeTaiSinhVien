@@ -1,6 +1,6 @@
 package com.example.qldetai.feature.topic.service;
 
-import com.example.qldetai.aspect.BusinessAudit;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ConflictException;
@@ -156,8 +156,6 @@ public class TopicService {
         topic.setProposedBy(actor);
         topic.setProposalSource(source);
         topic.setStatus(TopicStatus.PENDING);
-        topic.setCreatedAt(now);
-        topic.setUpdatedAt(now);
         return toResponse(topicRepository.save(topic));
     }
 
@@ -202,8 +200,6 @@ public class TopicService {
         topic.setProposedBy(actor);
         topic.setProposalSource(ProposalSource.LECTURER);
         topic.setStatus(TopicStatus.APPROVED);
-        topic.setCreatedAt(now);
-        topic.setUpdatedAt(now);
         topic = topicRepository.saveAndFlush(topic);
 
         Lecturer primary = requireLecturer(request.primaryLecturerId(), topic);
@@ -218,7 +214,6 @@ public class TopicService {
 
         topic.setStatus(TopicStatus.PUBLISHED);
         topic.setPublishedAt(now);
-        topic.setUpdatedAt(now);
         return toResponse(topicRepository.saveAndFlush(topic));
     }
 
@@ -238,7 +233,6 @@ public class TopicService {
                 request.prerequisites(),
                 request.visibilityType(),
                 resolveReservedGroup(topic.getPeriod(), request.visibilityType(), request.reservedGroupId(), actor));
-        topic.setUpdatedAt(LocalDateTime.now(clock));
         return toResponse(topic);
     }
 
@@ -267,7 +261,6 @@ public class TopicService {
         if (secondary != null) {
             topicSupervisorRepository.save(createSupervisor(topic, secondary, actor, 2, now));
         }
-        topic.setUpdatedAt(now);
         return toResponse(topic);
     }
 
@@ -295,7 +288,6 @@ public class TopicService {
             case REVISION_REQUIRED -> TopicStatus.REVISION_REQUIRED;
             case REJECTED -> TopicStatus.REJECTED;
         });
-        topic.setUpdatedAt(review.getReviewedAt());
 
         notificationService.publish(
                 topic.getProposedBy().getId(),
@@ -330,7 +322,6 @@ public class TopicService {
         LocalDateTime now = LocalDateTime.now(clock);
         topic.setStatus(TopicStatus.PUBLISHED);
         topic.setPublishedAt(now);
-        topic.setUpdatedAt(now);
         notificationService.publish(
                 topic.getProposedBy().getId(),
                 "topic-published-" + topic.getId(),
@@ -353,7 +344,6 @@ public class TopicService {
             throw new BusinessRuleException("Published topics cannot be withdrawn.");
         }
         topic.setStatus(TopicStatus.WITHDRAWN);
-        topic.setUpdatedAt(LocalDateTime.now(clock));
         notificationService.publish(
                 topic.getProposedBy().getId(),
                 "topic-withdrawn-" + topic.getId(),

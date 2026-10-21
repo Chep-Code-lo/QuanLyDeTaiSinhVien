@@ -18,7 +18,7 @@ export const statusLabel = (status?: string) => {
     case 'DRAFT':
       return 'Nháp'
     case 'LOCKED':
-      return 'Đã khóa 🔒'
+      return 'Đã khóa'
     case 'OPEN':
       return 'Đang mở'
     case 'PENDING':
