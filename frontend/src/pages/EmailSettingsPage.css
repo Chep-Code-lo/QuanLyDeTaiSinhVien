@@ -2,33 +2,6 @@
   display: grid;
   gap: 20px;
 }
-.email-settings__notice {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  margin: 0;
-  border-color: #cfe0ff;
-  background: #f7faff;
-}
-.email-settings__notice > svg {
-  flex: none;
-  margin-top: 2px;
-  color: #155eef;
-}
-.email-settings__notice strong {
-  display: block;
-  color: var(--ink-900);
-  font-size: 14px;
-}
-.email-settings__notice p {
-  margin: 4px 0 0;
-  color: var(--ink-500);
-  font-size: 13px;
-}
-.email-settings__notice code,
-.email-settings__variables code {
-  font-family: Consolas, 'Courier New', monospace;
-}
 .email-settings__layout {
   display: grid;
   grid-template-columns: minmax(230px, 0.33fr) minmax(0, 1fr);
@@ -52,6 +25,22 @@
   display: grid;
   gap: 8px;
   margin-top: 16px;
+}
+.email-settings__template-heading {
+  display: grid;
+  gap: 12px;
+}
+.email-settings__template-heading .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.email-settings__template-subtitle {
+  margin: 20px 0 0;
+  color: var(--ink-500);
+  font-size: 13px;
+  font-weight: 600;
 }
 .email-settings__event {
   display: flex;
@@ -173,67 +162,95 @@
 }
 .email-settings__body {
   min-height: 220px;
-  font-family: Consolas, 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.email-settings__field-help {
+  margin: 4px 0 8px;
+  color: var(--ink-500);
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.5;
 }
 .email-settings__recipients {
   margin: 0 0 18px;
   padding: 0;
   border: 0;
 }
-.email-settings__recipients > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
+.email-settings__recipients > .form-input {
+  margin-bottom: 12px;
+}
+.email-settings__people {
   margin-top: 8px;
 }
-.email-settings__recipient {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 36px;
-  padding: 7px 10px;
+.email-settings__person-list {
+  display: grid;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-top: 12px;
   border: 1px solid var(--line-border);
   border-radius: 8px;
-  color: var(--ink-700);
-  font-size: 13px;
+}
+.email-settings__person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-border);
   cursor: pointer;
 }
-.email-settings__recipient:has(input:checked) {
-  border-color: #9dbcf0;
-  color: #174ea6;
+.email-settings__person:last-child {
+  border-bottom: 0;
+}
+.email-settings__person:has(input:checked) {
   background: #eff6ff;
 }
-.email-settings__recipient input {
-  width: 15px;
-  height: 15px;
+.email-settings__person input {
+  width: 16px;
+  height: 16px;
   accent-color: #2563eb;
 }
-.email-settings__variables {
-  margin: 4px 0 20px;
-  padding: 13px;
-  border: 1px dashed #cbd5e1;
-  border-radius: 10px;
-  background: #f8fafc;
+.email-settings__person span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
-.email-settings__variables strong {
-  display: block;
-  color: var(--ink-700);
-  font-size: 13px;
+.email-settings__person strong {
+  font-size: 14px;
 }
-.email-settings__variables > div {
+.email-settings__person small {
+  color: var(--ink-500);
+  font-size: 12px;
+}
+.email-settings__selected {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 9px;
+  gap: 8px;
+  margin-top: 12px;
 }
-.email-settings__variables code {
-  padding: 3px 6px;
-  border-radius: 5px;
-  color: #1d4ed8;
-  background: #dbeafe;
+.email-settings__selected-person {
+  padding: 7px 10px;
+  border: 1px solid #9dbcf0;
+  border-radius: 8px;
+  color: #174ea6;
+  background: #eff6ff;
+  font: inherit;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.email-settings__selected-person span {
+  color: var(--ink-500);
   font-size: 12px;
+}
+.email-settings__recipient-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 13px;
 }
 .email-settings__actions {
   display: flex;
@@ -272,13 +289,21 @@
   font-size: 14px;
   overflow-wrap: anywhere;
 }
-.email-settings__preview-frame {
-  display: block;
+.email-settings__preview-body {
   width: 100%;
   min-height: 300px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 16px;
   border: 1px solid var(--line-border);
   border-radius: 9px;
+  color: var(--ink-800);
   background: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .email-settings__logs {
   overflow: hidden;
@@ -336,7 +361,6 @@
   }
 }
 @media (max-width: 680px) {
-  .email-settings__notice,
   .email-settings__form-header,
   .email-settings__section-heading {
     align-items: flex-start;

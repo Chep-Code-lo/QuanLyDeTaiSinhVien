@@ -1,6 +1,6 @@
 # Tài khoản demo
 
-Bộ dữ liệu này chỉ dành cho Docker cục bộ và được nạp khi volume MySQL mới.
+Bộ dữ liệu `database/seed/demo-data.sql` chỉ dành cho local/demo. Docker mặc định không nạp demo; chủ động dùng `docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build -d` trên volume MySQL mới để nạp. Không dùng cấu hình này trên VPS.
 Tất cả tài khoản dùng mật khẩu `Demo@123`; không sử dụng ở môi trường thật.
 
 | Vai trò | Tài khoản | Ghi chú |
@@ -22,4 +22,4 @@ Tất cả tài khoản dùng mật khẩu `Demo@123`; không sử dụng ở m�
 - Đợt KLTN có hội đồng, phản biện, phiếu điểm đã khóa và một kết quả đã công bố
   cho ba sinh viên.
 
-Để nạp lại dữ liệu mẫu, chạy `docker compose down -v` rồi `docker compose up --build -d`.
+Chỉ khi chấp nhận xóa toàn bộ dữ liệu local, có thể nạp lại dữ liệu mẫu bằng `docker compose -f docker-compose.yml -f docker-compose.demo.yml down -v` rồi `docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build -d`. Không thực hiện thao tác reset này trên VPS hoặc database cần giữ dữ liệu.

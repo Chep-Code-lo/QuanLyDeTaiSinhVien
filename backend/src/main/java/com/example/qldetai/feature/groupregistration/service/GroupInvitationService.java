@@ -141,7 +141,7 @@ public class GroupInvitationService {
         ensureGroupMutable(group);
         ensureEligibleInvitee(group, actor);
 
-        List<GroupMember> activeMembers = groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(group.getId());
+        List<GroupMember> activeMembers = groupMemberRepository.findActiveByGroupIdForUpdate(group.getId());
         if (activeMembers.size() >= period.getMaxGroupMembers()) {
             throw new BusinessRuleException("The group has reached its configured maximum number of members.");
         }
@@ -273,8 +273,8 @@ public class GroupInvitationService {
         if (projectAssignmentRepository.existsByGroupId(group.getId())) {
             throw new BusinessRuleException("This group already has a project assignment and can no longer change members.");
         }
-        if (topicRegistrationRepository.existsByGroupIdAndStatusIn(
-                group.getId(), List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED))) {
+        if (!topicRegistrationRepository.findByGroupIdAndStatusInForUpdate(
+                group.getId(), List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED)).isEmpty()) {
             throw new BusinessRuleException("Group members cannot change after a topic registration is pending or approved.");
         }
     }
@@ -288,7 +288,7 @@ public class GroupInvitationService {
         if (!groupMemberRepository.findConflictingMemberships(period.getId(), student.getId()).isEmpty()) {
             throw new BusinessRuleException("Student already belongs to an active group.");
         }
-        if (groupMemberRepository.countByGroupIdAndLeftAtIsNull(group.getId()) >= period.getMaxGroupMembers()) {
+        if (groupMemberRepository.findActiveByGroupIdForUpdate(group.getId()).size() >= period.getMaxGroupMembers()) {
             throw new BusinessRuleException("The group has reached its configured maximum number of members.");
         }
     }
@@ -312,7 +312,7 @@ public class GroupInvitationService {
     }
 
     private void refreshGroupStatus(StudentGroup group) {
-        long activeMembers = groupMemberRepository.countByGroupIdAndLeftAtIsNull(group.getId());
+        long activeMembers = groupMemberRepository.findActiveByGroupIdForUpdate(group.getId()).size();
         group.setStatus(activeMembers >= group.getPeriod().getMinGroupMembers() ? GroupStatus.ACTIVE : GroupStatus.FORMING);
     }
 

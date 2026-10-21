@@ -2,7 +2,6 @@ package com.example.qldetai.feature.dashboard.service;
 
 import com.example.qldetai.feature.academic.domain.RegistrationPeriod;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriodStatus;
-import com.example.qldetai.feature.academic.domain.Semester;
 import com.example.qldetai.feature.academic.repository.RegistrationPeriodRepository;
 import com.example.qldetai.feature.academic.repository.SemesterRepository;
 import com.example.qldetai.feature.communication.repository.NotificationRepository;
@@ -72,13 +71,9 @@ public class DashboardService {
     }
 
     private CurrentSemesterResponse currentSemester(LocalDate today) {
-        List<Semester> semesters = semesterRepository.findAll();
-        return semesters.stream()
-                .filter(semester -> !today.isBefore(semester.getStartsOn()) && !today.isAfter(semester.getEndsOn()))
-                .max(Comparator.comparing(Semester::getStartsOn))
-                .or(() -> semesters.stream()
-                        .filter(semester -> !semester.getStartsOn().isAfter(today))
-                        .max(Comparator.comparing(Semester::getStartsOn)))
+        return semesterRepository
+                .findFirstByStartsOnLessThanEqualAndEndsOnGreaterThanEqualOrderByStartsOnDesc(today, today)
+                .or(() -> semesterRepository.findFirstByStartsOnLessThanEqualOrderByStartsOnDesc(today))
                 .map(semester -> new CurrentSemesterResponse(semester.getSemesterNo(), semester.getAcademicYear()))
                 .orElse(null);
     }

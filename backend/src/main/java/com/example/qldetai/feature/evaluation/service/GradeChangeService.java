@@ -95,7 +95,7 @@ public class GradeChangeService {
     public void reviewChange(Long id, ReviewGradeChangeRequest request, Long actorId) {
         actorAccess.manager(actorId);
         GradeChangeRequest changeRequest =
-                changes.findById(id)
+                changes.findByIdForUpdate(id)
                         .orElseThrow(
                                 () ->
                                         new ResourceNotFoundException(

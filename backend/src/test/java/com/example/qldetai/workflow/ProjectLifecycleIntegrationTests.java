@@ -117,6 +117,9 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import com.example.qldetai.feature.communication.email.*;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -124,9 +127,89 @@ import java.util.Set;
 @Transactional
 class ProjectLifecycleIntegrationTests {
 
+    @DynamicPropertySource
+    static void isolatedResultEmailMysql(DynamicPropertyRegistry properties) {
+        String url = System.getProperty("result.email.mysql.url");
+        if (url != null) {
+            if (!url.startsWith("jdbc:mysql://127.0.0.1:") || !url.contains("/ql_de_tai_sinh_vien?")) {
+                throw new IllegalArgumentException("Result email tests require a disposable local database.");
+            }
+            properties.add("spring.datasource.url", () -> url);
+            properties.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
+            properties.add("spring.datasource.username", () -> "root");
+            properties.add("spring.datasource.password", () -> "isolated-email-test");
+            properties.add("spring.jpa.hibernate.ddl-auto", () -> "none");
+        }
+    }
+
     @Autowired private com.example.qldetai.feature.evaluation.repository.EvaluationAssignmentRepository evaluationRepository;
     @Autowired private com.example.qldetai.feature.evaluation.repository.ResultVersionRepository resultRepository;
     @Autowired private AcademicAppointmentRepository appointments;
+    @Autowired private EmailNotificationSettingsService emailSettings;
+    @Autowired private EmailOutboxRepository emailOutbox;
+    @Autowired private EmailNotificationEventService emailEvents;
+    @Autowired private EmailEventContextFactory emailContexts;
+
+    @Test
+    void publishedResultQueuesPersonalizedScoreEmailsExactlyOnce() {
+        configureResultEmail(true);
+        var project = createAssignedProject("emailed-score", leaderStudent, secondStudent);
+        var catalog = createLockedCatalog("email-score", "Scored", AssessmentComponentType.OTHER, 1);
+        submitFullScore(project.id(), catalog, lecturerThree, null);
+        var finalized = evaluationResultService.finalizeResult(project.id(), admin.getId());
+        assertThat(emailOutbox.count()).isZero();
+        assertThatThrownBy(() -> emailContexts.resultPublished(resultRepository.findById(finalized.id()).orElseThrow()))
+                .isInstanceOf(BusinessRuleException.class);
+        evaluationResultService.publish(finalized.id(), admin.getId());
+        assertThat(emailOutbox.findAll()).hasSize(2).allSatisfy(message -> {
+            assertThat(message.getEventType()).isEqualTo(EmailNotificationEventType.RESULT_PUBLISHED);
+            assertThat(message.getEventKey()).isEqualTo("result-published:" + finalized.id());
+            assertThat(message.getBody()).contains("10.00/10", "/results", message.getRecipientName());
+            assertThat(message.getStatus()).isEqualTo(EmailOutboxStatus.PENDING);
+        });
+        assertThat(emailOutbox.findAll()).extracting(EmailOutbox::getRecipientEmail)
+                .containsExactlyInAnyOrder(leaderStudent.getUser().getEmail(), secondStudent.getUser().getEmail());
+        emailEvents.resultPublished(resultRepository.findById(finalized.id()).orElseThrow());
+        assertThat(emailOutbox.count()).isEqualTo(2);
+        assertThatThrownBy(() -> evaluationResultService.publish(finalized.id(), admin.getId()))
+                .isInstanceOf(BusinessRuleException.class);
+        assertThat(emailOutbox.count()).isEqualTo(2);
+    }
+
+    @Test
+    void disabledResultEmailDoesNotPreventPublicationOrQueueMessages() {
+        configureResultEmail(false);
+        var project = createAssignedProject("disabled-email", leaderStudent, secondStudent);
+        var catalog = createLockedCatalog("disabled-email", "Scored", AssessmentComponentType.OTHER, 1);
+        submitFullScore(project.id(), catalog, lecturerThree, null);
+        var finalized = evaluationResultService.finalizeResult(project.id(), admin.getId());
+        assertThat(evaluationResultService.publish(finalized.id(), admin.getId()).status().name()).isEqualTo("PUBLISHED");
+        assertThat(emailOutbox.count()).isZero();
+    }
+
+    @Test
+    void resultEmailUsesSnapshotMembersEvenIfCurrentMembershipChanges() {
+        configureResultEmail(true);
+        var project = createAssignedProject("snapshot-email", leaderStudent, secondStudent);
+        var catalog = createLockedCatalog("snapshot-email", "Scored", AssessmentComponentType.OTHER, 1);
+        submitFullScore(project.id(), catalog, lecturerThree, null);
+        var finalized = evaluationResultService.finalizeResult(project.id(), admin.getId());
+        var projectEntity = projectAssignmentRepository.findById(project.id()).orElseThrow();
+        groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(projectEntity.getGroup().getId())
+                .forEach(member -> member.setLeftAt(nowUtc()));
+        groupMemberRepository.flush();
+        evaluationResultService.publish(finalized.id(), admin.getId());
+        assertThat(emailOutbox.findAll()).extracting(EmailOutbox::getRecipientEmail)
+                .containsExactlyInAnyOrder(leaderStudent.getUser().getEmail(), secondStudent.getUser().getEmail());
+    }
+
+    private void configureResultEmail(boolean enabled) {
+        var defaults = emailSettings.get(admin.getId(), EmailNotificationEventType.RESULT_PUBLISHED, NotificationScopeType.SYSTEM, 0L);
+        emailSettings.update(admin.getId(), EmailNotificationEventType.RESULT_PUBLISHED,
+                new EmailNotificationDtos.UpdateNotificationSettingRequest(NotificationScopeType.SYSTEM, 0L, enabled,
+                        defaults.senderName(), defaults.fromEmail(), null, defaults.subjectTemplate(), defaults.bodyTemplate(),
+                        defaults.recipientGroups(), null));
+    }
 
     private final TopicService topicService;
     private final GroupService groupService;
@@ -826,7 +909,13 @@ class ProjectLifecycleIntegrationTests {
                         "defense-sessions",
                         "results",
                         "grade-change-requests")) {
-            mvc.perform(get("/api/v1/" + resource).with(user(principal)))
+            var request = get("/api/v1/" + resource);
+            if ("assessment-components".equals(resource)) {
+                request.param("periodId", period.getId().toString());
+            } else if ("rubrics".equals(resource)) {
+                request.param("componentId", "0");
+            }
+            mvc.perform(request.with(user(principal)))
                     .andExpect(status().isOk());
         }
     }
@@ -1071,6 +1160,13 @@ class ProjectLifecycleIntegrationTests {
     private ProjectAssignmentResponse createAssignedProject(
             String topicCode, Student leader, Student member) {
         TopicResponse topic = createPublishedTopic(topicCode);
+        if (System.getProperty("result.email.mysql.url") != null) {
+            // Advance the fixture from proposal to registration without overlapping SQL time windows.
+            period.setProposalEndAt(nowUtc().minusDays(1));
+            period.setRegistrationStartAt(nowUtc().minusHours(1));
+            period.setRegistrationEndAt(nowUtc().plusDays(2));
+            registrationPeriodRepository.flush();
+        }
         StudentGroupResponse group = createActiveGroup(unique("Nhóm " + topicCode), leader, member);
         TopicRegistrationResponse registration =
                 registrationService.create(
@@ -1173,6 +1269,12 @@ class ProjectLifecycleIntegrationTests {
         entity.setStatus(RegistrationPeriodStatus.ACTIVE);
         entity.setCreatedBy(admin);
         entity.setCreatedAt(now.minusHours(3));
+        if (System.getProperty("result.email.mysql.url") != null) {
+            entity.setRegistrationStartAt(now.plusDays(3));
+            entity.setRegistrationEndAt(now.plusDays(5));
+            entity.setReviewDeadlineAt(null);
+            entity.setDefenseDate(null);
+        }
         return registrationPeriodRepository.save(entity);
     }
 

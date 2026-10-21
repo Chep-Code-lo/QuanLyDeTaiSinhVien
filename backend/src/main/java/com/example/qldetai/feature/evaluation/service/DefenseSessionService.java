@@ -107,7 +107,7 @@ public class DefenseSessionService {
                     "The committee and project assignment must belong to the same registration"
                         + " period.");
         }
-        List<CommitteeMember> members = committeeMembers.findByCommitteeId(committee.getId());
+        List<CommitteeMember> members = committeeMembers.findByCommitteeIdForUpdate(committee.getId());
         int minMembers = assignment.getPeriod().getMinCommitteeMembers();
         int maxMembers = assignment.getPeriod().getMaxCommitteeMembers();
         if (minMembers < 3 || maxMembers > 5 || members.size() < 3 || members.size() > 5
@@ -122,8 +122,8 @@ public class DefenseSessionService {
                     "A committee needs the configured number of members, one chair and one"
                         + " secretary.");
         }
-        if (defenses.hasCommitteeConflict(
-                committee.getId(), request.startsAt(), request.endsAt())) {
+        if (!defenses.findConflictsForUpdate(
+                committee.getId(), request.startsAt(), request.endsAt()).isEmpty()) {
             throw new ConflictException("The committee already has a defense in this time range.");
         }
         if (supervisors.findByTopicIdOrderBySlotNoAsc(assignment.getTopic().getId()).stream()
@@ -210,13 +210,13 @@ public class DefenseSessionService {
 
     private EvaluationCommittee committee(Long committeeId) {
         return committees
-                .findById(committeeId)
+                .findByIdForUpdate(committeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Committee was not found."));
     }
 
     private ProjectAssignment assignment(Long assignmentId) {
         return assignments
-                .findById(assignmentId)
+                .findByIdForUpdate(assignmentId)
                 .orElseThrow(
                         () -> new ResourceNotFoundException("Project assignment was not found."));
     }

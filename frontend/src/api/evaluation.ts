@@ -33,7 +33,7 @@ export interface ListDefensesParams {
 
 export const evaluationApi = {
   // Assessment Components
-  listComponents: async (periodId?: number) => {
+  listComponents: async (periodId: number) => {
     const response = await apiClient.get<ApiResponse<AssessmentComponentResponse[]>>(
       '/assessment-components',
       {
@@ -57,7 +57,7 @@ export const evaluationApi = {
   },
 
   // Rubrics
-  listRubrics: async (componentId?: number) => {
+  listRubrics: async (componentId: number) => {
     const response = await apiClient.get<ApiResponse<RubricResponse[]>>('/rubrics', {
       params: { componentId },
     })

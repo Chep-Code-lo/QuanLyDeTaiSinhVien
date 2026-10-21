@@ -17,6 +17,7 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -25,7 +26,7 @@ class EmailOutboxServiceTests {
 
     @SuppressWarnings("unchecked")
     @Test
-    void smtpFailureUsesMockSenderAndQueuesRetryWithoutThrowing() {
+    void smtpFailureUsesMockSenderAndQueuesRetryWithoutThrowing() throws Exception {
         EmailOutboxRepository outboxRepository = mock(EmailOutboxRepository.class);
         EmailDeliveryLogRepository deliveryLogRepository = mock(EmailDeliveryLogRepository.class);
         com.example.qldetai.feature.identity.repository.UserRepository userRepository = mock(
@@ -57,7 +58,9 @@ class EmailOutboxServiceTests {
 
         service.deliver(12L);
 
-        verify(sender).send(any(MimeMessage.class));
+        ArgumentCaptor<MimeMessage> messageCaptor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(sender).send(messageCaptor.capture());
+        assertThat(messageCaptor.getValue().getContentType()).containsIgnoringCase("text/plain");
         verify(deliveryLogRepository).save(any(EmailDeliveryLog.class));
         assertThat(outbox.getStatus()).isEqualTo(EmailOutboxStatus.PENDING);
         assertThat(outbox.getNextAttemptAt()).isEqualTo(LocalDateTime.of(2026, 10, 17, 0, 1));
@@ -79,7 +82,7 @@ class EmailOutboxServiceTests {
         outbox.setSenderName("Hệ thống");
         outbox.setFromEmail("thongbao@test.local");
         outbox.setSubject("Kiểm thử");
-        outbox.setBody("<p>Nội dung</p>");
+        outbox.setBody("Nội dung kiểm thử");
         outbox.setStatus(EmailOutboxStatus.SENDING);
         outbox.setAttemptCount(1);
         return outbox;
