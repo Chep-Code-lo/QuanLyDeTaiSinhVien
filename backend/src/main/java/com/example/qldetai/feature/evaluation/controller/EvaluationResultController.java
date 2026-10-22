@@ -63,7 +63,7 @@ public class EvaluationResultController {
     @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
     public ApiResponse<ResultResponse> finalize(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Result finalized.", service.finalizeResult(id, principal.id()));
+        return ApiResponse.success("Đã chốt kết quả.", service.finalizeResult(id, principal.id()));
     }
 
     @PostMapping("/results/{id}/publish")
@@ -71,6 +71,6 @@ public class EvaluationResultController {
             "hasRole('ADMIN') or @evaluationAuthorization.canManageResult(#id, authentication)")
     public ApiResponse<ResultResponse> publish(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Result published.", service.publish(id, principal.id()));
+        return ApiResponse.success("Đã công bố kết quả.", service.publish(id, principal.id()));
     }
 }

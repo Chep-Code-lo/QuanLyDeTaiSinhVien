@@ -37,7 +37,7 @@ public class StoredFileController {
             @AuthenticationPrincipal UserPrincipal principal) {
         StoredFileResponse storedFile = storedFileService.store(file, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/files/" + storedFile.id()))
-                .body(ApiResponse.success("File uploaded.", storedFile));
+                .body(ApiResponse.success("Đã tải tệp lên.", storedFile));
     }
 
     @GetMapping("/{id}")

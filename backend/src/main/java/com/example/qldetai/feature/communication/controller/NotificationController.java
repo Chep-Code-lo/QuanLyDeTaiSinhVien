@@ -43,6 +43,6 @@ public class NotificationController {
     @PatchMapping("/{id}/read")
     public ApiResponse<NotificationResponse> markRead(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Notification marked as read.", notificationService.markRead(id, principal.id()));
+        return ApiResponse.success("Đã đánh dấu thông báo là đã đọc.", notificationService.markRead(id, principal.id()));
     }
 }

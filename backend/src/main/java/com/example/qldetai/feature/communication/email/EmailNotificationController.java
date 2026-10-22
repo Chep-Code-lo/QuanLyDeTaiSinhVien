@@ -80,7 +80,7 @@ public class EmailNotificationController {
             @PathVariable EmailNotificationEventType eventType,
             @Valid @RequestBody UpdateNotificationSettingRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Email notification setting saved.", settingsService.update(principal.id(), eventType, request));
+        return ApiResponse.success("Đã lưu cài đặt thông báo email.", settingsService.update(principal.id(), eventType, request));
     }
 
     @PostMapping("/notification-settings/{eventType}/preview")
@@ -98,7 +98,7 @@ public class EmailNotificationController {
             @PathVariable EmailNotificationEventType eventType,
             @Valid @RequestBody SendTestEmailRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Test email was queued for the current account.",
+        return ApiResponse.success("Đã xếp hàng gửi email thử đến tài khoản hiện tại.",
                 settingsService.queueTest(principal.id(), eventType, request));
     }
 

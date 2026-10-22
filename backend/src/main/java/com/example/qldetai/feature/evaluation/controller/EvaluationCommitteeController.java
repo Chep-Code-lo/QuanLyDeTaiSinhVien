@@ -77,7 +77,7 @@ public class EvaluationCommitteeController {
             @AuthenticationPrincipal UserPrincipal principal) {
         Long id = service.createCommittee(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/evaluation-committees/" + id))
-                .body(ApiResponse.success("Committee created.", id));
+                .body(ApiResponse.success("Đã tạo hội đồng.", id));
     }
 
     @PostMapping("/evaluation-committees/{id}/members")
@@ -88,6 +88,6 @@ public class EvaluationCommitteeController {
             @Valid @RequestBody AddCommitteeMemberRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         service.addMember(id, request, principal.id());
-        return ApiResponse.success("Committee member added.", null);
+        return ApiResponse.success("Đã thêm thành viên hội đồng.", null);
     }
 }

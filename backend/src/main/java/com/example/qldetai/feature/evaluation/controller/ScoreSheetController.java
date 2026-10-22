@@ -42,6 +42,6 @@ public class ScoreSheetController {
             @Valid @RequestBody SaveSheetRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Score sheet saved.", service.saveSheet(id, request, principal.id()));
+                "Đã lưu phiếu điểm.", service.saveSheet(id, request, principal.id()));
     }
 }

@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-only-password
+          MYSQL_ROOT_HOST: '%'
+          MYSQL_DATABASE: ql_de_tai_sinh_vien
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pci-only-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      MYSQL_PWD: ci-only-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Install MySQL client
+        run: sudo apt-get update && sudo apt-get install -y mysql-client
+      - name: Bootstrap MySQL and migrate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mysql -h 127.0.0.1 -uroot -e 'SET GLOBAL log_bin_trust_function_creators = 1'
+          for file in \
+            database/bootstrap/00-create-database.sql \
+            database/schema/01-tables-and-local-constraints.sql \
+            database/constraints/01-foreign-keys.sql \
+            database/seed/00-system-data.sql \
+            database/objects/01-views.sql \
+            database/objects/02-triggers.sql; do
+            mysql -h 127.0.0.1 -uroot ql_de_tai_sinh_vien < "$file"
+          done
+          docker run --rm --network host \
+            -v "$PWD/database/migrations:/flyway/sql:ro" \
+            -e 'FLYWAY_URL=jdbc:mysql://127.0.0.1:3306/ql_de_tai_sinh_vien?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC' \
+            -e FLYWAY_USER=root -e "FLYWAY_PASSWORD=$MYSQL_PWD" \
+            -e FLYWAY_BASELINE_ON_MIGRATE=true -e FLYWAY_BASELINE_VERSION=0 \
+            -e FLYWAY_CLEAN_DISABLED=true flyway/flyway:13.10.3 migrate
+      - name: Backend clean verify
+        working-directory: backend
+        run: bash ./mvnw --batch-mode clean verify
+      - name: Concurrent HTTP and evaluation tests on MySQL
+        working-directory: backend
+        run: >-
+          bash ./mvnw --batch-mode test
+          '-Dtest=AuthSessionIntegrationTests,EvaluationConcurrencyIntegrationTests'
+          '-Drace.test.mysql.url=jdbc:mysql://127.0.0.1:3306/ql_de_tai_sinh_vien?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC'
+          -Drace.test.mysql.user=root
+          "-Drace.test.mysql.password=$MYSQL_PWD"
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test -- --maxWorkers=2
+      - run: npm run test:utils
+      - run: npm run build

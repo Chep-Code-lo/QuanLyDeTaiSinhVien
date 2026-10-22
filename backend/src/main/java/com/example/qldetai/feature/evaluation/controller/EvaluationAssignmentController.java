@@ -66,6 +66,6 @@ public class EvaluationAssignmentController {
             @AuthenticationPrincipal UserPrincipal principal) {
         Long id = service.assign(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/evaluation-assignments/" + id))
-                .body(ApiResponse.success("Evaluator assigned.", id));
+                .body(ApiResponse.success("Đã phân công người chấm.", id));
     }
 }

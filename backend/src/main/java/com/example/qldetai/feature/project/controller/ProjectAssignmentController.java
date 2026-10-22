@@ -73,7 +73,7 @@ public class ProjectAssignmentController {
         ProjectAssignmentResponse created =
                 projectAssignmentService.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/project-assignments/" + created.id()))
-                .body(ApiResponse.success("Project assignment created.", created));
+                .body(ApiResponse.success("Đã tạo phân công đề tài.", created));
     }
 
     @PatchMapping("/{id}/status")
@@ -84,7 +84,7 @@ public class ProjectAssignmentController {
             @Valid @RequestBody UpdateAssignmentStatusRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Project assignment status updated.",
+                "Đã cập nhật trạng thái phân công đề tài.",
                 projectAssignmentService.updateStatus(id, request, principal.id()));
     }
 }

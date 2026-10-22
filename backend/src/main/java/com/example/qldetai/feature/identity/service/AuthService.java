@@ -94,7 +94,8 @@ public class AuthService {
     @Transactional
     public void changePassword(Long userId, ChangePasswordRequest request,
             HttpServletRequest httpRequest, HttpServletResponse response) {
-        User user = requireUser(userId);
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản người dùng."));
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
             throw new BusinessRuleException("Mật khẩu hiện tại không chính xác.");
         }

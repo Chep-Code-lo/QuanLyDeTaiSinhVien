@@ -50,7 +50,7 @@ public class RubricController {
             @AuthenticationPrincipal UserPrincipal principal) {
         RubricResponse result = service.createRubric(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/rubrics/" + result.id()))
-                .body(ApiResponse.success("Rubric created.", result));
+                .body(ApiResponse.success("Đã tạo tiêu chuẩn đánh giá.", result));
     }
 
     @PatchMapping("/rubrics/{id}/lock")
@@ -58,6 +58,6 @@ public class RubricController {
             "hasRole('ADMIN') or @evaluationAuthorization.canManageRubric(#id, authentication)")
     public ApiResponse<RubricResponse> lockRubric(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Rubric locked.", service.lockRubric(id, principal.id()));
+        return ApiResponse.success("Đã khóa tiêu chuẩn đánh giá.", service.lockRubric(id, principal.id()));
     }
 }

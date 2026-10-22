@@ -69,7 +69,7 @@ public class TopicController {
             @AuthenticationPrincipal UserPrincipal principal) {
         TopicResponse created = topicService.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/topics/" + created.id()))
-                .body(ApiResponse.success("Topic proposal created.", created));
+                .body(ApiResponse.success("Đã tạo đề xuất đề tài.", created));
     }
 
     @PostMapping("/for-registration")
@@ -79,7 +79,7 @@ public class TopicController {
             @AuthenticationPrincipal UserPrincipal principal) {
         TopicResponse created = topicService.createForRegistration(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/topics/" + created.id()))
-                .body(ApiResponse.success("Topic created and published for registration.", created));
+                .body(ApiResponse.success("Đã tạo và công bố đề tài để đăng ký.", created));
     }
 
     @PutMapping("/{id}")
@@ -89,7 +89,7 @@ public class TopicController {
             @Valid @RequestBody UpdateTopicRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Topic updated.", topicService.update(id, request, principal.id()));
+                "Đã cập nhật đề tài.", topicService.update(id, request, principal.id()));
     }
 
     @PutMapping("/{id}/supervisors")
@@ -99,7 +99,7 @@ public class TopicController {
             @Valid @RequestBody AssignSupervisorsRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Topic supervisors assigned.",
+                "Đã phân công giảng viên hướng dẫn.",
                 topicService.assignSupervisors(id, request, principal.id()));
     }
 
@@ -110,7 +110,7 @@ public class TopicController {
             @Valid @RequestBody ReviewTopicRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Topic review recorded.", topicService.review(id, request, principal.id()));
+                "Đã ghi nhận kết quả xét duyệt đề tài.", topicService.review(id, request, principal.id()));
     }
 
     @PatchMapping("/{id}/publish")
@@ -120,7 +120,7 @@ public class TopicController {
             @Valid @RequestBody PublishTopicRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Topic published.", topicService.publish(id, request, principal.id()));
+                "Đã công bố đề tài.", topicService.publish(id, request, principal.id()));
     }
 
     @PatchMapping("/{id}/withdraw")
@@ -130,6 +130,6 @@ public class TopicController {
             @Valid @RequestBody WithdrawTopicRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Topic withdrawn.", topicService.withdraw(id, request, principal.id()));
+                "Đã rút đề tài.", topicService.withdraw(id, request, principal.id()));
     }
 }

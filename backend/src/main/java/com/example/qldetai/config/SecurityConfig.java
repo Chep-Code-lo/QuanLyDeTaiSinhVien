@@ -129,7 +129,7 @@ public class SecurityConfig {
         var encoder = new DelegatingPasswordEncoder("bcrypt", Map.of(
                 "pbkdf2", Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8(), "bcrypt", bcrypt));
         // Keep BCrypt for new passwords. Retain readers for previously stored hashes.
-        // BCrypt's 72-byte limit remains separate from the DTO's 100-character limit.
+        // PasswordByteLength validates new passwords against BCrypt's 72-byte UTF-8 limit.
         encoder.setDefaultPasswordEncoderForMatches(bcrypt);
         return encoder;
     }

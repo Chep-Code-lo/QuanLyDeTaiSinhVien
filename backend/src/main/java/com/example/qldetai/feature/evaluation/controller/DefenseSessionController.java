@@ -71,6 +71,6 @@ public class DefenseSessionController {
             @AuthenticationPrincipal UserPrincipal principal) {
         Long id = service.schedule(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/defense-sessions/" + id))
-                .body(ApiResponse.success("Defense scheduled.", id));
+                .body(ApiResponse.success("Đã xếp lịch bảo vệ.", id));
     }
 }

@@ -39,7 +39,7 @@ public class EmailTemplateController {
             @Valid @RequestBody SaveEmailTemplateRequest request) {
         var created = templates.create(principal.id(), request);
         return ResponseEntity.created(URI.create("/api/v1/email-templates/" + created.id()))
-                .body(ApiResponse.success("Email template created.", created));
+                .body(ApiResponse.success("Đã tạo mẫu email.", created));
     }
 
     @PutMapping("/{id}")
@@ -51,6 +51,6 @@ public class EmailTemplateController {
     @PostMapping("/{id}/send")
     public ApiResponse<EmailQueuedResponse> send(@PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody SendEmailRequest request) {
-        return ApiResponse.success("Email was queued for the selected recipients.", dispatch.sendTemplate(principal.id(), id, request));
+        return ApiResponse.success("Đã xếp hàng gửi email đến người nhận đã chọn.", dispatch.sendTemplate(principal.id(), id, request));
     }
 }

@@ -19,6 +19,7 @@ public class LoginAttemptLimiter {
     private static final int MAX_USERNAME_FAILURES = 20;
     private static final Duration WINDOW = Duration.ofMinutes(15);
     private final Clock clock;
+    // Counters live in this instance only; multiple backend instances need a shared store.
     private final Cache<String, Deque<Failure>> attempts;
     private final Object[] locks = new Object[256];
 

@@ -1,7 +1,5 @@
 package com.example.qldetai.security;
 
-import com.example.qldetai.feature.identity.repository.LecturerRepository;
-import com.example.qldetai.feature.identity.repository.StudentRepository;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 import java.util.Locale;
@@ -17,17 +15,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class DatabaseUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
-    private final StudentRepository studentRepository;
-    private final LecturerRepository lecturerRepository;
 
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public UserDetails loadUserByUsername(String identifier) throws UsernameNotFoundException {
         String normalized = identifier == null ? "" : identifier.trim().toLowerCase(Locale.ROOT);
-        User user = userRepository.findByEmailIgnoreCase(normalized)
-                .or(() -> studentRepository.findByStudentCodeIgnoreCase(normalized).map(student -> student.getUser()))
-                .or(() -> lecturerRepository.findByLecturerCodeIgnoreCase(normalized).map(lecturer -> lecturer.getUser()))
+        // Resolve only the ID first: loading a managed User before waiting on the
+        // lock could retain a stale password snapshot. AuthService's transaction
+        // holds this same row lock through authentication and session creation.
+        Long id = userRepository.findLoginIdByEmail(normalized)
+                .or(() -> userRepository.findLoginIdByStudentCode(normalized))
+                .or(() -> userRepository.findLoginIdByLecturerCode(normalized))
+                .orElseThrow(() -> new UsernameNotFoundException("Account not found."));
+        User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new UsernameNotFoundException("Account not found."));
         return UserPrincipal.from(user);
     }

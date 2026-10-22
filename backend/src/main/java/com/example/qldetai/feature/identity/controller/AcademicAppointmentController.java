@@ -42,12 +42,12 @@ public class AcademicAppointmentController {
             @AuthenticationPrincipal UserPrincipal principal) {
         AppointmentResponse created = academicAppointmentService.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/admin/academic-appointments/" + created.id()))
-                .body(ApiResponse.success("Academic appointment created.", created));
+                .body(ApiResponse.success("Đã tạo bổ nhiệm.", created));
     }
 
     @PatchMapping("/{id}/end")
     public ApiResponse<AppointmentResponse> end(
             @PathVariable Long id, @Valid @RequestBody EndAppointmentRequest request) {
-        return ApiResponse.success("Academic appointment ended.", academicAppointmentService.end(id, request));
+        return ApiResponse.success("Đã kết thúc bổ nhiệm.", academicAppointmentService.end(id, request));
     }
 }

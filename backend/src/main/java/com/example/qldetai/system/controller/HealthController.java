@@ -14,6 +14,6 @@ public class HealthController {
 
     @GetMapping
     public ApiResponse<HealthResponse> health() {
-        return ApiResponse.success("Service is running.", new HealthResponse("UP", Instant.now()));
+        return ApiResponse.success("Dịch vụ đang hoạt động.", new HealthResponse("UP", Instant.now()));
     }
 }

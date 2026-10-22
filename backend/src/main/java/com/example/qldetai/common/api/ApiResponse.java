@@ -16,7 +16,7 @@ import java.time.Instant;
 public record ApiResponse<T>(boolean success, String message, T data, Instant timestamp) {
 
     public static <T> ApiResponse<T> success(T data) {
-        return success("Request completed successfully.", data);
+        return success("Thao tác thành công.", data);
     }
 
     public static <T> ApiResponse<T> success(String message, T data) {
