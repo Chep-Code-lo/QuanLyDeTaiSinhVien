@@ -1342,6 +1342,30 @@ class ProjectLifecycleIntegrationTests {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void auditReproducesGradeChangeListDisclosureToUnrelatedLecturer(@Autowired MockMvc mvc) throws Exception {
+        var project = createAssignedProject("grade-change-disclosure", leaderStudent, secondStudent);
+        var catalog = createLockedCatalog("disclosure", "Review", AssessmentComponentType.OTHER);
+        Long evaluationId = evaluationService.assign(new CreateEvaluationRequest(project.id(), catalog.rubric().id(),
+                lecturerThree.getId(), null, nowUtc().plusDays(1)), admin.getId());
+        var sheet = evaluationService.saveSheet(evaluationId, new SaveSheetRequest(0, "Complete",
+                scoreRequests(catalog.rubric(), new BigDecimal("6"), new BigDecimal("4")), true), lecturerThree.getUser().getId());
+        Long change = gradeChangeService.requestChange(sheet.id(), new CreateGradeChangeRequest("Private correction reason"),
+                lecturerThree.getUser().getId());
+        // Audit reproducer: this unrelated lecturer must receive an empty list after the scoped-read fix.
+        mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].id").value(change))
+                .andExpect(jsonPath("$.data.content[0].reason").value("Private correction reason"));
+        mvc.perform(get("/api/v1/evaluation-assignments/{id}/score-sheet", evaluationId)
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/evaluation-assignments/{id}/score-sheet", evaluationId)
+                        .with(user(UserPrincipal.from(thirdStudent.getUser()))))
+                .andExpect(status().isForbidden());
+    }
+
     private void submitFullScore(Long assignmentId, LockedCatalog catalog, Lecturer lecturer, Long defenseId) {
         Long id = evaluationService.assign(new CreateEvaluationRequest(assignmentId, catalog.rubric().id(),
                 lecturer.getId(), defenseId, nowUtc().plusDays(1)), admin.getId());
