@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 class GlobalExceptionHandlerTests {
     private MockMvc mvc;
@@ -21,6 +22,14 @@ class GlobalExceptionHandlerTests {
     void setup() {
         mvc = MockMvcBuilders.standaloneSetup(new ProbeController())
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
+    }
+
+    @Test
+    void oversizedUploadReturns413WithVietnameseApiEnvelope() throws Exception {
+        mvc.perform(get("/probe/upload-size"))
+                .andExpect(status().is(413))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Tệp quá lớn. Tối đa 20 MB."));
     }
 
     @Test
@@ -48,6 +57,8 @@ class GlobalExceptionHandlerTests {
 
     @RestController
     static class ProbeController {
+        @GetMapping("/probe/upload-size")
+        void uploadSize() { throw new MaxUploadSizeExceededException(20 * 1024 * 1024); }
         @GetMapping("/probe/optimistic")
         void optimistic() { throw new OptimisticLockingFailureException("internal entity and SQL diagnostic"); }
         @GetMapping("/probe/lock")
