@@ -249,7 +249,7 @@ function ProjectResults({ project }: { project: ProjectAssignmentResponse }) {
                 </p>
               )}
               <div className="table-container">
-                <table className="data-table">
+                <table className="data-table result-input-table">
                   <thead>
                     <tr>
                       <th>Nội dung đánh giá</th>

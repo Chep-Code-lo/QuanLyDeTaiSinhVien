@@ -593,7 +593,31 @@ div.member-list {
   color: #dbeafe;
 }
 .portal-shell .sidebar__text {
+  white-space: normal;
+  overflow-wrap: anywhere;
   transition: transform 180ms ease;
+}
+.portal-shell .sidebar__nav {
+  align-content: start;
+  gap: 16px;
+}
+.portal-shell .sidebar__group {
+  display: grid;
+  gap: 4px;
+}
+.portal-shell .sidebar__group + .sidebar__group {
+  padding-top: 16px;
+  border-top: 1px solid rgb(255 255 255 / 12%);
+}
+.portal-shell .sidebar__group > .sidebar__label {
+  margin-bottom: 4px;
+}
+.portal-shell button.sidebar__link {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.portal-shell .sidebar__icon {
+  flex-shrink: 0;
 }
 .portal-shell .sidebar__link:is(:hover, :focus-visible) .sidebar__text {
   transform: translateX(5px);
@@ -627,6 +651,14 @@ div.member-list {
   flex-wrap: wrap;
 }
 
+.portal-shell:not(.management-shell) .table-pagination {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .topic-workflow-toolbar {
   display: flex;
   align-items: flex-end;
@@ -643,4 +675,44 @@ div.member-list {
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+}
+
+.academic-catalog-section > .btn + .table-container {
+  margin-top: 16px;
+}
+
+.audit-logs-toolbar {
+  margin-bottom: 16px;
+}
+
+.portal-shell .data-table.result-input-table :is(th, td) {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.catalog-editor-dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  margin: auto;
+  padding: 24px;
+  overflow-y: auto;
+  border: 1px solid var(--line-border);
+  border-radius: 12px;
+  color: var(--ink-900);
+  background: #fff;
+  font: inherit;
+}
+.catalog-editor-dialog__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.catalog-editor-dialog__heading h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.catalog-editor-dialog::backdrop {
+  background: rgb(15 30 55 / 45%);
 }

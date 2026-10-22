@@ -15,7 +15,16 @@ import {
 } from 'lucide-react'
 import type { PositionCode, RoleCode } from '../types/domain'
 
+export const navigationGroups = [
+  { id: 'general', label: 'Menu chính' },
+  { id: 'personal', label: 'Cá nhân' },
+  { id: 'projects', label: 'Đề tài & tiến độ' },
+  { id: 'evaluation', label: 'Đánh giá & kết quả' },
+  { id: 'management', label: 'Quản trị' },
+] as const
+
 export type NavigationItem = {
+  group: (typeof navigationGroups)[number]['id']
   icon: LucideIcon
   label: string
   to: string
@@ -26,65 +35,103 @@ export type NavigationItem = {
 }
 
 export const navigationItems: NavigationItem[] = [
-  { icon: Home, label: 'Tổng quan', to: '/dashboard' },
-  { icon: BookOpen, label: 'Đề tài & Dự án', to: '/topics' },
-  { icon: BookOpen, label: 'Đề xuất & Xét duyệt', to: '/topic-workflow' },
+  { group: 'general', icon: Home, label: 'Tổng quan', to: '/dashboard' },
+  { group: 'projects', icon: BookOpen, label: 'Đề tài & Dự án', to: '/topics' },
+  { group: 'projects', icon: BookOpen, label: 'Đề xuất & Xét duyệt', to: '/topic-workflow' },
+  { group: 'projects', icon: UsersRound, label: 'Nhóm đề tài', to: '/groups' },
+  { group: 'projects', icon: ClipboardCheck, label: 'Đăng ký đề tài', to: '/registrations' },
   {
+    group: 'projects',
     icon: ClipboardCheck,
     label: 'Đề tài được giao',
     to: '/project-assignments',
     roles: ['LECTURER', 'ADMIN'],
   },
+  { group: 'projects', icon: ListChecks, label: 'Tiến độ & Mốc báo cáo', to: '/progress' },
   {
-    icon: ListChecks,
-    label: 'Yêu cầu đổi điểm',
-    to: '/grade-change-requests',
-    roles: ['LECTURER', 'ADMIN'],
-  },
-  {
-    icon: Building2,
-    label: 'Danh mục học thuật',
-    to: '/academic-catalog',
-    requireAcademicManagement: true,
-  },
-  { icon: ShieldCheck, label: 'Nhật ký thao tác', to: '/audit-logs', adminOnly: true },
-  { icon: UsersRound, label: 'Nhóm đề tài', to: '/groups' },
-  { icon: ClipboardCheck, label: 'Đăng ký đề tài', to: '/registrations' },
-  { icon: ListChecks, label: 'Tiến độ & Mốc báo cáo', to: '/progress' },
-  {
+    group: 'evaluation',
     icon: ClipboardCheck,
     label: 'Tiêu chuẩn đánh giá',
     to: '/evaluations',
     roles: ['LECTURER', 'ADMIN'],
   },
   {
+    group: 'evaluation',
     icon: Flag,
     label: 'Phân công giảng viên',
     to: '/evaluator-assignment',
     roles: ['LECTURER', 'ADMIN'],
   },
-  { icon: ClipboardCheck, label: 'Chấm điểm đề tài', to: '/score-sheets', roles: ['LECTURER'] },
   {
+    group: 'evaluation',
+    icon: ClipboardCheck,
+    label: 'Chấm điểm đề tài',
+    to: '/score-sheets',
+    roles: ['LECTURER'],
+  },
+  {
+    group: 'evaluation',
     icon: ListChecks,
     label: 'Tổng hợp & Công bố điểm',
     to: '/evaluation-results',
     roles: ['LECTURER', 'ADMIN'],
   },
   {
+    group: 'evaluation',
+    icon: ListChecks,
+    label: 'Yêu cầu đổi điểm',
+    to: '/grade-change-requests',
+    roles: ['LECTURER', 'ADMIN'],
+  },
+  {
+    group: 'evaluation',
+    icon: CalendarCheck,
+    label: 'Lịch bảo vệ & Kết quả',
+    to: '/results',
+    roles: ['STUDENT'],
+  },
+  {
+    group: 'management',
+    icon: Building2,
+    label: 'Danh mục học thuật',
+    to: '/academic-catalog',
+    requireAcademicManagement: true,
+  },
+  {
+    group: 'management',
     icon: Building2,
     label: 'Quản lý Học thuật',
     to: '/academic-management',
     requireAcademicManagement: true,
   },
   {
+    group: 'management',
     icon: ShieldCheck,
     label: 'Bổ nhiệm chức vụ',
     to: '/admin-appointments',
     adminOnly: true,
   },
-  { icon: UserRound, label: 'Quản lý tài khoản', to: '/admin-users', adminOnly: true },
-  { icon: Mail, label: 'Cấu hình email', to: '/email-settings', roles: ['ADMIN', 'LECTURER'] },
-  { icon: CalendarCheck, label: 'Lịch bảo vệ & Kết quả', to: '/results', roles: ['STUDENT'] },
-  { icon: UserRound, label: 'Tài khoản', to: '/account' },
-  { icon: Bell, label: 'Thông báo', to: '/announcements' },
+  {
+    group: 'management',
+    icon: UserRound,
+    label: 'Quản lý tài khoản',
+    to: '/admin-users',
+    adminOnly: true,
+  },
+  {
+    group: 'management',
+    icon: Mail,
+    label: 'Cấu hình email',
+    to: '/email-settings',
+    roles: ['ADMIN', 'LECTURER'],
+  },
+  {
+    group: 'management',
+    icon: ShieldCheck,
+    label: 'Nhật ký thao tác',
+    to: '/audit-logs',
+    adminOnly: true,
+  },
+  { group: 'personal', icon: Bell, label: 'Thông báo', to: '/announcements' },
+  { group: 'personal', icon: UserRound, label: 'Tài khoản', to: '/account' },
 ]

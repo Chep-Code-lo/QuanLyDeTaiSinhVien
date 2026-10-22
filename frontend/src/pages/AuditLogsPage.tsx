@@ -7,39 +7,24 @@ import { useRemoteData } from '../hooks/useRemoteData'
 import { formatDateTime } from '../utils/dateTime'
 
 export function AuditLogsPage() {
-  const [query, setQuery] = useState('')
-  const [entityType, setEntityType] = useState('')
   const [page, setPage] = useState(0)
   const [revision, setRevision] = useState(0)
-  const load = useCallback(
-    () => adminApi.listAuditLogs({ entityType: entityType || undefined, page, size: 20 }),
-    [entityType, page],
-  )
+  const load = useCallback(() => adminApi.listAuditLogs({ page, size: 20 }), [page])
   const { data, loading, error } = useRemoteData(load, revision)
   return (
     <>
       <PageHeader title="Nhật ký thao tác" />
       <section className="page-card">
-        <form
-          className="inline-form"
-          onSubmit={(event) => {
-            event.preventDefault()
-            setPage(0)
-            setEntityType(query.trim())
-            setRevision((value) => value + 1)
-          }}
-        >
-          <label>
-            Loại đối tượng
-            <input
-              className="form-input"
-              value={query}
-              placeholder="Ví dụ: TOPIC, USER"
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
-          <button className="btn btn-secondary">Lọc nhật ký</button>
-        </form>
+        <div className="audit-logs-toolbar">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={loading}
+            onClick={() => setRevision((value) => value + 1)}
+          >
+            Làm mới nhật ký
+          </button>
+        </div>
         <RemoteState
           loading={loading}
           error={error}
