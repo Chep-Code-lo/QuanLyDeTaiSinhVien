@@ -71,6 +71,38 @@ class LoginAttemptLimiterTests {
     }
 
     @Test
+    void distributedFailuresAreLimitedByUsernameAndSuccessResetsAllIps() {
+        for (int index = 0; index < 19; index++) fail("distributed", "ip-" + index);
+        assertThat(limiter.authenticate("distributed", "good-ip", () -> "ok")).isEqualTo("ok");
+        for (int index = 0; index < 20; index++) fail("distributed", "ip-" + index);
+        assertThatThrownBy(() -> limiter.authenticate(" DISTRIBUTED ", "new-ip", () -> "blocked"))
+                .isInstanceOf(TooManyRequestsException.class);
+    }
+
+    @Test
+    void randomUsernamesCannotBlockARealUserWhenCacheIsFull() {
+        for (int index = 0; index < 15_000; index++) fail("random-" + index, "attacker-ip");
+        assertThat(limiter.authenticate("real-user", "real-ip", () -> "ok")).isEqualTo("ok");
+        fail("real-user", "real-ip");
+    }
+
+    @Test
+    void successfulAndInFlightRequestsDoNotAllocateEntries() throws Exception {
+        var field = LoginAttemptLimiter.class.getDeclaredField("attempts");
+        field.setAccessible(true);
+        var cache = (com.github.benmanes.caffeine.cache.Cache<?, ?>) field.get(limiter);
+        limiter.authenticate("valid", "ip", () -> {
+            assertThat(cache.estimatedSize()).isZero();
+            return "ok";
+        });
+        assertThat(cache.estimatedSize()).isZero();
+        assertThatThrownBy(() -> limiter.authenticate("unresolved", "ip", () -> {
+            throw new IllegalStateException("service unavailable");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(cache.estimatedSize()).isZero();
+    }
+
+    @Test
     void concurrentFailuresStillRunOnlyFiveAuthentications() throws Exception {
         var calls = new AtomicInteger();
         var startGate = new CountDownLatch(1);
