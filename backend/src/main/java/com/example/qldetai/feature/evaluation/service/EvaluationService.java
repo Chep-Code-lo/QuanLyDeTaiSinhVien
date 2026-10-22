@@ -7,6 +7,7 @@ import com.example.qldetai.exception.ConflictException;
 import com.example.qldetai.exception.ResourceNotFoundException;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriod;
 import com.example.qldetai.feature.academic.repository.RegistrationPeriodRepository;
+import com.example.qldetai.feature.communication.service.NotificationService;
 import com.example.qldetai.feature.evaluation.domain.AssessmentComponent;
 import com.example.qldetai.feature.evaluation.domain.AssessmentComponentType;
 import com.example.qldetai.feature.evaluation.domain.DefenseSession;
@@ -52,6 +53,7 @@ import jakarta.persistence.LockModeType;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -96,6 +98,10 @@ public class EvaluationService {
     private final TopicSupervisorRepository supervisors;
     private final Clock clock;
     private final EntityManager entityManager;
+    private final NotificationService notifications;
+
+    @Value("${app.email.display-time-zone:Asia/Ho_Chi_Minh}")
+    private String displayTimeZone;
 
     @Transactional(readOnly = true)
     public List<AssessmentComponentResponse> listComponents(Long periodId, Long actorId) {
@@ -406,7 +412,47 @@ public class EvaluationService {
         evaluationAssignment.setDefense(defense);
         evaluationAssignment.setEvaluatorRole(evaluatorRole);
         evaluationAssignment.setDeadlineAt(request.deadlineAt());
-        return evaluations.save(evaluationAssignment).getId();
+        evaluationAssignment = evaluations.save(evaluationAssignment);
+        notifyEvaluator(evaluationAssignment);
+        return evaluationAssignment.getId();
+    }
+
+    private void notifyEvaluator(EvaluationAssignment evaluation) {
+        var assignment = evaluation.getAssignment();
+        var zone = java.time.ZoneId.of(displayTimeZone);
+        var deadline =
+                evaluation
+                        .getDeadlineAt()
+                        .atOffset(java.time.ZoneOffset.UTC)
+                        .atZoneSameInstant(zone);
+        String content =
+                "Bạn được phân công chấm đề tài "
+                        + assignment.getTopic().getCode()
+                        + " - "
+                        + assignment.getTopic().getTitle()
+                        + ".\n"
+                        + "Nhóm: "
+                        + assignment.getGroup().getName()
+                        + ".\n"
+                        + "Thành phần đánh giá: "
+                        + evaluation.getComponent().getName()
+                        + ".\n"
+                        + "Bộ tiêu chí: "
+                        + evaluation.getRubric().getName()
+                        + ".\n"
+                        + "Hạn chấm: "
+                        + deadline.format(
+                                java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                        + " ("
+                        + zone.getId()
+                        + ").\n"
+                        + "Vui lòng mở mục Phiếu điểm để xem tiêu chí và chấm điểm.";
+        notifications.publish(
+                evaluation.getLecturer().getUser().getId(),
+                "evaluation-assigned-" + evaluation.getId(),
+                "Phân công chấm điểm",
+                content,
+                "/score-sheets");
     }
 
     @Transactional

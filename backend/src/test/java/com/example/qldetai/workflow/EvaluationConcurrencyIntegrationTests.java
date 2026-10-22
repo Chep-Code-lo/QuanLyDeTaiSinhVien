@@ -503,6 +503,8 @@ class EvaluationConcurrencyIntegrationTests {
                         evaluations.findByAssignmentIdAndStatus(
                                 fixture.projectId(), EvaluationStatus.ACTIVE))
                 .hasSize(2);
+        assertAssignmentNoticeCount(fixture.projectId(), lecturerFour, 1);
+        assertAssignmentNoticeCount(fixture.projectId(), lecturerFive, 0);
     }
 
     @Test
@@ -525,6 +527,59 @@ class EvaluationConcurrencyIntegrationTests {
                         evaluations.findByAssignmentIdAndStatus(
                                 fixture.projectId(), EvaluationStatus.ACTIVE))
                 .hasSize(2);
+        assertAssignmentNoticeCount(fixture.projectId(), lecturerFour, 1);
+        assertAssignmentNoticeCount(fixture.projectId(), lecturerFive, 0);
+    }
+
+    private void assertAssignmentNoticeCount(Long projectId, Lecturer recipient, long expected) {
+        assertThat(
+                        jdbc.queryForObject(
+                                """
+                select count(*) from notifications n
+                join evaluation_assignments e on n.event_key = concat('evaluation-assigned-', e.id)
+                where e.assignment_id = ? and n.user_id = ?
+                """,
+                                Long.class,
+                                projectId,
+                                recipient.getUser().getId()))
+                .isEqualTo(expected);
+    }
+
+    @Test
+    void batchAssignmentNotifiesEachNewEvaluatorOnceOnRetry() {
+        var fixture = fixture(false, AssessmentComponentType.REVIEW);
+        var batch =
+                new BatchEvaluationRequest(
+                        List.of(reviewer(fixture, lecturerFour), reviewer(fixture, lecturerFive)));
+        assertThat(batches.assign(batch, admin.getId()).assignedCount()).isEqualTo(2);
+        assertThat(batches.assign(batch, admin.getId()).skippedCount()).isEqualTo(2);
+        assertAssignmentNoticeCount(fixture.projectId(), lecturerFour, 1);
+        assertAssignmentNoticeCount(fixture.projectId(), lecturerFive, 1);
+        assertAssignmentNoticeCount(fixture.projectId(), lecturerOne, 0);
+    }
+
+    @Test
+    void failedBatchRollsBackNoticesAlreadyCreatedEarlierInTheBatch() {
+        var fixture = fixture(false, AssessmentComponentType.REVIEW);
+        var valid = reviewer(fixture, lecturerFour);
+        var invalid =
+                new CreateEvaluationRequest(
+                        valid.assignmentId(),
+                        Long.MAX_VALUE,
+                        valid.lecturerId(),
+                        null,
+                        valid.deadlineAt());
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () ->
+                                batches.assign(
+                                        new BatchEvaluationRequest(List.of(valid, invalid)),
+                                        admin.getId()))
+                .isInstanceOf(com.example.qldetai.exception.ResourceNotFoundException.class);
+        assertAssignmentNoticeCount(fixture.projectId(), lecturerFour, 0);
+        assertThat(
+                        evaluations.findByAssignmentIdAndStatus(
+                                fixture.projectId(), EvaluationStatus.ACTIVE))
+                .hasSize(1);
     }
 
     @Test
