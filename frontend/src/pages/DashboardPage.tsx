@@ -23,40 +23,34 @@ const dateTime = (value: string) => formatDateTime(value)
 export function DashboardPage() {
   const { user, hasRole } = useAuth()
   const isLecturer = hasRole('LECTURER') || hasRole('ADMIN')
-  const [summary, setSummary] = useState<DashboardSummary | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [snapshot, setSnapshot] = useState<{ userId: number | undefined; summary: DashboardSummary } | null>(null)
+  const [failedUserId, setFailedUserId] = useState<number | undefined | null>(null)
+  const summary = snapshot?.userId === user?.id ? snapshot?.summary ?? null : null
+  const error = failedUserId === user?.id
+  const loading = !summary && !error
   const [revision, setRevision] = useState(0)
   const [hoveredTopicType, setHoveredTopicType] = useState<TopicType | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null)
   const chartWrapperRef = useRef<HTMLDivElement>(null)
-  const lastUserId = useRef(user?.id)
 
   useEffect(() => {
     let active = true
     let pending = false
-    let loaded = lastUserId.current === user?.id && summary !== null
-    if (lastUserId.current !== user?.id) setSummary(null)
-    lastUserId.current = user?.id
-    setLoading(!loaded)
     const refresh = async () => {
       if (pending) return
       pending = true
-      if (!loaded) setLoading(true)
       try {
         const data = await dashboardApi.summary()
         if (active) {
-          setSummary(data)
-          loaded = true
-          setError(false)
+          setSnapshot({ userId: user?.id, summary: data })
+          setFailedUserId(null)
         }
       } catch {
         if (active) {
-          setError(true)
+          setFailedUserId(user?.id)
         }
       } finally {
         pending = false
-        if (active) setLoading(false)
       }
     }
     void refresh()
@@ -162,10 +156,10 @@ export function DashboardPage() {
             ) : loading ? (
               'Đang tải dữ liệu tổng quan...'
             ) : (
-              <>Chưa tải được dữ liệu tổng quan.{' '}{error && <button className="welcome-panel__retry" type="button" onClick={() => setRevision((value) => value + 1)}>Thử lại</button>}</>
+              <>Chưa tải được dữ liệu tổng quan.{' '}{error && <button className="welcome-panel__retry" type="button" onClick={() => { setFailedUserId(null); setRevision((value) => value + 1) }}>Thử lại</button>}</>
             )}
           </p>
-          {summary && error && <p role="status">Chưa cập nhật được dữ liệu mới. Đang hiển thị dữ liệu lần tải thành công gần nhất. <button type="button" className="welcome-panel__retry" onClick={() => setRevision((value) => value + 1)}>Thử lại</button></p>}
+          {summary && error && <p role="status">Chưa cập nhật được dữ liệu mới. Đang hiển thị dữ liệu lần tải thành công gần nhất. <button type="button" className="welcome-panel__retry" onClick={() => { setFailedUserId(null); setRevision((value) => value + 1) }}>Thử lại</button></p>}
           {user?.activeAppointments?.length ? (
             <div className="welcome-panel__roles">
               {user.activeAppointments.map((item) => (
@@ -207,7 +201,7 @@ export function DashboardPage() {
             <button
               className="text-button"
               disabled={loading}
-              onClick={() => setRevision((value) => value + 1)}
+              onClick={() => { setFailedUserId(null); setRevision((value) => value + 1) }}
             >
               {loading ? 'Đang tải...' : 'Cập nhật'}
             </button>

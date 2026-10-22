@@ -4,6 +4,7 @@ import { academicApi } from '../api/academic'
 import { adminApi } from '../api/admin'
 import { AnimatedSelect } from './AnimatedSelect'
 import { useToast } from '../context/ToastContext'
+import { useRequestLoading } from '../hooks/useRequestLoading'
 import type { DepartmentResponse, UpdateUserRequest, UserResponse } from '../types/domain'
 import { roleLabel } from '../utils/displayLabels'
 import './EditAccountForm.css'
@@ -69,9 +70,9 @@ function updateError(error: unknown): string {
 export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormProps) {
   const { showError, showSuccess } = useToast()
   const [form, setForm] = useState(() => formFromUser(user))
+  const [formUser, setFormUser] = useState(user)
   const [departments, setDepartments] = useState<DepartmentResponse[]>([])
-  const [loading, setLoading] = useState(Boolean(user.student || user.lecturer))
-  const [loadError, setLoadError] = useState(false)
+  const [departmentError, setLoadError] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -79,26 +80,23 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
   const hasStudentProfile = Boolean(user.student)
   const hasLecturerProfile = Boolean(user.lecturer)
   const requiresDepartments = hasStudentProfile || hasLecturerProfile
+  const loadError = requiresDepartments && departmentError
+  const [loading, setLoading] = useRequestLoading(JSON.stringify([requiresDepartments, loadAttempt]), requiresDepartments)
 
-  useEffect(() => {
+  if (formUser !== user) {
+    setFormUser(user)
     setForm(formFromUser(user))
     setErrorMessage('')
-  }, [user])
+  }
 
   useEffect(() => {
-    if (!requiresDepartments) {
-      setLoading(false)
-      setLoadError(false)
-      return
-    }
+    if (!requiresDepartments) return
 
     let active = true
-    setLoading(true)
-    setLoadError(false)
     academicApi
       .getDepartments()
       .then((items) => {
-        if (active) setDepartments(items)
+        if (active) { setDepartments(items); setLoadError(false) }
       })
       .catch(() => {
         if (active) setLoadError(true)
@@ -109,7 +107,7 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
     return () => {
       active = false
     }
-  }, [loadAttempt, requiresDepartments])
+  }, [loadAttempt, requiresDepartments, setLoading])
 
   const updateField = (field: keyof AccountForm, value: string) => {
     setForm((previous) => ({ ...previous, [field]: value }))

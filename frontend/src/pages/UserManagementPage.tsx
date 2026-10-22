@@ -8,6 +8,7 @@ import { EditAccountForm } from '../components/EditAccountForm'
 import { PageHeader } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { useRequestLoading } from '../hooks/useRequestLoading'
 import type { UserResponse } from '../types/domain'
 import { formatDateTime } from '../utils/dateTime'
 import { roleLabel } from '../utils/displayLabels'
@@ -46,23 +47,22 @@ export function UserManagementPage() {
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [totalElements, setTotalElements] = useState(0)
-  const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [reload, setReload] = useState(0)
   const [createOpen, setCreateOpen] = useState(false)
   const [userToEdit, setUserToEdit] = useState<UserResponse | null>(null)
   const [userToDelete, setUserToDelete] = useState<UserResponse | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [loading, setLoading] = useRequestLoading(JSON.stringify([page, search, reload]))
 
   const loadUsers = useCallback(() => {
     let active = true
-    setLoading(true)
-    setLoadError('')
     adminApi
       .listUsers({ search: search || undefined, page, size: PAGE_SIZE })
       .then((result) => {
         if (!active) return
         setUsers(result.content)
+        setLoadError('')
         setTotalPages(result.totalPages)
         setTotalElements(result.totalElements)
       })
@@ -75,7 +75,7 @@ export function UserManagementPage() {
     return () => {
       active = false
     }
-  }, [page, search])
+  }, [page, search, setLoading])
 
   useEffect(() => loadUsers(), [loadUsers, reload])
 

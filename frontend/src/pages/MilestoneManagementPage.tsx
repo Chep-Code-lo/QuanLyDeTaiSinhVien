@@ -9,6 +9,7 @@ import { MilestoneBoard } from '../components/MilestoneBoard'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { useRequestLoading } from '../hooks/useRequestLoading'
 import './MilestoneManagementPage.css'
 import type {
   MilestoneResponse,
@@ -24,10 +25,10 @@ export const MilestoneManagementPage: React.FC = () => {
   const [assignments, setAssignments] = useState<ProjectAssignmentResponse[]>([])
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null)
   const [milestones, setMilestones] = useState<MilestoneResponse[]>([])
-  const [loadingAssignments, setLoadingAssignments] = useState(false)
-  const [loadingMilestones, setLoadingMilestones] = useState(false)
+  const [loadingAssignments, setLoadingAssignments] = useState(true)
   const [milestoneError, setMilestoneError] = useState<string | null>(null)
   const [milestoneReload, setMilestoneReload] = useState(0)
+  const [loadingMilestones, setLoadingMilestones] = useRequestLoading(JSON.stringify([selectedAssignmentId, milestoneReload]), !!selectedAssignmentId)
 
   // Create Milestone Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -57,7 +58,6 @@ export const MilestoneManagementPage: React.FC = () => {
   // Load project assignments
   useEffect(() => {
     let active = true
-    setLoadingAssignments(true)
     allPages(page => academicApi.getProjectAssignments(undefined, page, 100))
       .then((res) => {
         if (!active) return
@@ -77,17 +77,11 @@ export const MilestoneManagementPage: React.FC = () => {
   // Load milestones when project assignment selection changes
   useEffect(() => {
     let active = true
-    setMilestones([])
-    setMilestoneError(null)
-    if (!selectedAssignmentId) {
-      setLoadingMilestones(false)
-      return
-    }
-    setLoadingMilestones(true)
+    if (!selectedAssignmentId) return
     milestoneApi
       .listByAssignment(selectedAssignmentId)
       .then((res) => {
-        if (active) setMilestones(res)
+        if (active) { setMilestones(res); setMilestoneError(null) }
       })
       .catch((err) => {
         if (!active) return
@@ -99,7 +93,7 @@ export const MilestoneManagementPage: React.FC = () => {
       })
       .finally(() => { if (active) setLoadingMilestones(false) })
     return () => { active = false }
-  }, [selectedAssignmentId, showError, milestoneReload])
+  }, [selectedAssignmentId, showError, milestoneReload, setLoadingMilestones])
 
   const handleCreateMilestone = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -272,9 +266,9 @@ export const MilestoneManagementPage: React.FC = () => {
 
       <MilestoneBoard
         key={selectedAssignmentId ?? 'no-assignment'}
-        milestones={milestones}
+        milestones={milestones.filter(item => item.assignmentId === selectedAssignmentId)}
         loading={loadingAssignments || loadingMilestones}
-        error={milestoneError}
+        error={selectedAssignmentId ? milestoneError : null}
         onRetry={() => setMilestoneReload((value) => value + 1)}
         hasAssignment={!!selectedAssignmentId}
         canManage={isLecturerOrAdmin}

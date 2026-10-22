@@ -22,37 +22,39 @@ export function DefenseSchedulePanel({ committees, projects, defenses, periods =
   const [committeeId, setCommitteeId] = useState('')
   const [projectId, setProjectId] = useState('')
   const [location, setLocation] = useState('')
-  const [startsAt, setStartsAt] = useState('')
-  const [endsAt, setEndsAt] = useState('')
+  const [times, setTimes] = useState<{ key: string; startsAt: string; endsAt: string } | null>(null)
   const committee = committees.find(item => String(item.id) === committeeId)
   const period = periods.find(item => item.id === committee?.periodId)
   const graduation = period?.projectType === 'GRADUATION'
   const fixedDate = graduation ? period.defenseDate : undefined
   const missingDate = graduation && !fixedDate
+  const timeKey = JSON.stringify([committeeId, fixedDate])
+  const defaultTimes = { startsAt: fixedDate ? `${fixedDate}T08:00` : '', endsAt: fixedDate ? `${fixedDate}T09:00` : '' }
+  const { startsAt, endsAt } = times?.key === timeKey ? times : defaultTimes
+  const setTime = (field: 'startsAt' | 'endsAt', value: string) => setTimes(previous => ({
+    ...(previous?.key === timeKey ? previous : defaultTimes), key: timeKey, [field]: value,
+  }))
+  const setStartsAt = (value: string) => setTime('startsAt', value)
+  const setEndsAt = (value: string) => setTime('endsAt', value)
   const dateError = defenseDateError(fixedDate, startsAt, endsAt)
-  useEffect(() => {
-    setStartsAt(fixedDate ? `${fixedDate}T08:00` : '')
-    setEndsAt(fixedDate ? `${fixedDate}T09:00` : '')
-  }, [committeeId, fixedDate])
   const [saving, setSaving] = useState(false)
   useEffect(() => { onBusyChange?.(saving); return () => onBusyChange?.(false) }, [saving, onBusyChange])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [refreshNeeded, setRefreshNeeded] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  const [eligibility, setEligibility] = useState<{ eligible: boolean; reason: string | null } | null>(null)
-  const [checking, setChecking] = useState(false)
+  const eligibilityKey = JSON.stringify([projectId, committeeId])
+  const [eligibilityResult, setEligibility] = useState<{ key: string; eligible: boolean; reason: string | null } | null>(null)
+  const eligibility = eligibilityResult?.key === eligibilityKey ? eligibilityResult : null
+  const checking = !!projectId && !!committeeId && !eligibility
   useEffect(() => {
     let live = true
-    setEligibility(null)
-    if (!projectId || !committeeId) { setChecking(false); return }
-    setChecking(true)
+    if (!projectId || !committeeId) return
     evaluationApi.defenseEligibility(Number(projectId), Number(committeeId)).then(result => {
-      if (live) setEligibility(result)
-    }).catch(() => { if (live) setEligibility({ eligible: false, reason: 'Không kiểm tra được điều kiện bảo vệ. Vui lòng chọn lại đề tài để thử lại.' }) })
-      .finally(() => { if (live) setChecking(false) })
+      if (live) setEligibility({ ...result, key: eligibilityKey })
+    }).catch(() => { if (live) setEligibility({ key: eligibilityKey, eligible: false, reason: 'Không kiểm tra được điều kiện bảo vệ. Vui lòng chọn lại đề tài để thử lại.' }) })
     return () => { live = false }
-  }, [projectId, committeeId])
+  }, [projectId, committeeId, eligibilityKey])
   // MySQL currently allows one session per project, including completed/cancelled sessions.
   const available = projects.filter(project => project.status !== 'CANCELLED' && project.status !== 'COMPLETED'
     && !defenses.some(defense => defense.assignmentId === project.id))
@@ -117,11 +119,11 @@ export function DefenseSchedulePanel({ committees, projects, defenses, periods =
       <fieldset disabled={saving || refreshNeeded || !savedCommittees.length}>
         <div className="ea-grid">
           <div className="ea-field"><label htmlFor="schedule-committee">Hội đồng đã lưu *</label>
-            <AnimatedSelect id="schedule-committee" required value={committeeId} onChange={event => { setCommitteeId(event.target.value); setError('') }}>
+            <AnimatedSelect id="schedule-committee" required value={committeeId} onChange={event => { setCommitteeId(event.target.value); setEligibility(null); setError('') }}>
               <option value="">Chọn hội đồng</option>{savedCommittees.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
             </AnimatedSelect></div>
           <div className="ea-field"><label htmlFor="schedule-project">Đề tài / nhóm *</label>
-            <AnimatedSelect id="schedule-project" required value={projectId} onChange={event => { setProjectId(event.target.value); setError('') }}>
+            <AnimatedSelect id="schedule-project" required value={projectId} onChange={event => { setProjectId(event.target.value); setEligibility(null); setError('') }}>
               <option value="">{available.length ? 'Chọn đề tài chưa có lịch' : 'Không còn đề tài chưa xếp lịch'}</option>
               {available.map(item => <option key={item.id} value={item.id}>{item.topicCode} · {item.topicTitle} · {item.groupName}</option>)}
             </AnimatedSelect></div>

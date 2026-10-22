@@ -21,17 +21,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<CurrentUser | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
 
-  const refreshUser = useCallback(async () => {
-    try {
-      setLoading(true)
-      const currentUser = await authApi.getCurrentUser()
-      setUser(currentUser)
-    } catch {
-      setUser(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const refreshUser = useCallback(() => authApi.getCurrentUser()
+    .then(setUser)
+    .catch(() => setUser(null))
+    .finally(() => setLoading(false)), [])
 
   useEffect(() => {
     refreshUser()
@@ -56,17 +49,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  const hasRole = (role: RoleCode): boolean => {
+  const hasRole = useCallback((role: RoleCode): boolean => {
     return user?.roles?.includes(role) ?? false
-  }
+  }, [user?.roles])
 
-  const hasAnyRole = (roles: RoleCode[]): boolean => {
+  const hasAnyRole = useCallback((roles: RoleCode[]): boolean => {
     return user?.roles?.some((r) => roles.includes(r)) ?? false
-  }
+  }, [user?.roles])
 
-  const hasAppointment = (position: PositionCode): boolean => {
+  const hasAppointment = useCallback((position: PositionCode): boolean => {
     return user?.activeAppointments?.some((apt) => apt.positionCode === position) ?? false
-  }
+  }, [user?.activeAppointments])
 
   const canAccessAcademicManagement = (): boolean => {
     if (!user) return false

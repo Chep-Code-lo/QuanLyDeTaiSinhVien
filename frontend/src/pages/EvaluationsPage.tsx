@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import type { EvaluationAssignmentResponse, RubricResponse, ScoreSheetResponse } from '../types/domain'
 import { formatDateTime } from '../utils/dateTime'
+import { useRequestLoading } from '../hooks/useRequestLoading'
 
 type ScoreDraft = { score: string; comment: string }
 
@@ -18,23 +19,23 @@ export function EvaluationsPage() {
   const { user } = useAuth()
   const [assignments, setAssignments] = useState<EvaluationAssignmentResponse[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
+  const [loading, setLoading] = useRequestLoading(JSON.stringify([user?.lecturer?.id, revision]))
   const selected = assignments.find(item => item.id === selectedId)
 
   useEffect(() => {
     let active = true
-    setLoading(true); setError('')
     allPages(page => evaluationApi.listAssignments({ lecturerId: user?.lecturer?.id, page, size: 100 }))
       .then(items => {
         if (!active) return
         setAssignments(items)
+        setError('')
         setSelectedId(current => items.some(item => item.id === current) ? current : items[0]?.id ?? null)
       }).catch(error => { if (active) setError(errorMessage(error)) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [user?.lecturer?.id, revision])
+  }, [user?.lecturer?.id, revision, setLoading])
 
   return <>
     <PageHeader title="Chấm điểm đề tài" />
@@ -56,21 +57,20 @@ function ScoreSheetEditor({ assignment }: { assignment: EvaluationAssignmentResp
   const [sheet, setSheet] = useState<ScoreSheetResponse | null>(null)
   const [scores, setScores] = useState<Record<number, ScoreDraft>>({})
   const [comment, setComment] = useState('')
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
+  const [loading, setLoading] = useRequestLoading(JSON.stringify([assignment.id, assignment.componentId, assignment.rubricId, revision]))
   const [saving, setSaving] = useState(false)
   const [confirmSubmit, setConfirmSubmit] = useState(false)
 
   useEffect(() => {
     let active = true
-    setLoading(true); setError('')
     Promise.all([evaluationApi.listRubrics(assignment.componentId), evaluationApi.getScoreSheet(assignment.id)])
       .then(([rubrics, result]) => {
         if (!active) return
         const assigned = rubrics.find(item => item.id === assignment.rubricId)
         if (!assigned) throw new Error('Không tìm thấy bộ tiêu chí được phân công.')
-        setRubric(assigned); setSheet(result); setComment(result.overallComment ?? '')
+        setRubric(assigned); setSheet(result); setComment(result.overallComment ?? ''); setError('')
         setScores(Object.fromEntries(assigned.criteria.map(criterion => {
           const saved = result.scores.find(item => item.criterionId === criterion.id)
           return [criterion.id, { score: saved ? String(saved.score) : '', comment: saved?.comment ?? '' }]
@@ -78,7 +78,7 @@ function ScoreSheetEditor({ assignment }: { assignment: EvaluationAssignmentResp
       }).catch(error => { if (active) setError(error.response ? errorMessage(error) : error.message) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [assignment.id, assignment.componentId, assignment.rubricId, revision])
+  }, [assignment.id, assignment.componentId, assignment.rubricId, revision, setLoading])
 
   const editable = assignment.status === 'ACTIVE' && sheet?.status === 'DRAFT'
   const valid = !!rubric?.criteria.length && rubric.criteria.every(criterion => {

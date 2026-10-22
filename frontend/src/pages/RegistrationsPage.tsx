@@ -1,5 +1,5 @@
 import { AnimatedSelect } from '../components/AnimatedSelect'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { academicApi } from '../api/academic'
 import { allPages } from '../api/student'
 import { groupApi } from '../api/groups'
@@ -44,7 +44,7 @@ const messageOf = (error: any) => {
 export function RegistrationsPage() {
   const { user, hasAnyRole, hasRole, hasAppointment } = useAuth()
   const { showError, showSuccess } = useToast()
-  const student = hasRole('STUDENT')
+  const student = Boolean(hasRole('STUDENT'))
   const reviewer = hasAnyRole(['LECTURER', 'ADMIN'])
   const canCreateTopic =
     hasRole('ADMIN') || hasAppointment('DEAN') || hasAppointment('DEPARTMENT_HEAD')
@@ -90,33 +90,26 @@ export function RegistrationsPage() {
     return ''
   }
   const blockedReason = registrationError(currentTime)
-  const load = async () => {
-    setLoading(true)
-    try {
-      const xs = await allPages(page =>
-        student
-          ? registrationApi.mine({ page, size: 100 })
-          : registrationApi.list({ page, size: 100 }),
-      )
+  const load = useCallback(() => Promise.all([
+      allPages(page => student ? registrationApi.mine({ page, size: 100 }) : registrationApi.list({ page, size: 100 })),
+      student ? groupApi.mine() : Promise.resolve([]),
+      student ? allPages(page => academicApi.getRegistrationPeriods(undefined, page, 100)) : Promise.resolve([]),
+      allPages(page => topicApi.list({ status: 'PUBLISHED', page, size: 100 })),
+    ]).then(([xs, mine, periodPage, topicRows]) => {
       setItems(xs)
       if (student) {
-        const [mine, periodPage] = await Promise.all([
-          groupApi.mine(),
-          allPages(page => academicApi.getRegistrationPeriods(undefined, page, 100)),
-        ])
         setGroups(mine)
         setPeriods(periodPage)
       }
-      setTopics(await allPages(page => topicApi.list({ status: 'PUBLISHED', page, size: 100 })))
-    } catch (error) {
+      setTopics(topicRows)
+    }).catch(error => {
       showError(messageOf(error))
-    } finally {
+    }).finally(() => {
       setLoading(false)
-    }
-  }
+    }), [student, showError])
   useEffect(() => {
-    load()
-  }, [])
+    void load()
+  }, [load])
   useEffect(() => {
     if (!student) return
     const timer = window.setInterval(() => setCurrentTime(Date.now()), 1000)

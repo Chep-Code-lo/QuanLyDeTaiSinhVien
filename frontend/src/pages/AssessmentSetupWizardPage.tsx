@@ -9,6 +9,7 @@ import { AnimatedSelect } from '../components/AnimatedSelect'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { PageHeader } from '../components/PageHeader'
 import { useToast } from '../context/ToastContext'
+import { useRequestLoading } from '../hooks/useRequestLoading'
 import { componentTypeLabel } from '../utils/displayLabels'
 import { criterionScore, defaultAssessmentCriteria, fromApiCriteria, rubricTotal, toApiCriteria, validRubric } from '../utils/assessmentRubric'
 import type { AssessmentCriterion } from '../utils/assessmentRubric'
@@ -26,7 +27,6 @@ export function AssessmentSetupWizardPage() {
   const [periodId, setPeriodId] = useState<number | null>(null)
   const [component, setComponent] = useState<AssessmentComponentResponse | null>(null)
   const [components, setComponents] = useState<AssessmentComponentResponse[]>([])
-  const [loadingComponents, setLoadingComponents] = useState(false)
   const [rubric, setRubric] = useState<RubricResponse | null>(null)
   const [name, setName] = useState('')
   const [componentType, setComponentType] = useState<AssessmentComponentType>('REVIEW')
@@ -36,6 +36,7 @@ export function AssessmentSetupWizardPage() {
   const [loadingRubric, setLoadingRubric] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [revision, setRevision] = useState(0)
+  const [loadingComponents, setLoadingComponents] = useRequestLoading(JSON.stringify([periodId, revision]), !!periodId)
   const [busy, setBusy] = useState(false)
   const [checkedRubric, setCheckedRubric] = useState(false)
   const [checkedComponent, setCheckedComponent] = useState(false)
@@ -58,15 +59,13 @@ export function AssessmentSetupWizardPage() {
   useEffect(() => {
     if (!periodId) return
     let active = true
-    setLoadingComponents(true)
-    setComponents([])
     evaluationApi.listComponents(periodId).then(items => {
       if (active) setComponents(items)
     }).catch(error => {
       if (active) setLoadError(`Không tải được thành phần đánh giá. ${errorMessage(error)}`)
     }).finally(() => { if (active) setLoadingComponents(false) })
     return () => { active = false }
-  }, [periodId, revision])
+  }, [periodId, revision, setLoadingComponents])
 
   useEffect(() => {
     if (!componentId) return
@@ -223,7 +222,7 @@ export function AssessmentSetupWizardPage() {
               {!periods.length && <option value="">Chưa có đợt đăng ký</option>}{periods.map((period) => <option key={period.id} value={period.id}>{period.name}</option>)}
             </AnimatedSelect>
           </div>
-          {!component && components.length > 0 && <div className="assessment-field">
+          {!component && !loadingComponents && components.length > 0 && <div className="assessment-field">
             <label htmlFor="assessment-existing">Tiếp tục cấu hình đã lưu</label>
             <AnimatedSelect id="assessment-existing" value="" disabled={busy} onChange={event => {
               const saved = components.find(item => item.id === Number(event.target.value))

@@ -1,9 +1,10 @@
 import { DateTimeInput } from '../components/DateTimeInput'
 import { AnimatedSelect } from '../components/AnimatedSelect'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { isAxiosError } from 'axios'
 import { academicApi } from '../api/academic'
 import { allPages } from '../api/student'
+import { useRequestLoading } from '../hooks/useRequestLoading'
 import { groupApi } from '../api/groups'
 import { PageHeader } from '../components/PageHeader'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -80,7 +81,6 @@ export function GroupsPage() {
   const [name, setName] = useState('')
   const [codes, setCodes] = useState<Record<number, string>>({})
   const [expiresAt, setExpiresAt] = useState<Record<number, string>>({})
-  const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
@@ -90,50 +90,43 @@ export function GroupsPage() {
   const [actionBusy, setActionBusy] = useState(false)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
   const student = hasRole('STUDENT')
+  const [loading, setLoading] = useRequestLoading(JSON.stringify([periodId, student, user?.id, page]))
 
-  const isLeader = (group: StudentGroupResponse) =>
-    group.members.some((member) => member.userId === user?.id && member.memberRole === 'LEADER')
+  const isLeader = useCallback((group: StudentGroupResponse) =>
+    group.members.some((member) => member.userId === user?.id && member.memberRole === 'LEADER'), [user?.id])
 
   useEffect(() => {
     const timer = window.setInterval(() => setCurrentTime(Date.now()), 30_000)
     return () => window.clearInterval(timer)
   }, [])
 
-  const load = async () => {
+  const load = useCallback((isCurrent: () => boolean = () => true) => {
     const requestId = ++loadRequest.current
-    setLoading(true)
-    setLoadError('')
-    try {
-      if (student) {
-        const [myGroups, invitations] = await Promise.all([
+    const request = student ? Promise.all([
           groupApi.mine(),
           allPages(page => groupApi.myInvitations(page, 100, 'PENDING')),
-        ])
+        ]).then(async ([myGroups, invitations]) => {
         const leaderGroups = myGroups.filter(group => isLeader(group) && group.status !== 'LOCKED' && group.status !== 'CLOSED')
         const invitationLists = await Promise.all(
           leaderGroups.map(
             async (group) => [group.id, await groupApi.invitationsForGroup(group.id)] as const,
           ),
         )
-        if (requestId !== loadRequest.current) return
-        setGroups(myGroups)
-        setIncoming(invitations)
-        setOutgoing(Object.fromEntries(invitationLists))
-      } else {
-        const result = await groupApi.list({ periodId, page, size: 10 })
-        if (requestId !== loadRequest.current) return
-        setGroups(result.content)
-        setTotalPages(result.totalPages)
-        setIncoming([])
-        setOutgoing({})
-      }
-    } catch (error) {
-      if (requestId !== loadRequest.current) return
+        return { groups: myGroups, incoming: invitations, outgoing: Object.fromEntries(invitationLists), totalPages: 0 }
+      }) : groupApi.list({ periodId, page, size: 10 }).then(result => ({
+        groups: result.content, incoming: [], outgoing: {}, totalPages: result.totalPages,
+      }))
+    return request.then(result => {
+      if (!isCurrent() || requestId !== loadRequest.current) return
+      setGroups(result.groups); setIncoming(result.incoming); setOutgoing(result.outgoing)
+      setTotalPages(result.totalPages); setLoadError('')
+    }).catch(error => {
+      if (!isCurrent() || requestId !== loadRequest.current) return
       setLoadError(messageOf(error))
-    } finally {
-      if (requestId === loadRequest.current) setLoading(false)
-    }
-  }
+    }).finally(() => {
+      if (isCurrent() && requestId === loadRequest.current) setLoading(false)
+    })
+  }, [student, isLeader, periodId, page, setLoading])
 
   useEffect(() => {
     const loadPeriods = async () => {
@@ -146,12 +139,13 @@ export function GroupsPage() {
       setPeriods([firstPage, ...remainingPages].flatMap((page) => page.content))
     }
     void loadPeriods().catch(() => showError('Không tải được đợt đăng ký. Vui lòng tải lại trang.'))
-  }, [])
+  }, [showError])
 
   useEffect(() => {
-    void load()
-    return () => { loadRequest.current++ }
-  }, [periodId, student, user?.id, page])
+    let active = true
+    void load(() => active)
+    return () => { active = false }
+  }, [load])
 
   const create = async (event: React.FormEvent) => {
     event.preventDefault()

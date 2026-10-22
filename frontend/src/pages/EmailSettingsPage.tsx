@@ -4,6 +4,7 @@ import { Eye, Plus, RefreshCw, Save, Send } from 'lucide-react'
 import { emailNotificationsApi } from '../api/emailNotifications'
 import { PageHeader } from '../components/PageHeader'
 import { useToast } from '../context/ToastContext'
+import { useRequestLoading } from '../hooks/useRequestLoading'
 import { useAuth } from '../context/AuthContext'
 import type {
   EmailLogResponse,
@@ -141,7 +142,7 @@ export function EmailSettingsPage() {
   const [selectedEvent, setSelectedEvent] = useState<EmailNotificationEventType>('TASK_ASSIGNED')
   const [form, setForm] = useState<EmailForm>(defaultForm)
   const [preview, setPreview] = useState<EmailPreviewResponse | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useRequestLoading(JSON.stringify([scopeType, scopeId]))
   const [logsLoading, setLogsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -162,7 +163,7 @@ export function EmailSettingsPage() {
   const [templateName, setTemplateName] = useState('')
   const [templatePage, setTemplatePage] = useState(0)
   const [templatePages, setTemplatePages] = useState(0)
-  const [templatesLoading, setTemplatesLoading] = useState(false)
+  const [templatesLoading, setTemplatesLoading] = useState(true)
   const resultEmail = !creatingTemplate && !selectedCustom && selectedEvent === 'RESULT_PUBLISHED'
 
   const selectedSetting = useMemo(
@@ -177,44 +178,29 @@ export function EmailSettingsPage() {
     [selectedEvent, selectedCustom, creatingTemplate],
   )
 
-  const loadSettings = useCallback(async () => {
-    setLoading(true)
-    setLoadError('')
-    try {
-      const items = await emailNotificationsApi.listSettings({ scopeType, scopeId })
-      setSettings(items)
-    } catch (error) {
-      setLoadError(emailError(error))
-    } finally {
-      setLoading(false)
-    }
-  }, [scopeType, scopeId])
+  const loadSettings = useCallback(() => emailNotificationsApi.listSettings({ scopeType, scopeId })
+    .then(items => { setSettings(items); setLoadError('') })
+    .catch(error => setLoadError(emailError(error)))
+    .finally(() => setLoading(false)), [scopeType, scopeId, setLoading])
 
-  const loadTemplates = useCallback(async (page = 0) => {
-    setTemplatesLoading(true)
-    try {
-      const result = await emailNotificationsApi.listTemplates(page)
+  const loadTemplates = useCallback((page = 0) => emailNotificationsApi.listTemplates(page)
+    .then(result => {
       setCustomTemplates(result.content)
       setTemplatePage(page)
       setTemplatePages(result.totalPages)
-    } catch (error) {
+    }).catch(error => {
       showError(emailError(error))
-    } finally {
+    }).finally(() => {
       setTemplatesLoading(false)
-    }
-  }, [showError])
+    }), [showError])
 
-  const loadLogs = useCallback(async () => {
-    setLogsLoading(true)
-    try {
-      const result = await emailNotificationsApi.listLogs()
-      setLogs(result.content)
-    } catch (error) {
+  const loadLogs = useCallback(() => emailNotificationsApi.listLogs()
+    .then(result => setLogs(result.content))
+    .catch(error => {
       showError(emailError(error))
-    } finally {
+    }).finally(() => {
       setLogsLoading(false)
-    }
-  }, [showError])
+    }), [showError])
 
   useEffect(() => {
     void loadSettings()
@@ -222,12 +208,16 @@ export function EmailSettingsPage() {
     void loadTemplates()
   }, [loadLogs, loadSettings, loadTemplates])
 
-  useEffect(() => {
+  const [formSetting, setFormSetting] = useState(selectedSetting)
+  const [formCreating, setFormCreating] = useState(creatingTemplate)
+  if (formSetting !== selectedSetting || formCreating !== creatingTemplate) {
+    setFormSetting(selectedSetting)
+    setFormCreating(creatingTemplate)
     if (selectedSetting && !creatingTemplate) {
       setForm(formFromSetting(selectedSetting))
       setPreview(null)
     }
-  }, [selectedSetting, creatingTemplate])
+  }
 
   const updateField = <Field extends keyof EmailForm>(field: Field, value: EmailForm[Field]) => {
     setForm((current) => ({ ...current, [field]: value }))
@@ -400,7 +390,7 @@ export function EmailSettingsPage() {
       <div className="content-state" role="alert">
         <strong>Không thể tải cấu hình email</strong>
         <p>{loadError || 'Không tìm thấy cấu hình email phù hợp.'}</p>
-        <button type="button" className="btn btn-secondary" onClick={() => void loadSettings()}>Thử lại</button>
+        <button type="button" className="btn btn-secondary" onClick={() => { setLoading(true); setLoadError(''); void loadSettings() }}>Thử lại</button>
       </div>
     )
   }
@@ -460,10 +450,10 @@ export function EmailSettingsPage() {
           {templatePages > 1 && (
             <div className="email-settings__recipient-pagination">
               <button type="button" className="btn btn-secondary" disabled={templatePage === 0 || templatesLoading}
-                onClick={() => void loadTemplates(templatePage - 1)}>Trước</button>
+                onClick={() => { setTemplatesLoading(true); void loadTemplates(templatePage - 1) }}>Trước</button>
               <span>{templatePage + 1} / {templatePages}</span>
               <button type="button" className="btn btn-secondary" disabled={templatePage + 1 >= templatePages || templatesLoading}
-                onClick={() => void loadTemplates(templatePage + 1)}>Sau</button>
+                onClick={() => { setTemplatesLoading(true); void loadTemplates(templatePage + 1) }}>Sau</button>
             </div>
           )}
         </nav>
@@ -685,7 +675,7 @@ export function EmailSettingsPage() {
             <h2 className="section-title">Nhật ký gửi email</h2>
             <p>Theo dõi trạng thái giao hàng của 10 thư gần nhất.</p>
           </div>
-          <button type="button" className="btn btn-secondary" onClick={() => void loadLogs()} disabled={logsLoading}>
+          <button type="button" className="btn btn-secondary" onClick={() => { setLogsLoading(true); void loadLogs() }} disabled={logsLoading}>
             <RefreshCw size={17} aria-hidden="true" /> Làm mới
           </button>
         </div>

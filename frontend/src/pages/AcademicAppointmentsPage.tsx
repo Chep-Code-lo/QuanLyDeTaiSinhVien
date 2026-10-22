@@ -19,7 +19,7 @@ export const AcademicAppointmentsPage: React.FC = () => {
   const { showSuccess, showError } = useToast()
 
   const [appointments, setAppointments] = useState<AppointmentResponse[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   const [faculties, setFaculties] = useState<FacultyResponse[]>([])
   const [departments, setDepartments] = useState<DepartmentResponse[]>([])
@@ -47,7 +47,6 @@ export const AcademicAppointmentsPage: React.FC = () => {
   })
 
   const loadAppointments = useCallback(() => {
-    setLoading(true)
     return Promise.all([adminApi.getAppointments(), academicApi.getDepartments()])
       .then(([items, catalog]) => {
         setAppointments(items)

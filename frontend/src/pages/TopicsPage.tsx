@@ -8,6 +8,7 @@ import { RegistrationTopicForm } from '../components/RegistrationTopicForm'
 import { StatusBadge } from '../components/StatusBadge'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { useRequestLoading } from '../hooks/useRequestLoading'
 import type { TopicResponse, TopicStatus } from '../types/domain'
 
 export function TopicsPage() {
@@ -17,7 +18,6 @@ export function TopicsPage() {
   const canCreateTopic =
     !student && (hasRole('ADMIN') || hasAppointment('DEAN') || hasAppointment('DEPARTMENT_HEAD'))
   const [topics, setTopics] = useState<TopicResponse[]>([])
-  const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [status, setStatus] = useState<TopicStatus>(student ? 'PUBLISHED' : '')
@@ -26,15 +26,15 @@ export function TopicsPage() {
   const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [loading, setLoading] = useRequestLoading(JSON.stringify([student, status, query, page, revision]))
   useEffect(() => {
     let active = true
-    setLoading(true)
-    setError('')
     const visibleStatus = student ? 'PUBLISHED' : status || undefined
     const timer = window.setTimeout(() => { void topicApi.list({ status: visibleStatus, q: query.trim() || undefined, page, size: 10 })
       .then((data) => {
         if (!active) return
         setTopics(data.content)
+        setError('')
         setTotalPages(data.totalPages)
         if (data.totalPages > 0 && page >= data.totalPages) setPage(data.totalPages - 1)
       })
@@ -47,7 +47,7 @@ export function TopicsPage() {
       .finally(() => { if (active) setLoading(false) })
     }, 200)
     return () => { active = false; window.clearTimeout(timer) }
-  }, [showError, status, revision, student, page, query])
+  }, [showError, status, revision, student, page, query, setLoading])
   return (
     <>
       <PageHeader

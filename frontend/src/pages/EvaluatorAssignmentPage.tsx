@@ -85,6 +85,38 @@ export function EvaluatorAssignmentPage() {
   const filteredProjects = eligibleProjects.filter((project) =>
     `${project.topicCode} ${project.topicTitle} ${project.groupName}`.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi')))
 
+  const periodKey = JSON.stringify([periodId, reload])
+  const [previousPeriodKey, setPreviousPeriodKey] = useState(periodKey)
+  if (previousPeriodKey !== periodKey) {
+    setPreviousPeriodKey(periodKey)
+    setLoading(!!periodId); setLoadError('')
+    setProjects([]); setComponents([]); setDefenses([]); setCommittees([]); setUnlockedReviews([])
+    setComponentId(null); setRubricId(null); setRubrics([])
+    setCommitteeTask('CONFIGURE'); setCommitteeId(null); setCommitteeName(''); setMemberDrafts(initialMembers()); setProjectIds([]); setLecturerId(null); setDeadline(''); setPage(0)
+  }
+  const [previousMode, setPreviousMode] = useState(mode)
+  const [previousComponents, setPreviousComponents] = useState(components)
+  if (previousMode !== mode || previousComponents !== components) {
+    setPreviousMode(mode); setPreviousComponents(components)
+    setComponentId(components.find((item) => item.componentType === mode)?.id ?? null)
+    setProjectIds([]); setCommitteeTask('CONFIGURE'); setCommitteeId(null); setCommitteeName(''); setMemberDrafts(initialMembers()); setRubricId(null); setLecturerId(null); setTopicOpen(false); setQuery('')
+  }
+  const rubricKey = JSON.stringify([componentId, components.map(item => [item.id, item.componentType]), isCommittee, reload])
+  const [previousRubricKey, setPreviousRubricKey] = useState(rubricKey)
+  if (previousRubricKey !== rubricKey) {
+    setPreviousRubricKey(rubricKey)
+    setRubrics([]); setRubricError('')
+    const hasComponents = isCommittee ? components.some(item => item.componentType === 'COMMITTEE') : !!componentId
+    setRubricsLoading(hasComponents)
+    if (!hasComponents) setRubricId(null)
+  }
+  const listKey = JSON.stringify([periodId, page, listVersion])
+  const [previousListKey, setPreviousListKey] = useState(listKey)
+  if (previousListKey !== listKey) {
+    setPreviousListKey(listKey)
+    setListLoading(!!periodId); setListError('')
+  }
+
   useEffect(() => {
     let live = true
     allPages(page => academicApi.getRegistrationPeriods(undefined, page, 100)).then((result) => {
@@ -99,10 +131,6 @@ export function EvaluatorAssignmentPage() {
   useEffect(() => {
     if (!periodId) return
     let live = true
-    setLoading(true); setLoadError('')
-    setProjects([]); setComponents([]); setDefenses([]); setCommittees([]); setUnlockedReviews([])
-    setComponentId(null); setRubricId(null); setRubrics([])
-    setCommitteeTask('CONFIGURE'); setCommitteeId(null); setCommitteeName(''); setMemberDrafts(initialMembers()); setProjectIds([]); setLecturerId(null); setDeadline(''); setPage(0)
     Promise.all([
       allPages((page) => academicApi.getProjectAssignments(periodId, page, 100)),
       evaluationApi.listComponents(periodId),
@@ -120,17 +148,11 @@ export function EvaluatorAssignmentPage() {
     return () => { live = false }
   }, [periodId, reload])
 
-  useEffect(() => {
-    setComponentId(components.find((item) => item.componentType === mode)?.id ?? null)
-    setProjectIds([]); setCommitteeTask('CONFIGURE'); setCommitteeId(null); setCommitteeName(''); setMemberDrafts(initialMembers()); setRubricId(null); setLecturerId(null); setTopicOpen(false); setQuery('')
-  }, [components, mode])
 
   useEffect(() => {
     let live = true
-    setRubrics([]); setRubricError(''); setRubricsLoading(false)
     const componentIds = isCommittee ? components.filter((item) => item.componentType === 'COMMITTEE').map((item) => item.id) : componentId ? [componentId] : []
-    if (!componentIds.length) { setRubricId(null); return }
-    setRubricsLoading(true)
+    if (!componentIds.length) return
     Promise.all(componentIds.map((id) => evaluationApi.listRubrics(id))).then((lists) => {
       if (!live) return
       const locked = lists.flat().filter((item) => item.status === 'LOCKED')
@@ -144,7 +166,6 @@ export function EvaluatorAssignmentPage() {
   useEffect(() => {
     if (!periodId) return
     let live = true
-    setListLoading(true); setListError('')
     evaluationApi.listAssignments({ periodId, page, size: 10 }).then((result) => {
       if (!live) return
       setAssignments(result.content); setTotalPages(result.totalPages); setTotalElements(result.totalElements)

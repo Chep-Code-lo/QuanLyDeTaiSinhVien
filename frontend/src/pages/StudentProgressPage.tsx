@@ -38,26 +38,22 @@ export function StudentProgressPage() {
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
-      const [projectRows, groupRows] = await Promise.all([
+  const load = useCallback(() => Promise.all([
         studentApi.projectAssignments(),
         groupApi.mine(),
-      ])
+      ]).then(async ([projectRows, groupRows]) => {
       const milestoneRows = (
         await Promise.all(projectRows.map((project) => milestoneApi.listByAssignment(project.id)))
       ).flat()
       setProjects(projectRows)
       setGroups(groupRows)
       setMilestones(milestoneRows)
-    } catch (loadError) {
+      setError('')
+    }).catch((loadError) => {
       setError(errorMessage(loadError))
-    } finally {
+    }).finally(() => {
       setLoading(false)
-    }
-  }, [])
+    }), [])
 
   useEffect(() => {
     void load()
@@ -112,7 +108,7 @@ export function StudentProgressPage() {
       <PageHeader
         title="Tiến độ & báo cáo"
       />
-      <RemoteState loading={loading} error={error} retry={load} />
+      <RemoteState loading={loading} error={error} retry={() => { setLoading(true); setError(''); void load() }} />
 
       {!loading && !error && (
         <>

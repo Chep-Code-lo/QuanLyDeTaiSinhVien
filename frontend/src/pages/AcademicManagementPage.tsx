@@ -1,7 +1,7 @@
 import { formatDateInput, formatDateTime } from '../utils/dateTime'
 import { DateTimeInput } from '../components/DateTimeInput'
 import { AnimatedSelect } from '../components/AnimatedSelect'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { academicApi } from '../api/academic'
 import { allPages } from '../api/student'
 import { StatusBadge } from '../components/StatusBadge'
@@ -36,7 +36,7 @@ export const AcademicManagementPage: React.FC = () => {
 
   // Registration Periods state
   const [periods, setPeriods] = useState<RegistrationPeriodResponse[]>([])
-  const [loadingPeriods, setLoadingPeriods] = useState(false)
+  const [loadingPeriods, setLoadingPeriods] = useState(true)
   const [isPeriodModalOpen, setIsPeriodModalOpen] = useState(false)
   const [submittingPeriod, setSubmittingPeriod] = useState(false)
   const [pendingStatusChange, setPendingStatusChange] = useState<{
@@ -108,22 +108,21 @@ export const AcademicManagementPage: React.FC = () => {
       .then(setFaculties)
       .catch((error) => showError(error.message))
     academicApi.getSemesters().then(setSemesters)
-  }, [])
+  }, [showError])
 
   // Load registration periods
-  const loadRegistrationPeriods = () => {
-    setLoadingPeriods(true)
-    allPages(page => academicApi.getRegistrationPeriods(undefined, page, 100))
+  const loadRegistrationPeriods = useCallback(() => {
+    return allPages(page => academicApi.getRegistrationPeriods(undefined, page, 100))
       .then(setPeriods)
       .catch((err) =>
         showError('Lỗi tải đợt đăng ký: ' + (err.response?.data?.message || err.message)),
       )
       .finally(() => setLoadingPeriods(false))
-  }
+  }, [showError])
 
   useEffect(() => {
     loadRegistrationPeriods()
-  }, [])
+  }, [loadRegistrationPeriods])
 
   const handleCreatePeriod = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()

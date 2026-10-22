@@ -23,7 +23,6 @@ export function NotificationMenu({ unread, management, onOpen }: { unread: numbe
   useEffect(() => {
     if (!open) return
     let active = true
-    setLoading(true); setError('')
     notificationApi.list(0, 8).then(page => { if (active) setItems(page.content) })
       .catch(e => { if (active) setError(errorMessage(e)) })
       .finally(() => { if (active) setLoading(false) })
@@ -51,13 +50,13 @@ export function NotificationMenu({ unread, management, onOpen }: { unread: numbe
   }
 
   return <div className="notification-menu" ref={root}>
-    <button ref={trigger} className="notification-button" type="button" title="Thông báo" aria-label={unread ? 'Có thông báo mới' : 'Thông báo'} aria-expanded={open} aria-haspopup="dialog" aria-controls={open ? panelId : undefined} onClick={() => { setOpen(value => !value); onOpen() }}>
+    <button ref={trigger} className="notification-button" type="button" title="Thông báo" aria-label={unread ? 'Có thông báo mới' : 'Thông báo'} aria-expanded={open} aria-haspopup="dialog" aria-controls={open ? panelId : undefined} onClick={() => { if (!open) { setLoading(true); setError('') }; setOpen(value => !value); onOpen() }}>
       <Bell size={18} aria-hidden="true" />{unread !== null && unread > 0 && (management ? <span className="notification-button__dot" aria-hidden="true" /> : <span>{unread}</span>)}
     </button>
     {open && <section className="notification-popover" id={panelId} role="dialog" aria-label="Danh sách thông báo">
       <header className="notification-popover__heading"><h2>Thông báo</h2><button className="notification-close" type="button" aria-label="Đóng danh sách thông báo" onClick={() => { setOpen(false); trigger.current?.focus() }}><X size={18} aria-hidden="true" /></button></header>
       <div className="notification-popover__list">
-        {loading ? <p className="notification-popover__state" role="status">Đang tải thông báo...</p> : error ? <div className="notification-popover__state" role="alert"><p>{error}</p><button type="button" className="text-button" onClick={() => setRevision(value => value + 1)}>Thử lại</button></div> : !items.length ? <p className="notification-popover__state">Chưa có thông báo.</p> : <ul>{items.map(item => <li key={item.id}><button className={`notification-popover__item${!item.readAt ? ' notification-popover__item--unread' : ''}`} type="button" onClick={() => void openDetail(item)}><span>{item.title}</span>{!item.readAt && <i aria-label="Chưa đọc" />}</button></li>)}</ul>}
+        {loading ? <p className="notification-popover__state" role="status">Đang tải thông báo...</p> : error ? <div className="notification-popover__state" role="alert"><p>{error}</p><button type="button" className="text-button" onClick={() => { setLoading(true); setError(''); setRevision(value => value + 1) }}>Thử lại</button></div> : !items.length ? <p className="notification-popover__state">Chưa có thông báo.</p> : <ul>{items.map(item => <li key={item.id}><button className={`notification-popover__item${!item.readAt ? ' notification-popover__item--unread' : ''}`} type="button" onClick={() => void openDetail(item)}><span>{item.title}</span>{!item.readAt && <i aria-label="Chưa đọc" />}</button></li>)}</ul>}
       </div>
       <footer><button className="text-button" type="button" onClick={() => { setOpen(false); navigate('/announcements') }}>Xem tất cả thông báo</button></footer>
     </section>}

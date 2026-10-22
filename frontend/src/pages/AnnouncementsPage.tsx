@@ -1,7 +1,8 @@
 import { formatDateTime } from '../utils/dateTime'
 import './AnnouncementsPage.css'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { academicApi } from '../api/academic'
+import { useRequestLoading } from '../hooks/useRequestLoading'
 import { announcementApi } from '../api/announcements'
 import { notificationApi } from '../api/notifications'
 import { allPages } from '../api/student'
@@ -28,10 +29,9 @@ export function AnnouncementsPage() {
   const [notifications, setNotifications] = useState<NotificationResponse[]>([])
   const [faculties, setFaculties] = useState<FacultyResponse[]>([])
   const [managed, setManaged] = useState<AnnouncementResponse[]>([])
-  const [facultyId, setFacultyId] = useState<number>()
-  const [loading, setLoading] = useState(true)
-  const [personalLoading, setPersonalLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'general' | 'personal'>('general')
+  const [loading, setLoading] = useRequestLoading(JSON.stringify([user?.id, activeTab]), activeTab === 'general')
+  const [personalLoading, setPersonalLoading] = useRequestLoading(JSON.stringify([user?.id, activeTab]), activeTab === 'personal')
   const [managing, setManaging] = useState(false)
   const [editing, setEditing] = useState<AnnouncementResponse>()
   const [pendingArchive, setPendingArchive] = useState<AnnouncementResponse>()
@@ -59,46 +59,39 @@ export function AnnouncementsPage() {
       .map((faculty) => faculty.id)
   }, [faculties, user, hasRole])
   const canManage = allowedFacultyIds.length > 0
+  const facultyId = allowedFacultyIds[0]
+  const canLoadFaculties = hasRole('ADMIN') || hasAppointment('DEAN')
 
-  const loadPublic = async (isCurrent = () => true) => {
-    setLoading(true)
-    try {
-      const [official, personal] = await Promise.all([
+  const loadPublic = useCallback((isCurrent: () => boolean = () => true) => Promise.all([
         allPages(page => announcementApi.list({ page, size: 100 })),
         allPages(page => notificationApi.list(page, 100)),
-      ])
+      ]).then(([official, personal]) => {
       if (!isCurrent()) return
       setAnnouncements(official)
       setNotifications(personal)
-    } catch (error) {
+    }).catch(error => {
       if (isCurrent()) showError(messageOf(error))
-    } finally {
+    }).finally(() => {
       if (isCurrent()) setLoading(false)
-    }
-  }
+    }), [showError, setLoading])
 
-  const loadPersonal = async (isCurrent: () => boolean) => {
-    setPersonalLoading(true)
-    try {
-      const personal = await allPages(page => notificationApi.list(page, 100))
+  const loadPersonal = useCallback((isCurrent: () => boolean) => allPages(page => notificationApi.list(page, 100))
+    .then(personal => {
       if (!isCurrent()) return
       setNotifications(personal)
-    } catch (error) {
+    }).catch(error => {
       if (isCurrent()) showError(messageOf(error))
-    } finally {
+    }).finally(() => {
       if (isCurrent()) setPersonalLoading(false)
-    }
-  }
+    }), [showError, setPersonalLoading])
 
-  const loadManaged = async (id = facultyId) => {
+  const loadManaged = useCallback((id = facultyId) => {
     if (!id || !canManage) return
-    try {
-      const data = await allPages(page => announcementApi.listForManagement({ facultyId: id, page, size: 100 }))
-      setManaged(data)
-    } catch (error) {
+    return allPages(page => announcementApi.listForManagement({ facultyId: id, page, size: 100 }))
+      .then(setManaged).catch(error => {
       showError(messageOf(error))
-    }
-  }
+    })
+  }, [facultyId, canManage, showError])
 
   useEffect(() => {
     let active = true
@@ -107,23 +100,19 @@ export function AnnouncementsPage() {
     return () => {
       active = false
     }
-  }, [user?.id, activeTab])
+  }, [user?.id, activeTab, loadPublic, loadPersonal])
 
   useEffect(() => {
-    if (hasRole('ADMIN') || hasAppointment('DEAN'))
+    if (canLoadFaculties)
       academicApi
         .getFaculties()
         .then(setFaculties)
         .catch((error) => showError(messageOf(error)))
-  }, [user?.id])
-
-  useEffect(() => {
-    if (!facultyId && allowedFacultyIds.length) setFacultyId(allowedFacultyIds[0])
-  }, [allowedFacultyIds, facultyId])
+  }, [user?.id, canLoadFaculties, showError])
 
   useEffect(() => {
     if (managing && facultyId) void loadManaged(facultyId)
-  }, [facultyId, managing])
+  }, [facultyId, managing, loadManaged])
 
   const markRead = async (item: NotificationResponse) => {
     if (item.readAt) return

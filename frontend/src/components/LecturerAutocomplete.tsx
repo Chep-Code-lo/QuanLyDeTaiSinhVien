@@ -37,10 +37,15 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
   departmentId,
 }) => {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<LecturerDirectoryResponse[]>([])
-  const [selectedLecturer, setSelectedLecturer] = useState<LecturerOption | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [searchResult, setSearchResult] = useState<{ key: string; items: LecturerDirectoryResponse[] } | null>(null)
+  const [resolvedLecturer, setResolvedLecturer] = useState<LecturerOption | null>(null)
+  const [searchVersion, setSearchVersion] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
+  const selectedLecturer = value === undefined ? resolvedLecturer : !value ? null
+    : selectedOption?.id === value ? selectedOption : resolvedLecturer?.id === value ? resolvedLecturer : null
+  const searchKey = JSON.stringify([query, facultyId, departmentId, searchVersion])
+  const results = searchResult?.key === searchKey ? searchResult.items : []
+  const loading = isOpen && searchResult?.key !== searchKey
   const containerRef = useRef<HTMLDivElement>(null)
   const generatedId = useId()
   const fieldId = inputId ?? generatedId
@@ -56,22 +61,16 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
   // Fetch initial selected lecturer if value is provided
   useEffect(() => {
     let active = true
-    if (value && selectedOption?.id === value) {
-      setSelectedLecturer((current) => current?.id === value && current.fullName === selectedOption.fullName ? current : selectedOption)
-      return
-    }
+    if (value && selectedOption?.id === value) return
     if (value && (!selectedLecturer || selectedLecturer.id !== value)) {
-      setSelectedLecturer(null)
       allPages(page => lecturerApi.list({ facultyId, departmentId, page, size: 100 }))
         .then((res) => {
           const found = res.find((l) => l.id === value)
           if (active && found) {
-            setSelectedLecturer(found)
+            setResolvedLecturer(found)
           }
         })
         .catch(() => {})
-    } else if (!value) {
-      setSelectedLecturer(null)
     }
     return () => { active = false }
   }, [value, selectedLecturer, selectedOption, facultyId, departmentId])
@@ -80,28 +79,22 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
   useEffect(() => {
     if (!isOpen) return
     let active = true
-    setResults([])
-    setLoading(true)
     const timer = setTimeout(() => {
-      setLoading(true)
       lecturerApi
         .list({ search: query, facultyId, departmentId, size: 20 })
         .then((res) => {
-          if (active) setResults(res.content)
+          if (active) setSearchResult({ key: searchKey, items: res.content })
         })
         .catch(() => {
-          if (active) setResults([])
-        })
-        .finally(() => {
-          if (active) setLoading(false)
+          if (active) setSearchResult({ key: searchKey, items: [] })
         })
     }, 300)
 
     return () => { active = false; clearTimeout(timer) }
-  }, [query, isOpen, facultyId, departmentId])
+  }, [query, isOpen, facultyId, departmentId, searchKey])
 
   const handleSelect = (lecturer: LecturerDirectoryResponse) => {
-    setSelectedLecturer(lecturer)
+    setResolvedLecturer(lecturer)
     onChange(lecturer.id, lecturer)
     setIsOpen(false)
     setQuery('')
@@ -109,7 +102,7 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setSelectedLecturer(null)
+    setResolvedLecturer(null)
     onChange(null, null)
     setQuery('')
   }
@@ -153,7 +146,7 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
               setQuery(e.target.value)
               setIsOpen(true)
             }}
-            onFocus={() => setIsOpen(true)}
+            onFocus={() => { setIsOpen(true); setSearchVersion(version => version + 1) }}
           />
           {loading && <div className="autocomplete-spinner" />}
 
