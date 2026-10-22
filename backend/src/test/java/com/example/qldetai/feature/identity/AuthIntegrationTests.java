@@ -48,6 +48,40 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class AuthIntegrationTests {
 
+    @Test
+    void loginReturns429AfterFiveFailuresForTheSameUsernameAndIp() throws Exception {
+        String email = createUserWithRole("throttled-login", RoleCode.ADMIN);
+        for (int index = 0; index < 5; index++) {
+            loginAttempt(email, "incorrect", "203.0.113.10").andExpect(status().isUnauthorized());
+        }
+        loginAttempt(email.toUpperCase(), "TestPassword123!", "203.0.113.10")
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút."));
+        loginAttempt(email, "TestPassword123!", "203.0.113.11").andExpect(status().isOk());
+        loginAttempt("another-" + email, "incorrect", "203.0.113.10").andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void successfulLoginResetsFailureCountForItsPair() throws Exception {
+        String email = createUserWithRole("reset-login-limit", RoleCode.ADMIN);
+        for (int index = 0; index < 4; index++) {
+            loginAttempt(email, "incorrect", "203.0.113.12").andExpect(status().isUnauthorized());
+        }
+        loginAttempt(email, "TestPassword123!", "203.0.113.12").andExpect(status().isOk());
+        for (int index = 0; index < 5; index++) {
+            loginAttempt(email, "incorrect", "203.0.113.12").andExpect(status().isUnauthorized());
+        }
+    }
+
+    private org.springframework.test.web.servlet.ResultActions loginAttempt(String email, String password, String ip) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/login")
+                .with(csrf())
+                .with(request -> { request.setRemoteAddr(ip); return request; })
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"%s\",\"password\":\"%s\"}".formatted(email, password)));
+    }
+
     private final MockMvc mockMvc;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;

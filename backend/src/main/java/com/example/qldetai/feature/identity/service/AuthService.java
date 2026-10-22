@@ -9,6 +9,7 @@ import com.example.qldetai.feature.identity.dto.IdentityDtos.LoginRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.LoginResponse;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.security.UserPrincipal;
+import com.example.qldetai.security.LoginAttemptLimiter;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -39,15 +40,16 @@ public class AuthService {
     private final UserProfileService userProfileService;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
+    private final LoginAttemptLimiter loginAttempts;
 
 
     @Transactional
     public LoginResponse login(
             LoginRequest request, HttpServletRequest httpRequest, HttpServletResponse response) {
         Authentication authentication =
-                authenticationManager.authenticate(
+                loginAttempts.authenticate(request.username(), clientIp(httpRequest), () -> authenticationManager.authenticate(
                         UsernamePasswordAuthenticationToken.unauthenticated(
-                                request.username().trim(), request.password()));
+                                request.username().trim(), request.password())));
         sessionAuthenticationStrategy.onAuthentication(authentication, httpRequest, response);
 
         SecurityContext context = SecurityContextHolder.createEmptyContext();
