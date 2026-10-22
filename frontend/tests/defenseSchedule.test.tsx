@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { EvaluatorAssignmentPage } from '../src/pages/EvaluatorAssignmentPage'
 
@@ -133,6 +133,14 @@ const committee = {
 
 let scheduled: Record<string, unknown>[]
 
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute('open', '')
+  }
+  HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute('open')
+  }
+})
 beforeEach(() => {
   scheduled = []
   mocks.showError.mockReset()
@@ -229,6 +237,65 @@ async function confirmSchedule() {
 }
 
 describe('Xếp lịch bảo vệ', () => {
+  it('giải thích đề tài đã giao chưa có lịch bảo vệ và mở được trang xếp lịch', async () => {
+    render(<EvaluatorAssignmentPage />)
+    await screen.findByLabelText('Hội đồng đã tạo')
+    await waitFor(() => expect(screen.queryByText('Đang tải dữ liệu phân công...')).toBeNull())
+    fireEvent.change(screen.getByLabelText('Hội đồng đã tạo'), {
+      target: { value: String(committee.id) },
+    })
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Phân công chấm cho hội đồng đã lưu' }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: /Đề tài tham gia bảo vệ/ }))
+    fireEvent.change(screen.getByLabelText('Tìm đề tài'), { target: { value: project.topicCode } })
+    await screen.findByText('Chưa xếp lịch bảo vệ.')
+    expect(screen.queryByRole('checkbox')).toBeNull()
+    expect(mocks.assignBatch).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Mở lịch bảo vệ' }))
+    expect(screen.getByRole('tab', { name: 'Lịch bảo vệ' }).getAttribute('aria-selected')).toBe(
+      'true',
+    )
+    await screen.findByRole('option', { name: new RegExp(project.topicCode) })
+  })
+  it.each(['SCHEDULED', 'COMPLETED', 'CANCELLED'] as const)(
+    'không phân công nhầm đề tài có lịch khác phạm vi: %s',
+    async (status) => {
+      mocks.defenses.mockResolvedValue(
+        page([
+          {
+            id: 71,
+            assignmentId: project.id,
+            committeeId: 99,
+            committeeName: 'Hội đồng khác',
+            status,
+          },
+        ]),
+      )
+      render(<EvaluatorAssignmentPage />)
+      await screen.findByLabelText('Hội đồng đã tạo')
+      await waitFor(() => expect(screen.queryByText('Đang tải dữ liệu phân công...')).toBeNull())
+      fireEvent.change(screen.getByLabelText('Hội đồng đã tạo'), {
+        target: { value: String(committee.id) },
+      })
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Phân công chấm cho hội đồng đã lưu' }),
+      )
+      await userEvent.click(screen.getByRole('button', { name: /Đề tài tham gia bảo vệ/ }))
+      fireEvent.change(screen.getByLabelText('Tìm đề tài'), {
+        target: { value: project.topicCode },
+      })
+      await screen.findByText(
+        status === 'SCHEDULED'
+          ? 'Đã xếp lịch ở hội đồng khác: Hội đồng khác.'
+          : status === 'COMPLETED'
+            ? 'Lịch bảo vệ đã hoàn thành.'
+            : 'Lịch bảo vệ đã hủy.',
+      )
+      expect(screen.queryByRole('checkbox')).toBeNull()
+      expect(mocks.assignBatch).not.toHaveBeenCalled()
+    },
+  )
   it('kiểm tra lại phòng/khung giờ và bỏ qua kết quả cũ đến muộn', async () => {
     render(<EvaluatorAssignmentPage />)
     await openSchedule()
@@ -290,7 +357,7 @@ describe('Xếp lịch bảo vệ', () => {
     expect(mocks.scheduleDefense).not.toHaveBeenCalled()
   })
 
-  it('xếp lịch bằng hội đồng đã lưu rồi phân công chấm riêng, không cần chọn phiên bảo vệ', async () => {
+  it('xếp lịch xong mở phân công chấm với đúng đề tài và hội đồng, không quay lại tab cũ', async () => {
     render(<EvaluatorAssignmentPage />)
     await openSchedule()
     await fillSchedule()
@@ -305,19 +372,18 @@ describe('Xếp lịch bảo vệ', () => {
     })
     expect(screen.queryByLabelText('Phiên bảo vệ')).toBeNull()
     expect(screen.getByText('Phòng A101')).toBeTruthy()
-    await userEvent.click(screen.getByRole('tab', { name: 'Hội đồng bảo vệ' }))
-    fireEvent.change(screen.getByLabelText('Hội đồng đã tạo'), {
-      target: { value: String(committee.id) },
-    })
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Phân công chấm cho hội đồng đã lưu' }),
+    const dialog = await screen.findByRole('dialog', { name: 'Phân công chấm · KLTN-01' })
+    expect(screen.getByRole('tab', { name: 'Lịch bảo vệ' }).getAttribute('aria-selected')).toBe(
+      'true',
     )
-    await userEvent.click(screen.getByRole('button', { name: /Đề tài tham gia bảo vệ/ }))
-    await userEvent.click(screen.getByRole('checkbox'))
+    expect(within(dialog).getByText(/Hội đồng: Hội đồng chấm/)).toBeTruthy()
+    expect(within(dialog).getByText('KLTN-01 · Nhóm Alpha')).toBeTruthy()
     fireEvent.change(screen.getByLabelText(/Hạn chót chấm điểm/), {
       target: { value: '21/02/2099 10:00' },
     })
-    await userEvent.click(screen.getByRole('button', { name: 'Lưu phân công' }))
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Phân công chấm', exact: true }),
+    )
     await waitFor(() => expect(mocks.assignBatch).toHaveBeenCalledOnce())
     expect(mocks.assignBatch.mock.calls[0][0]).toHaveLength(3)
     expect(mocks.assignBatch.mock.calls[0][0]).toEqual(
@@ -326,6 +392,119 @@ describe('Xếp lịch bảo vệ', () => {
       ]),
     )
     expect(mocks.saveCommittee).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('Lưu & xếp lịch chọn sẵn đúng hội đồng vừa lưu', async () => {
+    mocks.saveCommittee.mockResolvedValue({ ...committee, version: 1 })
+    render(<EvaluatorAssignmentPage />)
+    const picker = await screen.findByLabelText('Hội đồng đã tạo')
+    await waitFor(() => expect(screen.queryByText('Đang tải dữ liệu phân công...')).toBeNull())
+    fireEvent.change(picker, { target: { value: String(committee.id) } })
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu & xếp lịch' }))
+    const schedule = (await screen.findByLabelText('Hội đồng đã lưu *')) as HTMLSelectElement
+    expect(schedule.value).toBe(String(committee.id))
+    expect(mocks.saveCommittee).toHaveBeenCalledOnce()
+    expect(mocks.scheduleDefense).not.toHaveBeenCalled()
+    expect(mocks.assignBatch).not.toHaveBeenCalled()
+  })
+
+  it('phân công lỗi giữ lịch đã lưu, thử lại không xếp lịch trùng và chặn gửi đồng thời', async () => {
+    let reject!: (error: unknown) => void
+    mocks.assignBatch.mockImplementationOnce(
+      () =>
+        new Promise((_, fail) => {
+          reject = fail
+        }),
+    )
+    render(<EvaluatorAssignmentPage />)
+    await openSchedule()
+    await fillSchedule()
+    await confirmSchedule()
+    const dialog = await screen.findByRole('dialog', { name: 'Phân công chấm · KLTN-01' })
+    fireEvent.change(within(dialog).getByLabelText(/Hạn chót chấm điểm/), {
+      target: { value: '21/02/2099 10:00' },
+    })
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Phân công chấm', exact: true }),
+    )
+    fireEvent.submit(dialog.querySelector('form')!)
+    fireEvent(dialog, new Event('cancel', { cancelable: true }))
+    expect(mocks.assignBatch).toHaveBeenCalledOnce()
+    expect(
+      (within(dialog).getByRole('button', { name: 'Để sau' }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+    await act(async () => reject({ response: { data: { message: 'Phân công không hợp lệ.' } } }))
+    expect((await within(dialog).findByRole('alert')).textContent).toContain(
+      'Lịch bảo vệ vẫn được giữ lại',
+    )
+    expect((within(dialog).getByLabelText(/Hạn chót chấm điểm/) as HTMLInputElement).value).toBe(
+      '21/02/2099 10:00',
+    )
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Phân công chấm', exact: true }),
+    )
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(mocks.scheduleDefense).toHaveBeenCalledOnce()
+    expect(mocks.assignBatch).toHaveBeenCalledTimes(2)
+    expect(mocks.assignBatch.mock.calls[1][0]).toEqual(
+      committee.members.map((member) => ({
+        assignmentId: project.id,
+        defenseId: 71,
+        rubricId: 7,
+        lecturerId: member.lecturerId,
+        deadlineAt: '2099-02-21T03:00:00.000Z',
+      })),
+    )
+  })
+
+  it('Để sau không tạo phân công, mở lại trực tiếp từ lịch đã xếp', async () => {
+    render(<EvaluatorAssignmentPage />)
+    await openSchedule()
+    await fillSchedule()
+    await confirmSchedule()
+    await screen.findByRole('dialog', { name: 'Phân công chấm · KLTN-01' })
+    await userEvent.click(screen.getByRole('button', { name: 'Để sau' }))
+    expect(mocks.assignBatch).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Phân công chấm', exact: true }))
+    await screen.findByRole('dialog', { name: 'Phân công chấm · KLTN-01' })
+    expect(mocks.scheduleDefense).toHaveBeenCalledOnce()
+  })
+
+  it('lịch đã lưu nhưng tải lại lỗi: chỉ tải lại dữ liệu rồi mở phân công, không tạo lịch trùng', async () => {
+    mocks.defenses.mockResolvedValueOnce(page([])).mockRejectedValueOnce(new Error('offline'))
+    render(<EvaluatorAssignmentPage />)
+    await openSchedule()
+    await fillSchedule()
+    await confirmSchedule()
+    await screen.findByText(
+      'Lịch đã lưu nhưng chưa tải lại được danh sách. Bấm tải lại lịch trước khi tiếp tục.',
+    )
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocks.scheduleDefense).toHaveBeenCalledOnce()
+    await userEvent.click(screen.getByRole('button', { name: 'Tải lại lịch' }))
+    await screen.findByRole('dialog', { name: 'Phân công chấm · KLTN-01' })
+    expect(mocks.scheduleDefense).toHaveBeenCalledOnce()
+    expect(mocks.assignBatch).not.toHaveBeenCalled()
+  })
+
+  it('không phân công khi hạn chấm đã qua', async () => {
+    render(<EvaluatorAssignmentPage />)
+    await openSchedule()
+    await fillSchedule()
+    await confirmSchedule()
+    const dialog = await screen.findByRole('dialog', { name: 'Phân công chấm · KLTN-01' })
+    fireEvent.change(within(dialog).getByLabelText(/Hạn chót chấm điểm/), {
+      target: { value: '01/01/2000 10:00' },
+    })
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Phân công chấm', exact: true }),
+    )
+    expect((await within(dialog).findByRole('alert')).textContent).toContain(
+      'Hạn chót chấm điểm phải sau thời điểm hiện tại.',
+    )
+    expect(mocks.assignBatch).not.toHaveBeenCalled()
+    expect(mocks.scheduleDefense).toHaveBeenCalledOnce()
   })
 
   it('giải thích xung đột giảng viên hướng dẫn tại chỗ, giữ dữ liệu để sửa và thử lại', async () => {

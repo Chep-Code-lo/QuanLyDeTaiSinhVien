@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { EvaluatorAssignmentPage } from '../src/pages/EvaluatorAssignmentPage'
 
@@ -86,7 +86,17 @@ vi.mock('../src/api/evaluation', () => ({
       },
     ],
     listDefenses: async () =>
-      page([{ id: 71, assignmentId: 51, committeeId: 11, status: 'SCHEDULED' }]),
+      page([
+        {
+          id: 71,
+          assignmentId: 51,
+          committeeId: 11,
+          committeeName: committee.name,
+          topicCode: 'DT01',
+          groupName: 'Nhóm A',
+          status: 'SCHEDULED',
+        },
+      ]),
     listCommittees: async () => page([committee]),
     reviewProgress: mocks.progress,
     listAssignments: mocks.assignments,
@@ -99,6 +109,14 @@ vi.mock('../src/context/ToastContext', () => ({
   useToast: () => ({ showSuccess: mocks.success, showError: mocks.error }),
 }))
 
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute('open', '')
+  }
+  HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute('open')
+  }
+})
 beforeEach(() => {
   mocks.progress.mockReset()
   mocks.progress.mockResolvedValue({
@@ -224,20 +242,17 @@ it('mở đúng hội đồng và đề tài từ lịch đã xếp, chưa tự 
   await userEvent.click(screen.getByRole('tab', { name: 'Lịch bảo vệ' }))
   await userEvent.click(await screen.findByRole('button', { name: 'Phân công chấm' }))
   await screen.findByLabelText(/Hạn chót chấm điểm/)
-  await waitFor(() =>
-    expect((screen.getByLabelText('Hội đồng đã tạo') as HTMLSelectElement).value).toBe('11'),
+  const dialog = screen.getByRole('dialog', { name: 'Phân công chấm · DT01' })
+  expect(within(dialog).getByText('DT01 · Nhóm A')).toBeTruthy()
+  expect(within(dialog).getByText(`Hội đồng: ${committee.name}`)).toBeTruthy()
+  expect(screen.getByRole('tab', { name: 'Lịch bảo vệ' }).getAttribute('aria-selected')).toBe(
+    'true',
   )
-  await waitFor(() =>
-    expect((screen.getByRole('combobox', { name: /Bộ tiêu chí/ }) as HTMLSelectElement).value).toBe(
-      '7',
-    ),
-  )
-  expect(screen.getByText('Đã chọn 1 đề tài')).toBeTruthy()
   expect(mocks.assignBatch).not.toHaveBeenCalled()
   fireEvent.change(screen.getByLabelText(/Hạn chót chấm điểm/), {
     target: { value: '21/02/2099 10:00 AM' },
   })
-  await userEvent.click(screen.getByRole('button', { name: 'Lưu phân công' }))
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Phân công chấm', exact: true }))
   await waitFor(() => expect(mocks.assignBatch).toHaveBeenCalledOnce())
   expect(mocks.assignBatch.mock.calls[0][0]).toHaveLength(3)
   expect(mocks.assignBatch.mock.calls[0][0]).toEqual(

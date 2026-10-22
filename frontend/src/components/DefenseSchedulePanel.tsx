@@ -21,7 +21,8 @@ type Props = {
   periods?: RegistrationPeriodResponse[]
   unlockedReviews?: AssessmentComponentResponse[]
   onAssign?: (defense: DefenseSessionResponse) => void
-  onScheduled: () => Promise<void>
+  onScheduled: (defenseId?: number) => Promise<void>
+  initialCommitteeId?: number | null
   onBusyChange?: (busy: boolean) => void
 }
 
@@ -34,8 +35,11 @@ export function DefenseSchedulePanel({
   onAssign,
   onScheduled,
   onBusyChange,
+  initialCommitteeId,
 }: Props) {
-  const [committeeId, setCommitteeId] = useState('')
+  const [committeeId, setCommitteeId] = useState(
+    initialCommitteeId ? String(initialCommitteeId) : '',
+  )
   const [projectId, setProjectId] = useState('')
   const [location, setLocation] = useState('')
   const [times, setTimes] = useState<{ key: string; startsAt: string; endsAt: string } | null>(null)
@@ -67,6 +71,7 @@ export function DefenseSchedulePanel({
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [refreshNeeded, setRefreshNeeded] = useState(false)
+  const [savedDefenseId, setSavedDefenseId] = useState<number>()
   const [confirming, setConfirming] = useState(false)
   const eligibilityKey = JSON.stringify([
     projectId,
@@ -169,20 +174,21 @@ export function DefenseSchedulePanel({
     const end = defenseInstant(endsAt, graduation)
     setSaving(true)
     try {
-      await evaluationApi.scheduleDefense({
+      const defenseId = await evaluationApi.scheduleDefense({
         assignmentId: Number(projectId),
         committeeId: Number(committeeId),
         location: location.trim(),
         startsAt: start.toISOString(),
         endsAt: end.toISOString(),
       })
+      setSavedDefenseId(defenseId)
       setSuccess('Đã xếp lịch bảo vệ.')
       setProjectId('')
       setLocation('')
       setStartsAt(fixedDate ? `${fixedDate}T08:00` : '')
       setEndsAt(fixedDate ? `${fixedDate}T09:00` : '')
       try {
-        await onScheduled()
+        await onScheduled(defenseId)
       } catch {
         setRefreshNeeded(true)
         setError(
@@ -207,7 +213,7 @@ export function DefenseSchedulePanel({
   }
 
   return (
-    <section className="ea-card" aria-labelledby="defense-schedule-title">
+    <section className="ea-card ea-schedule-card" aria-labelledby="defense-schedule-title">
       <h2 id="defense-schedule-title">Lịch bảo vệ</h2>
       {!savedCommittees.length && (
         <p className="ea-notice">
@@ -266,7 +272,7 @@ export function DefenseSchedulePanel({
           onClick={async () => {
             setSaving(true)
             try {
-              await onScheduled()
+              await onScheduled(savedDefenseId)
               setRefreshNeeded(false)
               setError('')
             } catch {
@@ -388,7 +394,7 @@ export function DefenseSchedulePanel({
         <p className="ea-empty">Chưa có lịch bảo vệ trong đợt này.</p>
       ) : (
         <div className="table-container">
-          <table className="data-table">
+          <table className="data-table ea-scheduled-table">
             <thead>
               <tr>
                 <th>Đề tài / nhóm</th>

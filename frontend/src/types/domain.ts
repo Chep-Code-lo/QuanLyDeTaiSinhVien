@@ -410,6 +410,18 @@ export interface ProjectAssignmentResponse {
   status: 'ASSIGNED' | 'IN_PROGRESS' | 'SUBMITTED' | 'COMPLETED' | 'CANCELLED' | string
 }
 
+export interface SupervisedStudentResponse {
+  studentId: number
+  studentCode: string
+  fullName: string
+  className: string
+}
+
+export interface SupervisedProjectResponse {
+  project: ProjectAssignmentResponse
+  students: SupervisedStudentResponse[]
+}
+
 export interface NotificationResponse {
   id: number
   title: string

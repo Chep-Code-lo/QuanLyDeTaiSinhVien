@@ -42,51 +42,53 @@ export function GradeChangesPage() {
     <>
       <PageHeader title="Yêu cầu đổi điểm" />
       <section className="page-card">
-        <label>
-          Trạng thái yêu cầu
-          <select
-            className="form-select"
-            value={status}
-            onChange={(event) => {
-              setStatus(event.target.value as typeof status)
+        <div className="grade-change-filters">
+          <div className="grade-change-filters__status">
+            <select
+              aria-label="Trạng thái yêu cầu"
+              className="form-select"
+              value={status}
+              onChange={(event) => {
+                setStatus(event.target.value as typeof status)
+                setPage(0)
+                setSelected(null)
+              }}
+            >
+              <option value="">Tất cả</option>
+              {Object.entries(labels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <form
+            className="inline-form"
+            onSubmit={(event) => {
+              event.preventDefault()
+              const value = Number(sheetInput)
+              if (sheetInput.trim() && (!Number.isSafeInteger(value) || value <= 0)) return
+              setSheetId(value)
               setPage(0)
               setSelected(null)
+              setRevision((value) => value + 1)
             }}
           >
-            <option value="">Tất cả</option>
-            {Object.entries(labels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <form
-          className="inline-form"
-          onSubmit={(event) => {
-            event.preventDefault()
-            const value = Number(sheetInput)
-            if (sheetInput.trim() && (!Number.isSafeInteger(value) || value <= 0)) return
-            setSheetId(value)
-            setPage(0)
-            setSelected(null)
-            setRevision((value) => value + 1)
-          }}
-        >
-          <label>
-            Mã phiếu điểm
-            <input
-              className="form-input"
-              type="number"
-              min="1"
-              step="1"
-              value={sheetInput}
-              onChange={(event) => setSheetInput(event.target.value)}
-              placeholder="Tất cả phiếu"
-            />
-          </label>
-          <button className="btn btn-secondary">Lọc theo phiếu</button>
-        </form>
+            <div>
+              <input
+                aria-label="Mã phiếu điểm"
+                className="form-input"
+                type="number"
+                min="1"
+                step="1"
+                value={sheetInput}
+                onChange={(event) => setSheetInput(event.target.value)}
+                placeholder="Tất cả phiếu"
+              />
+            </div>
+            <button className="btn btn-secondary">Lọc theo phiếu</button>
+          </form>
+        </div>
         <RemoteState
           loading={loading}
           error={error}

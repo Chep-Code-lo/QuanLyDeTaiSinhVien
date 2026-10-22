@@ -5,6 +5,7 @@ import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.feature.project.domain.AssignmentStatus;
 import com.example.qldetai.feature.project.dto.ProjectDtos.CreateAssignmentRequest;
 import com.example.qldetai.feature.project.dto.ProjectDtos.ProjectAssignmentResponse;
+import com.example.qldetai.feature.project.dto.ProjectDtos.SupervisedProjectResponse;
 import com.example.qldetai.feature.project.dto.ProjectDtos.UpdateAssignmentStatusRequest;
 import com.example.qldetai.feature.project.service.ProjectAssignmentService;
 import com.example.qldetai.security.UserPrincipal;
@@ -47,6 +48,15 @@ public class ProjectAssignmentController {
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return ApiResponse.success(projectAssignmentService.list(periodId, status, page, size));
+    }
+
+    @GetMapping("/supervised")
+    @PreAuthorize("hasRole('LECTURER')")
+    public ApiResponse<PageResponse<SupervisedProjectResponse>> supervised(
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(projectAssignmentService.listSupervised(principal.id(), page, size));
     }
 
     @GetMapping("/mine")

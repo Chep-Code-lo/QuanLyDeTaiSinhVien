@@ -36,10 +36,9 @@ export type NavigationItem = {
 
 export const navigationItems: NavigationItem[] = [
   { group: 'general', icon: Home, label: 'Tổng quan', to: '/dashboard' },
-  { group: 'projects', icon: BookOpen, label: 'Đề tài & Dự án', to: '/topics' },
+  { group: 'projects', icon: BookOpen, label: 'Đề tài & đăng ký', to: '/topics' },
   { group: 'projects', icon: BookOpen, label: 'Đề xuất & Xét duyệt', to: '/topic-workflow' },
   { group: 'projects', icon: UsersRound, label: 'Nhóm đề tài', to: '/groups' },
-  { group: 'projects', icon: ClipboardCheck, label: 'Đăng ký đề tài', to: '/registrations' },
   {
     group: 'projects',
     icon: ClipboardCheck,

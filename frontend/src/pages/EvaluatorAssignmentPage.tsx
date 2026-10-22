@@ -6,6 +6,7 @@ import { AnimatedSelect } from '../components/AnimatedSelect'
 import { DateTimeInput } from '../components/DateTimeInput'
 import { LecturerAutocomplete } from '../components/LecturerAutocomplete'
 import { DefenseSchedulePanel } from '../components/DefenseSchedulePanel'
+import { DefenseGradingDialog } from '../components/DefenseGradingDialog'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
 import { useToast } from '../context/ToastContext'
@@ -76,7 +77,8 @@ export function EvaluatorAssignmentPage() {
   const [memberDrafts, setMemberDrafts] = useState<MemberDraft[]>(initialMembers)
   const nextMemberKey = useRef(4)
   const [committeeTask, setCommitteeTask] = useState<'CONFIGURE' | 'ASSIGN'>('CONFIGURE')
-  const [pendingDefense, setPendingDefense] = useState<DefenseSessionResponse | null>(null)
+  const [gradingDefense, setGradingDefense] = useState<DefenseSessionResponse | null>(null)
+  const [scheduleCommitteeId, setScheduleCommitteeId] = useState<number | null>(null)
   const [lecturerId, setLecturerId] = useState<number | null>(null)
   const [projectIds, setProjectIds] = useState<number[]>([])
   const [deadline, setDeadline] = useState('')
@@ -148,13 +150,23 @@ export function EvaluatorAssignmentPage() {
   const filteredProjects = eligibleProjects.filter((project) =>
     `${project.topicCode} ${project.topicTitle} ${project.groupName}`
       .toLocaleLowerCase('vi')
-      .includes(query.toLocaleLowerCase('vi')),
+      .includes(query.trim().toLocaleLowerCase('vi')),
   )
+  const matchingUnavailableProjects =
+    isCommittee && !filteredProjects.length && query.trim()
+      ? projects.filter((project) =>
+          `${project.topicCode} ${project.topicTitle} ${project.groupName}`
+            .toLocaleLowerCase('vi')
+            .includes(query.trim().toLocaleLowerCase('vi')),
+        )
+      : []
 
   const periodKey = JSON.stringify([periodId, reload])
   const [previousPeriodKey, setPreviousPeriodKey] = useState(periodKey)
   if (previousPeriodKey !== periodKey) {
     setPreviousPeriodKey(periodKey)
+    setScheduleCommitteeId(null)
+    setGradingDefense(null)
     setLoading(!!periodId)
     setLoadError('')
     setProjects([])
@@ -189,15 +201,6 @@ export function EvaluatorAssignmentPage() {
     setLecturerId(null)
     setTopicOpen(false)
     setQuery('')
-  }
-  if (pendingDefense && mode === 'COMMITTEE') {
-    const saved = committees.find((item) => item.id === pendingDefense.committeeId)
-    if (saved) {
-      selectCommittee(saved)
-      setCommitteeTask('ASSIGN')
-      setProjectIds([pendingDefense.assignmentId])
-      setPendingDefense(null)
-    }
   }
   const rubricKey = JSON.stringify([
     componentId,
@@ -366,6 +369,8 @@ export function EvaluatorAssignmentPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+    const continueToSchedule =
+      (event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') === 'schedule'
     if (submitting) return
     if (
       !rubric ||
@@ -426,6 +431,10 @@ export function EvaluatorAssignmentPage() {
           showSuccess(
             'Đã lưu hội đồng ' + updated.name + ' với ' + updated.members.length + ' thành viên.',
           )
+          if (continueToSchedule) {
+            setScheduleCommitteeId(updated.id)
+            setMode('SCHEDULE')
+          }
           return
         }
       }
@@ -535,10 +544,8 @@ export function EvaluatorAssignmentPage() {
             </p>
           ) : (
             <DefenseSchedulePanel
-              onAssign={(defense) => {
-                setPendingDefense(defense)
-                setMode('COMMITTEE')
-              }}
+              onAssign={setGradingDefense}
+              initialCommitteeId={scheduleCommitteeId}
               onBusyChange={setScheduleBusy}
               key={periodId}
               committees={committees}
@@ -546,7 +553,7 @@ export function EvaluatorAssignmentPage() {
               defenses={defenses}
               periods={periods}
               unlockedReviews={unlockedReviews}
-              onScheduled={async () => {
+              onScheduled={async (defenseId) => {
                 if (!periodId) return
                 const [scheduled, saved] = await Promise.all([
                   allPages((page) => evaluationApi.listDefenses({ periodId, page, size: 100 })),
@@ -554,6 +561,11 @@ export function EvaluatorAssignmentPage() {
                 ])
                 setDefenses(scheduled)
                 setCommittees(saved)
+                if (defenseId) {
+                  const defense = scheduled.find((item) => item.id === defenseId)
+                  if (!defense) throw new Error('Chưa tải được lịch vừa lưu.')
+                  setGradingDefense(defense)
+                }
               }}
             />
           )}
@@ -925,7 +937,53 @@ export function EvaluatorAssignmentPage() {
                               </span>
                             </label>
                           ))}
-                          {!filteredProjects.length && <p>Không có đề tài phù hợp.</p>}
+                          {!filteredProjects.length && (
+                            <div className="ea-topic-unavailable" role="status">
+                              {isCommittee &&
+                              (matchingUnavailableProjects.length > 0 || !query.trim()) ? (
+                                <>
+                                  <p>
+                                    Chỉ có thể phân công chấm cho đề tài đã xếp lịch bảo vệ vào hội
+                                    đồng đang chọn.
+                                  </p>
+                                  {matchingUnavailableProjects.map((project) => {
+                                    const defense = defenses.find(
+                                      (item) => item.assignmentId === project.id,
+                                    )
+                                    const reason = !defense
+                                      ? 'Chưa xếp lịch bảo vệ.'
+                                      : defense.status === 'SCHEDULED'
+                                        ? `Đã xếp lịch ở hội đồng khác: ${defense.committeeName}.`
+                                        : defense.status === 'COMPLETED'
+                                          ? 'Lịch bảo vệ đã hoàn thành.'
+                                          : 'Lịch bảo vệ đã hủy.'
+                                    return (
+                                      <p key={project.id}>
+                                        <strong>
+                                          {project.topicCode} · {project.groupName}
+                                        </strong>
+                                        <br />
+                                        {reason}
+                                      </p>
+                                    )
+                                  })}
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                      setTopicOpen(false)
+                                      setMode('SCHEDULE')
+                                      document.getElementById('ea-tab-SCHEDULE')?.focus()
+                                    }}
+                                  >
+                                    Mở lịch bảo vệ
+                                  </button>
+                                </>
+                              ) : (
+                                <p>Không có đề tài phù hợp.</p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1004,9 +1062,32 @@ export function EvaluatorAssignmentPage() {
                     ? 'Lưu hội đồng'
                     : 'Lưu phân công'}
               </button>
+              {isCommittee && !assigningTopics && (
+                <button
+                  type="submit"
+                  value="schedule"
+                  className="btn ea-save"
+                  disabled={submitting || loading || !!loadError || !rubric}
+                >
+                  Lưu & xếp lịch
+                </button>
+              )}
             </div>
           </footer>
         </form>
+      )}
+      {gradingDefense && (
+        <DefenseGradingDialog
+          key={gradingDefense.id}
+          defense={gradingDefense}
+          committee={committees.find((item) => item.id === gradingDefense.committeeId)}
+          onClose={() => setGradingDefense(null)}
+          onAssigned={() => {
+            setGradingDefense(null)
+            setPage(0)
+            setListVersion((value) => value + 1)
+          }}
+        />
       )}
       {periodId && (
         <section className="ea-notice" aria-label="Tiến độ phản biện của đợt" role="status">

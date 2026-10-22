@@ -1,12 +1,11 @@
 import { isAxiosError } from 'axios'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { topicApi } from '../api/topics'
 import { errorMessage } from '../api/student'
 import { PageHeader } from '../components/PageHeader'
 import { PageControls } from '../components/PageControls'
 import { RemoteState } from '../components/RemoteState'
-import { ConfirmModal } from '../components/ConfirmModal'
 import { TopicProposalForm } from '../components/TopicProposalForm'
 import { LecturerAutocomplete } from '../components/LecturerAutocomplete'
 import { useAuth } from '../context/AuthContext'
@@ -73,7 +72,7 @@ export function TopicWorkflowPage() {
           <>
             {!data.content.length && <p>Không có đề xuất phù hợp.</p>}
             <div className="table-container">
-              <table className="data-table">
+              <table className="data-table topic-workflow-table">
                 <thead>
                   <tr>
                     <th>Đề tài</th>
@@ -123,50 +122,142 @@ export function TopicWorkflowPage() {
           }}
         />
       )}
-      {selected && <TopicWorkflowDetail key={selected} id={selected} onChanged={refresh} />}
+      {selected && (
+        <TopicWorkflowDetail
+          key={selected}
+          id={selected}
+          onChanged={refresh}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </>
   )
 }
-function TopicWorkflowDetail({ id, onChanged }: { id: number; onChanged: () => void }) {
+function TopicWorkflowDetail({
+  id,
+  onChanged,
+  onClose,
+}: {
+  id: number
+  onChanged: () => void
+  onClose: () => void
+}) {
   const [revision, setRevision] = useState(0)
   const load = useCallback(() => topicApi.get(id), [id])
   const { data, loading, error } = useRemoteData(load, revision)
   const [editing, setEditing] = useState(false)
+  const [confirm, setConfirm] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const blocked = useRef(false)
+  const dialog = useRef<HTMLDialogElement>(null)
+  const closeButton = useRef<HTMLButtonElement>(null)
+  const titleId = useId()
+  const changeBusy = (value: boolean) => {
+    blocked.current = value
+    setBusy(value)
+  }
+  useEffect(() => {
+    const element = dialog.current
+    const trigger = document.activeElement as HTMLElement | null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    element?.showModal()
+    closeButton.current?.focus()
+    return () => {
+      element?.close()
+      document.body.style.overflow = previousOverflow
+      if (trigger?.isConnected) trigger.focus()
+    }
+  }, [])
+  useEffect(() => {
+    if (confirm) dialog.current?.querySelector<HTMLButtonElement>('[data-cancel]')?.focus()
+    else closeButton.current?.focus()
+  }, [confirm])
   const refresh = () => {
     setEditing(false)
     setRevision((value) => value + 1)
     onChanged()
   }
   return (
-    <section className="page-card">
-      <RemoteState loading={loading} error={error} retry={refresh} />
+    <dialog
+      ref={dialog}
+      className="catalog-editor-dialog topic-workflow-dialog"
+      aria-labelledby={titleId}
+      onCancel={(event) => {
+        event.preventDefault()
+        if (blocked.current) return
+        if (confirm) setConfirm(false)
+        else onClose()
+      }}
+    >
+      <div className="catalog-editor-dialog__heading">
+        <h2 id={titleId}>
+          {confirm ? 'Xác nhận xử lý đề tài' : `Xử lý đề tài ${data?.code ?? `#${id}`}`}
+        </h2>
+        <button
+          ref={closeButton}
+          type="button"
+          className="btn btn-secondary"
+          disabled={busy}
+          aria-label="Đóng xử lý đề tài"
+          onClick={() => {
+            if (confirm) setConfirm(false)
+            else onClose()
+          }}
+        >
+          Đóng
+        </button>
+      </div>
+      {!confirm && <RemoteState loading={loading} error={error} retry={refresh} />}
       {data && (
         <>
-          <h2>
-            {data.code} · {data.title}
-          </h2>
-          <p>{data.description}</p>
-          <p>Mục tiêu: {data.objectives}</p>
-          <p>Kết quả dự kiến: {data.expectedOutcomes}</p>
-          {data.latestReview?.comment && <p>Phản hồi xét duyệt: {data.latestReview.comment}</p>}
+          {!confirm && (
+            <>
+              <h2>
+                {data.code} · {data.title}
+              </h2>
+              <p>{data.description}</p>
+              <p>Mục tiêu: {data.objectives}</p>
+              <p>Kết quả dự kiến: {data.expectedOutcomes}</p>
+              {data.latestReview?.comment && <p>Phản hồi xét duyệt: {data.latestReview.comment}</p>}
+            </>
+          )}
           {editing ? (
-            <TopicProposalForm topic={data} onClose={() => setEditing(false)} onSaved={refresh} />
+            <TopicProposalForm
+              topic={data}
+              onClose={() => setEditing(false)}
+              onSaved={refresh}
+              onBusyChange={changeBusy}
+            />
           ) : (
-            <TopicActions topic={data} onEdit={() => setEditing(true)} onChanged={refresh} />
+            <TopicActions
+              topic={data}
+              onEdit={() => setEditing(true)}
+              onChanged={refresh}
+              confirm={confirm}
+              setConfirm={setConfirm}
+              onBusyChange={changeBusy}
+            />
           )}
         </>
       )}
-    </section>
+    </dialog>
   )
 }
 function TopicActions({
   topic,
   onEdit,
   onChanged,
+  confirm,
+  setConfirm,
+  onBusyChange,
 }: {
   topic: TopicResponse
   onEdit: () => void
   onChanged: () => void
+  confirm: boolean
+  setConfirm: (value: boolean) => void
+  onBusyChange: (value: boolean) => void
 }) {
   const { user } = useAuth()
   const { showSuccess, showError } = useToast()
@@ -179,182 +270,217 @@ function TopicActions({
   const savedSecondary = topic.supervisors.find((item) => item.slotNo === 2)
   const [primary, setPrimary] = useState<number | null>(savedPrimary?.lecturerId ?? null)
   const [secondary, setSecondary] = useState<number | null>(savedSecondary?.lecturerId ?? null)
-  const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
   const sending = useRef(false)
   return (
     <>
-      <div className="inline-form">
-        {owner && ['DRAFT', 'PENDING', 'REVISION_REQUIRED'].includes(topic.status) && (
-          <button type="button" className="btn btn-secondary" onClick={onEdit}>
-            Sửa đề xuất
-          </button>
-        )}
-        {manager && !['PUBLISHED', 'WITHDRAWN'].includes(topic.status) && (
-          <button type="button" className="btn btn-secondary" onClick={() => setAction('review')}>
-            Xét duyệt đề xuất
-          </button>
-        )}
-        {manager && ['APPROVED', 'PUBLISHED'].includes(topic.status) && (
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setAction('supervisors')}
-          >
-            Phân công GVHD
-          </button>
-        )}
-        {manager && topic.status === 'APPROVED' && (
-          <button type="button" className="btn btn-primary" onClick={() => setAction('publish')}>
-            Công bố đề tài
-          </button>
-        )}
-        {owner && !['PUBLISHED', 'WITHDRAWN'].includes(topic.status) && (
-          <button type="button" className="btn btn-danger" onClick={() => setAction('withdraw')}>
-            Rút đề xuất
-          </button>
-        )}
-      </div>
-      {action && (
-        <form
-          className="stack-form"
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (
-              !busy &&
-              ((action !== 'review' && action !== 'withdraw') || comment.trim()) &&
-              (action !== 'supervisors' || (primary && primary !== secondary))
-            )
-              setConfirm(true)
-          }}
-        >
-          <fieldset className="student-fieldset" disabled={busy}>
-            {action === 'review' && (
-              <label>
-                Kết quả xét duyệt
-                <select
-                  className="form-select"
-                  value={decision}
-                  onChange={(event) => setDecision(event.target.value as TopicReviewDecision)}
-                >
-                  <option value="APPROVED">Duyệt</option>
-                  <option value="REVISION_REQUIRED">Yêu cầu sửa</option>
-                  <option value="REJECTED">Từ chối</option>
-                </select>
-              </label>
+      {!confirm && (
+        <>
+          <div className="inline-form">
+            {owner && ['DRAFT', 'PENDING', 'REVISION_REQUIRED'].includes(topic.status) && (
+              <button type="button" className="btn btn-secondary" onClick={onEdit}>
+                Sửa đề xuất
+              </button>
             )}
-            {(action === 'review' || action === 'withdraw') && (
-              <label>
-                {action === 'review' ? 'Nhận xét xét duyệt' : 'Lý do rút'}
-                <textarea
-                  required
-                  className="form-textarea"
-                  value={comment}
-                  onChange={(event) => setComment(event.target.value)}
-                />
-              </label>
+            {manager && !['PUBLISHED', 'WITHDRAWN'].includes(topic.status) && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setAction('review')}
+              >
+                Xét duyệt đề xuất
+              </button>
             )}
-            {action === 'supervisors' && (
-              <>
-                <LecturerAutocomplete
-                  ariaLabel="GVHD chính"
-                  label="GVHD chính"
-                  required
-                  value={primary}
-                  facultyId={topic.facultyId}
-                  excludedIds={secondary ? [secondary] : []}
-                  selectedOption={
-                    savedPrimary
-                      ? {
-                          id: savedPrimary.lecturerId,
-                          fullName: savedPrimary.lecturerName,
-                          lecturerCode: savedPrimary.lecturerCode,
-                        }
-                      : undefined
-                  }
-                  onChange={setPrimary}
-                />
-                <LecturerAutocomplete
-                  ariaLabel="GVHD phụ"
-                  label="GVHD phụ"
-                  value={secondary}
-                  selectedOption={
-                    savedSecondary
-                      ? {
-                          id: savedSecondary.lecturerId,
-                          fullName: savedSecondary.lecturerName,
-                          lecturerCode: savedSecondary.lecturerCode,
-                        }
-                      : undefined
-                  }
-                  facultyId={topic.facultyId}
-                  excludedIds={primary ? [primary] : []}
-                  onChange={setSecondary}
-                />
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setSecondary(null)}
-                >
-                  Bỏ GVHD phụ
+            {manager && ['APPROVED', 'PUBLISHED'].includes(topic.status) && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setAction('supervisors')}
+              >
+                Phân công GVHD
+              </button>
+            )}
+            {manager && topic.status === 'APPROVED' && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setAction('publish')}
+              >
+                Công bố đề tài
+              </button>
+            )}
+            {owner && !['PUBLISHED', 'WITHDRAWN'].includes(topic.status) && (
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => setAction('withdraw')}
+              >
+                Rút đề xuất
+              </button>
+            )}
+          </div>
+          {action && (
+            <form
+              className="stack-form"
+              onSubmit={(event) => {
+                event.preventDefault()
+                if (
+                  !busy &&
+                  ((action !== 'review' && action !== 'withdraw') || comment.trim()) &&
+                  (action !== 'supervisors' || (primary && primary !== secondary))
+                )
+                  setConfirm(true)
+              }}
+            >
+              <fieldset className="student-fieldset" disabled={busy}>
+                {action === 'review' && (
+                  <label>
+                    Kết quả xét duyệt
+                    <select
+                      className="form-select"
+                      value={decision}
+                      onChange={(event) => setDecision(event.target.value as TopicReviewDecision)}
+                    >
+                      <option value="APPROVED">Duyệt</option>
+                      <option value="REVISION_REQUIRED">Yêu cầu sửa</option>
+                      <option value="REJECTED">Từ chối</option>
+                    </select>
+                  </label>
+                )}
+                {(action === 'review' || action === 'withdraw') && (
+                  <label>
+                    {action === 'review' ? 'Nhận xét xét duyệt' : 'Lý do rút'}
+                    <textarea
+                      required
+                      className="form-textarea"
+                      value={comment}
+                      onChange={(event) => setComment(event.target.value)}
+                    />
+                  </label>
+                )}
+                {action === 'supervisors' && (
+                  <>
+                    <LecturerAutocomplete
+                      ariaLabel="GVHD chính"
+                      label="GVHD chính"
+                      required
+                      value={primary}
+                      facultyId={topic.facultyId}
+                      excludedIds={secondary ? [secondary] : []}
+                      selectedOption={
+                        savedPrimary
+                          ? {
+                              id: savedPrimary.lecturerId,
+                              fullName: savedPrimary.lecturerName,
+                              lecturerCode: savedPrimary.lecturerCode,
+                            }
+                          : undefined
+                      }
+                      onChange={setPrimary}
+                    />
+                    <LecturerAutocomplete
+                      ariaLabel="GVHD phụ"
+                      label="GVHD phụ"
+                      value={secondary}
+                      selectedOption={
+                        savedSecondary
+                          ? {
+                              id: savedSecondary.lecturerId,
+                              fullName: savedSecondary.lecturerName,
+                              lecturerCode: savedSecondary.lecturerCode,
+                            }
+                          : undefined
+                      }
+                      facultyId={topic.facultyId}
+                      excludedIds={primary ? [primary] : []}
+                      onChange={setSecondary}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setSecondary(null)}
+                    >
+                      Bỏ GVHD phụ
+                    </button>
+                  </>
+                )}
+                {action === 'publish' && (
+                  <p>
+                    Công bố đề tài đã duyệt để sinh viên đăng ký. Đề tài cần có đủ GVHD theo quy
+                    định.
+                  </p>
+                )}
+                <button className="btn btn-primary" disabled={busy}>
+                  Tiếp tục
                 </button>
-              </>
-            )}
-            {action === 'publish' && (
-              <p>
-                Công bố đề tài đã duyệt để sinh viên đăng ký. Đề tài cần có đủ GVHD theo quy định.
-              </p>
-            )}
-            <button className="btn btn-primary" disabled={busy}>
-              Tiếp tục
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setAction('')}>
-              Hủy thao tác
-            </button>
-          </fieldset>
-        </form>
+                <button type="button" className="btn btn-secondary" onClick={() => setAction('')}>
+                  Hủy thao tác
+                </button>
+              </fieldset>
+            </form>
+          )}
+        </>
       )}
-      <ConfirmModal
-        isOpen={confirm}
-        title="Xác nhận xử lý đề tài"
-        message={`Xác nhận thao tác với đề tài ${topic.code}?`}
-        loading={busy}
-        onCancel={() => {
-          if (!sending.current) setConfirm(false)
-        }}
-        onConfirm={async () => {
-          if (!action || sending.current) return
-          sending.current = true
-          setBusy(true)
-          try {
-            if (action === 'review')
-              await topicApi.review(topic.id, {
-                version: topic.version,
-                decision,
-                comment: comment.trim(),
-              })
-            if (action === 'publish') await topicApi.publish(topic.id, topic.version)
-            if (action === 'withdraw')
-              await topicApi.withdraw(topic.id, { version: topic.version, reason: comment.trim() })
-            if (action === 'supervisors' && primary)
-              await topicApi.assignSupervisors(topic.id, {
-                version: topic.version,
-                primaryLecturerId: primary,
-                secondaryLecturerId: secondary,
-              })
-            showSuccess('Đã cập nhật đề tài.')
-            setAction('')
-            onChanged()
-          } catch (error) {
-            showError(errorMessage(error))
-            if (isAxiosError(error) && error.response?.status === 409) onChanged()
-          } finally {
-            sending.current = false
-            setBusy(false)
-            setConfirm(false)
-          }
-        }}
-      />
+      {confirm && (
+        <>
+          <p>{`Xác nhận thao tác với đề tài ${topic.code}?`}</p>
+          <div className="topic-workflow-dialog__actions">
+            <button
+              type="button"
+              data-cancel
+              className="btn btn-secondary"
+              disabled={busy}
+              onClick={() => setConfirm(false)}
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={busy}
+              onClick={async () => {
+                if (!action || sending.current) return
+                sending.current = true
+                setBusy(true)
+                onBusyChange(true)
+                try {
+                  if (action === 'review')
+                    await topicApi.review(topic.id, {
+                      version: topic.version,
+                      decision,
+                      comment: comment.trim(),
+                    })
+                  if (action === 'publish') await topicApi.publish(topic.id, topic.version)
+                  if (action === 'withdraw')
+                    await topicApi.withdraw(topic.id, {
+                      version: topic.version,
+                      reason: comment.trim(),
+                    })
+                  if (action === 'supervisors' && primary)
+                    await topicApi.assignSupervisors(topic.id, {
+                      version: topic.version,
+                      primaryLecturerId: primary,
+                      secondaryLecturerId: secondary,
+                    })
+                  showSuccess('Đã cập nhật đề tài.')
+                  setAction('')
+                  onChanged()
+                } catch (error) {
+                  showError(errorMessage(error))
+                  if (isAxiosError(error) && error.response?.status === 409) onChanged()
+                } finally {
+                  sending.current = false
+                  setBusy(false)
+                  onBusyChange(false)
+                  setConfirm(false)
+                }
+              }}
+            >
+              {busy ? 'Đang xử lý...' : 'Xác nhận'}
+            </button>
+          </div>
+        </>
+      )}
     </>
   )
 }

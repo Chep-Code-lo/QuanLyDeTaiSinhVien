@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { academicApi } from '../api/academic'
 import { evaluationApi } from '../api/evaluation'
 import { errorMessage } from '../api/student'
-import { ConfirmModal } from '../components/ConfirmModal'
 import { PageHeader } from '../components/PageHeader'
 import { RemoteState } from '../components/RemoteState'
 import { useToast } from '../context/ToastContext'
@@ -86,7 +85,7 @@ export function EvaluationResultsPage() {
                         <button
                           type="button"
                           className="btn btn-secondary"
-                          aria-pressed={selected?.id === project.id}
+                          aria-haspopup="dialog"
                           onClick={() => setSelected(project)}
                         >
                           Xem điểm {project.topicCode}
@@ -124,12 +123,20 @@ export function EvaluationResultsPage() {
           </>
         )}
       </section>
-      {selected && <ProjectResults key={selected.id} project={selected} />}
+      {selected && (
+        <ProjectResults key={selected.id} project={selected} onClose={() => setSelected(null)} />
+      )}
     </>
   )
 }
 
-function ProjectResults({ project }: { project: ProjectAssignmentResponse }) {
+function ProjectResults({
+  project,
+  onClose,
+}: {
+  project: ProjectAssignmentResponse
+  onClose: () => void
+}) {
   const { showSuccess, showError } = useToast()
   const [page, setPage] = useState(0)
   const [revision, setRevision] = useState(0)
@@ -144,6 +151,26 @@ function ProjectResults({ project }: { project: ProjectAssignmentResponse }) {
   const [pending, setPending] = useState<{ kind: 'finalize' | 'publish'; id: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const inFlight = useRef(false)
+  const dialog = useRef<HTMLDialogElement>(null)
+  const closeButton = useRef<HTMLButtonElement>(null)
+  const titleId = useId()
+  useEffect(() => {
+    const element = dialog.current
+    const trigger = document.activeElement as HTMLElement | null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    element?.showModal()
+    closeButton.current?.focus()
+    return () => {
+      element?.close()
+      document.body.style.overflow = previousOverflow
+      if (trigger?.isConnected) trigger.focus()
+    }
+  }, [])
+  useEffect(() => {
+    if (pending) dialog.current?.querySelector<HTMLButtonElement>('[data-cancel]')?.focus()
+    else closeButton.current?.focus()
+  }, [pending])
   const live = useRef(true)
   useEffect(() => {
     live.current = true
@@ -196,137 +223,182 @@ function ProjectResults({ project }: { project: ProjectAssignmentResponse }) {
   }
   const awaitingPublication = current?.data?.content.some((result) => result.status === 'FINALIZED')
   return (
-    <section className="page-card" aria-label={`Kết quả ${project.topicCode}`}>
-      <h2>
-        {project.topicCode} · {project.groupName}
-      </h2>
-
-      <RemoteState
-        loading={!current}
-        error={current?.error ?? ''}
-        retry={() => setRevision((value) => value + 1)}
-      />
-      <button
-        type="button"
-        className="btn btn-secondary"
-        disabled={busy}
-        onClick={() => setRevision((value) => value + 1)}
-      >
-        Làm mới kết quả
-      </button>
-      {current?.data && (
+    <dialog
+      ref={dialog}
+      className="catalog-editor-dialog project-results-dialog"
+      aria-labelledby={titleId}
+      onCancel={(event) => {
+        event.preventDefault()
+        if (inFlight.current) return
+        if (pending) setPending(null)
+        else onClose()
+      }}
+    >
+      <div className="catalog-editor-dialog__heading">
+        <h2 id={titleId}>
+          {pending
+            ? pending.kind === 'publish'
+              ? 'Công bố kết quả'
+              : 'Chốt kết quả'
+            : `${project.topicCode} · ${project.groupName}`}
+        </h2>
+        <button
+          ref={closeButton}
+          type="button"
+          className="btn btn-secondary"
+          disabled={busy}
+          aria-label="Đóng hộp thoại kết quả"
+          onClick={() => {
+            if (pending) setPending(null)
+            else onClose()
+          }}
+        >
+          Đóng
+        </button>
+      </div>
+      {!pending && (
         <>
-          {current.actions?.canFinalize && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={busy || awaitingPublication || page !== 0}
-              onClick={() => setPending({ kind: 'finalize', id: project.id })}
-            >
-              Chốt kết quả
-            </button>
-          )}
-          {!current.data.content.length && (
-            <p>
-              Chưa có kết quả được chốt. Cần phân công đủ và nộp đầy đủ phiếu của các thành phần
-              đánh giá bắt buộc trước khi chốt.
-            </p>
-          )}
-          {current.data.content.map((result) => (
-            <article key={result.id} className="page-card">
-              <h3>
-                Kết quả lần {result.versionNo} · {statusLabels[result.status]}
-              </h3>
-              <p>
-                Điểm tổng kết: <strong>{Number(result.finalScore).toFixed(2)}/10</strong>
-              </p>
-              <p>
-                Người chốt điểm: {result.finalizedByName} · {formatDateTime(result.finalizedAt)}
-              </p>
-              {result.publishedAt && (
-                <p>
-                  Người công bố: {result.publishedByName} · {formatDateTime(result.publishedAt)}
-                </p>
-              )}
-              <div className="table-container">
-                <table className="data-table result-input-table">
-                  <thead>
-                    <tr>
-                      <th>Nội dung đánh giá</th>
-                      <th>Phiếu chấm</th>
-                      <th>Điểm đánh giá</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.inputs.map((input) => (
-                      <tr key={input.id}>
-                        <td>{componentLabels[input.componentCode] ?? input.componentCode}</td>
-                        <td>Phiếu số {input.sheetId}</td>
-                        <td>{Number(input.scoreSnapshot).toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p>
-                Sinh viên:{' '}
-                {result.members
-                  .map((member) => `${member.studentCodeSnapshot} · ${member.fullNameSnapshot}`)
-                  .join('; ')}
-              </p>
-              {result.status === 'FINALIZED' && current.actions?.canPublish && (
+          <RemoteState
+            loading={!current}
+            error={current?.error ?? ''}
+            retry={() => setRevision((value) => value + 1)}
+          />
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={busy}
+            onClick={() => setRevision((value) => value + 1)}
+          >
+            Làm mới kết quả
+          </button>
+          {current?.data && (
+            <>
+              {current.actions?.canFinalize && (
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={busy}
-                  onClick={() => setPending({ kind: 'publish', id: result.id })}
+                  disabled={busy || awaitingPublication || page !== 0}
+                  onClick={() => setPending({ kind: 'finalize', id: project.id })}
                 >
-                  Công bố kết quả
+                  Chốt kết quả
                 </button>
               )}
-            </article>
-          ))}
-          {current.data.totalPages > 1 && (
-            <nav className="table-pagination result-pagination" aria-label="Phân trang kết quả">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={busy || page === 0}
-                onClick={() => setPage((value) => value - 1)}
-              >
-                Trước
-              </button>
-              <span>
-                {' '}
-                Trang {page + 1}/{Math.max(1, current.data.totalPages)}{' '}
-              </span>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={busy || page + 1 >= current.data.totalPages}
-                onClick={() => setPage((value) => value + 1)}
-              >
-                Sau
-              </button>
-            </nav>
+              {!current.data.content.length && (
+                <p>
+                  Chưa có kết quả được chốt. Cần phân công đủ và nộp đầy đủ phiếu của các thành phần
+                  đánh giá bắt buộc trước khi chốt.
+                </p>
+              )}
+              {current.data.content.map((result) => (
+                <article key={result.id} className="page-card">
+                  <h3>
+                    Kết quả lần {result.versionNo} · {statusLabels[result.status]}
+                  </h3>
+                  <p>
+                    Điểm tổng kết: <strong>{Number(result.finalScore).toFixed(2)}/10</strong>
+                  </p>
+                  <p>
+                    Người chốt điểm: {result.finalizedByName} · {formatDateTime(result.finalizedAt)}
+                  </p>
+                  {result.publishedAt && (
+                    <p>
+                      Người công bố: {result.publishedByName} · {formatDateTime(result.publishedAt)}
+                    </p>
+                  )}
+                  <div className="table-container">
+                    <table className="data-table result-input-table">
+                      <thead>
+                        <tr>
+                          <th>Nội dung đánh giá</th>
+                          <th>Phiếu chấm</th>
+                          <th>Điểm đánh giá</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {result.inputs.map((input) => (
+                          <tr key={input.id}>
+                            <td>{componentLabels[input.componentCode] ?? input.componentCode}</td>
+                            <td>Phiếu số {input.sheetId}</td>
+                            <td>{Number(input.scoreSnapshot).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p>
+                    Sinh viên:{' '}
+                    {result.members
+                      .map((member) => `${member.studentCodeSnapshot} · ${member.fullNameSnapshot}`)
+                      .join('; ')}
+                  </p>
+                  {result.status === 'FINALIZED' && current.actions?.canPublish && (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={busy}
+                      onClick={() => setPending({ kind: 'publish', id: result.id })}
+                    >
+                      Công bố kết quả
+                    </button>
+                  )}
+                </article>
+              ))}
+              {current.data.totalPages > 1 && (
+                <nav className="table-pagination result-pagination" aria-label="Phân trang kết quả">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={busy || page === 0}
+                    onClick={() => setPage((value) => value - 1)}
+                  >
+                    Trước
+                  </button>
+                  <span>
+                    {' '}
+                    Trang {page + 1}/{Math.max(1, current.data.totalPages)}{' '}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={busy || page + 1 >= current.data.totalPages}
+                    onClick={() => setPage((value) => value + 1)}
+                  >
+                    Sau
+                  </button>
+                </nav>
+              )}
+            </>
           )}
         </>
       )}
-      <ConfirmModal
-        isOpen={!!pending}
-        title={pending?.kind === 'publish' ? 'Công bố kết quả' : 'Chốt kết quả'}
-        message={
-          pending?.kind === 'publish'
-            ? `Công bố kết quả ${project.topicCode} cho sinh viên trong nhóm?`
-            : `Chốt kết quả ${project.topicCode}? Hệ thống sẽ kiểm tra đủ phiếu và lưu ảnh chụp điểm. Điểm đã chốt chỉ được điều chỉnh qua quy trình được phê duyệt.`
-        }
-        confirmText="Xác nhận"
-        loading={busy}
-        onConfirm={() => void confirm()}
-        onCancel={() => {
-          if (!inFlight.current) setPending(null)
-        }}
-      />
-    </section>
+      {pending && (
+        <>
+          <p>
+            {pending.kind === 'publish'
+              ? `Công bố kết quả ${project.topicCode} cho sinh viên trong nhóm?`
+              : `Chốt kết quả ${project.topicCode}? Hệ thống sẽ kiểm tra đủ phiếu và lưu ảnh chụp điểm. Điểm đã chốt chỉ được điều chỉnh qua quy trình được phê duyệt.`}
+          </p>
+          <div className="project-results-dialog__actions">
+            <button
+              type="button"
+              data-cancel
+              className="btn btn-secondary"
+              disabled={busy}
+              onClick={() => setPending(null)}
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={busy}
+              onClick={() => void confirm()}
+            >
+              {busy ? 'Đang xử lý...' : 'Xác nhận'}
+            </button>
+          </div>
+        </>
+      )}
+    </dialog>
   )
 }

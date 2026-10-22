@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { EvaluationResultsPage } from '../src/pages/EvaluationResultsPage'
@@ -52,6 +52,14 @@ const finalized = {
   inputs: [{ id: 1, sheetId: 11, componentCode: 'REVIEW', sheetVersion: 1, scoreSnapshot: 9 }],
   members: [{ studentId: 1, studentCodeSnapshot: 'SV01', fullNameSnapshot: 'Sinh viên A' }],
 }
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute('open', '')
+  }
+  HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute('open')
+  }
+})
 beforeEach(() => {
   Object.values(mocks).forEach((mock) => mock.mockReset())
   mocks.projects.mockResolvedValue(page([project(), project(2)], 2))
@@ -66,6 +74,31 @@ async function selectProject() {
   await userEvent.click(await screen.findByRole('button', { name: 'Xem điểm DT01' }))
   await screen.findByText(/Chưa có kết quả được chốt/)
 }
+it('xem điểm mở hộp thoại, khóa cuộn nền và trả focus về nút khi đóng', async () => {
+  await selectProject()
+  const dialog = screen.getByRole('dialog', { name: 'DT01 · Nhóm 1' })
+  expect(dialog.hasAttribute('open')).toBe(true)
+  expect(document.body.style.overflow).toBe('hidden')
+  fireEvent(dialog, new Event('cancel', { cancelable: true }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Xem điểm DT01' }))
+  expect(document.body.style.overflow).toBe('')
+  expect(mocks.finalize).not.toHaveBeenCalled()
+  expect(mocks.publish).not.toHaveBeenCalled()
+})
+it('hủy xác nhận quay về xem điểm, không đóng hộp thoại hoặc chốt kết quả', async () => {
+  await selectProject()
+  await userEvent.click(screen.getByRole('button', { name: 'Chốt kết quả' }))
+  const dialog = screen.getByRole('dialog', { name: 'Chốt kết quả' })
+  expect(screen.getAllByRole('dialog')).toHaveLength(1)
+  fireEvent(dialog, new Event('cancel', { cancelable: true }))
+  expect(screen.getByRole('dialog', { name: 'DT01 · Nhóm 1' }).hasAttribute('open')).toBe(true)
+  expect(mocks.finalize).not.toHaveBeenCalled()
+  await userEvent.click(screen.getByRole('button', { name: 'Chốt kết quả' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Hủy', exact: true }))
+  expect(screen.getByRole('dialog', { name: 'DT01 · Nhóm 1' })).toBeTruthy()
+  expect(mocks.finalize).not.toHaveBeenCalled()
+})
 it('chốt sau xác nhận, chặn gửi trùng và tải lại kết quả đã chốt', async () => {
   let resolve!: (value: unknown) => void
   mocks.finalize.mockImplementation(
@@ -83,6 +116,11 @@ it('chốt sau xác nhận, chặn gửi trùng và tải lại kết quả đã
   fireEvent.click(confirm)
   fireEvent.click(confirm)
   expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith(1)
+  expect(
+    (screen.getByRole('button', { name: 'Đóng hộp thoại kết quả' }) as HTMLButtonElement).disabled,
+  ).toBe(true)
+  fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
+  expect(screen.getByRole('dialog', { name: 'Chốt kết quả' })).toBeTruthy()
   mocks.results.mockResolvedValue(page([finalized]))
   await act(async () => resolve({ id: 7 }))
   await screen.findByText('8.50/10')
@@ -149,10 +187,12 @@ it('bỏ qua phản hồi đề tài cũ đến muộn và phân trang ở serve
   )
   render(<EvaluationResultsPage />)
   await userEvent.click(await screen.findByRole('button', { name: 'Xem điểm DT01' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Đóng hộp thoại kết quả' }))
   await userEvent.click(screen.getByRole('button', { name: 'Xem điểm DT02' }))
   await screen.findByText(/Chưa có kết quả được chốt/)
   await act(async () => resolve(page([finalized])))
   expect(screen.queryByText('8.50/10')).toBeNull()
+  await userEvent.click(screen.getByRole('button', { name: 'Đóng hộp thoại kết quả' }))
   await userEvent.click(screen.getByRole('button', { name: 'Sau' }))
   await waitFor(() => expect(mocks.projects).toHaveBeenLastCalledWith(undefined, 1, 10))
 })

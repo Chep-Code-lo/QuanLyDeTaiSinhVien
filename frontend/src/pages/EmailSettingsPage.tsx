@@ -1,6 +1,7 @@
 import { PageControls } from '../components/PageControls'
 import { EmailScopePicker, type EmailScopeSelection } from '../components/EmailScopePicker'
 import { EmailDeliveryDetail } from '../components/EmailDeliveryDetail'
+import { EmailRecipientPreview } from '../components/EmailRecipientPreview'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
@@ -180,6 +181,7 @@ export function EmailSettingsPage() {
   )
   const [recipientSearch, setRecipientSearch] = useState('')
   const [recipientPage, setRecipientPage] = useState(0)
+  const [recipientPreviewOpen, setRecipientPreviewOpen] = useState(false)
   const [recipients, setRecipients] = useState<EmailRecipientResponse[]>([])
   const [selectedRecipients, setSelectedRecipients] = useState<EmailRecipientResponse[]>([])
   const [recipientTotal, setRecipientTotal] = useState(0)
@@ -824,7 +826,7 @@ export function EmailSettingsPage() {
           {!creatingTemplate && !selectedCustom && (
             <fieldset
               disabled={saving || sending || testing}
-              className="email-settings__recipients"
+              className="email-settings__recipients email-settings__recipient-groups"
             >
               <legend>Nhóm nhận email tự động</legend>
               {(selectedEvent === 'REGISTRATION_OPENED'
@@ -883,6 +885,7 @@ export function EmailSettingsPage() {
                   setRecipientsLoading(true)
                   setRecipientError('')
                   setRecipientType(event.target.value as typeof recipientType)
+                  setRecipientPreviewOpen(false)
                   setRecipientPage(0)
                   setRecipientSearch('')
                 }}
@@ -997,6 +1000,16 @@ export function EmailSettingsPage() {
               )}
               {hasUnsavedChanges && (
                 <p className="email-settings__field-help">Lưu thay đổi trước khi gửi email.</p>
+              )}
+              {recipientType !== 'SPECIFIC' && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  aria-haspopup="dialog"
+                  onClick={() => setRecipientPreviewOpen(true)}
+                >
+                  <Eye size={17} aria-hidden="true" /> Xem danh sách người nhận
+                </button>
               )}
             </fieldset>
           )}
@@ -1211,6 +1224,13 @@ export function EmailSettingsPage() {
           onPage={setLogPage}
         />
       </section>
+      {recipientPreviewOpen && recipientType !== 'SPECIFIC' && (
+        <EmailRecipientPreview
+          key={recipientType}
+          role={recipientType}
+          onClose={() => setRecipientPreviewOpen(false)}
+        />
+      )}
     </div>
   )
 }

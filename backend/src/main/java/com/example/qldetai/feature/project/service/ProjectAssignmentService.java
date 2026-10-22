@@ -8,6 +8,7 @@ import com.example.qldetai.exception.ResourceNotFoundException;
 import com.example.qldetai.feature.communication.email.EmailNotificationEventService;
 import com.example.qldetai.feature.communication.service.NotificationService;
 import com.example.qldetai.feature.groupregistration.domain.GroupStatus;
+import com.example.qldetai.feature.groupregistration.domain.GroupMember;
 import com.example.qldetai.feature.groupregistration.domain.RegistrationStatus;
 import com.example.qldetai.feature.groupregistration.domain.TopicRegistration;
 import com.example.qldetai.feature.groupregistration.repository.GroupMemberRepository;
@@ -21,6 +22,8 @@ import com.example.qldetai.feature.project.domain.ProjectAssignment;
 import com.example.qldetai.feature.project.dto.ProjectDtos.CreateAssignmentRequest;
 import com.example.qldetai.feature.project.dto.ProjectDtos.ProjectAssignmentResponse;
 import com.example.qldetai.feature.project.dto.ProjectDtos.UpdateAssignmentStatusRequest;
+import com.example.qldetai.feature.project.dto.ProjectDtos.SupervisedProjectResponse;
+import com.example.qldetai.feature.project.dto.ProjectDtos.SupervisedStudentResponse;
 import com.example.qldetai.feature.project.repository.ProjectAssignmentRepository;
 import com.example.qldetai.feature.topic.repository.TopicRepository;
 
@@ -84,6 +87,32 @@ public class ProjectAssignmentService {
         return projectAssignmentRepository.findByCurrentStudentUserId(userId).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<SupervisedProjectResponse> listSupervised(Long userId, int page, int size) {
+        var assignments =
+                projectAssignmentRepository.findSupervisedByUserId(
+                        userId, PageRequest.of(page, size, Sort.by("assignedAt", "id").descending()));
+        var groupIds = assignments.stream().map(assignment -> assignment.getGroup().getId()).toList();
+        Map<Long, List<GroupMember>> membersByGroup =
+                groupIds.isEmpty()
+                        ? Map.of()
+                        : groupMemberRepository
+                                .findByGroupIdInAndLeftAtIsNullOrderBySlotNoAsc(groupIds)
+                                .stream()
+                                .collect(java.util.stream.Collectors.groupingBy(
+                                        member -> member.getGroup().getId()));
+        return PageResponse.from(assignments.map(assignment ->
+                new SupervisedProjectResponse(
+                        toResponse(assignment),
+                        membersByGroup.getOrDefault(assignment.getGroup().getId(), List.of()).stream()
+                                .map(member -> new SupervisedStudentResponse(
+                                        member.getStudent().getId(),
+                                        member.getStudent().getStudentCode(),
+                                        member.getStudent().getUser().getFullName(),
+                                        member.getStudent().getClassName()))
+                                .toList())));
     }
 
     @Transactional(readOnly = true)

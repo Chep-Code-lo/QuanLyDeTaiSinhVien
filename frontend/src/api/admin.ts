@@ -24,6 +24,12 @@ export const adminApi = {
   },
   getUser: async (id: number) =>
     (await apiClient.get<ApiResponse<UserResponse>>(`/admin/users/${id}`)).data.data,
+  lookupUser: async (identifier: string) =>
+    (
+      await apiClient.get<ApiResponse<UserResponse>>('/admin/users/lookup', {
+        params: { identifier },
+      })
+    ).data.data,
   createUser: async (payload: CreateUserRequest) => {
     const response = await apiClient.post<ApiResponse<UserResponse>>('/admin/users', payload)
     return response.data.data
@@ -34,6 +40,9 @@ export const adminApi = {
   },
   updateStatus: async (id: number, status: UserStatus) =>
     (await apiClient.patch<ApiResponse<UserResponse>>(`/admin/users/${id}/status`, { status })).data
+      .data,
+  updateAccess: async (id: number, payload: { status: UserStatus; roles: RoleCode[] }) =>
+    (await apiClient.patch<ApiResponse<UserResponse>>(`/admin/users/${id}/access`, payload)).data
       .data,
   updateRoles: async (id: number, roles: RoleCode[]) =>
     (await apiClient.put<ApiResponse<UserResponse>>(`/admin/users/${id}/roles`, { roles })).data

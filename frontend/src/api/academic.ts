@@ -5,6 +5,7 @@ import type {
   DepartmentResponse,
   FacultyResponse,
   ProjectAssignmentResponse,
+  SupervisedProjectResponse,
   RegistrationPeriodResponse,
   SemesterResponse,
   UpdateRegistrationPeriodRequest,
@@ -88,6 +89,13 @@ export const academicApi = {
   getProject: async (id: number) =>
     (await apiClient.get<ApiResponse<ProjectAssignmentResponse>>(`/project-assignments/${id}`)).data
       .data,
+  getSupervisedProjects: async (page = 0, size = 10) =>
+    (
+      await apiClient.get<ApiResponse<PageResponse<SupervisedProjectResponse>>>(
+        '/project-assignments/supervised',
+        { params: { page, size } },
+      )
+    ).data.data,
   updateProjectStatus: async (
     id: number,
     payload: { version: number; status: 'COMPLETED' | 'CANCELLED' },

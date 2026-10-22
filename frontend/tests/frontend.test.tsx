@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, useLocation } from 'react-router-dom'
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { Sidebar } from '../src/components/Sidebar'
 import { Header } from '../src/components/Header'
 import { TopicsPage } from '../src/pages/TopicsPage'
@@ -133,6 +133,15 @@ function CurrentPath() {
   return <output data-testid="current-path">{useLocation().pathname}</output>
 }
 
+function CurrentSearch() {
+  return <output data-testid="current-search">{useLocation().search}</output>
+}
+
+function SearchNavigation() {
+  const navigate = useNavigate()
+  return <button onClick={() => navigate('/topics?q=Đề tài khác')}>Tìm từ URL</button>
+}
+
 // jsdom does not implement the native dialog methods; browser checks cover the top layer.
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal = function () {
@@ -215,10 +224,9 @@ describe('Hồi quy frontend', () => {
         .getAllByRole('button')
         .map((button) => button.textContent),
     ).toEqual([
-      'Đề tài & Dự án',
+      'Đề tài & đăng ký',
       'Đề xuất & Xét duyệt',
       'Nhóm đề tài',
-      'Đăng ký đề tài',
       'Đề tài được giao',
       'Tiến độ & Mốc báo cáo',
     ])
@@ -302,6 +310,76 @@ describe('Hồi quy frontend', () => {
         expect.objectContaining({ q: 'Khác', page: 0, size: 10 }),
       ),
     )
+  })
+
+  it('không cập nhật URL hoặc tra cứu khi bộ gõ còn đang ghép dấu tiếng Việt', async () => {
+    mocks.topics.mockClear()
+    mount(
+      <>
+        <TopicsPage />
+        <CurrentSearch />
+      </>,
+      '/topics?tab=published',
+    )
+    await screen.findByText('Chưa có đề tài phù hợp.')
+    const input = screen.getByRole('textbox', { name: 'Tìm đề tài' }) as HTMLInputElement
+    input.focus()
+    fireEvent.compositionStart(input)
+    fireEvent.change(input, { target: { value: 'Do' } })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+    })
+    expect(mocks.topics).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('current-search').textContent).toBe('?tab=published')
+    fireEvent.change(input, { target: { value: 'Đồ án tiếng Việt' } })
+    fireEvent.compositionEnd(input, { data: 'Đồ án tiếng Việt' })
+    input.setSelectionRange(3, 3)
+    await waitFor(() =>
+      expect(mocks.topics).toHaveBeenLastCalledWith({
+        status: 'PUBLISHED',
+        q: 'Đồ án tiếng Việt',
+        page: 0,
+        size: 10,
+      }),
+    )
+    expect(input.value).toBe('Đồ án tiếng Việt')
+    expect(document.activeElement).toBe(input)
+    expect(input.selectionStart).toBe(3)
+    expect(input.selectionEnd).toBe(3)
+    expect(
+      new URLSearchParams(screen.getByTestId('current-search').textContent ?? '').get('q'),
+    ).toBe('Đồ án tiếng Việt')
+    expect(
+      new URLSearchParams(screen.getByTestId('current-search').textContent ?? '').get('tab'),
+    ).toBe('published')
+  })
+
+  it('đồng bộ từ khóa khi điều hướng và hủy từ khóa đang chờ tra cứu', async () => {
+    mount(
+      <>
+        <TopicsPage />
+        <SearchNavigation />
+        <CurrentSearch />
+      </>,
+      '/topics?q=Ban đầu',
+    )
+    await screen.findByText('Chưa có đề tài phù hợp.')
+    const input = screen.getByRole('textbox', { name: 'Tìm đề tài' }) as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'Bản nháp chưa tìm' } })
+    await userEvent.click(screen.getByRole('button', { name: 'Tìm từ URL' }))
+    await waitFor(() => expect(input.value).toBe('Đề tài khác'))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 450))
+    })
+    expect(
+      new URLSearchParams(screen.getByTestId('current-search').textContent ?? '').get('q'),
+    ).toBe('Đề tài khác')
+    expect(mocks.topics).toHaveBeenLastCalledWith({
+      status: 'PUBLISHED',
+      q: 'Đề tài khác',
+      page: 0,
+      size: 10,
+    })
   })
 
   it('cho phép thử tải lại sau khi tải đề tài thất bại', async () => {

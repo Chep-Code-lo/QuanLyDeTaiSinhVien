@@ -35,6 +35,17 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     @EntityGraph(attributePaths = {"userRoles", "userRoles.role"})
     Optional<User> findWithRolesById(Long id);
 
+    @EntityGraph(attributePaths = {"userRoles", "userRoles.role"})
+    @Query("""
+            select u from User u
+            where lower(u.email) = :identifier
+               or exists (select s.id from Student s
+                          where s.user = u and lower(s.studentCode) = :identifier)
+               or exists (select l.id from Lecturer l
+                          where l.user = u and lower(l.lecturerCode) = :identifier)
+            """)
+    List<User> findForAdminLookup(@Param("identifier") String identifier);
+
     boolean existsByEmailIgnoreCase(String email);
 
     boolean existsByEmailIgnoreCaseAndIdNot(String email, Long id);

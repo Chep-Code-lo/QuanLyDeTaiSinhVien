@@ -1,5 +1,4 @@
 import { formatDate } from '../utils/dateTime'
-import { AnimatedSelect } from '../components/AnimatedSelect'
 import { Fragment, useEffect, useState } from 'react'
 import { topicApi } from '../api/topics'
 import { useSearchParams } from 'react-router-dom'
@@ -9,9 +8,9 @@ import { StatusBadge } from '../components/StatusBadge'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { useRequestLoading } from '../hooks/useRequestLoading'
-import type { TopicResponse, TopicStatus } from '../types/domain'
+import type { TopicResponse } from '../types/domain'
 
-export function TopicsPage() {
+export function TopicsPage({ embedded = false }: { embedded?: boolean }) {
   const { hasAppointment, hasRole } = useAuth()
   const { showError } = useToast()
   const student = hasRole('STUDENT')
@@ -20,21 +19,41 @@ export function TopicsPage() {
   const [topics, setTopics] = useState<TopicResponse[]>([])
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
-  const [status, setStatus] = useState<TopicStatus>(student ? 'PUBLISHED' : '')
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get('q') ?? ''
+  const [searchInput, setSearchInput] = useState(query)
+  const [composing, setComposing] = useState(false)
+  const [previousQuery, setPreviousQuery] = useState(query)
+  if (previousQuery !== query) {
+    setPreviousQuery(query)
+    setSearchInput(query)
+    setPage(0)
+  }
+  useEffect(() => {
+    if (composing || searchInput === query) return
+    const timer = window.setTimeout(() => {
+      setPage(0)
+      setSearchParams(
+        (previous) => {
+          const next = new URLSearchParams(previous)
+          if (searchInput) next.set('q', searchInput)
+          else next.delete('q')
+          return next
+        },
+        { replace: true },
+      )
+    }, 200)
+    return () => window.clearTimeout(timer)
+  }, [searchInput, query, composing, setSearchParams])
   const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
   const [expandedId, setExpandedId] = useState<number | null>(null)
-  const [loading, setLoading] = useRequestLoading(
-    JSON.stringify([student, status, query, page, revision]),
-  )
+  const [loading, setLoading] = useRequestLoading(JSON.stringify([query, page, revision]))
   useEffect(() => {
     let active = true
-    const visibleStatus = student ? 'PUBLISHED' : status || undefined
     const timer = window.setTimeout(() => {
       void topicApi
-        .list({ status: visibleStatus, q: query.trim() || undefined, page, size: 10 })
+        .list({ status: 'PUBLISHED', q: query.trim() || undefined, page, size: 10 })
         .then((data) => {
           if (!active) return
           setTopics(data.content)
@@ -56,10 +75,10 @@ export function TopicsPage() {
       active = false
       window.clearTimeout(timer)
     }
-  }, [showError, status, revision, student, page, query, setLoading])
+  }, [showError, revision, page, query, setLoading])
   return (
     <>
-      <PageHeader title={student ? 'Danh sách đề tài đã công bố' : 'Đề tài & Dự án'} />
+      {!embedded && <PageHeader title="Danh sách đề tài đã công bố" />}
       {canCreateTopic && (
         <RegistrationTopicForm
           onCreated={() => {
@@ -74,39 +93,19 @@ export function TopicsPage() {
             <span aria-hidden="true">⌕</span>
             <input
               aria-label="Tìm đề tài"
-              value={query}
-              onChange={(e) => {
-                setPage(0)
-                setSearchParams(
-                  (previous) => {
-                    const next = new URLSearchParams(previous)
-                    if (e.target.value) next.set('q', e.target.value)
-                    else next.delete('q')
-                    return next
-                  },
-                  { replace: true },
-                )
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="none"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              onCompositionStart={() => setComposing(true)}
+              onCompositionEnd={(event) => {
+                setSearchInput(event.currentTarget.value)
+                setComposing(false)
               }}
               placeholder="Tìm mã, tên đề tài, bộ môn, GVHD..."
             />
           </label>
-          {!student && (
-            <AnimatedSelect
-              wrapperClassName="topic-filter"
-              value={status}
-              onChange={(e) => {
-                setPage(0)
-                setStatus(e.target.value)
-              }}
-            >
-              <option value="">Tất cả trạng thái</option>
-              <option value="DRAFT">Nháp</option>
-              <option value="PENDING">Chờ duyệt</option>
-              <option value="APPROVED">Đã duyệt</option>
-              <option value="PUBLISHED">Đã công bố</option>
-              <option value="REJECTED">Từ chối</option>
-            </AnimatedSelect>
-          )}
         </div>
         {loading ? (
           <div className="content-state">

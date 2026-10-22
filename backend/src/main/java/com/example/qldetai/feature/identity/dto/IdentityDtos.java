@@ -99,6 +99,8 @@ public final class IdentityDtos {
 
     public record UpdateUserRolesRequest(@NotEmpty Set<RoleCode> roles) {}
 
+    public record UpdateUserAccessRequest(@NotNull UserStatus status, @NotEmpty Set<RoleCode> roles) {}
+
     public record UserResponse(
             Long id,
             String email,

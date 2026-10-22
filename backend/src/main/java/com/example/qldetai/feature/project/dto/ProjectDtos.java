@@ -5,6 +5,7 @@ import com.example.qldetai.feature.project.domain.AssignmentStatus;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public final class ProjectDtos {
 
@@ -14,6 +15,12 @@ public final class ProjectDtos {
 
     public record UpdateAssignmentStatusRequest(
             @NotNull Integer version, @NotNull AssignmentStatus status) {}
+
+    public record SupervisedStudentResponse(
+            Long studentId, String studentCode, String fullName, String className) {}
+
+    public record SupervisedProjectResponse(
+            ProjectAssignmentResponse project, List<SupervisedStudentResponse> students) {}
 
     public record ProjectAssignmentResponse(
             Long id,

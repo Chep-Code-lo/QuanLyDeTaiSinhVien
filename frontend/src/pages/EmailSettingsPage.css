@@ -183,6 +183,27 @@
 .email-settings__recipients > .form-input {
   margin-bottom: 12px;
 }
+.email-settings__recipient-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+.email-settings__recipient-groups > legend {
+  margin-bottom: 12px;
+}
+.email-settings__recipient-groups > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  cursor: pointer;
+}
+.email-settings__recipient-groups input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+}
 .email-settings__people {
   margin-top: 8px;
 }
@@ -362,6 +383,12 @@
   .email-settings__event-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+.email-recipient-preview {
+  width: min(760px, calc(100vw - 32px));
+}
+.email-recipient-preview td {
+  overflow-wrap: anywhere;
 }
 @media (max-width: 680px) {
   .email-settings__form-header,

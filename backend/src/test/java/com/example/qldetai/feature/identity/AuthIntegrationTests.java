@@ -338,6 +338,12 @@ class AuthIntegrationTests {
         assertThat(userRepository.findActiveAdministrators()).hasSize(1);
         MockHttpSession session = login("admin@test.local", "TestPassword123!");
         mockMvc.perform(
+                        patch("/api/v1/admin/users/{id}/access", admin.getId())
+                                .session(session).with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"status\":\"LOCKED\",\"roles\":[\"ADMIN\"]}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(
                         patch("/api/v1/admin/users/{id}/status", admin.getId())
                                 .session(session)
                                 .with(csrf())
@@ -447,6 +453,106 @@ class AuthIntegrationTests {
                                         """
                                 {"username":"admin@test.local","password":"TestPassword123!"}
                                 """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminSavesStatusAndRolesTogetherAndInvalidRolesLeaveBothUnchanged() throws Exception {
+        Department department = createDepartment(createFaculty("ACCESS"), "ACCESS");
+        Lecturer lecturer = createLecturer("access-lecturer", "GVACCESS", "Access Lecturer", department);
+        User target = lecturer.getUser();
+        MockHttpSession session = login("admin@test.local", "TestPassword123!");
+        mockMvc.perform(patch("/api/v1/admin/users/{id}/access", target.getId())
+                        .session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"LOCKED\",\"roles\":[\"LECTURER\",\"ADMIN\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("LOCKED"));
+        User saved = userRepository.findWithRolesById(target.getId()).orElseThrow();
+        assertThat(saved.getStatus()).isEqualTo(UserStatus.LOCKED);
+        assertThat(saved.getUserRoles()).extracting(role -> role.getRole().getCode())
+                .containsExactlyInAnyOrder(RoleCode.LECTURER, RoleCode.ADMIN);
+
+        // Removing the lecturer role is invalid while its academic profile exists.
+        mockMvc.perform(patch("/api/v1/admin/users/{id}/access", target.getId())
+                        .session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"ACTIVE\",\"roles\":[\"ADMIN\"]}"))
+                .andExpect(status().isBadRequest());
+        User unchanged = userRepository.findWithRolesById(target.getId()).orElseThrow();
+        assertThat(unchanged.getStatus()).isEqualTo(UserStatus.LOCKED);
+        assertThat(unchanged.getUserRoles()).extracting(role -> role.getRole().getCode())
+                .containsExactlyInAnyOrder(RoleCode.LECTURER, RoleCode.ADMIN);
+    }
+
+    @Test
+    void combinedAccessUpdateRequiresAdminAndValidStatusAndRoles() throws Exception {
+        User admin = userRepository.findByEmailIgnoreCase("admin@test.local").orElseThrow();
+        MockHttpSession session = login("admin@test.local", "TestPassword123!");
+        for (String payload : new String[] {"{\"roles\":[\"ADMIN\"]}",
+                "{\"status\":\"ACTIVE\",\"roles\":[]}"}) {
+            mockMvc.perform(patch("/api/v1/admin/users/{id}/access", admin.getId())
+                            .session(session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                            .content(payload))
+                    .andExpect(status().isBadRequest());
+        }
+        MockHttpSession nonAdmin = login(createUserWithRole("access-denied", RoleCode.STUDENT),
+                "TestPassword123!");
+        mockMvc.perform(patch("/api/v1/admin/users/{id}/access", admin.getId())
+                        .session(nonAdmin).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"ACTIVE\",\"roles\":[\"ADMIN\"]}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminLooksUpAllAccountStatusesByExactEmailOrAcademicCode() throws Exception {
+        Department department = createDepartment(createFaculty("LOOKUP"), "LOOKUP");
+        Student student = createStudent("lookup-student", "SVLOOK", "Lookup Student", department);
+        Lecturer lecturer = createLecturer("lookup-lecturer", "GVLOOK", "Lookup Lecturer", department);
+        student.getUser().setStatus(UserStatus.DISABLED);
+        lecturer.getUser().setStatus(UserStatus.LOCKED);
+        userRepository.saveAndFlush(student.getUser());
+        userRepository.saveAndFlush(lecturer.getUser());
+        MockHttpSession session = login("admin@test.local", "TestPassword123!");
+
+        for (String identifier : new String[] {
+            "  LOOKUP-STUDENT@TEST.LOCAL  ", student.getStudentCode().toLowerCase()
+        }) {
+            mockMvc.perform(get("/api/v1/admin/users/lookup").session(session)
+                            .param("identifier", identifier))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.id").value(student.getUser().getId()))
+                    .andExpect(jsonPath("$.data.status").value("DISABLED"));
+        }
+        mockMvc.perform(get("/api/v1/admin/users/lookup").session(session)
+                        .param("identifier", lecturer.getLecturerCode().toLowerCase()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(lecturer.getUser().getId()))
+                .andExpect(jsonPath("$.data.status").value("LOCKED"));
+        mockMvc.perform(get("/api/v1/admin/users/lookup").session(session)
+                        .param("identifier", "admin@test.local"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+        mockMvc.perform(get("/api/v1/admin/users/lookup").session(session)
+                        .param("identifier", "lookup-student"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/admin/users/lookup").session(session)
+                        .param("identifier", " "))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/admin/users/lookup").session(session)
+                        .param("identifier", "x".repeat(256)))
+                .andExpect(status().isBadRequest());
+
+        lecturer.setLecturerCode(student.getStudentCode());
+        lecturerRepository.saveAndFlush(lecturer);
+        mockMvc.perform(get("/api/v1/admin/users/lookup").session(session)
+                        .param("identifier", student.getStudentCode()))
+                .andExpect(status().isConflict());
+        mockMvc.perform(get("/api/v1/admin/users/lookup")
+                        .param("identifier", "admin@test.local"))
+                .andExpect(status().isUnauthorized());
+        MockHttpSession nonAdmin = login(createUserWithRole("lookup-denied", RoleCode.STUDENT),
+                "TestPassword123!");
+        mockMvc.perform(get("/api/v1/admin/users/lookup").session(nonAdmin)
+                        .param("identifier", "admin@test.local"))
                 .andExpect(status().isForbidden());
     }
 
