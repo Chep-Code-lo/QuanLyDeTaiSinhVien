@@ -55,8 +55,9 @@ public class AuthController {
     @PostMapping("/change-password")
     public ApiResponse<Void> changePassword(
             @AuthenticationPrincipal UserPrincipal principal,
-            @Valid @RequestBody ChangePasswordRequest request) {
-        authService.changePassword(principal.id(), request);
+            @Valid @RequestBody ChangePasswordRequest request,
+            HttpServletRequest httpRequest, HttpServletResponse response) {
+        authService.changePassword(principal.id(), request, httpRequest, response);
         return ApiResponse.success("Password changed successfully.", null);
     }
 

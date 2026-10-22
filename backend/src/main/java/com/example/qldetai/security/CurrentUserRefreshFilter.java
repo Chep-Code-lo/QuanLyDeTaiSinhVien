@@ -7,6 +7,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Objects;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -55,6 +56,16 @@ public class CurrentUserRefreshFilter extends OncePerRequestFilter {
             response.setStatus(401);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             objectMapper.writeValue(response.getOutputStream(), ApiResponse.failure("The account is not active."));
+            return;
+        }
+
+        if (!Objects.equals(refreshed.password(), principal.password())) {
+            SecurityContextHolder.clearContext();
+            if (request.getSession(false) != null) request.getSession(false).invalidate();
+            response.setStatus(401);
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            objectMapper.writeValue(response.getOutputStream(),
+                    ApiResponse.failure("Mật khẩu đã được thay đổi. Vui lòng đăng nhập lại."));
             return;
         }
 

@@ -24,6 +24,8 @@ import org.springframework.security.web.authentication.session.SessionAuthentica
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -71,7 +73,8 @@ public class AuthService {
     }
 
     @Transactional
-    public void changePassword(Long userId, ChangePasswordRequest request) {
+    public void changePassword(Long userId, ChangePasswordRequest request,
+            HttpServletRequest httpRequest, HttpServletResponse response) {
         User user = requireUser(userId);
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
             throw new BusinessRuleException("The current password is incorrect.");
@@ -81,6 +84,19 @@ public class AuthService {
                     "The new password must differ from the current password.");
         }
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        UserPrincipal updated = UserPrincipal.from(user);
+        // Publish the new credential snapshot only after the password update commits.
+        // Other sessions still hold the old hash and are rejected by CurrentUserRefreshFilter.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                SecurityContext context = SecurityContextHolder.createEmptyContext();
+                context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
+                        updated, null, updated.getAuthorities()));
+                SecurityContextHolder.setContext(context);
+                securityContextRepository.saveContext(context, httpRequest, response);
+            }
+        });
     }
 
     private User requireUser(Long userId) {
