@@ -8,6 +8,9 @@ import { PageHeader } from '../components/PageHeader'
 import { DownloadButton, RemoteState } from '../components/RemoteState'
 import { SelectionPanel } from '../components/SelectionPanel'
 import { StatusBadge } from '../components/StatusBadge'
+import { MilestoneCalendar } from '../components/MilestoneCalendar'
+import { parseUtcDateTime } from '../utils/dateTime'
+import { milestoneDayKey } from '../utils/milestoneSchedule'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import type { MilestoneResponse, ProjectAssignmentResponse, StudentGroupResponse } from '../types/domain'
@@ -32,6 +35,8 @@ export function StudentProgressPage() {
   const [file, setFile] = useState<File>()
   const [note, setNote] = useState('')
   const [currentTime, setCurrentTime] = useState(() => Date.now())
+  const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -120,7 +125,7 @@ export function StudentProgressPage() {
               id="student-project"
               value={selected}
               disabled={!projects.length}
-              onChange={(event) => setSelected(event.target.value)}
+              onChange={(event) => { setSelected(event.target.value); setSelectedDay(null) }}
             >
               <option value="">
                 {projects.length ? 'Tất cả dự án của tôi' : 'Chưa có dự án được phân công'}
@@ -155,6 +160,7 @@ export function StudentProgressPage() {
             </section>
           )}
 
+          {projects.length > 0 && <div className="milestone-board student-progress-layout">
           <div className="student-timeline">
             {visible.map((milestone, index) => {
               const project = projects.find((item) => item.id === milestone.assignmentId)
@@ -163,7 +169,7 @@ export function StudentProgressPage() {
                 milestone.status !== 'ACCEPTED'
 
               return (
-                <section className="page-card student-timeline__item" key={milestone.id}>
+                <section id={`student-milestone-${milestone.id}`} className={`page-card student-timeline__item${selectedDay === milestoneDayKey(parseUtcDateTime(milestone.dueAt)) ? ' student-timeline__item--selected' : ''}`} key={milestone.id}>
                   <span className="student-timeline__marker" aria-hidden="true">
                     {index + 1}
                   </span>
@@ -239,6 +245,14 @@ export function StudentProgressPage() {
               )
             })}
           </div>
+          <aside className="milestone-board__sidebar" aria-label="Lịch báo cáo của sinh viên">
+            <MilestoneCalendar milestones={visible} month={month} selectedDay={selectedDay} now={new Date(currentTime)}
+              onMonthChange={setMonth} onSelectDay={(day, due) => {
+                setSelectedDay(day)
+                if (due[0]) document.getElementById(`student-milestone-${due[0].id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+              }} />
+          </aside>
+          </div>}
         </>
       )}
 

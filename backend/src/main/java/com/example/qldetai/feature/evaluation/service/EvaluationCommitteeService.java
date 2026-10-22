@@ -35,6 +35,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class EvaluationCommitteeService {
 
+    private final EvaluationReadScope readScope;
     private final EvaluationCommitteeRepository committees;
     private final CommitteeMemberRepository committeeMembers;
     private final RegistrationPeriodRepository periods;
@@ -43,10 +44,13 @@ public class EvaluationCommitteeService {
 
 
     @Transactional(readOnly = true)
-    public PageResponse<EvaluationCommitteeResponse> listCommittees(
-            Long periodId, int page, int size) {
-        Specification<EvaluationCommittee> specification =
-                (root, query, builder) -> builder.conjunction();
+    public PageResponse<EvaluationCommitteeResponse> listCommittees(Long periodId, int page, int size) {
+        return listCommittees(periodId, page, size, null);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<EvaluationCommitteeResponse> listCommittees(Long periodId, int page, int size, Long actorId) {
+        Specification<EvaluationCommittee> specification = readScope.committees(actorId);
         if (periodId != null) {
             specification =
                     specification.and(

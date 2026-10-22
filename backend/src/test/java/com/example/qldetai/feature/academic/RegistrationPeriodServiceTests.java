@@ -11,6 +11,7 @@ import com.example.qldetai.feature.academic.domain.Semester;
 import com.example.qldetai.feature.academic.dto.AcademicDtos.ChangePeriodStatusRequest;
 import com.example.qldetai.feature.academic.dto.AcademicDtos.CreateRegistrationPeriodRequest;
 import com.example.qldetai.feature.academic.dto.AcademicDtos.RegistrationPeriodResponse;
+import com.example.qldetai.feature.academic.dto.AcademicDtos.UpdateRegistrationPeriodRequest;
 import com.example.qldetai.feature.academic.repository.FacultyRepository;
 import com.example.qldetai.feature.academic.repository.SemesterRepository;
 import com.example.qldetai.feature.academic.service.RegistrationPeriodService;
@@ -32,6 +33,8 @@ import java.time.LocalDateTime;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestConstructor;
@@ -144,6 +147,50 @@ class RegistrationPeriodServiceTests {
         assertThatThrownBy(() -> registrationPeriodService.create(request, admin.getId()))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Required order");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "2027-04-30T16:59:00,true",
+        "2027-04-30T17:00:00,true",
+        "2027-05-01T16:59:00,true",
+        "2027-05-01T17:00:00,false",
+        "2027-05-05T01:00:00,false"
+    })
+    void reviewDeadlineCannotFallAfterVietnameseDefenseDay(LocalDateTime deadline, boolean valid) {
+        var request = graduationPeriod(deadline);
+        if (valid) {
+            var created = registrationPeriodService.create(request, admin.getId());
+            assertThat(created.reviewDeadlineAt()).isEqualTo(deadline);
+            assertThat(created.defenseDate()).isEqualTo(LocalDate.of(2027, 5, 1));
+            assertThat(registrationPeriodService.get(created.id()).defenseDate()).isEqualTo(created.defenseDate());
+        } else {
+            assertThatThrownBy(() -> registrationPeriodService.create(request, admin.getId()))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessage("Hạn phản biện không được sau ngày bảo vệ KLTN theo giờ Việt Nam.");
+        }
+    }
+
+    @Test
+    void updatingPeriodWithReviewAfterDefenseIsRejectedWithoutChangingItsDates() {
+        var request = graduationPeriod(LocalDateTime.of(2027, 4, 30, 10, 0));
+        var created = registrationPeriodService.create(request, admin.getId());
+        var update = new UpdateRegistrationPeriodRequest(created.version(), semester.getId(), created.name(),
+                ProjectType.GRADUATION, request.proposalStartAt(), request.proposalEndAt(),
+                request.registrationStartAt(), request.registrationEndAt(),
+                LocalDateTime.of(2027, 5, 5, 1, 0), request.defenseDate());
+        assertThatThrownBy(() -> registrationPeriodService.update(created.id(), update))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Hạn phản biện");
+        assertThat(registrationPeriodService.get(created.id()).reviewDeadlineAt()).isEqualTo(request.reviewDeadlineAt());
+        assertThat(registrationPeriodService.get(created.id()).defenseDate()).isEqualTo(request.defenseDate());
+    }
+
+    private CreateRegistrationPeriodRequest graduationPeriod(LocalDateTime deadline) {
+        return new CreateRegistrationPeriodRequest(faculty.getId(), semester.getId(), "Graduation dates",
+                ProjectType.GRADUATION, LocalDateTime.of(2027, 2, 1, 0, 0), LocalDateTime.of(2027, 2, 10, 0, 0),
+                LocalDateTime.of(2027, 2, 10, 0, 0), LocalDateTime.of(2027, 2, 20, 0, 0),
+                deadline, LocalDate.of(2027, 5, 1));
     }
 
     @Test

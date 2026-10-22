@@ -95,13 +95,21 @@ describe('Hồi quy frontend', () => {
     expect(screen.getByRole('button', { name: 'Quản lý tài khoản' }).hasAttribute('href')).toBe(false)
   })
 
-  it('tìm từ URL trên tất cả các trang đề tài, kể cả dữ liệu trang sau', async () => {
+  it('gửi từ khóa URL đến backend và chỉ tải trang đang xem', async () => {
     const topic = (id: number, title: string) => ({ id, title, code: `DT${id}`, departmentName: 'CNTT', supervisors: [], status: 'PUBLISHED', createdAt: '2026-01-01T00:00:00Z' })
-    mocks.topics.mockImplementation(({ page: index }) => Promise.resolve(page(index === 0 ? [topic(1, 'Không khớp')] : [topic(2, 'Mục tiêu tìm kiếm')], 2)))
+    mocks.topics.mockClear()
+    mocks.topics.mockImplementation(({ q, page: index, size }) => Promise.resolve(page(
+      q === 'Mục tiêu' && size === 10 ? [topic(index + 1, index === 0 ? 'Mục tiêu tìm kiếm' : 'Mục tiêu trang sau')] : [], 2)))
     mount(<TopicsPage />, '/topics?q=Mục tiêu')
     expect(await screen.findByText('Mục tiêu tìm kiếm')).toBeTruthy()
     expect(screen.queryByText('Không khớp')).toBeNull()
-    expect(mocks.topics).toHaveBeenCalledWith(expect.objectContaining({ page: 1 }))
+    expect(mocks.topics).toHaveBeenCalledTimes(1)
+    expect(mocks.topics).toHaveBeenCalledWith(expect.objectContaining({ q: 'Mục tiêu', page: 0, size: 10 }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sau' }))
+    expect(await screen.findByText('Mục tiêu trang sau')).toBeTruthy()
+    expect(mocks.topics).toHaveBeenCalledWith(expect.objectContaining({ q: 'Mục tiêu', page: 1, size: 10 }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tìm đề tài' }), { target: { value: 'Khác' } })
+    await waitFor(() => expect(mocks.topics).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'Khác', page: 0, size: 10 })))
   })
 
   it('cho phép thử tải lại sau khi tải đề tài thất bại', async () => {

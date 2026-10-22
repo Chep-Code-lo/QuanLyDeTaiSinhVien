@@ -38,9 +38,10 @@ public class GroupInvitationController {
     @GetMapping("/mine")
     public ApiResponse<PageResponse<GroupInvitationResponse>> mine(
             @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(required = false) com.example.qldetai.feature.groupregistration.domain.GroupInvitationStatus status,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(groupInvitationService.mine(principal.id(), page, size));
+        return ApiResponse.success(groupInvitationService.mine(principal.id(), status, page, size));
     }
 
     @GetMapping("/groups/{groupId}")

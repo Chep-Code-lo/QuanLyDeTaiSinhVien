@@ -73,6 +73,7 @@ public class EvaluationService {
     private static final String STATUS_DRAFT = "DRAFT";
     private static final String STATUS_LOCKED = "LOCKED";
 
+    private final EvaluationReadScope readScope;
     private final AssessmentComponentRepository components;
     private final RubricRepository rubrics;
     private final RubricCriterionRepository criteria;
@@ -202,14 +203,13 @@ public class EvaluationService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<EvaluationAssignmentResponse> listAssignments(
-            Long periodId,
-            Long assignmentId,
-            Long lecturerId,
-            EvaluationStatus status,
-            int page,
-            int size) {
-        Specification<EvaluationAssignment> specification = (root, query, builder) -> builder.conjunction();
+    public PageResponse<EvaluationAssignmentResponse> listAssignments(Long periodId, Long assignmentId, Long lecturerId, EvaluationStatus status, int page, int size) {
+        return listAssignments(periodId, assignmentId, lecturerId, status, page, size, null);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<EvaluationAssignmentResponse> listAssignments(Long periodId, Long assignmentId, Long lecturerId, EvaluationStatus status, int page, int size, Long actorId) {
+        Specification<EvaluationAssignment> specification = readScope.assignments(actorId);
         if (periodId != null) {
             specification = specification.and(
                     (root, query, builder) -> builder.equal(root.join("period").get("id"), periodId));

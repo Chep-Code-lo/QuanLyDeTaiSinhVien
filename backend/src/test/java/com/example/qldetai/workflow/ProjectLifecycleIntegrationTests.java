@@ -102,6 +102,8 @@ import com.example.qldetai.security.UserPrincipal;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -150,6 +152,80 @@ class ProjectLifecycleIntegrationTests {
     @Autowired private EmailOutboxRepository emailOutbox;
     @Autowired private EmailNotificationEventService emailEvents;
     @Autowired private EmailEventContextFactory emailContexts;
+    @Autowired private com.example.qldetai.feature.communication.service.NotificationService notifications;
+
+    @ParameterizedTest
+    @CsvSource({
+        "GRADUATION,2027-05-01T01:00:00,2027-05-01T02:30:00,201",
+        "GRADUATION,2027-04-30T17:00:00,2027-04-30T18:00:00,201",
+        "GRADUATION,2027-04-30T23:30:00,2027-05-01T00:30:00,201",
+        "GRADUATION,2027-04-30T01:00:00,2027-04-30T02:00:00,400",
+        "GRADUATION,2027-05-02T01:00:00,2027-05-02T02:00:00,400",
+        "GRADUATION,2027-05-01T16:30:00,2027-05-01T17:30:00,400",
+        "GRADUATION,2027-05-01T16:30:00,2027-05-01T17:00:00,400",
+        "GRADUATION,2027-04-30T16:30:00,2027-04-30T17:30:00,400",
+        "COURSE,2027-05-02T01:00:00,2027-05-02T02:00:00,201",
+        "SPECIALIZED,2027-05-02T01:00:00,2027-05-02T02:00:00,201",
+        "RESEARCH,2027-05-02T01:00:00,2027-05-02T02:00:00,201"
+    })
+    void defenseDateIsEnforcedOnlyForGraduationUsingVietnamCalendarDates(
+            ProjectType type, LocalDateTime start, LocalDateTime end, int expectedStatus,
+            @Autowired MockMvc mvc) throws Exception {
+        var project = createAssignedProject("defense-date", leaderStudent, secondStudent);
+        Long committeeId = evaluationCommitteeService.createCommittee(
+                new CreateCommitteeRequest(period.getId(), "Date validation"), admin.getId());
+        evaluationCommitteeService.addMember(committeeId,
+                new AddCommitteeMemberRequest(lecturerThree.getId(), 1, CommitteeRole.CHAIR), admin.getId());
+        evaluationCommitteeService.addMember(committeeId,
+                new AddCommitteeMemberRequest(lecturerFour.getId(), 2, CommitteeRole.SECRETARY), admin.getId());
+        evaluationCommitteeService.addMember(committeeId,
+                new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER), admin.getId());
+        period.setProjectType(type);
+        period.setDefenseDate(LocalDate.of(2027, 5, 1));
+        var result = mvc.perform(post("/api/v1/defense-sessions")
+                .with(user(UserPrincipal.from(admin))).with(csrf())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("""
+                        {"assignmentId":%d,"committeeId":%d,"location":"A101","startsAt":"%sZ","endsAt":"%sZ"}
+                        """.formatted(project.id(), committeeId, start, end)))
+                .andExpect(status().is(expectedStatus));
+        if (expectedStatus == 400) {
+            result.andExpect(jsonPath("$.message").value(
+                    "Phiên bảo vệ phải diễn ra vào ngày 01/05/2027 theo cấu hình đợt KLTN."));
+            assertThat(defenseSessionService.listDefensesForStudent(leaderStudent.getUser().getId())).isEmpty();
+            assertThat(notifications.list(leaderStudent.getUser().getId(), 0, 100).content())
+                    .noneMatch(item -> item.title().equals("Lịch bảo vệ đề tài"));
+        } else {
+            assertThat(defenseSessionService.listDefensesForStudent(leaderStudent.getUser().getId()))
+                    .singleElement().satisfies(item -> {
+                        assertThat(item.startsAt()).isEqualTo(start);
+                        assertThat(item.endsAt()).isEqualTo(end);
+                    });
+        }
+    }
+
+    @Test
+    void rejectionNotifiesEveryCurrentMemberWithTheEnteredReason() {
+        var topic = createPublishedTopic("rejected-reason");
+        var group = createActiveGroup("Rejected group", leaderStudent, secondStudent);
+        var registration = registrationService.create(
+                new CreateTopicRegistrationRequest(group.id(), topic.id(), null),
+                leaderStudent.getUser().getId());
+        String reason = "Đề tài chưa phù hợp với định hướng của nhóm.";
+        var rejected = registrationService.review(registration.id(),
+                new ReviewTopicRegistrationRequest(registration.version(), RegistrationStatus.REJECTED, "  " + reason + "  "),
+                admin.getId());
+        assertThat(rejected.decisionReason()).isEqualTo(reason);
+        for (var student : List.of(leaderStudent, secondStudent)) {
+            var received = notifications.list(student.getUser().getId(), 0, 100).content();
+            assertThat(received).filteredOn(item -> item.title().equals("Kết quả đăng ký đề tài"))
+                    .singleElement().satisfies(item -> {
+                        assertThat(item.content()).contains("đã bị từ chối", "Lý do: " + reason);
+                        assertThat(item.readAt()).isNull();
+                    });
+        }
+        assertThat(notifications.list(thirdStudent.getUser().getId(), 0, 100).content()).isEmpty();
+    }
 
     @Test
     void publishedResultQueuesPersonalizedScoreEmailsExactlyOnce() {
@@ -626,6 +702,20 @@ class ProjectLifecycleIntegrationTests {
                                 startsAt.plusHours(1)),
                         admin.getId());
 
+        for (var student : List.of(leaderStudent, secondStudent)) {
+            assertThat(notifications.list(student.getUser().getId(), 0, 100).content())
+                    .filteredOn(item -> item.title().equals("Lịch bảo vệ đề tài"))
+                    .singleElement().satisfies(item -> {
+                        assertThat(item.content()).contains(assignment.topicCode(), assignment.topicTitle(), "Phòng A101");
+                        var localStart = startsAt.atOffset(java.time.ZoneOffset.UTC)
+                                .atZoneSameInstant(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+                        assertThat(item.content()).contains(localStart.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+                        assertThat(item.targetPath()).isEqualTo("/results");
+                        assertThat(item.readAt()).isNull();
+                    });
+        }
+        assertThat(notifications.list(thirdStudent.getUser().getId(), 0, 100).content()).isEmpty();
+
         Long evaluationId =
                 evaluationService.assign(
                         new CreateEvaluationRequest(
@@ -719,6 +809,10 @@ class ProjectLifecycleIntegrationTests {
                                         admin.getId()))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Complete every reviewer assignment");
+        for (var student : List.of(leaderStudent, secondStudent)) {
+            assertThat(notifications.list(student.getUser().getId(), 0, 100).content())
+                    .noneMatch(item -> item.title().equals("Lịch bảo vệ đề tài"));
+        }
     }
 
     @Test

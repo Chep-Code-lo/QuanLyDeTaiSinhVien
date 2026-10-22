@@ -208,6 +208,8 @@
 }
 
 .ea-saved-committee { margin-bottom: 18px; max-width: 520px; }
+.ea-task-switch { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.ea-task-switch [aria-pressed="true"] { border-color: #173f79; background: #edf4ff; }
 .ea-members-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 10px; }
 .ea-members-heading h2 { margin: 0; }
 .ea-add-member { color: #1c3e77; background: #f1f6ff; border: 1px solid #b9cdec; white-space: nowrap; }

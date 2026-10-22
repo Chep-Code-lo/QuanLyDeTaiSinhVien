@@ -31,11 +31,11 @@ export const groupApi = {
         expiresAt: new Date(payload.expiresAt).toISOString(),
       })
     ).data.data,
-  myInvitations: async (page = 0, size = 100) =>
+  myInvitations: async (page = 0, size = 100, status?: string) =>
     (
       await apiClient.get<ApiResponse<PageResponse<GroupInvitationResponse>>>(
         '/group-invitations/mine',
-        { params: { page, size } },
+        { params: { page, size, status } },
       )
     ).data.data,
   invitationsForGroup: async (groupId: number) =>

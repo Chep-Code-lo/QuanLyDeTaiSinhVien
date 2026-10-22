@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   scheduleDefense: vi.fn(),
   saveCommittee: vi.fn(),
   assign: vi.fn(),
+  assignBatch: vi.fn(),
+  eligibility: vi.fn(),
   lecturers: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
@@ -35,6 +37,8 @@ vi.mock('../src/api/evaluation', () => ({
     scheduleDefense: mocks.scheduleDefense,
     saveCommittee: mocks.saveCommittee,
     assign: mocks.assign,
+    assignBatch: mocks.assignBatch,
+    defenseEligibility: mocks.eligibility,
   },
 }))
 vi.mock('../src/api/lecturers', () => ({ lecturerApi: { list: mocks.lecturers } }))
@@ -74,6 +78,8 @@ beforeEach(() => {
   mocks.saveCommittee.mockReset()
   mocks.assign.mockReset()
   mocks.assign.mockResolvedValue(81)
+  mocks.assignBatch.mockReset(); mocks.assignBatch.mockResolvedValue({ assignedCount: 3, skippedCount: 0 })
+  mocks.eligibility.mockReset(); mocks.eligibility.mockResolvedValue({ eligible: true, reason: null })
   mocks.periods.mockResolvedValue(page([period]))
   mocks.projects.mockResolvedValue(page([project]))
   mocks.components.mockResolvedValue([{ id: 5, periodId: 1, code: 'HD', name: 'Hội đồng', componentType: 'COMMITTEE', status: 'LOCKED' }])
@@ -108,6 +114,26 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
+async function openSchedule() {
+  await screen.findByLabelText('Hội đồng đã tạo')
+  await waitFor(() => expect(screen.queryByText('Đang tải dữ liệu phân công...')).toBeNull())
+  await userEvent.click(screen.getByRole('tab', { name: 'Lịch bảo vệ' }))
+  fireEvent.change(await screen.findByLabelText('Hội đồng đã lưu *'), { target: { value: String(committee.id) } })
+}
+
+async function fillSchedule() {
+  fireEvent.change(screen.getByLabelText(/Đề tài \/ nhóm/), { target: { value: String(project.id) } })
+  fireEvent.change(screen.getByLabelText(/Địa điểm/), { target: { value: 'Phòng A101' } })
+  fireEvent.change(screen.getByLabelText(/Bắt đầu/), { target: { value: '20/02/2099 09:00' } })
+  fireEvent.change(screen.getByLabelText(/Kết thúc/), { target: { value: '20/02/2099 10:00' } })
+  await waitFor(() => expect((screen.getByRole('button', { name: 'Xếp lịch bảo vệ' }) as HTMLButtonElement).disabled).toBe(false))
+}
+
+async function confirmSchedule() {
+  await userEvent.click(screen.getByRole('button', { name: 'Xếp lịch bảo vệ' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Xác nhận xếp lịch' }))
+}
+
 describe('Xếp lịch bảo vệ', () => {
   it('báo rõ phản biện chưa khóa trước khi người dùng bấm xếp lịch', async () => {
     mocks.components.mockResolvedValue([
@@ -115,51 +141,37 @@ describe('Xếp lịch bảo vệ', () => {
       { id: 6, periodId: 1, code: 'PB', name: 'Phản biện', componentType: 'REVIEW', status: 'DRAFT' },
     ])
     render(<EvaluatorAssignmentPage />)
-    const committeePicker = await screen.findByLabelText('Hội đồng đã tạo')
-    await waitFor(() => expect(screen.queryByText('Đang tải dữ liệu phân công...')).toBeNull())
-    fireEvent.change(committeePicker, { target: { value: String(committee.id) } })
-    expect(await screen.findByText(/Chưa thể xếp lịch: phần Phản biện độc lập còn bản nháp:/)).toBeTruthy()
+    await openSchedule()
+    expect(screen.getByText(/Chưa thể xếp lịch: phần Phản biện độc lập còn bản nháp:/)).toBeTruthy()
     expect(screen.getByText(/“Phản biện” \(PB\)/)).toBeTruthy()
     expect(screen.getByText(/Bộ tiêu chí hội đồng đã khóa là cấu hình riêng/)).toBeTruthy()
     expect((screen.getByRole('button', { name: 'Xếp lịch bảo vệ' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(mocks.scheduleDefense).not.toHaveBeenCalled()
   })
 
-  it('xếp lịch cho hội đồng đã lưu mà không cần ô chọn phiên bảo vệ', async () => {
+  it('xếp lịch bằng hội đồng đã lưu rồi phân công chấm riêng, không cần chọn phiên bảo vệ', async () => {
     render(<EvaluatorAssignmentPage />)
-
-    const committeePicker = await screen.findByLabelText('Hội đồng đã tạo')
-    await waitFor(() => expect(screen.queryByText('Đang tải dữ liệu phân công...')).toBeNull())
-    fireEvent.change(committeePicker, { target: { value: String(committee.id) } })
-
-    const projectPicker = await screen.findByLabelText(/Đề tài \/ nhóm/)
-    fireEvent.change(projectPicker, { target: { value: String(project.id) } })
-    fireEvent.change(screen.getByLabelText(/Địa điểm/), { target: { value: 'Phòng A101' } })
-    fireEvent.change(screen.getByLabelText(/Bắt đầu/), { target: { value: '20/02/2099 09:00' } })
-    fireEvent.change(screen.getByLabelText(/Kết thúc/), { target: { value: '20/02/2099 10:00' } })
-
-    await userEvent.click(screen.getByRole('button', { name: 'Xếp lịch bảo vệ' }))
-
-    await waitFor(() => {
-      expect(mocks.scheduleDefense).toHaveBeenCalledWith({
-        assignmentId: project.id,
-        committeeId: committee.id,
-        location: 'Phòng A101',
-        startsAt: new Date('2099-02-20T09:00').toISOString(),
-        endsAt: new Date('2099-02-20T10:00').toISOString(),
-      })
-    })
-    expect(mocks.showSuccess).toHaveBeenCalledWith(expect.stringContaining(project.topicCode))
+    await openSchedule()
+    await fillSchedule()
+    await confirmSchedule()
+    await screen.findByText('Đã xếp lịch bảo vệ.')
+    expect(mocks.scheduleDefense).toHaveBeenCalledWith({ assignmentId: project.id, committeeId: committee.id,
+      location: 'Phòng A101', startsAt: '2099-02-20T02:00:00.000Z', endsAt: '2099-02-20T03:00:00.000Z' })
     expect(screen.queryByLabelText('Phiên bảo vệ')).toBeNull()
-    expect(screen.getByText('Phiên đã xếp cho hội đồng này')).toBeTruthy()
+    expect(screen.getByText('Phòng A101')).toBeTruthy()
+    await userEvent.click(screen.getByRole('tab', { name: 'Hội đồng bảo vệ' }))
+    fireEvent.change(screen.getByLabelText('Hội đồng đã tạo'), { target: { value: String(committee.id) } })
+    await userEvent.click(screen.getByRole('button', { name: 'Phân công chấm cho hội đồng đã lưu' }))
     await userEvent.click(screen.getByRole('button', { name: /Đề tài tham gia bảo vệ/ }))
-    expect(screen.getByRole('checkbox')).toBeTruthy()
     await userEvent.click(screen.getByRole('checkbox'))
     fireEvent.change(screen.getByLabelText(/Hạn chót chấm điểm/), { target: { value: '21/02/2099 10:00' } })
-    mocks.saveCommittee.mockResolvedValue({ ...committee, status: 'CONFIRMED', version: 1 })
     await userEvent.click(screen.getByRole('button', { name: 'Lưu phân công' }))
-    await waitFor(() => expect(mocks.assign).toHaveBeenCalledTimes(3))
-    expect(mocks.saveCommittee).toHaveBeenCalledWith(committee.id, expect.objectContaining({ version: 1 }))
-    expect(mocks.assign).toHaveBeenCalledWith(expect.objectContaining({ assignmentId: project.id, defenseId: 71 }))
+    await waitFor(() => expect(mocks.assignBatch).toHaveBeenCalledOnce())
+    expect(mocks.assignBatch.mock.calls[0][0]).toHaveLength(3)
+    expect(mocks.assignBatch.mock.calls[0][0]).toEqual(expect.arrayContaining([
+      expect.objectContaining({ assignmentId: project.id, defenseId: 71 }),
+    ]))
+    expect(mocks.saveCommittee).not.toHaveBeenCalled()
   })
 
   it('giải thích xung đột giảng viên hướng dẫn tại chỗ, giữ dữ liệu để sửa và thử lại', async () => {
@@ -167,45 +179,40 @@ describe('Xếp lịch bảo vệ', () => {
       message: 'A topic supervisor cannot be on its defense committee.',
     } } })
     render(<EvaluatorAssignmentPage />)
-    const committeePicker = await screen.findByLabelText('Hội đồng đã tạo')
-    await waitFor(() => expect(screen.queryByText('Đang tải dữ liệu phân công...')).toBeNull())
-    fireEvent.change(committeePicker, { target: { value: String(committee.id) } })
-    fireEvent.change(await screen.findByLabelText(/Đề tài \/ nhóm/), { target: { value: String(project.id) } })
-    fireEvent.change(screen.getByLabelText(/Địa điểm/), { target: { value: 'Phòng A101' } })
-    fireEvent.change(screen.getByLabelText(/Bắt đầu/), { target: { value: '20/02/2099 09:00' } })
-    fireEvent.change(screen.getByLabelText(/Kết thúc/), { target: { value: '20/02/2099 10:00' } })
-    await userEvent.click(screen.getByRole('button', { name: 'Xếp lịch bảo vệ' }))
+    await openSchedule()
+    await fillSchedule()
+    await confirmSchedule()
     expect((await screen.findByRole('alert')).textContent).toContain('giảng viên hướng dẫn')
     expect(mocks.showError).not.toHaveBeenCalled()
     expect((screen.getByLabelText(/Địa điểm/) as HTMLInputElement).value).toBe('Phòng A101')
-    await userEvent.click(screen.getByRole('button', { name: 'Xếp lịch bảo vệ' }))
-    await waitFor(() => expect(mocks.showSuccess).toHaveBeenCalled())
+    await confirmSchedule()
+    await screen.findByText('Đã xếp lịch bảo vệ.')
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  it('lưu thay đổi hội đồng trước khi xếp lịch và không xếp lịch nếu lưu thất bại', async () => {
+  it('lỗi lưu cấu hình không xếp lịch; sửa và lưu hội đồng thành công trước khi chuyển qua lịch', async () => {
     mocks.saveCommittee.mockRejectedValueOnce({ response: { status: 400, data: { message: 'Hội đồng cần đúng một Chủ tịch và một Thư ký.' } } })
     render(<EvaluatorAssignmentPage />)
-    const committeePicker = await screen.findByLabelText('Hội đồng đã tạo')
+    const picker = await screen.findByLabelText('Hội đồng đã tạo')
     await waitFor(() => expect(screen.queryByText('Đang tải dữ liệu phân công...')).toBeNull())
-    fireEvent.change(committeePicker, { target: { value: String(committee.id) } })
-    fireEvent.change(await screen.findByLabelText(/Đề tài \/ nhóm/), { target: { value: String(project.id) } })
-    fireEvent.change(screen.getByLabelText(/Địa điểm/), { target: { value: 'Phòng A101' } })
-    fireEvent.change(screen.getByLabelText(/Bắt đầu/), { target: { value: '20/02/2099 09:00' } })
-    fireEvent.change(screen.getByLabelText(/Kết thúc/), { target: { value: '20/02/2099 10:00' } })
+    fireEvent.change(picker, { target: { value: String(committee.id) } })
     fireEvent.change(screen.getByLabelText('Vai trò thành viên 1'), { target: { value: 'Ủy viên' } })
-    const callsBefore = mocks.scheduleDefense.mock.calls.length
-    await userEvent.click(screen.getByRole('button', { name: 'Xếp lịch bảo vệ' }))
-    expect((await screen.findByRole('alert')).textContent).toContain('Chủ tịch')
-    expect(mocks.scheduleDefense.mock.calls.length).toBe(callsBefore)
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu hội đồng' }))
+    await waitFor(() => expect(mocks.showError).toHaveBeenCalledWith(expect.stringContaining('Chủ tịch')))
+    expect(mocks.scheduleDefense).not.toHaveBeenCalled()
     expect(mocks.saveCommittee).toHaveBeenCalledWith(committee.id, expect.objectContaining({
       members: expect.arrayContaining([{ lecturerId: 3, roleName: 'Ủy viên' }]), version: 0,
     }))
     mocks.saveCommittee.mockResolvedValueOnce({ ...committee, name: 'Hội đồng mới', version: 1 })
     fireEvent.change(screen.getByLabelText('Vai trò thành viên 1'), { target: { value: 'Chủ tịch' } })
     fireEvent.change(screen.getByLabelText(/^Hội đồng \*/), { target: { value: 'Hội đồng mới' } })
-    await userEvent.click(screen.getByRole('button', { name: 'Xếp lịch bảo vệ' }))
-    await waitFor(() => expect(mocks.showSuccess).toHaveBeenCalled())
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu hội đồng' }))
+    await waitFor(() => expect(mocks.showSuccess).toHaveBeenCalledWith(expect.stringContaining('Hội đồng mới')))
+    await openSchedule()
+    await fillSchedule()
+    await confirmSchedule()
+    await screen.findByText('Đã xếp lịch bảo vệ.')
     expect(mocks.saveCommittee).toHaveBeenCalledTimes(2)
+    expect(mocks.scheduleDefense).toHaveBeenCalledOnce()
   })
 })

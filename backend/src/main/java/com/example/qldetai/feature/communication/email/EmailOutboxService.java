@@ -136,7 +136,7 @@ public class EmailOutboxService {
             deliveryStateService.markSent(outboxId);
         } catch (Exception exception) {
             deliveryStateService.markFailure(
-                    outboxId, exception.getClass().getSimpleName() + ": " + exception.getMessage(), true);
+                    outboxId, exception.getClass().getSimpleName() + ": SMTP delivery failed. Check mail server configuration and connectivity.", true);
         }
     }
 

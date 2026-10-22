@@ -64,8 +64,8 @@ public class EvaluationCommitteeController {
     public ApiResponse<PageResponse<EvaluationCommitteeResponse>> committees(
             @RequestParam(required = false) Long periodId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(service.listCommittees(periodId, page, size));
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size, @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(service.listCommittees(periodId, page, size, principal.id()));
     }
 
     @PostMapping("/evaluation-committees")

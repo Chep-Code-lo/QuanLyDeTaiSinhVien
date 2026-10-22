@@ -1,0 +1,1094 @@
+[
+  {
+    "role": "ADMIN",
+    "width": 390,
+    "route": "/dashboard",
+    "headings": [
+      "Hệ thống quản lý đề tài sinh viên"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 390,
+    "route": "/topics",
+    "headings": [
+      "Đề tài & Dự án"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 390,
+    "route": "/groups",
+    "headings": [
+      "Nhóm đề tài"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 390,
+    "route": "/registrations",
+    "headings": [
+      "Đăng ký đề tài"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 390,
+    "route": "/progress",
+    "headings": [
+      "Tiến độ & Mốc báo cáo"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 390,
+    "route": "/evaluations",
+    "headings": [
+      "Tiêu chuẩn đánh giá"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 390,
+    "route": "/evaluator-assignment",
+    "headings": [
+      "Phân công hội đồng"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 390,
+    "route": "/academic-management",
+    "headings": [
+      "Quản lý Học thuật"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 390,
+    "route": "/admin-appointments",
+    "headings": [
+      "Bổ nhiệm chức vụ"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 390,
+    "route": "/admin-users",
+    "headings": [
+      "Quản lý tài khoản"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 390,
+    "route": "/email-settings",
+    "headings": [
+      "Cấu hình email"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 390,
+    "route": "/announcements",
+    "headings": [
+      "Thông báo"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 390,
+    "route": "/account",
+    "headings": [
+      "Tài khoản"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 768,
+    "route": "/dashboard",
+    "headings": [
+      "Hệ thống quản lý đề tài sinh viên"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 768,
+    "route": "/topics",
+    "headings": [
+      "Đề tài & Dự án"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 768,
+    "route": "/groups",
+    "headings": [
+      "Nhóm đề tài"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 768,
+    "route": "/registrations",
+    "headings": [
+      "Đăng ký đề tài"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 768,
+    "route": "/progress",
+    "headings": [
+      "Tiến độ & Mốc báo cáo"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 768,
+    "route": "/evaluations",
+    "headings": [
+      "Tiêu chuẩn đánh giá"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 768,
+    "route": "/evaluator-assignment",
+    "headings": [
+      "Phân công hội đồng"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 768,
+    "route": "/academic-management",
+    "headings": [
+      "Quản lý Học thuật"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 768,
+    "route": "/admin-appointments",
+    "headings": [
+      "Bổ nhiệm chức vụ"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 768,
+    "route": "/admin-users",
+    "headings": [
+      "Quản lý tài khoản"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 768,
+    "route": "/email-settings",
+    "headings": [
+      "Cấu hình email"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 768,
+    "route": "/announcements",
+    "headings": [
+      "Thông báo"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 768,
+    "route": "/account",
+    "headings": [
+      "Tài khoản"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 1440,
+    "route": "/dashboard",
+    "headings": [
+      "Hệ thống quản lý đề tài sinh viên"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 1440,
+    "route": "/topics",
+    "headings": [
+      "Đề tài & Dự án"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 1440,
+    "route": "/groups",
+    "headings": [
+      "Nhóm đề tài"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 1440,
+    "route": "/registrations",
+    "headings": [
+      "Đăng ký đề tài"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 1440,
+    "route": "/progress",
+    "headings": [
+      "Tiến độ & Mốc báo cáo"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 1440,
+    "route": "/evaluations",
+    "headings": [
+      "Tiêu chuẩn đánh giá"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 1440,
+    "route": "/evaluator-assignment",
+    "headings": [
+      "Phân công hội đồng"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 1440,
+    "route": "/academic-management",
+    "headings": [
+      "Quản lý Học thuật"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 1440,
+    "route": "/admin-appointments",
+    "headings": [
+      "Bổ nhiệm chức vụ"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 1440,
+    "route": "/admin-users",
+    "headings": [
+      "Quản lý tài khoản"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 1440,
+    "route": "/email-settings",
+    "headings": [
+      "Cấu hình email"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 1440,
+    "route": "/announcements",
+    "headings": [
+      "Thông báo"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "ADMIN",
+    "width": 1440,
+    "route": "/account",
+    "headings": [
+      "Tài khoản"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "LECTURER",
+    "width": 390,
+    "route": "/score-sheets",
+    "headings": [
+      "Chấm điểm đề tài"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "LECTURER",
+    "width": 390,
+    "route": "/progress",
+    "headings": [
+      "Tiến độ & Mốc báo cáo"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "LECTURER",
+    "width": 768,
+    "route": "/score-sheets",
+    "headings": [
+      "Chấm điểm đề tài"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "LECTURER",
+    "width": 768,
+    "route": "/progress",
+    "headings": [
+      "Tiến độ & Mốc báo cáo"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "LECTURER",
+    "width": 1440,
+    "route": "/score-sheets",
+    "headings": [
+      "Chấm điểm đề tài"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "LECTURER",
+    "width": 1440,
+    "route": "/progress",
+    "headings": [
+      "Tiến độ & Mốc báo cáo"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEAN",
+    "width": 390,
+    "route": "/academic-management",
+    "headings": [
+      "Quản lý Học thuật"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEAN",
+    "width": 390,
+    "route": "/evaluations",
+    "headings": [
+      "Tiêu chuẩn đánh giá"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEAN",
+    "width": 390,
+    "route": "/evaluator-assignment",
+    "headings": [
+      "Phân công hội đồng"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEAN",
+    "width": 768,
+    "route": "/academic-management",
+    "headings": [
+      "Quản lý Học thuật"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEAN",
+    "width": 768,
+    "route": "/evaluations",
+    "headings": [
+      "Tiêu chuẩn đánh giá"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEAN",
+    "width": 768,
+    "route": "/evaluator-assignment",
+    "headings": [
+      "Phân công hội đồng"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEAN",
+    "width": 1440,
+    "route": "/academic-management",
+    "headings": [
+      "Quản lý Học thuật"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEAN",
+    "width": 1440,
+    "route": "/evaluations",
+    "headings": [
+      "Tiêu chuẩn đánh giá"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEAN",
+    "width": 1440,
+    "route": "/evaluator-assignment",
+    "headings": [
+      "Phân công hội đồng"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEPARTMENT_HEAD",
+    "width": 390,
+    "route": "/academic-management",
+    "headings": [
+      "Quản lý Học thuật"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEPARTMENT_HEAD",
+    "width": 390,
+    "route": "/topics",
+    "headings": [
+      "Đề tài & Dự án"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEPARTMENT_HEAD",
+    "width": 768,
+    "route": "/academic-management",
+    "headings": [
+      "Quản lý Học thuật"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEPARTMENT_HEAD",
+    "width": 768,
+    "route": "/topics",
+    "headings": [
+      "Đề tài & Dự án"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEPARTMENT_HEAD",
+    "width": 1440,
+    "route": "/academic-management",
+    "headings": [
+      "Quản lý Học thuật"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "DEPARTMENT_HEAD",
+    "width": 1440,
+    "route": "/topics",
+    "headings": [
+      "Đề tài & Dự án"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 390,
+    "route": "/groups",
+    "headings": [
+      "Nhóm đề tài"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 390,
+    "route": "/registrations",
+    "headings": [
+      "Đăng ký đề tài"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 390,
+    "route": "/progress",
+    "headings": [
+      "Tiến độ & báo cáo"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 390,
+    "route": "/results",
+    "headings": [
+      "Lịch bảo vệ & kết quả"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 390,
+    "route": "/account",
+    "headings": [
+      "Tài khoản"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 768,
+    "route": "/groups",
+    "headings": [
+      "Nhóm đề tài"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 768,
+    "route": "/registrations",
+    "headings": [
+      "Đăng ký đề tài"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 768,
+    "route": "/progress",
+    "headings": [
+      "Tiến độ & báo cáo"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 768,
+    "route": "/results",
+    "headings": [
+      "Lịch bảo vệ & kết quả"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 768,
+    "route": "/account",
+    "headings": [
+      "Tài khoản"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 1440,
+    "route": "/groups",
+    "headings": [
+      "Nhóm đề tài"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 1440,
+    "route": "/registrations",
+    "headings": [
+      "Đăng ký đề tài"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 1440,
+    "route": "/progress",
+    "headings": [
+      "Tiến độ & báo cáo"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 1440,
+    "route": "/results",
+    "headings": [
+      "Lịch bảo vệ & kết quả"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "STUDENT",
+    "width": 1440,
+    "route": "/account",
+    "headings": [
+      "Tài khoản"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "GUEST",
+    "width": 390,
+    "route": "/login",
+    "headings": [
+      "Đăng nhập hệ thống"
+    ],
+    "dimensions": {
+      "viewport": 390,
+      "body": 390
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "GUEST",
+    "width": 768,
+    "route": "/login",
+    "headings": [
+      "Đăng nhập hệ thống"
+    ],
+    "dimensions": {
+      "viewport": 768,
+      "body": 768
+    },
+    "errors": [],
+    "passed": true
+  },
+  {
+    "role": "GUEST",
+    "width": 1440,
+    "route": "/login",
+    "headings": [
+      "Đăng nhập hệ thống"
+    ],
+    "dimensions": {
+      "viewport": 1440,
+      "body": 1440
+    },
+    "errors": [],
+    "passed": true
+  }
+]

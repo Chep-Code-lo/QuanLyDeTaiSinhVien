@@ -1,11 +1,12 @@
 import { DateTimeInput } from '../components/DateTimeInput'
 import { AnimatedSelect } from '../components/AnimatedSelect'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { isAxiosError } from 'axios'
 import { academicApi } from '../api/academic'
 import { allPages } from '../api/student'
 import { groupApi } from '../api/groups'
 import { PageHeader } from '../components/PageHeader'
+import { ConfirmModal } from '../components/ConfirmModal'
 import { SelectionPanel } from '../components/SelectionPanel'
 import { StatusBadge } from '../components/StatusBadge'
 import { useAuth } from '../context/AuthContext'
@@ -81,6 +82,12 @@ export function GroupsPage() {
   const [expiresAt, setExpiresAt] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [page, setPage] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [loadError, setLoadError] = useState('')
+  const loadRequest = useRef(0)
+  const [pendingAction, setPendingAction] = useState<{ message: string; action: () => Promise<void> } | null>(null)
+  const [actionBusy, setActionBusy] = useState(false)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
   const student = hasRole('STUDENT')
 
@@ -93,31 +100,38 @@ export function GroupsPage() {
   }, [])
 
   const load = async () => {
+    const requestId = ++loadRequest.current
     setLoading(true)
+    setLoadError('')
     try {
       if (student) {
         const [myGroups, invitations] = await Promise.all([
           groupApi.mine(),
-          allPages(page => groupApi.myInvitations(page, 100)),
+          allPages(page => groupApi.myInvitations(page, 100, 'PENDING')),
         ])
-        setGroups(myGroups)
-        setIncoming(invitations)
-        const leaderGroups = myGroups.filter(isLeader)
+        const leaderGroups = myGroups.filter(group => isLeader(group) && group.status !== 'LOCKED' && group.status !== 'CLOSED')
         const invitationLists = await Promise.all(
           leaderGroups.map(
             async (group) => [group.id, await groupApi.invitationsForGroup(group.id)] as const,
           ),
         )
+        if (requestId !== loadRequest.current) return
+        setGroups(myGroups)
+        setIncoming(invitations)
         setOutgoing(Object.fromEntries(invitationLists))
       } else {
-        setGroups(await allPages(page => groupApi.list({ periodId, page, size: 100 })))
+        const result = await groupApi.list({ periodId, page, size: 10 })
+        if (requestId !== loadRequest.current) return
+        setGroups(result.content)
+        setTotalPages(result.totalPages)
         setIncoming([])
         setOutgoing({})
       }
     } catch (error) {
-      showError(messageOf(error))
+      if (requestId !== loadRequest.current) return
+      setLoadError(messageOf(error))
     } finally {
-      setLoading(false)
+      if (requestId === loadRequest.current) setLoading(false)
     }
   }
 
@@ -136,7 +150,8 @@ export function GroupsPage() {
 
   useEffect(() => {
     void load()
-  }, [periodId, student, user?.id])
+    return () => { loadRequest.current++ }
+  }, [periodId, student, user?.id, page])
 
   const create = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -278,7 +293,7 @@ export function GroupsPage() {
             <AnimatedSelect
               className="form-select"
               value={periodId ?? ''}
-              onChange={(event) => setPeriodId(Number(event.target.value) || undefined)}
+              onChange={(event) => { setPage(0); setPeriodId(Number(event.target.value) || undefined) }}
               required
             >
               <option value="">Chọn đợt đăng ký</option>
@@ -306,7 +321,7 @@ export function GroupsPage() {
             id="group-period-filter"
             className="form-select"
             value={periodId ?? ''}
-            onChange={(event) => setPeriodId(Number(event.target.value) || undefined)}
+            onChange={(event) => { setPage(0); setPeriodId(Number(event.target.value) || undefined) }}
           >
             <option value="">Tất cả đợt</option>
             {periods.map((period) => (
@@ -319,6 +334,7 @@ export function GroupsPage() {
       )}
 
       <section className="page-card">
+        {loadError && <p role="alert">{loadError} <button type="button" className="text-button" onClick={() => void load()}>Thử lại</button></p>}
         {loading ? (
           <div className="content-state">
             <span className="spinner" />
@@ -369,7 +385,7 @@ export function GroupsPage() {
                         ) : student && leader ? (
                           <button
                             className="text-button"
-                            onClick={() => remove(group.id, member.studentId)}
+                            onClick={() => setPendingAction({ message: `Xóa ${member.fullName} khỏi nhóm ${group.name}?`, action: () => remove(group.id, member.studentId) })}
                           >
                             Xóa
                           </button>
@@ -434,7 +450,7 @@ export function GroupsPage() {
                                 {invitation.status === 'PENDING' && (
                                   <button
                                     className="text-button"
-                                    onClick={() => cancelInvitation(invitation)}
+                                    onClick={() => setPendingAction({ message: `Hủy lời mời vào nhóm dành cho ${invitation.invitedStudentName}?`, action: () => cancelInvitation(invitation) })}
                                   >
                                     Hủy lời mời
                                   </button>
@@ -451,7 +467,17 @@ export function GroupsPage() {
             })}
           </div>
         )}
+        {!student && totalPages > 1 && <div className="table-pagination"><span>Trang {page + 1} / {totalPages}</span><div>
+          <button type="button" className="btn btn-secondary" disabled={loading || page === 0} onClick={() => setPage(page - 1)}>Trước</button>
+          <button type="button" className="btn btn-secondary" disabled={loading || page >= totalPages - 1} onClick={() => setPage(page + 1)}>Sau</button>
+        </div></div>}
       </section>
+      <ConfirmModal isOpen={pendingAction !== null} title="Xác nhận thay đổi nhóm" message={pendingAction?.message ?? ''}
+        loading={actionBusy} onCancel={() => { if (!actionBusy) setPendingAction(null) }} onConfirm={() => {
+          if (!pendingAction || actionBusy) return
+          setActionBusy(true)
+          void pendingAction.action().finally(() => { setActionBusy(false); setPendingAction(null) })
+        }} />
     </>
   )
 }

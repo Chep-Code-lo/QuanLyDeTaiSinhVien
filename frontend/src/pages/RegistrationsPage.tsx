@@ -54,7 +54,6 @@ export function RegistrationsPage() {
   const [periods, setPeriods] = useState<RegistrationPeriodResponse[]>([])
   const [groupId, setGroupId] = useState('')
   const [topicId, setTopicId] = useState('')
-  const [motivation, setMotivation] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [currentTime, setCurrentTime] = useState(Date.now)
@@ -136,11 +135,9 @@ export function RegistrationsPage() {
       await registrationApi.create({
         groupId: Number(groupId),
         topicId: Number(topicId),
-        motivation: motivation.trim() || undefined,
       })
       setGroupId('')
       setTopicId('')
-      setMotivation('')
       showSuccess('Đã gửi đăng ký đề tài.')
       await load()
     } catch (error) {
@@ -244,13 +241,6 @@ export function RegistrationsPage() {
                 Chưa có đề tài đã công bố trong đợt {selectedGroup.periodName}.
               </p>
             )}
-            <textarea
-              className="form-input"
-              value={motivation}
-              onChange={(e) => setMotivation(e.target.value)}
-              disabled={loading || submitting || !!blockedReason}
-              placeholder="Lý do/kinh nghiệm phù hợp với đề tài (không bắt buộc)"
-            />
             <button
               className="btn btn-primary"
               disabled={loading || submitting || !!blockedReason || !topicId}

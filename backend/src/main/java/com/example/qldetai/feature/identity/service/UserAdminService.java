@@ -127,7 +127,9 @@ public class UserAdminService {
     @Transactional
     @BusinessAudit(action = "USER_STATUS_UPDATE", entityType = "USER", entityIdArgument = 0)
     public UserResponse updateStatus(Long id, UpdateUserStatusRequest request) {
+        lockAdministratorChanges();
         User user = requireUser(id);
+        if (request.status() != UserStatus.ACTIVE) requireAdministratorRemains(user);
         user.setStatus(request.status());
         return userProfileService.toUser(user);
     }
@@ -139,13 +141,12 @@ public class UserAdminService {
             throw new BusinessRuleException("You cannot delete the account currently in use.");
         }
 
+        lockAdministratorChanges();
         User user = requireUser(id);
         if (user.getStatus() == UserStatus.DISABLED) {
             return;
         }
-        if (hasRole(user, RoleCode.ADMIN) && userRepository.findActiveAdministrators().size() <= 1) {
-            throw new BusinessRuleException("At least one active administrator account is required.");
-        }
+        requireAdministratorRemains(user);
 
         user.setStatus(UserStatus.DISABLED);
     }
@@ -153,7 +154,9 @@ public class UserAdminService {
     @Transactional
     @BusinessAudit(action = "USER_ROLES_UPDATE", entityType = "USER", entityIdArgument = 0)
     public UserResponse updateRoles(Long id, UpdateUserRolesRequest request) {
+        lockAdministratorChanges();
         User user = requireUser(id);
+        if (!request.roles().contains(RoleCode.ADMIN)) requireAdministratorRemains(user);
         if (studentRepository.findByUserId(id).isPresent()
                 && !request.roles().contains(RoleCode.STUDENT)) {
             throw new BusinessRuleException(
@@ -176,6 +179,18 @@ public class UserAdminService {
         LocalDateTime now = LocalDateTime.now(clock);
         user.replaceRoles(requireRoles(request.roles()), now);
         return userProfileService.toUser(user);
+    }
+
+    private void lockAdministratorChanges() {
+        roleRepository.findByCodeForUpdate(RoleCode.ADMIN).orElseThrow(() ->
+                new ResourceNotFoundException("Administrator role was not found."));
+    }
+
+    private void requireAdministratorRemains(User user) {
+        if (user.getStatus() == UserStatus.ACTIVE && hasRole(user, RoleCode.ADMIN)
+                && userRepository.findActiveAdministratorsForUpdate(PageRequest.of(0, 2)).size() <= 1) {
+            throw new BusinessRuleException("At least one active administrator account is required.");
+        }
     }
 
     private Student createStudent(User user, StudentProfileInput input) {

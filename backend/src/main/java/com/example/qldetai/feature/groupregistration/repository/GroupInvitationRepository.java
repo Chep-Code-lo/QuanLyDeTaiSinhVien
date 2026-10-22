@@ -18,6 +18,8 @@ public interface GroupInvitationRepository extends JpaRepository<GroupInvitation
 
     Page<GroupInvitation> findByInvitedStudentIdOrderByCreatedAtDesc(Long studentId, Pageable pageable);
 
+    Page<GroupInvitation> findByInvitedStudentIdAndStatusOrderByCreatedAtDesc(Long studentId, GroupInvitationStatus status, Pageable pageable);
+
     List<GroupInvitation> findByGroupIdOrderByCreatedAtDesc(Long groupId);
 
     boolean existsByGroupIdAndInvitedStudentIdAndStatus(

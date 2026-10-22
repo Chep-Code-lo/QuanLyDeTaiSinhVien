@@ -84,15 +84,48 @@ public class TopicService {
     @Transactional(readOnly = true)
     public PageResponse<TopicResponse> list(
             Long periodId, TopicStatus status, int page, int size, Long actorId) {
-        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return list(periodId, status, null, page, size, actorId);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<TopicResponse> list(
+            Long periodId, TopicStatus status, String search, int page, int size, Long actorId) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending().and(Sort.by("id").descending()));
         User actor = requireUser(actorId);
-        if (isAcademicStaff(actor)) {
-            return toResponses(listAll(periodId, status, pageable), null);
-        }
-        if (!hasRole(actor, RoleCode.STUDENT)) {
+        boolean staff = isAcademicStaff(actor);
+        if (!staff && !hasRole(actor, RoleCode.STUDENT)) {
             throw new AccessDeniedException("A student, lecturer, or administrator account is required.");
         }
-        return toResponses(topicRepository.findVisibleToStudent(periodId, status, actorId, pageable), actorId);
+        org.springframework.data.jpa.domain.Specification<Topic> specification = (root, query, cb) -> {
+            var conditions = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+            if (periodId != null) conditions.add(cb.equal(root.get("period").get("id"), periodId));
+            if (status != null) conditions.add(cb.equal(root.get("status"), status));
+            if (!staff) {
+                var membership = query.subquery(Long.class);
+                var member = membership.from(com.example.qldetai.feature.groupregistration.domain.GroupMember.class);
+                membership.select(member.get("id")).where(
+                        cb.equal(member.get("group"), root.get("reservedGroup")),
+                        cb.equal(member.get("student").get("user").get("id"), actorId),
+                        cb.isNull(member.get("leftAt")));
+                conditions.add(cb.or(cb.equal(root.get("proposedBy").get("id"), actorId),
+                        cb.and(cb.equal(root.get("status"), TopicStatus.PUBLISHED),
+                                cb.or(cb.equal(root.get("visibilityType"), VisibilityType.OPEN), cb.exists(membership)))));
+            }
+            if (search != null && !search.isBlank()) {
+                String pattern = "%" + search.trim().toLowerCase(java.util.Locale.ROOT)
+                        .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+                var supervisorQuery = query.subquery(Long.class);
+                var supervisor = supervisorQuery.from(com.example.qldetai.feature.topic.domain.TopicSupervisor.class);
+                supervisorQuery.select(supervisor.get("id")).where(cb.equal(supervisor.get("topic"), root),
+                        cb.like(cb.lower(supervisor.get("lecturer").get("user").get("fullName")), pattern, '\\'));
+                conditions.add(cb.or(cb.like(cb.lower(root.get("code")), pattern, '\\'),
+                        cb.like(cb.lower(root.get("title")), pattern, '\\'),
+                        cb.like(cb.lower(root.get("department").get("name")), pattern, '\\'),
+                        cb.exists(supervisorQuery)));
+            }
+            return cb.and(conditions.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+        return toResponses(topicRepository.findAll(specification, pageable), staff ? null : actorId);
     }
 
     @Transactional(readOnly = true)

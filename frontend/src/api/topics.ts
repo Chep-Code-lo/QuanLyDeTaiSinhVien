@@ -4,7 +4,7 @@ import type { CreateRegistrationTopicRequest, TopicResponse, TopicStatus } from 
 
 export const topicApi = {
   list: async (
-    params: { periodId?: number; status?: TopicStatus; page?: number; size?: number } = {},
+    params: { periodId?: number; status?: TopicStatus; q?: string; page?: number; size?: number } = {},
   ) => {
     const response = await apiClient.get<ApiResponse<PageResponse<TopicResponse>>>('/topics', {
       params,

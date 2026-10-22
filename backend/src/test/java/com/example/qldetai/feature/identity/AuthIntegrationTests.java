@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -163,6 +164,9 @@ class AuthIntegrationTests {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.totalTopics").value(0))
                 .andExpect(jsonPath("$.data.unreadNotifications").value(0));
+        mockMvc.perform(post("/api/v1/evaluation-assignments/batch").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"assignments\":[null]}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -174,6 +178,28 @@ class AuthIntegrationTests {
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/v1/evaluation-committees").session(session))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/defense-sessions/eligibility").param("assignmentId", "1").param("committeeId", "1").session(session))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/evaluation-assignments/batch").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                            {"assignments":[{"assignmentId":1,"rubricId":1,"lecturerId":1,"deadlineAt":"2099-01-01T00:00:00"}]}
+                            """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void lastActiveAdministratorCannotBeLockedOrLoseAdminRoleThroughOtherEndpoints() throws Exception {
+        User admin = userRepository.findByEmailIgnoreCase("admin@test.local").orElseThrow();
+        assertThat(userRepository.findActiveAdministrators()).hasSize(1);
+        MockHttpSession session = login("admin@test.local", "TestPassword123!");
+        mockMvc.perform(patch("/api/v1/admin/users/{id}/status", admin.getId()).session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"LOCKED\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(put("/api/v1/admin/users/{id}/roles", admin.getId()).session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"roles\":[\"LECTURER\"]}"))
+                .andExpect(status().isBadRequest());
+        assertThat(userRepository.findActiveAdministrators()).hasSize(1);
+        assertThat(userRepository.findById(admin.getId()).orElseThrow().getStatus()).isEqualTo(UserStatus.ACTIVE);
     }
 
     @Test

@@ -46,6 +46,15 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
             """)
     List<User> findActiveAdministrators();
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select u from User u where u.status = com.example.qldetai.feature.identity.domain.UserStatus.ACTIVE
+              and exists (select ur.id from UserRole ur where ur.user = u
+                          and ur.role.code = com.example.qldetai.feature.identity.domain.RoleCode.ADMIN)
+            order by u.id
+            """)
+    List<User> findActiveAdministratorsForUpdate(Pageable pageable);
+
     @Query("""
             select u from User u
             where u.id in :ids

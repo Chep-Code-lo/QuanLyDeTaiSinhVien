@@ -34,6 +34,14 @@ public class DefenseSessionController {
 
     private final DefenseSessionService service;
 
+    @GetMapping("/defense-sessions/eligibility")
+    @PreAuthorize("hasRole('ADMIN') or (@projectAuthorization.canManageAssignment(#assignmentId, authentication) and @evaluationAuthorization.canManageCommittee(#committeeId, authentication))")
+    public ApiResponse<com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.DefenseEligibilityResponse> eligibility(
+            @RequestParam Long assignmentId, @RequestParam Long committeeId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(service.eligibility(assignmentId, committeeId, principal.id()));
+    }
+
 
     @GetMapping("/defense-sessions")
     @PreAuthorize("hasRole('ADMIN') or hasRole('LECTURER')")
@@ -41,8 +49,8 @@ public class DefenseSessionController {
             @RequestParam(required = false) Long periodId,
             @RequestParam(required = false) Long committeeId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(service.listDefenses(periodId, committeeId, page, size));
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size, @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(service.listDefenses(periodId, committeeId, page, size, principal.id()));
     }
 
     @GetMapping("/student/defense-sessions")

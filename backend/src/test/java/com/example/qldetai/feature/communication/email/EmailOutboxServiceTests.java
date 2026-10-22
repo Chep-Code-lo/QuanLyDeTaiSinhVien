@@ -35,7 +35,7 @@ class EmailOutboxServiceTests {
         ObjectProvider<JavaMailSender> senderProvider = mock(ObjectProvider.class);
         when(senderProvider.getIfAvailable()).thenReturn(sender);
         when(sender.createMimeMessage()).thenReturn(new MimeMessage(Session.getInstance(new Properties())));
-        org.mockito.Mockito.doThrow(new MailSendException("temporary SMTP outage")).when(sender).send(any(MimeMessage.class));
+        org.mockito.Mockito.doThrow(new MailSendException("temporary SMTP outage password=secret-token-for-test")).when(sender).send(any(MimeMessage.class));
 
         EmailNotificationProperties properties = new EmailNotificationProperties();
         properties.setMaxAttempts(4);
@@ -65,6 +65,7 @@ class EmailOutboxServiceTests {
         assertThat(outbox.getStatus()).isEqualTo(EmailOutboxStatus.PENDING);
         assertThat(outbox.getNextAttemptAt()).isEqualTo(LocalDateTime.of(2026, 10, 17, 0, 1));
         assertThat(outbox.getLastError()).contains("MailSendException");
+        assertThat(outbox.getLastError()).doesNotContain("secret-token-for-test", "password=");
     }
 
     private EmailOutbox sendingOutbox() {

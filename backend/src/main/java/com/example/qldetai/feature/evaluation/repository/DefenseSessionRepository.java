@@ -24,6 +24,27 @@ public interface DefenseSessionRepository
 
     Optional<DefenseSession> findByAssignmentId(Long assignmentId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from DefenseSession d where d.assignment.id = :assignmentId")
+    Optional<DefenseSession> findByAssignmentIdForUpdate(Long assignmentId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select d from DefenseSession d
+            where d.status = 'SCHEDULED' and d.startsAt < :endsAt and d.endsAt > :startsAt
+              and lower(trim(d.location)) = lower(trim(:location))
+            """)
+    List<DefenseSession> findRoomConflictsForUpdate(String location, LocalDateTime startsAt, LocalDateTime endsAt);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select d from DefenseSession d
+            where d.status = 'SCHEDULED' and d.startsAt < :endsAt and d.endsAt > :startsAt
+              and exists (select m.id from CommitteeMember m
+                          where m.committee = d.committee and m.lecturer.id in :lecturerIds)
+            """)
+    List<DefenseSession> findLecturerConflictsForUpdate(List<Long> lecturerIds, LocalDateTime startsAt, LocalDateTime endsAt);
+
     @Query("""
             select defense from DefenseSession defense
             join GroupMember member on member.group.id = defense.assignment.group.id

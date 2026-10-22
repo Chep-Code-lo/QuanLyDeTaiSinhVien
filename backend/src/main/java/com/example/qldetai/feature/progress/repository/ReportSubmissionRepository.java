@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 public interface ReportSubmissionRepository extends JpaRepository<ReportSubmission, Long> {
  List<ReportSubmission> findByMilestoneIdOrderByVersionNoDesc(Long milestoneId);
+ @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"file", "submittedBy.user", "milestone"})
+ List<ReportSubmission> findByMilestoneIdInOrderByVersionNoDesc(List<Long> milestoneIds);
  List<ReportSubmission> findByFileId(Long fileId);
  long countByMilestoneId(Long milestoneId);
  @Lock(LockModeType.PESSIMISTIC_WRITE)

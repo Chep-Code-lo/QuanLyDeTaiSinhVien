@@ -19,6 +19,11 @@ button:disabled { cursor:not-allowed; opacity:.55; }
 .student-timeline::before { content:''; position:absolute; top:24px; bottom:24px; left:0; width:2px; background:#cbdcf3; }
 .student-timeline__item { position:relative; margin-left:30px; }
 .student-timeline__marker { position:absolute; z-index:1; top:22px; left:-43px; display:grid; width:28px; height:28px; place-items:center; border:3px solid #fff; border-radius:50%; color:#fff; background:var(--brand-600); box-shadow:0 0 0 2px #cbdcf3; font-size:12px; font-weight:800; }
+.student-progress-layout .student-timeline { min-width:0; }
+.student-timeline__item--selected { outline:2px solid #4386ff; outline-offset:2px; }
+@media(max-width:960px) {
+  .student-progress-layout > .milestone-board__sidebar { grid-template-columns:minmax(0,1fr); }
+}
 .student-milestone-type { display:inline-block; margin-bottom:4px; color:var(--brand-600); font-size:12px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
 .student-step { font-size:36px; color:var(--primary-blue); font-weight:800; }
 .student-fieldset input[type=file] { display:block; padding:14px; border:1px dashed #94a3b8; border-radius:8px; width:100%; }

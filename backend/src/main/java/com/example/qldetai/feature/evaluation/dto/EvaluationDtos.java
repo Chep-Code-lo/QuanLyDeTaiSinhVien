@@ -21,6 +21,13 @@ public final class EvaluationDtos {
     private EvaluationDtos() {
     }
 
+    public record BatchEvaluationRequest(
+            @NotEmpty @Size(max = 100) List<@NotNull @jakarta.validation.Valid CreateEvaluationRequest> assignments) {
+    }
+
+    public record BatchEvaluationResponse(int assignedCount, int skippedCount) {
+    }
+
     public record CreateAssessmentComponentRequest(
             @NotNull Long periodId,
             @NotBlank @Size(max = 30) String code,

@@ -30,23 +30,28 @@ export function DashboardPage() {
   const [hoveredTopicType, setHoveredTopicType] = useState<TopicType | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null)
   const chartWrapperRef = useRef<HTMLDivElement>(null)
+  const lastUserId = useRef(user?.id)
 
   useEffect(() => {
     let active = true
     let pending = false
+    let loaded = lastUserId.current === user?.id && summary !== null
+    if (lastUserId.current !== user?.id) setSummary(null)
+    lastUserId.current = user?.id
+    setLoading(!loaded)
     const refresh = async () => {
       if (pending) return
       pending = true
-      setLoading(true)
+      if (!loaded) setLoading(true)
       try {
         const data = await dashboardApi.summary()
         if (active) {
           setSummary(data)
+          loaded = true
           setError(false)
         }
       } catch {
         if (active) {
-          setSummary(null)
           setError(true)
         }
       } finally {
@@ -160,6 +165,7 @@ export function DashboardPage() {
               <>Chưa tải được dữ liệu tổng quan.{' '}{error && <button className="welcome-panel__retry" type="button" onClick={() => setRevision((value) => value + 1)}>Thử lại</button>}</>
             )}
           </p>
+          {summary && error && <p role="status">Chưa cập nhật được dữ liệu mới. Đang hiển thị dữ liệu lần tải thành công gần nhất. <button type="button" className="welcome-panel__retry" onClick={() => setRevision((value) => value + 1)}>Thử lại</button></p>}
           {user?.activeAppointments?.length ? (
             <div className="welcome-panel__roles">
               {user.activeAppointments.map((item) => (

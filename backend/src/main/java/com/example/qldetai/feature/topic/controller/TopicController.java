@@ -48,10 +48,11 @@ public class TopicController {
     public ApiResponse<PageResponse<TopicResponse>> list(
             @RequestParam(required = false) Long periodId,
             @RequestParam(required = false) TopicStatus status,
+            @RequestParam(required = false) @jakarta.validation.constraints.Size(max = 200) String q,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success(topicService.list(periodId, status, page, size, principal.id()));
+        return ApiResponse.success(topicService.list(periodId, status, q, page, size, principal.id()));
     }
 
     @GetMapping("/{id}")

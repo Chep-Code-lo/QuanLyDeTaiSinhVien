@@ -157,7 +157,7 @@ public class RegistrationService {
             // decision is rolled back as well, preserving the one-step approval invariant.
             projectAssignmentService.createForApprovedRegistration(registration, actor);
         } else {
-            notifyGroup(registration, "Đăng ký đề tài đã bị từ chối.");
+            notifyGroup(registration, "Đăng ký đề tài đã bị từ chối.\nLý do: " + registration.getDecisionReason());
         }
         emailNotificationEventService.topicRegistrationDecision(registration, actor);
         return toResponse(registration);

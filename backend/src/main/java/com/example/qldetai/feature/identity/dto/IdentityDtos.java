@@ -19,11 +19,13 @@ public final class IdentityDtos {
     }
 
     public record LoginRequest(@NotBlank String username, @NotBlank String password) {
+        @Override public String toString() { return "LoginRequest[credentials=REDACTED]"; }
     }
 
     public record ChangePasswordRequest(
             @NotBlank String currentPassword,
             @NotBlank @Size(min = 8, max = 100) String newPassword) {
+        @Override public String toString() { return "ChangePasswordRequest[credentials=REDACTED]"; }
     }
 
     public record CurrentUserResponse(
@@ -61,6 +63,7 @@ public final class IdentityDtos {
             @NotEmpty Set<RoleCode> roles,
             @Valid StudentProfileInput student,
             @Valid LecturerProfileInput lecturer) {
+        @Override public String toString() { return "CreateUserRequest[credentials=REDACTED]"; }
     }
 
     public record UpdateUserRequest(

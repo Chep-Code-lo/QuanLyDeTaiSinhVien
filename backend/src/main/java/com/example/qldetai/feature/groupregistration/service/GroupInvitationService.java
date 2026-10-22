@@ -57,11 +57,17 @@ public class GroupInvitationService {
 
     @Transactional
     public PageResponse<GroupInvitationResponse> mine(Long actorId, int page, int size) {
+        return mine(actorId, null, page, size);
+    }
+
+    @Transactional
+    public PageResponse<GroupInvitationResponse> mine(Long actorId, GroupInvitationStatus status, int page, int size) {
         expireStale();
         Student student = requireStudent(actorId);
-        return PageResponse.from(groupInvitationRepository.findByInvitedStudentIdOrderByCreatedAtDesc(
-                        student.getId(), PageRequest.of(page, size, Sort.by("createdAt").descending()))
-                .map(this::toResponse));
+        var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending().and(Sort.by("id").descending()));
+        var found = status == null ? groupInvitationRepository.findByInvitedStudentIdOrderByCreatedAtDesc(student.getId(), pageable)
+                : groupInvitationRepository.findByInvitedStudentIdAndStatusOrderByCreatedAtDesc(student.getId(), status, pageable);
+        return PageResponse.from(found.map(this::toResponse));
     }
 
     @Transactional

@@ -32,7 +32,7 @@ public final class EvaluationAdminDtos {
             @NotNull Long periodId,
             @NotBlank @Size(max = 200) String name,
             @NotNull Long rubricId,
-            @NotNull @Size(min = 1, max = 5) List<@Valid CommitteeMemberInput> members,
+            @NotNull @Size(min = 1, max = 5) List<@NotNull @Valid CommitteeMemberInput> members,
             Integer version) {
     }
 
@@ -45,9 +45,12 @@ public final class EvaluationAdminDtos {
     public record CreateDefenseRequest(
             @NotNull Long assignmentId,
             @NotNull Long committeeId,
-            @NotBlank String location,
+            @NotBlank @Size(max = 255) String location,
             @NotNull LocalDateTime startsAt,
             @NotNull LocalDateTime endsAt) {
+    }
+
+    public record DefenseEligibilityResponse(boolean eligible, String reason) {
     }
 
     public record ReviewGradeChangeRequest(@NotNull Boolean approved, @Size(max = 5000) String comment) {

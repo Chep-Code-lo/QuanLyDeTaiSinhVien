@@ -87,6 +87,16 @@ export const evaluationApi = {
     const response = await apiClient.post<ApiResponse<number>>('/evaluation-assignments', payload)
     return response.data.data
   },
+  assignBatch: async (assignments: CreateEvaluationRequest[]) => {
+    const response = await apiClient.post<ApiResponse<{ assignedCount: number; skippedCount: number }>>(
+      '/evaluation-assignments/batch', { assignments },
+    )
+    return response.data.data
+  },
+  defenseEligibility: async (assignmentId: number, committeeId: number) => {
+    const response = await apiClient.get<ApiResponse<{ eligible: boolean; reason: string | null }>>('/defense-sessions/eligibility', { params: { assignmentId, committeeId } })
+    return response.data.data
+  },
 
   listCommittees: async (params: { periodId?: number; page?: number; size?: number } = {}) => {
     const response = await apiClient.get<ApiResponse<PageResponse<EvaluationCommitteeResponse>>>(

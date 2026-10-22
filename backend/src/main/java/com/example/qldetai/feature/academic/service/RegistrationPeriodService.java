@@ -20,6 +20,7 @@ import com.example.qldetai.feature.academic.repository.SemesterRepository;
 import com.example.qldetai.feature.communication.email.EmailNotificationEventService;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.UserRepository;
+import com.example.qldetai.common.time.VietnamTime;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
@@ -217,6 +218,10 @@ public class RegistrationPeriodService {
         }
         if (projectType != ProjectType.GRADUATION && defenseDate != null) {
             throw new BusinessRuleException("Only graduation projects may have a defense date.");
+        }
+        if (projectType == ProjectType.GRADUATION && defenseDate != null && reviewDeadlineAt != null
+                && VietnamTime.dateOf(reviewDeadlineAt).isAfter(defenseDate)) {
+            throw new BusinessRuleException("Hạn phản biện không được sau ngày bảo vệ KLTN theo giờ Việt Nam.");
         }
         if (status != RegistrationPeriodStatus.DRAFT && status != RegistrationPeriodStatus.CANCELLED) {
             if (requiresReview && reviewDeadlineAt == null) {

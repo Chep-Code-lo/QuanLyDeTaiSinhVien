@@ -67,6 +67,8 @@ class BackendConsistencyIntegrationTests {
     @Autowired RegistrationService registrations;
     @Autowired ProjectAssignmentService projects;
     @Autowired EvaluationService evaluation;
+    @Autowired EvaluationAssignmentBatchService batchAssignments;
+    @Autowired CommitteeConfigurationService committeeConfiguration;
     @Autowired EvaluationCommitteeService committees;
     @Autowired DefenseSessionService defenses;
     @Autowired EvaluationResultService results;
@@ -80,6 +82,7 @@ class BackendConsistencyIntegrationTests {
     @Autowired RegistrationPeriodRepository periods;
     @Autowired UserRepository users;
     @Autowired RoleRepository roles;
+    @Autowired AcademicAppointmentRepository auditAppointments;
     @Autowired StudentRepository students;
     @Autowired LecturerRepository lecturers;
     @Autowired TopicRepository topics;
@@ -110,6 +113,7 @@ class BackendConsistencyIntegrationTests {
     private Lecturer lecturerB;
     private Lecturer lecturerC;
     private Lecturer lecturerD;
+    private String roomPrefix;
 
     @DynamicPropertySource
     static void isolatedMysql(DynamicPropertyRegistry properties) {
@@ -124,11 +128,13 @@ class BackendConsistencyIntegrationTests {
             properties.add("spring.datasource.password", () -> "audit-only-local");
             // Use the authoritative SQL bootstrap, including generated columns and triggers.
             properties.add("spring.jpa.hibernate.ddl-auto", () -> "none");
+            properties.add("spring.sql.init.mode", () -> "never");
         }
     }
 
     @BeforeEach
     void fixture() {
+        roomPrefix = unique();
         tx = new TransactionTemplate(transactionManager);
         tx.executeWithoutResult(status -> {
             Faculty faculty = new Faculty();
@@ -402,9 +408,169 @@ class BackendConsistencyIntegrationTests {
         addCommitteeMember(committee, lecturerB, 2, CommitteeRole.SECRETARY);
         addCommitteeMember(committee, lecturerD, 3, CommitteeRole.MEMBER);
         LocalDateTime starts = now().plusDays(2); LocalDateTime ends = starts.plusHours(1);
-        assertOneSuccess(race(() -> defenses.schedule(new CreateDefenseRequest(first, committee, "A1", starts, ends), admin.getId()),
-                () -> defenses.schedule(new CreateDefenseRequest(second, committee, "A2", starts, ends), admin.getId())));
+        assertOneSuccess(race(() -> defenses.schedule(new CreateDefenseRequest(first, committee, roomPrefix + "-A1", starts, ends), admin.getId()),
+                () -> defenses.schedule(new CreateDefenseRequest(second, committee, roomPrefix + "-A2", starts, ends), admin.getId())));
         assertThat(defenses.listDefenses(period.getId(), committee, 0, 20).totalElements()).isEqualTo(1);
+    }
+
+    @Test
+    void differentCommitteesCannotUseTheSameRoomConcurrently() throws Exception {
+        Long first = assignedProject();
+        Long second = secondProject();
+        Long left = fullCommittee(lecturerA, lecturerB, lecturerD);
+        Long right = tx.execute(status -> fullCommittee(lecturer(), lecturer(), lecturer()));
+        LocalDateTime starts = now().plusDays(2);
+        assertOneSuccess(race(
+                () -> defenses.schedule(new CreateDefenseRequest(first, left, " " + roomPrefix + "-Room-A ", starts, starts.plusHours(1)), admin.getId()),
+                () -> defenses.schedule(new CreateDefenseRequest(second, right, roomPrefix + "-room-a", starts, starts.plusHours(1)), admin.getId())));
+    }
+
+    @Test
+    void sharedLecturerCannotAttendOverlappingCommittees() throws Exception {
+        Long first = assignedProject();
+        Long second = secondProject();
+        Long left = fullCommittee(lecturerA, lecturerB, lecturerD);
+        Long right = tx.execute(status -> fullCommittee(lecturerA, lecturer(), lecturer()));
+        LocalDateTime starts = now().plusDays(2);
+        assertOneSuccess(race(
+                () -> defenses.schedule(new CreateDefenseRequest(first, left, roomPrefix + "-B1", starts, starts.plusHours(1)), admin.getId()),
+                () -> defenses.schedule(new CreateDefenseRequest(second, right, roomPrefix + "-B2", starts.plusMinutes(30), starts.plusHours(2)), admin.getId())));
+    }
+
+    @Test
+    void adjacentSessionsAreAllowedButDuplicateProjectsAndInvalidTimesAreRejected() {
+        Long first = assignedProject();
+        Long second = secondProject();
+        Long committee = fullCommittee(lecturerA, lecturerB, lecturerD);
+        LocalDateTime starts = now().plusDays(2).withNano(123456789);
+        assertThatThrownBy(() -> defenses.schedule(new CreateDefenseRequest(first, committee, roomPrefix + "-C1", starts, starts), admin.getId()))
+                .isInstanceOf(BusinessRuleException.class);
+        defenses.schedule(new CreateDefenseRequest(first, committee, roomPrefix + "-C1", starts, starts.plusHours(1)), admin.getId());
+        defenses.schedule(new CreateDefenseRequest(second, committee, roomPrefix + "-C1", starts.plusHours(1), starts.plusHours(2)), admin.getId());
+        assertThatThrownBy(() -> defenses.schedule(new CreateDefenseRequest(first, committee, roomPrefix + "-C2", starts.plusDays(1), starts.plusDays(1).plusHours(1)), admin.getId()))
+                .isInstanceOf(ConflictException.class).hasMessageContaining("phiên bảo vệ");
+    }
+
+    @Test
+    void missingSecretaryAndDuplicateMembersAreRejected() {
+        Long project = assignedProject();
+        Long committee = committees.createCommittee(new CreateCommitteeRequest(period.getId(), "Incomplete"), admin.getId());
+        addCommitteeMember(committee, lecturerA, 1, CommitteeRole.CHAIR);
+        addCommitteeMember(committee, lecturerB, 2, CommitteeRole.MEMBER);
+        addCommitteeMember(committee, lecturerD, 3, CommitteeRole.MEMBER);
+        assertThatThrownBy(() -> addCommitteeMember(committee, lecturerA, 4, CommitteeRole.MEMBER)).isInstanceOf(ConflictException.class);
+        LocalDateTime starts = now().plusDays(2);
+        assertThatThrownBy(() -> defenses.schedule(new CreateDefenseRequest(project, committee, roomPrefix + "-D1", starts, starts.plusHours(1)), admin.getId()))
+                .isInstanceOf(BusinessRuleException.class);
+    }
+
+    @Test
+    void failedBatchRollsBackEarlierAssignmentsAndSuccessfulRetriesAreIdempotent() {
+        Long project = assignedProject();
+        var rubric = lockedRubric();
+        var first = new CreateEvaluationRequest(project, rubric.id(), lecturerA.getId(), null, now().plusHours(1));
+        var invalid = new CreateEvaluationRequest(project, rubric.id(), lecturerB.getId(), null, now().minusHours(1));
+        assertThatThrownBy(() -> batchAssignments.assign(new BatchEvaluationRequest(List.of(first, invalid)), admin.getId()))
+                .isInstanceOf(BusinessRuleException.class);
+        assertThat(evaluation.listAssignments(null, project, null, null, 0, 20).totalElements()).isZero();
+        assertThat(batchAssignments.assign(new BatchEvaluationRequest(List.of(first)), admin.getId()).assignedCount()).isEqualTo(1);
+        assertThat(batchAssignments.assign(new BatchEvaluationRequest(List.of(first)), admin.getId()).skippedCount()).isEqualTo(1);
+    }
+
+    private Long secondProject() {
+        var registration = register(activeGroup(leaderB, extra).id(), topic(), leaderB);
+        approve(registration);
+        return projectRepository.findByRegistrationId(registration.id()).orElseThrow().getId();
+    }
+
+    private Long fullCommittee(Lecturer chair, Lecturer secretary, Lecturer member) {
+        Long id = committees.createCommittee(new CreateCommitteeRequest(period.getId(), "Audit committee"), admin.getId());
+        addCommitteeMember(id, chair, 1, CommitteeRole.CHAIR);
+        addCommitteeMember(id, secretary, 2, CommitteeRole.SECRETARY);
+        addCommitteeMember(id, member, 3, CommitteeRole.MEMBER);
+        return id;
+    }
+
+    @Test
+    void committeeConfigurationIsAtomicAndChecksVersionAndRoster() {
+        var component = evaluation.createComponent(new CreateAssessmentComponentRequest(period.getId(), unique(),
+                "Committee criteria", AssessmentComponentType.COMMITTEE), admin.getId());
+        var rubric = rubric(component.id());
+        evaluation.lockRubric(rubric.id(), admin.getId());
+        evaluation.lockComponent(component.id(), admin.getId());
+        var roster = List.of(new CommitteeMemberInput(lecturerA.getId(), "Chair"),
+                new CommitteeMemberInput(lecturerB.getId(), "Secretary"), new CommitteeMemberInput(lecturerD.getId(), "Member"));
+        var saved = committeeConfiguration.save(null,
+                new SaveCommitteeRequest(period.getId(), "Configured committee", rubric.id(), roster, null), admin.getId());
+        assertThat(saved.members()).hasSize(3);
+        assertThat(saved.rubricId()).isEqualTo(rubric.id());
+        var changed = committeeConfiguration.save(saved.id(),
+                new SaveCommitteeRequest(period.getId(), "Renamed committee", rubric.id(), roster, saved.version()), admin.getId());
+        assertThat(changed.version()).isGreaterThan(saved.version());
+        assertThatThrownBy(() -> committeeConfiguration.save(saved.id(),
+                new SaveCommitteeRequest(period.getId(), "Stale edit", rubric.id(), roster, saved.version()), admin.getId()))
+                .isInstanceOf(ConflictException.class);
+        var invalid = List.of(new CommitteeMemberInput(lecturerA.getId(), "Chair"),
+                new CommitteeMemberInput(lecturerA.getId(), "Secretary"), new CommitteeMemberInput(lecturerD.getId(), "Member"));
+        assertThatThrownBy(() -> committeeConfiguration.save(saved.id(),
+                new SaveCommitteeRequest(period.getId(), "Invalid edit", rubric.id(), invalid, changed.version()), admin.getId()))
+                .isInstanceOf(BusinessRuleException.class);
+        assertThat(committees.listCommittees(period.getId(), 0, 10).content())
+                .anySatisfy(item -> { assertThat(item.name()).isEqualTo("Renamed committee"); assertThat(item.members()).hasSize(3); });
+    }
+
+    @Test
+    void evaluationListsApplyActorScopeBeforePaginationAndRespectAppointmentExpiry() {
+        Long project = assignedProject();
+        var rubric = lockedRubric();
+        assign(project, rubric.id(), lecturerA);
+        assign(project, rubric.id(), lecturerB);
+        assertThat(evaluation.listAssignments(period.getId(), null, null, null, 0, 1, lecturerA.getUser().getId()).totalElements()).isEqualTo(1);
+        assertThat(evaluation.listAssignments(period.getId(), null, lecturerB.getId(), null, 0, 1, lecturerA.getUser().getId()).totalElements()).isZero();
+        assertThat(evaluation.listAssignments(period.getId(), null, null, null, 0, 1, lecturerD.getUser().getId()).totalElements()).isZero();
+        Long appointmentId = tx.execute(status -> {
+            AcademicAppointment appointment = new AcademicAppointment();
+            appointment.setLecturer(lecturerD); appointment.setFaculty(period.getFaculty());
+            appointment.setPositionCode(PositionCode.DEAN); appointment.setStartsAt(now().minusDays(1));
+            appointment.setAssignedBy(admin);
+            return auditAppointments.saveAndFlush(appointment).getId();
+        });
+        assertThat(evaluation.listAssignments(period.getId(), null, null, null, 0, 1, lecturerD.getUser().getId()).totalElements()).isEqualTo(2);
+        tx.executeWithoutResult(status -> auditAppointments.findById(appointmentId).orElseThrow().setEndsAt(now().minusHours(1)));
+        assertThat(evaluation.listAssignments(period.getId(), null, null, null, 0, 1, lecturerD.getUser().getId()).totalElements()).isZero();
+        Long committee = fullCommittee(lecturerA, lecturerB, lecturerD);
+        var start = now().plusDays(2);
+        defenses.schedule(new CreateDefenseRequest(project, committee, roomPrefix + "-Scope room", start, start.plusHours(1)), admin.getId());
+        assertThat(defenses.listDefenses(period.getId(), null, 0, 1, lecturerA.getUser().getId()).totalElements()).isEqualTo(1);
+        assertThat(defenses.listDefenses(period.getId(), null, 0, 1, lecturerC.getUser().getId()).totalElements()).isZero();
+        assertThat(committees.listCommittees(period.getId(), 0, 1, lecturerC.getUser().getId()).totalElements()).isZero();
+    }
+
+    @Test
+    void topicSearchFiltersInDatabaseWithStablePaginationAndLiteralWildcards() {
+        tx.executeWithoutResult(status -> {
+            for (int index = 0; index < 250; index++) {
+                Topic topic = new Topic(); topic.setPeriod(period); topic.setFaculty(period.getFaculty());
+                topic.setDepartment(department); topic.setCode("PAGING-" + index);
+                topic.setTitle("Paged search topic " + index); topic.setDescription("Description"); topic.setObjectives("Objectives");
+                topic.setExpectedOutcomes("Outcomes"); topic.setProposedBy(admin); topic.setProposalSource(ProposalSource.LECTURER);
+                topic.setVisibilityType(VisibilityType.OPEN); topic.setStatus(TopicStatus.PENDING); topics.save(topic);
+            }
+        });
+        var first = topicService.list(period.getId(), TopicStatus.PENDING, "Paged search", 0, 10, admin.getId());
+        var second = topicService.list(period.getId(), TopicStatus.PENDING, "Paged search", 1, 10, admin.getId());
+        assertThat(first.totalElements()).isEqualTo(250);
+        assertThat(first.content()).hasSize(10);
+        assertThat(first.content().stream().map(item -> item.id()).toList())
+                .doesNotContainAnyElementsOf(second.content().stream().map(item -> item.id()).toList());
+        assertThat(topicService.list(period.getId(), TopicStatus.PUBLISHED, "Paged search", 0, 10, admin.getId()).totalElements()).isZero();
+        assertThat(topicService.list(period.getId(), null, "%", 0, 10, admin.getId()).totalElements()).isZero();
+        assertThat(topicService.list(period.getId(), null, "Audit department", 0, 10, admin.getId()).totalElements()).isEqualTo(250);
+        Long supervisedTopic = topic();
+        assertThat(topicService.list(period.getId(), null, "Audit user", 0, 10, admin.getId()).content())
+                .extracting(item -> item.id()).containsExactly(supervisedTopic);
+        String code = tx.execute(status -> topics.findById(supervisedTopic).orElseThrow().getCode());
+        assertThat(topicService.list(period.getId(), null, code, 0, 10, admin.getId()).totalElements()).isEqualTo(1);
     }
 
     @Test
@@ -421,6 +587,36 @@ class BackendConsistencyIntegrationTests {
         var stored = gradeChanges.listChanges(null, sheet.id(), 0, 20, admin.getId()).content().getFirst();
         assertThat(evaluation.mySheet(evaluationId, lecturerA.getUser().getId()).status())
                 .isEqualTo(stored.status() == GradeChangeStatus.APPROVED ? ScoreSheetStatus.DRAFT : ScoreSheetStatus.SUBMITTED);
+    }
+
+    @Test
+    void milestoneListsBatchReportsAndFeedbackWithoutQueriesPerRow() {
+        Long project = assignedProject();
+        var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        long[] queryCounts = new long[2];
+        for (int index = 0; index < 3; index++) {
+            var milestone = progress.create(new CreateMilestoneRequest(project, "Milestone " + index,
+                    MilestoneType.PROGRESS, "Description", now().plusDays(1)), admin.getId());
+            Long file = tx.execute(status -> {
+                StoredFile stored = new StoredFile(); stored.setStorageKey(unique()); stored.setOriginalName("report.txt");
+                stored.setMimeType("text/plain"); stored.setSizeBytes(1L); stored.setSha256("0".repeat(64));
+                stored.setUploadedBy(users.getReferenceById(leaderA.getUser().getId())); stored.setUploadedAt(now());
+                stored.setStatus(StoredFileStatus.READY); return files.save(stored).getId();
+            });
+            var report = progress.submit(milestone.id(), new SubmitReportRequest(file, "Report"), leaderA.getUser().getId());
+            progress.feedback(report.id(), new FeedbackRequest("Complete", true), lecturerC.getUser().getId());
+            if (index == 0 || index == 2) {
+                int position = index == 0 ? 0 : 1;
+                int size = index + 1;
+                tx.executeWithoutResult(status -> {
+                    entityManager.clear(); statistics.clear();
+                    assertThat(progress.list(project, admin.getId())).hasSize(size).allSatisfy(item ->
+                            assertThat(item.submissions()).hasSize(1).allSatisfy(submission -> assertThat(submission.feedback()).hasSize(1)));
+                    queryCounts[position] = statistics.getPrepareStatementCount();
+                });
+            }
+        }
+        assertThat(queryCounts[1]).isEqualTo(queryCounts[0]);
     }
 
     @Test

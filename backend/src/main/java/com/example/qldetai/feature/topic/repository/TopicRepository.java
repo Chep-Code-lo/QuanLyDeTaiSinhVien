@@ -14,7 +14,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface TopicRepository extends JpaRepository<Topic, Long> {
+public interface TopicRepository extends JpaRepository<Topic, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Topic> {
+
+    @Override
+    @EntityGraph(attributePaths = {"period", "faculty", "department", "proposedBy", "reservedGroup"})
+    Page<Topic> findAll(org.springframework.data.jpa.domain.Specification<Topic> specification, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select topic from Topic topic where topic.id = :id")

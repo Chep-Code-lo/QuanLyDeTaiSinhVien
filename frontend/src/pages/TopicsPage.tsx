@@ -1,8 +1,7 @@
 import { formatDate } from '../utils/dateTime'
 import { AnimatedSelect } from '../components/AnimatedSelect'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { topicApi } from '../api/topics'
-import { allPages } from '../api/student'
 import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
 import { RegistrationTopicForm } from '../components/RegistrationTopicForm'
@@ -20,6 +19,7 @@ export function TopicsPage() {
   const [topics, setTopics] = useState<TopicResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
   const [status, setStatus] = useState<TopicStatus>(student ? 'PUBLISHED' : '')
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get('q') ?? ''
@@ -31,10 +31,12 @@ export function TopicsPage() {
     setLoading(true)
     setError('')
     const visibleStatus = student ? 'PUBLISHED' : status || undefined
-    allPages(page => topicApi.list({ status: visibleStatus, page, size: 100 }))
+    const timer = window.setTimeout(() => { void topicApi.list({ status: visibleStatus, q: query.trim() || undefined, page, size: 10 })
       .then((data) => {
         if (!active) return
-        setTopics(data)
+        setTopics(data.content)
+        setTotalPages(data.totalPages)
+        if (data.totalPages > 0 && page >= data.totalPages) setPage(data.totalPages - 1)
       })
       .catch((error) => {
         if (!active) return
@@ -43,40 +45,23 @@ export function TopicsPage() {
         showError(message)
       })
       .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
-  }, [showError, status, revision, student])
-  const filtered = useMemo(() => {
-    const text = query.trim().toLocaleLowerCase('vi')
-    return text
-      ? topics.filter((topic) =>
-          [
-            topic.code,
-            topic.title,
-            topic.departmentName,
-            topic.supervisors.map((x) => x.lecturerName).join(' '),
-          ]
-            .join(' ')
-            .toLocaleLowerCase('vi')
-            .includes(text),
-        )
-      : topics
-  }, [query, topics])
-  const filteredTotalPages = Math.ceil(filtered.length / 10)
-  const currentPage = Math.min(page, Math.max(0, filteredTotalPages - 1))
-  const visible = filtered.slice(currentPage * 10, (currentPage + 1) * 10)
+    }, 200)
+    return () => { active = false; window.clearTimeout(timer) }
+  }, [showError, status, revision, student, page, query])
   return (
     <>
       <PageHeader
         title={student ? 'Danh sách đề tài đã công bố' : 'Đề tài & Dự án'}
       />
       {canCreateTopic && (
-        <RegistrationTopicForm onCreated={(topic) => setTopics((current) => [topic, ...current])} />
+        <RegistrationTopicForm onCreated={() => { setPage(0); setRevision((value) => value + 1) }} />
       )}
       <section className="page-card">
         <div className="topics-toolbar">
           <label className="search-field">
             <span aria-hidden="true">⌕</span>
             <input
+              aria-label="Tìm đề tài"
               value={query}
               onChange={(e) => { setPage(0); setSearchParams(previous => { const next = new URLSearchParams(previous); if (e.target.value) next.set('q', e.target.value); else next.delete('q'); return next }, { replace: true }) }}
               placeholder="Tìm mã, tên đề tài, bộ môn, GVHD..."
@@ -105,7 +90,7 @@ export function TopicsPage() {
           </div>
         ) : error ? (
           <div className="content-state" role="alert"><p>{error}</p><button className="btn btn-secondary" onClick={() => setRevision(value => value + 1)}>Thử lại</button></div>
-        ) : visible.length === 0 ? (
+        ) : topics.length === 0 ? (
           <div className="content-state">
             <strong>Chưa có đề tài phù hợp.</strong>
             <p>Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.</p>
@@ -125,7 +110,7 @@ export function TopicsPage() {
                 </tr>
               </thead>
               <tbody>
-                {visible.map((topic) => (
+                {topics.map((topic) => (
                   <Fragment key={topic.id}><tr>
                     <td className="topic-code">{topic.code}</td>
                     <td>
@@ -153,23 +138,23 @@ export function TopicsPage() {
             </table>
           </div>
         )}
-        {filteredTotalPages > 1 && (
+        {totalPages > 1 && (
           <div className="table-pagination">
             <span>
-              Trang {currentPage + 1} / {filteredTotalPages}
+              Trang {page + 1} / {totalPages}
             </span>
             <div>
               <button
                 className="btn btn-secondary btn-sm"
-                disabled={loading || currentPage === 0}
-                onClick={() => setPage(currentPage - 1)}
+                disabled={loading || page === 0}
+                onClick={() => setPage(page - 1)}
               >
                 Trước
               </button>
               <button
                 className="btn btn-secondary btn-sm"
-                disabled={loading || currentPage >= filteredTotalPages - 1}
-                onClick={() => setPage(currentPage + 1)}
+                disabled={loading || page >= totalPages - 1}
+                onClick={() => setPage(page + 1)}
               >
                 Sau
               </button>
