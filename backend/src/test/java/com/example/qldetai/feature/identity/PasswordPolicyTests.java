@@ -28,13 +28,12 @@ class PasswordPolicyTests {
     }
 
     @Test
-    void accepts100CharactersButRejects101AndReportsThePasswordField() {
-        try (var factory = Validation.buildDefaultValidatorFactory()) {
-            var validator = factory.getValidator();
-            assertThat(validator.validate(new ChangePasswordRequest("old", "A1!" + "a".repeat(97)))).isEmpty();
-            assertThat(validator.validate(new ChangePasswordRequest("old", "A1!" + "a".repeat(98))))
-                    .allSatisfy(violation -> assertThat(violation.getPropertyPath().toString()).isEqualTo("newPassword"));
-            assertThat(validator.validate(new ChangePasswordRequest("old", "A1!" + "a".repeat(98)))).isNotEmpty();
+    void enforcesUtf8ByteBoundaryOnBothDtos() {
+        for (String prefix : new String[] {"A1!" + "a".repeat(69), "A1!" + "ề".repeat(23),
+                "A1!" + "😀".repeat(17) + "a"}) {
+            bothBackendDtosEnforceTheFrontendUnicodePolicy(prefix, true);
+            bothBackendDtosEnforceTheFrontendUnicodePolicy(prefix + "a", false);
         }
+        bothBackendDtosEnforceTheFrontendUnicodePolicy("A1!" + "a".repeat(97), false);
     }
 }

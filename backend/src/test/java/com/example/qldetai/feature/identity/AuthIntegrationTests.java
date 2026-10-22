@@ -74,6 +74,26 @@ class AuthIntegrationTests {
         }
     }
 
+    @Test
+    void oversizedLoginPasswordReturnsClearVietnamese400() throws Exception {
+        for (String password : new String[] {"A1!" + "a".repeat(70), "A1!" + "ề".repeat(24),
+                "A1!" + "😀".repeat(18), "A1!" + "a".repeat(97)}) {
+            loginAttempt("admin@test.local", password, "203.0.113.80")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(com.example.qldetai.feature.identity.validation.PasswordByteLength.MESSAGE));
+        }
+    }
+
+    @Test
+    void legacyPbkdf2UserCanStillLogin() throws Exception {
+        String email = createUserWithRole("legacy-pbkdf2", RoleCode.ADMIN);
+        User user = userRepository.findByEmailIgnoreCase(email).orElseThrow();
+        user.setPasswordHash("{pbkdf2}" + org.springframework.security.crypto.password.Pbkdf2PasswordEncoder
+                .defaultsForSpringSecurity_v5_8().encode("TestPassword123!"));
+        userRepository.saveAndFlush(user);
+        loginAttempt(email, "TestPassword123!", "203.0.113.81").andExpect(status().isOk());
+    }
+
     private org.springframework.test.web.servlet.ResultActions loginAttempt(String email, String password, String ip) throws Exception {
         return mockMvc.perform(post("/api/v1/auth/login")
                 .with(csrf())

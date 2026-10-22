@@ -3,6 +3,7 @@ package com.example.qldetai.feature.identity.dto;
 import com.example.qldetai.feature.identity.domain.PositionCode;
 import com.example.qldetai.feature.identity.domain.RoleCode;
 import com.example.qldetai.feature.identity.domain.UserStatus;
+import com.example.qldetai.feature.identity.validation.PasswordByteLength;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Min;
@@ -19,7 +20,7 @@ public final class IdentityDtos {
     private static final String PASSWORD_PATTERN =
             "(?=[\\s\\S]*\\p{Lu})(?=[\\s\\S]*\\p{Nd})(?=[\\s\\S]*[\\p{P}\\p{S}])[\\s\\S]{8,100}";
     private static final String PASSWORD_REQUIREMENTS =
-            "Mật khẩu phải có từ 8 đến 100 ký tự, chữ in hoa, chữ số và ký tự đặc biệt.";
+            "Mật khẩu phải có ít nhất 8 ký tự, chữ in hoa, chữ số và ký tự đặc biệt, tối đa 72 byte UTF-8 (tiếng Việt có dấu/emoji chiếm nhiều byte hơn).";
 
     private IdentityDtos() {
     }
@@ -30,7 +31,7 @@ public final class IdentityDtos {
 
     public record ChangePasswordRequest(
             @NotBlank String currentPassword,
-            @NotBlank @Size(min = 8, max = 100)
+            @NotBlank @PasswordByteLength @Size(min = 8, max = 100)
             @Pattern(regexp = PASSWORD_PATTERN, message = PASSWORD_REQUIREMENTS) String newPassword) {
         @Override public String toString() { return "ChangePasswordRequest[credentials=REDACTED]"; }
     }
@@ -64,7 +65,7 @@ public final class IdentityDtos {
 
     public record CreateUserRequest(
             @NotBlank @Email @Size(max = 254) String email,
-            @NotBlank @Size(min = 8, max = 100)
+            @NotBlank @PasswordByteLength @Size(min = 8, max = 100)
             @Pattern(regexp = PASSWORD_PATTERN, message = PASSWORD_REQUIREMENTS) String password,
             @NotBlank @Size(max = 150) String fullName,
             @Size(max = 20) String phone,

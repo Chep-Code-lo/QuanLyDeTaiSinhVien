@@ -27,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.nio.charset.StandardCharsets;
+import com.example.qldetai.feature.identity.validation.PasswordByteLength;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +50,9 @@ public class AuthService {
     @Transactional
     public LoginResponse login(
             LoginRequest request, HttpServletRequest httpRequest, HttpServletResponse response) {
+        if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
+            throw new BusinessRuleException(PasswordByteLength.MESSAGE);
+        }
         Authentication authentication =
                 loginAttempts.authenticate(request.username(), clientIp(httpRequest), () -> authenticationManager.authenticate(
                         UsernamePasswordAuthenticationToken.unauthenticated(
