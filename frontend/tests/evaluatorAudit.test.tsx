@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
   periods: vi.fn(),
+  progress: vi.fn(),
+  assignments: vi.fn(),
 }))
 const page = (content: unknown[]) => ({
   content,
@@ -86,7 +88,8 @@ vi.mock('../src/api/evaluation', () => ({
     listDefenses: async () =>
       page([{ id: 71, assignmentId: 51, committeeId: 11, status: 'SCHEDULED' }]),
     listCommittees: async () => page([committee]),
-    listAssignments: async () => page([]),
+    reviewProgress: mocks.progress,
+    listAssignments: mocks.assignments,
     saveCommittee: mocks.saveCommittee,
     assignBatch: mocks.assignBatch,
   },
@@ -97,6 +100,15 @@ vi.mock('../src/context/ToastContext', () => ({
 }))
 
 beforeEach(() => {
+  mocks.progress.mockReset()
+  mocks.progress.mockResolvedValue({
+    assignedCount: 32,
+    submittedCount: 20,
+    draftCount: 2,
+    notStartedCount: 10,
+  })
+  mocks.assignments.mockReset()
+  mocks.assignments.mockResolvedValue(page([]))
   mocks.periods.mockReset()
   mocks.periods.mockResolvedValue(
     page([{ id: 1, name: 'Đợt A', minCommitteeMembers: 3, maxCommitteeMembers: 5 }]),
@@ -166,4 +178,42 @@ it('lỗi phân công theo lô giữ lựa chọn và không lưu lại hội đ
     expect.arrayContaining([expect.objectContaining({ assignmentId: 51, defenseId: 71 })]),
   )
   expect(screen.getByText('Đã chọn 1 đề tài')).toBeTruthy()
+})
+
+it('hiển thị tiến độ toàn đợt, phân biệt trạng thái phân công và phiếu điểm, cho phép làm mới', async () => {
+  const row = {
+    id: 1,
+    topicTitle: 'Đề tài phản biện',
+    topicCode: 'PB01',
+    groupName: 'Nhóm A',
+    lecturerName: 'GV A',
+    componentName: 'Phản biện',
+    rubricName: 'Tiêu chí',
+    rubricVersionNo: 1,
+    evaluatorRole: 'REVIEWER',
+    deadlineAt: '2099-02-20T00:00:00Z',
+    status: 'ACTIVE',
+  }
+  mocks.assignments.mockResolvedValue({
+    ...page([
+      { ...row, scoreSheetId: 11, scoreSheetStatus: 'SUBMITTED' },
+      { ...row, id: 2, scoreSheetId: 12, scoreSheetStatus: 'DRAFT' },
+    ]),
+    totalElements: 32,
+    totalPages: 4,
+  })
+  render(<EvaluatorAssignmentPage />)
+  expect(await screen.findByText(/Đã nộp 20\/32 phiếu/)).toBeTruthy()
+  const table = await screen.findByRole('table')
+  expect(table.textContent).toContain('Tiến độ chấm')
+  expect(table.textContent).toContain('Đã nộp')
+  expect(table.textContent).toContain('Đang chấm')
+  mocks.progress.mockResolvedValue({
+    assignedCount: 32,
+    submittedCount: 21,
+    draftCount: 1,
+    notStartedCount: 10,
+  })
+  await userEvent.click(screen.getByRole('button', { name: 'Làm mới tiến độ phản biện' }))
+  expect(await screen.findByText(/Đã nộp 21\/32 phiếu/)).toBeTruthy()
 })

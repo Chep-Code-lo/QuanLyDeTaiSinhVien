@@ -21,6 +21,7 @@ import type {
   ProjectAssignmentResponse,
   RegistrationPeriodResponse,
   RubricResponse,
+  ReviewProgressResponse,
 } from '../types/domain'
 import './EvaluatorAssignmentPage.css'
 
@@ -92,6 +93,29 @@ export function EvaluatorAssignmentPage() {
   const [listLoading, setListLoading] = useState(false)
   const [listError, setListError] = useState('')
   const [listVersion, setListVersion] = useState(0)
+  const progressKey = JSON.stringify([periodId, listVersion, reload])
+  const [reviewProgress, setReviewProgress] = useState<{
+    key: string
+    data?: ReviewProgressResponse
+    error?: string
+  } | null>(null)
+  const progress = reviewProgress?.key === progressKey ? reviewProgress : null
+  useEffect(() => {
+    if (!periodId) return
+    let active = true
+    evaluationApi
+      .reviewProgress(periodId)
+      .then((data) => {
+        if (active) setReviewProgress({ key: progressKey, data })
+      })
+      .catch(() => {
+        if (active)
+          setReviewProgress({ key: progressKey, error: 'Không tải được tiến độ phản biện.' })
+      })
+    return () => {
+      active = false
+    }
+  }, [periodId, progressKey])
   const [topicOpen, setTopicOpen] = useState(false)
   const [query, setQuery] = useState('')
   const picker = useRef<HTMLDivElement>(null)
@@ -970,6 +994,36 @@ export function EvaluatorAssignmentPage() {
           </footer>
         </form>
       )}
+      {periodId && (
+        <section className="ea-notice" aria-label="Tiến độ phản biện của đợt" role="status">
+          <strong>Tiến độ phản biện của đợt</strong>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={!progress}
+            onClick={() => setListVersion((value) => value + 1)}
+          >
+            Làm mới tiến độ phản biện
+          </button>
+          {!progress ? (
+            <p>Đang tải tiến độ phản biện...</p>
+          ) : progress.error ? (
+            <p>
+              {progress.error}{' '}
+              <button type="button" onClick={() => setListVersion((value) => value + 1)}>
+                Thử lại
+              </button>
+            </p>
+          ) : (
+            progress.data && (
+              <p>
+                Đã nộp {progress.data.submittedCount}/{progress.data.assignedCount} phiếu · Đang
+                chấm: {progress.data.draftCount} · Chưa chấm: {progress.data.notStartedCount}
+              </p>
+            )
+          )}
+        </section>
+      )}
       <section className="ea-list">
         <div className="ea-list-heading">
           <h2>Danh sách phân công</h2>
@@ -1002,6 +1056,7 @@ export function EvaluatorAssignmentPage() {
                   <th>Vai trò</th>
                   <th>Hạn chót</th>
                   <th>Trạng thái</th>
+                  <th>Tiến độ chấm</th>
                 </tr>
               </thead>
               <tbody>
@@ -1027,6 +1082,19 @@ export function EvaluatorAssignmentPage() {
                     <td>{formatDateTime(item.deadlineAt)}</td>
                     <td>
                       <StatusBadge status={item.status} />
+                    </td>
+                    <td>
+                      {item.status !== 'ACTIVE'
+                        ? 'Đã hủy'
+                        : !item.scoreSheetId
+                          ? 'Chưa chấm'
+                          : item.scoreSheetStatus === 'DRAFT'
+                            ? 'Đang chấm'
+                            : item.scoreSheetStatus === 'LOCKED'
+                              ? 'Đã nộp (đã khóa)'
+                              : item.scoreSheetStatus === 'SUBMITTED'
+                                ? 'Đã nộp'
+                                : 'Chưa chấm'}
                     </td>
                   </tr>
                 ))}

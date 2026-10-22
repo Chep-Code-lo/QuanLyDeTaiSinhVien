@@ -33,6 +33,12 @@ vi.mock('../src/api/evaluation', () => ({
     listDefenses: mocks.defenses,
     listCommittees: mocks.committees,
     listRubrics: mocks.rubrics,
+    reviewProgress: async () => ({
+      assignedCount: 3,
+      submittedCount: 1,
+      draftCount: 1,
+      notStartedCount: 1,
+    }),
     listAssignments: mocks.assignments,
     scheduleDefense: mocks.scheduleDefense,
     saveCommittee: mocks.saveCommittee,

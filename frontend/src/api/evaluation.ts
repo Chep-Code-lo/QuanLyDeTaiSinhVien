@@ -14,6 +14,7 @@ import type {
   RubricResponse,
   SaveSheetRequest,
   ScoreSheetResponse,
+  ReviewProgressResponse,
 } from '../types/domain'
 
 export interface ListAssignmentsParams {
@@ -91,6 +92,13 @@ export const evaluationApi = {
     const response = await apiClient.post<
       ApiResponse<{ assignedCount: number; skippedCount: number }>
     >('/evaluation-assignments/batch', { assignments })
+    return response.data.data
+  },
+  reviewProgress: async (periodId: number) => {
+    const response = await apiClient.get<ApiResponse<ReviewProgressResponse>>(
+      '/evaluation-assignments/review-progress',
+      { params: { periodId } },
+    )
     return response.data.data
   },
   defenseEligibility: async (

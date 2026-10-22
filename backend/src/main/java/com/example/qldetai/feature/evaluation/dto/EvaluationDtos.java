@@ -111,6 +111,9 @@ public final class EvaluationDtos {
             Long scoreSheetId,
             ScoreSheetStatus scoreSheetStatus) {}
 
+    public record ReviewProgressResponse(
+            long assignedCount, long submittedCount, long draftCount, long notStartedCount) {}
+
     public record ScoreSheetResponse(
             Long id,
             Long evaluationId,

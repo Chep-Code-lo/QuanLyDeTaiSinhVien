@@ -21,6 +21,9 @@ public interface EvaluationAssignmentRepository
         extends JpaRepository<EvaluationAssignment, Long>,
                 JpaSpecificationExecutor<EvaluationAssignment> {
 
+    @Query("select e.assignment.id from EvaluationAssignment e where e.id = :id")
+    Optional<Long> findProjectIdByEvaluationId(Long id);
+
     @Override
     @EntityGraph(
             attributePaths = {

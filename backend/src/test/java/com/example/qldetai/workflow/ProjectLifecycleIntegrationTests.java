@@ -354,6 +354,160 @@ class ProjectLifecycleIntegrationTests {
                 .andExpect(status().isCreated());
     }
 
+    @Test
+    void reviewSubmissionNotifiesScopedManagersOnlyAndProgressCountsAllActiveAssignments(
+            @Autowired MockMvc mvc) throws Exception {
+        var project = createAssignedProject("review-progress", leaderStudent, secondStudent);
+        var catalog =
+                createLockedCatalog("review-progress", "Phản biện", AssessmentComponentType.REVIEW);
+        var dean = new AcademicAppointment();
+        dean.setLecturer(lecturerFive);
+        dean.setFaculty(faculty);
+        dean.setPositionCode(PositionCode.DEAN);
+        dean.setStartsAt(nowUtc().minusDays(1));
+        dean.setAssignedBy(admin);
+        appointments.saveAndFlush(dean);
+        var otherHead = new AcademicAppointment();
+        otherHead.setLecturer(lecturerOne);
+        otherHead.setFaculty(faculty);
+        otherHead.setDepartment(createDepartment(faculty, "OTHER"));
+        otherHead.setPositionCode(PositionCode.DEPARTMENT_HEAD);
+        otherHead.setStartsAt(nowUtc().minusDays(1));
+        otherHead.setAssignedBy(admin);
+        appointments.saveAndFlush(otherHead);
+        Long first =
+                evaluationService.assign(
+                        new CreateEvaluationRequest(
+                                project.id(),
+                                catalog.rubric().id(),
+                                lecturerThree.getId(),
+                                null,
+                                nowUtc().plusDays(1)),
+                        admin.getId());
+        Long second =
+                evaluationService.assign(
+                        new CreateEvaluationRequest(
+                                project.id(),
+                                catalog.rubric().id(),
+                                lecturerFour.getId(),
+                                null,
+                                nowUtc().plusDays(1)),
+                        admin.getId());
+        Long canceledId =
+                evaluationService.assign(
+                        new CreateEvaluationRequest(
+                                project.id(),
+                                catalog.rubric().id(),
+                                lecturerFive.getId(),
+                                null,
+                                nowUtc().plusDays(1)),
+                        admin.getId());
+        var canceled = evaluationRepository.findById(canceledId).orElseThrow();
+        canceled.setStatus(
+                com.example.qldetai.feature.evaluation.domain.EvaluationStatus.CANCELLED);
+        evaluationRepository.saveAndFlush(canceled);
+        var draft =
+                evaluationService.saveSheet(
+                        first,
+                        new SaveSheetRequest(
+                                0,
+                                "Private comment",
+                                scoreRequests(
+                                        catalog.rubric(),
+                                        new BigDecimal("5.5"),
+                                        new BigDecimal("3.5")),
+                                false),
+                        lecturerThree.getUser().getId());
+        assertThat(notifications.list(admin.getId(), "phiếu điểm phản biện", 0, 100).content())
+                .isEmpty();
+        var progress = evaluationService.reviewProgress(period.getId(), admin.getId());
+        assertThat(progress.assignedCount()).isEqualTo(2);
+        assertThat(progress.draftCount()).isEqualTo(1);
+        assertThat(progress.notStartedCount()).isEqualTo(1);
+        assertThat(progress.submittedCount()).isZero();
+        evaluationService.saveSheet(
+                first,
+                new SaveSheetRequest(
+                        draft.version(),
+                        "Private comment",
+                        scoreRequests(
+                                catalog.rubric(), new BigDecimal("5.5"), new BigDecimal("3.5")),
+                        true),
+                lecturerThree.getUser().getId());
+        assertThat(notifications.list(admin.getId(), "hoàn tất phản biện", 0, 100).content())
+                .isEmpty();
+        evaluationService.saveSheet(
+                second,
+                new SaveSheetRequest(
+                        0,
+                        "Private comment",
+                        scoreRequests(
+                                catalog.rubric(), new BigDecimal("5.5"), new BigDecimal("3.5")),
+                        true),
+                lecturerFour.getUser().getId());
+        for (User manager : List.of(admin, lecturerFive.getUser())) {
+            assertThat(
+                            notifications
+                                    .list(manager.getId(), "Đã nộp phiếu điểm phản biện", 0, 100)
+                                    .content())
+                    .hasSize(2)
+                    .allSatisfy(
+                            item ->
+                                    assertThat(item.content())
+                                            .doesNotContain("Private comment", "5.5", "3.5"));
+            assertThat(notifications.list(manager.getId(), "hoàn tất phản biện", 0, 100).content())
+                    .hasSize(1);
+        }
+        for (User other :
+                List.of(leaderStudent.getUser(), secondStudent.getUser(), lecturerOne.getUser())) {
+            assertThat(notifications.list(other.getId(), "phiếu điểm phản biện", 0, 100).content())
+                    .isEmpty();
+        }
+        assertThatThrownBy(
+                        () ->
+                                evaluationService.saveSheet(
+                                        second,
+                                        new SaveSheetRequest(
+                                                0,
+                                                null,
+                                                scoreRequests(
+                                                        catalog.rubric(),
+                                                        new BigDecimal("5.5"),
+                                                        new BigDecimal("3.5")),
+                                                true),
+                                        lecturerFour.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class);
+        assertThat(
+                        notifications
+                                .list(admin.getId(), "Đã nộp phiếu điểm phản biện", 0, 100)
+                                .content())
+                .hasSize(2);
+        mvc.perform(
+                        get("/api/v1/evaluation-assignments/review-progress")
+                                .param("periodId", period.getId().toString())
+                                .with(user(UserPrincipal.from(admin))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.assignedCount").value(2))
+                .andExpect(jsonPath("$.data.submittedCount").value(2));
+        mvc.perform(
+                        get("/api/v1/evaluation-assignments/review-progress")
+                                .param("periodId", period.getId().toString())
+                                .with(user(UserPrincipal.from(lecturerThree.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.assignedCount").value(1));
+        mvc.perform(
+                        get("/api/v1/evaluation-assignments/review-progress")
+                                .param("periodId", period.getId().toString())
+                                .with(user(UserPrincipal.from(lecturerTwo.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.assignedCount").value(0));
+        mvc.perform(
+                        get("/api/v1/evaluation-assignments/review-progress")
+                                .param("periodId", period.getId().toString())
+                                .with(user(UserPrincipal.from(leaderStudent.getUser()))))
+                .andExpect(status().isForbidden());
+    }
+
     private Long eligibilityCommittee(String name) {
         Long id =
                 evaluationCommitteeService.createCommittee(

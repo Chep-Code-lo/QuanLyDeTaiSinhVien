@@ -51,6 +51,17 @@ public class EvaluationAssignmentController {
         return ApiResponse.success(batchService.assign(request, principal.id()));
     }
 
+    @GetMapping("/evaluation-assignments/review-progress")
+    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    public ApiResponse<
+                    com.example.qldetai.feature.evaluation.dto.EvaluationDtos
+                            .ReviewProgressResponse>
+            reviewProgress(
+                    @RequestParam @Min(1) Long periodId,
+                    @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(service.reviewProgress(periodId, principal.id()));
+    }
+
     @GetMapping("/evaluation-assignments")
     @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
     public ApiResponse<PageResponse<EvaluationAssignmentResponse>> assignments(
