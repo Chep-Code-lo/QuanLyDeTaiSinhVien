@@ -3,6 +3,7 @@ package com.example.qldetai.feature.communication.email;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -29,13 +30,20 @@ public class EmailOutboxDeliveryStateService {
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime threshold = now.minusMinutes(Math.max(1, properties.getClaimTimeoutMinutes()));
         int batchSize = Math.max(1, Math.min(properties.getMaxPerRun(), 100));
-        List<EmailOutbox> stale = outboxRepository.findByStatusAndClaimedAtBefore(
-                EmailOutboxStatus.SENDING, threshold, PageRequest.of(0, batchSize));
+        // Discover IDs without locking the status index, then use the same primary-key
+        // lock order as sendIfOwned. Re-check after waiting for any in-flight SMTP call.
+        List<Long> stale = outboxRepository.findStaleClaimIds(threshold, PageRequest.of(0, batchSize));
         int maxAttempts = Math.max(1, properties.getMaxAttempts());
-        for (EmailOutbox message : stale) {
+        for (Long id : stale) {
+            EmailOutbox message = outboxRepository.findByIdForUpdate(id).orElse(null);
+            if (message == null || message.getStatus() != EmailOutboxStatus.SENDING
+                    || message.getClaimedAt() == null || !message.getClaimedAt().isBefore(threshold)) {
+                continue;
+            }
             boolean retry = message.getAttemptCount() < maxAttempts;
             message.setStatus(retry ? EmailOutboxStatus.PENDING : EmailOutboxStatus.FAILED);
             message.setClaimedAt(null);
+            message.setClaimToken(null);
             if (retry) {
                 message.setNextAttemptAt(now);
             }
@@ -45,35 +53,53 @@ public class EmailOutboxDeliveryStateService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void markSent(Long outboxId) {
-        outboxRepository.findById(outboxId)
-                .filter(message -> message.getStatus() == EmailOutboxStatus.SENDING)
-                .ifPresent(message -> {
-                    LocalDateTime now = LocalDateTime.now(clock);
-                    message.setStatus(EmailOutboxStatus.SENT);
-                    message.setSentAt(now);
-                    message.setClaimedAt(null);
-                    message.setLastError(null);
-                    recordAttempt(message, EmailOutboxStatus.SENT, null, now);
-                });
+    public void sendIfOwned(EmailDeliveryClaim claim, Runnable send) {
+        owned(claim).ifPresent(message -> {
+            try {
+                send.run();
+                sent(message);
+            } catch (RuntimeException exception) {
+                failed(message, exception.getClass().getSimpleName() + ": SMTP delivery failed.", true);
+            }
+        });
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void markFailure(Long outboxId, String rawError, boolean retryable) {
-        outboxRepository.findById(outboxId)
-                .filter(message -> message.getStatus() == EmailOutboxStatus.SENDING)
-                .ifPresent(message -> {
-                    LocalDateTime now = LocalDateTime.now(clock);
-                    String safeError = sanitizeError(rawError);
-                    boolean retry = retryable && message.getAttemptCount() < Math.max(1, properties.getMaxAttempts());
-                    message.setStatus(retry ? EmailOutboxStatus.PENDING : EmailOutboxStatus.FAILED);
-                    message.setClaimedAt(null);
-                    message.setLastError(safeError);
-                    if (retry) {
-                        message.setNextAttemptAt(now.plusSeconds(backoffSeconds(message.getAttemptCount())));
-                    }
-                    recordAttempt(message, EmailOutboxStatus.FAILED, safeError, now);
-                });
+    public void markSent(EmailDeliveryClaim claim) {
+        owned(claim).ifPresent(this::sent);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markFailure(EmailDeliveryClaim claim, String rawError, boolean retryable) {
+        owned(claim).ifPresent(message -> failed(message, rawError, retryable));
+    }
+
+    private Optional<EmailOutbox> owned(EmailDeliveryClaim claim) {
+        return outboxRepository.findByIdForUpdate(claim.id())
+                .filter(message -> message.getStatus() == EmailOutboxStatus.SENDING
+                        && claim.token() != null && claim.token().equals(message.getClaimToken()));
+    }
+
+    private void sent(EmailOutbox message) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        message.setStatus(EmailOutboxStatus.SENT);
+        message.setSentAt(now);
+        message.setClaimedAt(null);
+        message.setClaimToken(null);
+        message.setLastError(null);
+        recordAttempt(message, EmailOutboxStatus.SENT, null, now);
+    }
+
+    private void failed(EmailOutbox message, String rawError, boolean retryable) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        String safeError = sanitizeError(rawError);
+        boolean retry = retryable && message.getAttemptCount() < Math.max(1, properties.getMaxAttempts());
+        message.setStatus(retry ? EmailOutboxStatus.PENDING : EmailOutboxStatus.FAILED);
+        message.setClaimedAt(null);
+        message.setClaimToken(null);
+        message.setLastError(safeError);
+        if (retry) message.setNextAttemptAt(now.plusSeconds(backoffSeconds(message.getAttemptCount())));
+        recordAttempt(message, EmailOutboxStatus.FAILED, safeError, now);
     }
 
     private void recordAttempt(

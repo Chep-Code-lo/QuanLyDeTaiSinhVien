@@ -74,6 +74,7 @@ public class EvaluationService {
     private static final String STATUS_LOCKED = "LOCKED";
 
     private final EvaluationReadScope readScope;
+    private final EvaluationCatalogAccess catalogAccess;
     private final AssessmentComponentRepository components;
     private final RubricRepository rubrics;
     private final RubricCriterionRepository criteria;
@@ -94,9 +95,9 @@ public class EvaluationService {
 
 
     @Transactional(readOnly = true)
-    public List<AssessmentComponentResponse> listComponents(Long periodId) {
-        List<AssessmentComponent> found = components.findByPeriodIdOrderByCodeAsc(periodId);
-        return found.stream().map(this::component).toList();
+    public List<AssessmentComponentResponse> listComponents(Long periodId, Long actorId) {
+        return components.findAll(catalogAccess.components(periodId, actorId), Sort.by("code").ascending())
+                .stream().map(this::component).toList();
     }
 
     @Transactional
@@ -135,8 +136,8 @@ public class EvaluationService {
     }
 
     @Transactional(readOnly = true)
-    public List<RubricResponse> listRubrics(Long componentId) {
-        List<Rubric> found = rubrics.findByComponentIdOrderByVersionNoDesc(componentId);
+    public List<RubricResponse> listRubrics(Long componentId, Long actorId) {
+        List<Rubric> found = rubrics.findAll(catalogAccess.rubrics(componentId, actorId), Sort.by("versionNo").descending());
         if (found.isEmpty()) {
             return List.of();
         }

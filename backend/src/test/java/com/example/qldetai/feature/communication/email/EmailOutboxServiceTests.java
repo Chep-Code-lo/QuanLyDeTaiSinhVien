@@ -54,9 +54,9 @@ class EmailOutboxServiceTests {
 
         EmailOutbox outbox = sendingOutbox();
         when(outboxRepository.findByIdAndStatus(12L, EmailOutboxStatus.SENDING)).thenReturn(Optional.of(outbox));
-        when(outboxRepository.findById(12L)).thenReturn(Optional.of(outbox));
+        when(outboxRepository.findByIdForUpdate(12L)).thenReturn(Optional.of(outbox));
 
-        service.deliver(12L);
+        service.deliver(new EmailDeliveryClaim(12L, "claim-token"));
 
         ArgumentCaptor<MimeMessage> messageCaptor = ArgumentCaptor.forClass(MimeMessage.class);
         verify(sender).send(messageCaptor.capture());
@@ -86,6 +86,7 @@ class EmailOutboxServiceTests {
         outbox.setBody("Nội dung kiểm thử");
         outbox.setStatus(EmailOutboxStatus.SENDING);
         outbox.setAttemptCount(1);
+        outbox.setClaimToken("claim-token");
         return outbox;
     }
 }

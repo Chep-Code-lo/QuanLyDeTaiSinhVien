@@ -80,16 +80,17 @@ public class EmailOutboxService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public List<Long> claimReadyMessages() {
+    public List<EmailDeliveryClaim> claimReadyMessages() {
         LocalDateTime now = LocalDateTime.now(clock);
         int batchSize = Math.max(1, Math.min(properties.getMaxPerRun(), 100));
         List<EmailOutbox> messages = outboxRepository.lockReadyForDelivery(now, PageRequest.of(0, batchSize));
         for (EmailOutbox message : messages) {
             message.setStatus(EmailOutboxStatus.SENDING);
             message.setClaimedAt(now);
+            message.setClaimToken(UUID.randomUUID().toString());
             message.setAttemptCount(message.getAttemptCount() + 1);
         }
-        return messages.stream().map(EmailOutbox::getId).toList();
+        return messages.stream().map(message -> new EmailDeliveryClaim(message.getId(), message.getClaimToken())).toList();
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -107,19 +108,19 @@ public class EmailOutboxService {
     }
 
     /** SMTP communication happens after the original business transaction has committed. */
-    public void deliver(Long outboxId) {
-        Optional<DeliveryPayload> payload = loadDeliveryPayload(outboxId);
+    public void deliver(EmailDeliveryClaim claim) {
+        Optional<DeliveryPayload> payload = loadDeliveryPayload(claim);
         if (payload.isEmpty()) {
             return;
         }
         DeliveryPayload message = payload.get();
         if (!message.recipientActive()) {
-            deliveryStateService.markFailure(outboxId, "Recipient account is no longer active.", false);
+            deliveryStateService.markFailure(claim, "Recipient account is no longer active.", false);
             return;
         }
         JavaMailSender sender = mailSenderProvider.getIfAvailable();
         if (sender == null) {
-            deliveryStateService.markFailure(outboxId, "SMTP sender is not configured in this environment.", false);
+            deliveryStateService.markFailure(claim, "SMTP sender is not configured in this environment.", false);
             return;
         }
         try {
@@ -132,16 +133,17 @@ public class EmailOutboxService {
             }
             helper.setSubject(message.subject());
             helper.setText(message.body(), false);
-            sender.send(mimeMessage);
-            deliveryStateService.markSent(outboxId);
+            // The row lock spans the final fence check, SMTP call and completion.
+            deliveryStateService.sendIfOwned(claim, () -> sender.send(mimeMessage));
         } catch (Exception exception) {
             deliveryStateService.markFailure(
-                    outboxId, exception.getClass().getSimpleName() + ": SMTP delivery failed. Check mail server configuration and connectivity.", true);
+                    claim, exception.getClass().getSimpleName() + ": SMTP delivery failed. Check mail server configuration and connectivity.", true);
         }
     }
 
-    protected Optional<DeliveryPayload> loadDeliveryPayload(Long outboxId) {
-        return outboxRepository.findByIdAndStatus(outboxId, EmailOutboxStatus.SENDING)
+    protected Optional<DeliveryPayload> loadDeliveryPayload(EmailDeliveryClaim claim) {
+        return outboxRepository.findByIdAndStatus(claim.id(), EmailOutboxStatus.SENDING)
+                .filter(message -> claim.token() != null && claim.token().equals(message.getClaimToken()))
                 .map(message -> new DeliveryPayload(
                         message.getRecipientUser().getStatus() == UserStatus.ACTIVE,
                         message.getRecipientEmail(),

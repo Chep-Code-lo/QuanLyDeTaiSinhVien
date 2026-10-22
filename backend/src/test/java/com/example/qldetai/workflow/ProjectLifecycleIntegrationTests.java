@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -23,6 +24,7 @@ import com.example.qldetai.feature.academic.repository.FacultyRepository;
 import com.example.qldetai.feature.academic.repository.RegistrationPeriodRepository;
 import com.example.qldetai.feature.academic.repository.SemesterRepository;
 import com.example.qldetai.feature.evaluation.domain.AssessmentComponentType;
+import com.example.qldetai.feature.evaluation.domain.EvaluationStatus;
 import com.example.qldetai.feature.evaluation.domain.CommitteeRole;
 import com.example.qldetai.feature.evaluation.domain.GradeChangeStatus;
 import com.example.qldetai.feature.evaluation.domain.ScoreSheetStatus;
@@ -142,6 +144,7 @@ class ProjectLifecycleIntegrationTests {
             properties.add("spring.datasource.username", () -> "root");
             properties.add("spring.datasource.password", () -> "isolated-email-test");
             properties.add("spring.jpa.hibernate.ddl-auto", () -> "none");
+            properties.add("spring.sql.init.mode", () -> "never");
         }
     }
 
@@ -1352,18 +1355,149 @@ class ProjectLifecycleIntegrationTests {
                 scoreRequests(catalog.rubric(), new BigDecimal("6"), new BigDecimal("4")), true), lecturerThree.getUser().getId());
         Long change = gradeChangeService.requestChange(sheet.id(), new CreateGradeChangeRequest("Private correction reason"),
                 lecturerThree.getUser().getId());
-        // Audit reproducer: this unrelated lecturer must receive an empty list after the scoped-read fix.
         mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
                         .with(user(UserPrincipal.from(lecturerFive.getUser()))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.content[0].id").value(change))
-                .andExpect(jsonPath("$.data.content[0].reason").value("Private correction reason"));
+                .andExpect(jsonPath("$.data.content").isEmpty())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+        mvc.perform(get("/api/v1/grade-change-requests")
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.content").isEmpty());
+        mvc.perform(get("/api/v1/grade-change-requests/{id}", change)
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isForbidden());
+        for (User reader : List.of(admin, lecturerThree.getUser(), lecturerOne.getUser())) {
+            mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
+                            .with(user(UserPrincipal.from(reader))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.content[0].id").value(change))
+                    .andExpect(jsonPath("$.data.content[0].reason").value("Private correction reason"));
+            mvc.perform(get("/api/v1/grade-change-requests/{id}", change).with(user(UserPrincipal.from(reader))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value(change));
+        }
+        for (boolean approved : List.of(true, false)) {
+            mvc.perform(patch("/api/v1/grade-change-requests/{id}/review", change)
+                            .with(user(UserPrincipal.from(lecturerFive.getUser()))).with(csrf())
+                            .contentType("application/json").content("{\"approved\":" + approved + ",\"comment\":\"unrelated\"}"))
+                    .andExpect(status().isForbidden());
+            assertThatThrownBy(() -> gradeChangeService.reviewChange(change,
+                    new ReviewGradeChangeRequest(approved, "unrelated"), lecturerFive.getUser().getId()))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        }
+        evaluationService.assign(new CreateEvaluationRequest(project.id(), catalog.rubric().id(),
+                lecturerFour.getId(), null, nowUtc().plusDays(1)), admin.getId());
+        mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
+                        .with(user(UserPrincipal.from(lecturerFour.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.content[0].id").value(change));
+        mvc.perform(patch("/api/v1/grade-change-requests/{id}/review", change)
+                        .with(user(UserPrincipal.from(lecturerThree.getUser()))).with(csrf())
+                        .contentType("application/json").content("{\"approved\":true,\"comment\":\"self review\"}"))
+                .andExpect(status().isForbidden());
+        AcademicAppointment appointment = new AcademicAppointment();
+        appointment.setLecturer(lecturerFive); appointment.setFaculty(createFaculty("OUT"));
+        appointment.setPositionCode(PositionCode.DEAN);
+        appointment.setStartsAt(nowUtc().minusDays(1)); appointment.setAssignedBy(admin);
+        appointments.saveAndFlush(appointment);
+        mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.content").isEmpty());
+        appointment.setFaculty(faculty); appointments.saveAndFlush(appointment);
+        mvc.perform(get("/api/v1/grade-change-requests/{id}", change)
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk());
+        appointment.setPositionCode(PositionCode.DEPARTMENT_HEAD);
+        appointment.setDepartment(createDepartment(faculty, "OTH"));
+        appointments.saveAndFlush(appointment);
+        mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.content").isEmpty());
+        appointment.setDepartment(department);
+        appointment.setStartsAt(nowUtc().minusDays(1)); appointment.setAssignedBy(admin);
+        appointments.saveAndFlush(appointment);
+        mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.content[0].id").value(change));
+        appointment.setEndsAt(nowUtc().minusSeconds(1)); appointments.saveAndFlush(appointment);
+        mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.content").isEmpty());
+        appointment.setEndsAt(null); appointments.saveAndFlush(appointment);
+        mvc.perform(patch("/api/v1/grade-change-requests/{id}/review", change)
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))).with(csrf())
+                        .contentType("application/json").content("{\"approved\":false,\"comment\":\"scoped rejection\"}"))
+                .andExpect(status().isOk());
+        Long nextChange = gradeChangeService.requestChange(sheet.id(), new CreateGradeChangeRequest("Second correction"),
+                lecturerThree.getUser().getId());
+        mvc.perform(patch("/api/v1/grade-change-requests/{id}/review", nextChange)
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))).with(csrf())
+                        .contentType("application/json").content("{\"approved\":true,\"comment\":\"scoped approval\"}"))
+                .andExpect(status().isOk());
+        evaluationRepository.findById(evaluationId).orElseThrow().setStatus(EvaluationStatus.CANCELLED);
+        evaluationRepository.flush();
+        mvc.perform(get("/api/v1/grade-change-requests/{id}", change)
+                        .with(user(UserPrincipal.from(lecturerThree.getUser()))))
+                .andExpect(status().isOk());
         mvc.perform(get("/api/v1/evaluation-assignments/{id}/score-sheet", evaluationId)
                         .with(user(UserPrincipal.from(lecturerFive.getUser()))))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/evaluation-assignments/{id}/score-sheet", evaluationId)
                         .with(user(UserPrincipal.from(thirdStudent.getUser()))))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void draftEvaluationCatalogsAreVisibleOnlyWithinManagementScope(@Autowired MockMvc mvc) throws Exception {
+        var component = evaluationService.createComponent(new CreateAssessmentComponentRequest(period.getId(),
+                unique("draft-private"), "Private draft", AssessmentComponentType.OTHER), admin.getId());
+        var rubric = evaluationService.createRubric(new CreateRubricRequest(component.id(), "Private draft rubric",
+                List.of(new CriterionRequest("Private", "Draft details", BigDecimal.TEN, 1))), admin.getId());
+        for (User outsider : List.of(lecturerFive.getUser(), thirdStudent.getUser())) {
+            mvc.perform(get("/api/v1/assessment-components").param("periodId", period.getId().toString())
+                            .with(user(UserPrincipal.from(outsider))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
+            mvc.perform(get("/api/v1/rubrics").param("componentId", component.id().toString())
+                            .with(user(UserPrincipal.from(outsider))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
+        }
+        mvc.perform(get("/api/v1/rubrics").param("componentId", component.id().toString())
+                        .with(user(UserPrincipal.from(admin))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].id").value(rubric.id()));
+        AcademicAppointment appointment = new AcademicAppointment();
+        appointment.setLecturer(lecturerFive);
+        appointment.setFaculty(createFaculty("OUT"));
+        appointment.setPositionCode(PositionCode.DEAN);
+        appointment.setStartsAt(nowUtc().minusDays(1));
+        appointment.setAssignedBy(admin);
+        appointments.saveAndFlush(appointment);
+        mvc.perform(get("/api/v1/rubrics").param("componentId", component.id().toString())
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
+        appointment.setFaculty(faculty);
+        appointment.setPositionCode(PositionCode.DEPARTMENT_HEAD);
+        appointment.setDepartment(department);
+        appointments.saveAndFlush(appointment);
+        mvc.perform(get("/api/v1/rubrics").param("componentId", component.id().toString())
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
+        appointment.setPositionCode(PositionCode.DEAN);
+        appointment.setDepartment(null);
+        appointments.saveAndFlush(appointment);
+        mvc.perform(get("/api/v1/assessment-components").param("periodId", period.getId().toString())
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].id").value(component.id()));
+        mvc.perform(get("/api/v1/rubrics").param("componentId", component.id().toString())
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].id").value(rubric.id()));
+        appointment.setEndsAt(nowUtc().minusSeconds(1));
+        appointments.saveAndFlush(appointment);
+        mvc.perform(get("/api/v1/rubrics").param("componentId", component.id().toString())
+                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
+        evaluationService.lockRubric(rubric.id(), admin.getId());
+        evaluationService.lockComponent(component.id(), admin.getId());
+        mvc.perform(get("/api/v1/rubrics").param("componentId", component.id().toString())
+                        .with(user(UserPrincipal.from(thirdStudent.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].id").value(rubric.id()));
     }
 
     private void submitFullScore(Long assignmentId, LockedCatalog catalog, Lecturer lecturer, Long defenseId) {
