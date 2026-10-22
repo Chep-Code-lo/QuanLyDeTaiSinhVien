@@ -97,13 +97,24 @@ class AuthHttpRaceIntegrationTests {
             }
             return result;
         }).when(encoder).matches(anyString(), anyString());
-        try (var pool = Executors.newSingleThreadExecutor()) {
+        try (var pool = Executors.newFixedThreadPool(2)) {
             var login = pool.submit(() -> login(concurrent));
+            java.util.concurrent.Future<HttpResponse<String>> changing;
             try {
                 assertThat(verified.await(15, TimeUnit.SECONDS)).isTrue();
-                assertThat(change(current, "OldPassword123!", "NewPassword456!").statusCode()).isEqualTo(200);
+                var started = new CountDownLatch(1);
+                changing = pool.submit(() -> {
+                    started.countDown();
+                    return change(current, "OldPassword123!", "NewPassword456!");
+                });
+                assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+                // Login owns the user row until its transaction commits. The
+                // password change must wait, rather than deadlocking this test.
+                org.assertj.core.api.Assertions.assertThatThrownBy(() -> changing.get(300, TimeUnit.MILLISECONDS))
+                        .isInstanceOf(java.util.concurrent.TimeoutException.class);
             } finally { release.countDown(); }
-            assertThat(login.get(20, TimeUnit.SECONDS).statusCode()).isIn(200, 409);
+            assertThat(login.get(20, TimeUnit.SECONDS).statusCode()).isEqualTo(200);
+            assertThat(changing.get(20, TimeUnit.SECONDS).statusCode()).isEqualTo(200);
         }
         assertThat(get(current, "/me").statusCode()).isEqualTo(200);
         assertThat(get(concurrent, "/me").statusCode()).isEqualTo(401);
