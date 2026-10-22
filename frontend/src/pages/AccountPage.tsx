@@ -4,7 +4,12 @@ import { PageHeader } from '../components/PageHeader'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { roleLabel } from '../utils/displayLabels'
-import { isValidPassword, PASSWORD_PATTERN, PASSWORD_REQUIREMENTS } from '../utils/passwordPolicy'
+import {
+  isValidPassword,
+  PASSWORD_HINT,
+  PASSWORD_PATTERN,
+  PASSWORD_REQUIREMENTS,
+} from '../utils/passwordPolicy'
 import { avatarInitial } from '../utils/userDisplay'
 
 export function AccountPage() {
@@ -72,7 +77,7 @@ export function AccountPage() {
         <section className="page-card">
           <h2 className="section-title">Đổi mật khẩu</h2>
           <p className="section-description" id="new-password-hint">
-            {PASSWORD_REQUIREMENTS}
+            {PASSWORD_HINT}
           </p>
           <form className="account-form" onSubmit={changePassword}>
             <div className="form-group">

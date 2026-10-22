@@ -6,7 +6,12 @@ import { adminApi } from '../api/admin'
 import { AnimatedSelect } from './AnimatedSelect'
 import { useToast } from '../context/ToastContext'
 import type { CreateUserRequest, DepartmentResponse, UserResponse } from '../types/domain'
-import { isValidPassword, PASSWORD_PATTERN, PASSWORD_REQUIREMENTS } from '../utils/passwordPolicy'
+import {
+  isValidPassword,
+  PASSWORD_HINT,
+  PASSWORD_PATTERN,
+  PASSWORD_REQUIREMENTS,
+} from '../utils/passwordPolicy'
 import './CreateAccountForm.css'
 
 type CreateAccountFormProps = {
@@ -296,7 +301,7 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
               aria-describedby="create-password-hint"
               required
             />
-            <small id="create-password-hint">{PASSWORD_REQUIREMENTS}</small>
+            <small id="create-password-hint">{PASSWORD_HINT}</small>
           </div>
           <div className="form-group">
             <label className="form-label" htmlFor="create-confirm-password">
