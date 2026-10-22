@@ -42,9 +42,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest(properties = "server.forward-headers-strategy=framework")
+@SpringBootTest(properties = {"server.forward-headers-strategy=none", "app.security.trusted-proxies=127.0.0.1"})
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(print = org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint.NONE)
 @Transactional
 class AuthIntegrationTests {
 
@@ -92,6 +92,23 @@ class AuthIntegrationTests {
                 .defaultsForSpringSecurity_v5_8().encode("TestPassword123!"));
         userRepository.saveAndFlush(user);
         loginAttempt(email, "TestPassword123!", "203.0.113.81").andExpect(status().isOk());
+    }
+
+    @Test
+    void longLegacyPbkdf2PasswordsAuthenticateWithoutChangingStoredCredentials() throws Exception {
+        int index = 0;
+        for (String password : new String[] {"A1!" + "a".repeat(97), "Đ1!" + "ề".repeat(30),
+                "A1!" + "😀".repeat(20)}) {
+            String email = createUserWithRole("long-legacy-" + index++, RoleCode.ADMIN);
+            User legacy = userRepository.findByEmailIgnoreCase(email).orElseThrow();
+            String hash = "{pbkdf2}" + org.springframework.security.crypto.password.Pbkdf2PasswordEncoder
+                    .defaultsForSpringSecurity_v5_8().encode(password);
+            legacy.setPasswordHash(hash);
+            userRepository.saveAndFlush(legacy);
+            loginAttempt(email, password, "203.0.113.82").andExpect(status().isOk());
+            loginAttempt(email, password + "wrong", "203.0.113.82").andExpect(status().isUnauthorized());
+            assertThat(userRepository.findByEmailIgnoreCase(email).orElseThrow().getPasswordHash().equals(hash)).isTrue();
+        }
     }
 
     private org.springframework.test.web.servlet.ResultActions loginAttempt(String email, String password, String ip) throws Exception {

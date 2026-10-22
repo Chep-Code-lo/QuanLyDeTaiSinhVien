@@ -12,7 +12,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.Test;
 
 class PasswordPolicyTests {
-    @ParameterizedTest
+    @ParameterizedTest(name = "Unicode policy case {index}")
     @CsvSource({
         "Abcdef1!,true", "abcdefgh1!,false", "Abcdefgh!,false", "Abcdefg1,false",
         "Abc1!,false", "ĐồÁn2026!,true", "ĐềTài١٢!,true", "Abcdef1😀,true"
