@@ -10,10 +10,10 @@ services:
       # when binary logging is enabled, including for users with TRIGGER privilege.
       - --log-bin-trust-function-creators=1
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root-password-local}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD before starting Docker Compose}
       MYSQL_DATABASE: ql_de_tai_sinh_vien
       MYSQL_USER: ${MYSQL_APP_USER:-ql_de_tai_app}
-      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD:-change-me-local}
+      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD:?Set MYSQL_APP_PASSWORD before starting Docker Compose}
     ports:
       - "127.0.0.1:${MYSQL_PORT:-3307}:3306"
     volumes:
@@ -38,7 +38,7 @@ services:
         condition: service_healthy
     environment:
       MYSQL_APP_USER: ${MYSQL_APP_USER:-ql_de_tai_app}
-      MYSQL_PWD: ${MYSQL_APP_PASSWORD:-change-me-local}
+      MYSQL_PWD: ${MYSQL_APP_PASSWORD:?Set MYSQL_APP_PASSWORD before starting Docker Compose}
     volumes:
       - ./database/migrations:/migrations:ro
     entrypoint: ["/bin/sh", "-ec"]
@@ -49,12 +49,22 @@ services:
           mysql --protocol=TCP -h mysql -u "$$MYSQL_APP_USER" ql_de_tai_sinh_vien < "$$migration"
         done
 
+  file-storage-init:
+    image: alpine:3
+    user: "0:0"
+    restart: "no"
+    command: ["chown", "-R", "10001:10001", "/data/files"]
+    volumes:
+      - backend_files:/data/files
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
+      file-storage-init:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       schema-migrate:
@@ -62,8 +72,8 @@ services:
     environment:
       DB_URL: jdbc:mysql://mysql:3306/ql_de_tai_sinh_vien?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC
       DB_USERNAME: ${MYSQL_APP_USER:-ql_de_tai_app}
-      DB_PASSWORD: ${MYSQL_APP_PASSWORD:-change-me-local}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:${FRONTEND_PORT:-5173},http://127.0.0.1:${FRONTEND_PORT:-5173},https://*.trycloudflare.com}
+      DB_PASSWORD: ${MYSQL_APP_PASSWORD:?Set MYSQL_APP_PASSWORD before starting Docker Compose}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:${FRONTEND_PORT:-5173},http://127.0.0.1:${FRONTEND_PORT:-5173}}
       FILE_STORAGE_ROOT: /data/files
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       SESSION_COOKIE_SAME_SITE: ${SESSION_COOKIE_SAME_SITE:-lax}

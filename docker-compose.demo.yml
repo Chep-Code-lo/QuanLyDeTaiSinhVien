@@ -1,4 +1,5 @@
 # Local demo only; opt in explicitly. Do not use this override on the VPS.
+# docker compose --env-file docker-compose.demo.env -p qldetai-demo -f docker-compose.yml -f docker-compose.demo.yml up --build
 # The MySQL entrypoint imports this seed only when initializing an empty volume.
 services:
   mysql:
