@@ -32,9 +32,19 @@ public class NotificationController {
     @GetMapping
     public ApiResponse<PageResponse<NotificationResponse>> list(
             @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(defaultValue = "") @jakarta.validation.constraints.Size(max = 250)
+                    String search,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(notificationService.list(principal.id(), page, size));
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size) {
+        return ApiResponse.success(notificationService.list(principal.id(), search, page, size));
+    }
+
+    @GetMapping("/for-announcements")
+    public ApiResponse<java.util.List<NotificationResponse>> forAnnouncements(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam @jakarta.validation.constraints.Size(min = 1, max = 50)
+                    java.util.List<@Min(1) Long> ids) {
+        return ApiResponse.success(notificationService.forAnnouncements(principal.id(), ids));
     }
 
     @GetMapping("/unread-count")

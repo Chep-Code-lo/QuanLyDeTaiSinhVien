@@ -44,9 +44,12 @@ public class AnnouncementController {
     @GetMapping
     public ApiResponse<PageResponse<AnnouncementResponse>> listPublished(
             @RequestParam(required = false) Long facultyId,
+            @RequestParam(defaultValue = "") @jakarta.validation.constraints.Size(max = 250)
+                    String search,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(announcementService.listPublished(facultyId, page, size));
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size) {
+        return ApiResponse.success(
+                announcementService.listPublished(facultyId, search, page, size));
     }
 
     @GetMapping("/manage")
@@ -55,10 +58,12 @@ public class AnnouncementController {
     public ApiResponse<PageResponse<AnnouncementResponse>> listForManagement(
             @RequestParam Long facultyId,
             @RequestParam(required = false) AnnouncementStatus status,
+            @RequestParam(defaultValue = "") @jakarta.validation.constraints.Size(max = 250)
+                    String search,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size) {
         return ApiResponse.success(
-                announcementService.listForManagement(facultyId, status, page, size));
+                announcementService.listForManagement(facultyId, status, search, page, size));
     }
 
     @GetMapping("/{id}")

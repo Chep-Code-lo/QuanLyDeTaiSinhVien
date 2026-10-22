@@ -2,17 +2,21 @@ import { formatDateTime } from '../utils/dateTime'
 import './AnnouncementsPage.css'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { academicApi } from '../api/academic'
-import { useRequestLoading } from '../hooks/useRequestLoading'
+import { useCommunicationPage } from '../hooks/useCommunicationPage'
 import { announcementApi } from '../api/announcements'
 import { notificationApi } from '../api/notifications'
-import { allPages } from '../api/student'
 import { PageHeader } from '../components/PageHeader'
-import { AnnouncementTable } from '../components/AnnouncementTable'
+import { AnnouncementTable, CommunicationPagination } from '../components/AnnouncementTable'
 import { StatusBadge } from '../components/StatusBadge'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import type { AnnouncementResponse, FacultyResponse, NotificationResponse } from '../types/domain'
+import type {
+  AnnouncementResponse,
+  AnnouncementStatus,
+  FacultyResponse,
+  NotificationResponse,
+} from '../types/domain'
 
 const messageOf = (error: any) =>
   error.response?.data?.message || 'Không thể thực hiện thao tác. Vui lòng thử lại.'
@@ -25,19 +29,11 @@ const announcementTabs = [
 export function AnnouncementsPage() {
   const { user, hasAppointment, hasRole } = useAuth()
   const { showError, showSuccess } = useToast()
-  const [announcements, setAnnouncements] = useState<AnnouncementResponse[]>([])
-  const [notifications, setNotifications] = useState<NotificationResponse[]>([])
   const [faculties, setFaculties] = useState<FacultyResponse[]>([])
-  const [managed, setManaged] = useState<AnnouncementResponse[]>([])
   const [activeTab, setActiveTab] = useState<'general' | 'personal'>('general')
-  const [loading, setLoading] = useRequestLoading(
-    JSON.stringify([user?.id, activeTab]),
-    activeTab === 'general',
-  )
-  const [personalLoading, setPersonalLoading] = useRequestLoading(
-    JSON.stringify([user?.id, activeTab]),
-    activeTab === 'personal',
-  )
+  const [generalReadState, setGeneralReadState] = useState<NotificationResponse[]>([])
+  const [selectedFaculty, setSelectedFaculty] = useState<number>()
+  const [managedStatus, setManagedStatus] = useState<AnnouncementStatus | ''>('')
   const [managing, setManaging] = useState(false)
   const [editing, setEditing] = useState<AnnouncementResponse>()
   const [pendingArchive, setPendingArchive] = useState<AnnouncementResponse>()
@@ -45,16 +41,6 @@ export function AnnouncementsPage() {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [attachmentFileId, setAttachmentFileId] = useState('')
-  useEffect(() => {
-    const updateReadState = (event: Event) => {
-      const updated = (event as CustomEvent<{ notification?: NotificationResponse }>).detail
-        ?.notification
-      if (updated)
-        setNotifications((items) => items.map((item) => (item.id === updated.id ? updated : item)))
-    }
-    window.addEventListener('notifications-updated', updateReadState)
-    return () => window.removeEventListener('notifications-updated', updateReadState)
-  }, [])
   const allowedFacultyIds = useMemo(() => {
     return faculties
       .filter(
@@ -67,85 +53,108 @@ export function AnnouncementsPage() {
       .map((faculty) => faculty.id)
   }, [faculties, user, hasRole])
   const canManage = allowedFacultyIds.length > 0
-  const facultyId = allowedFacultyIds[0]
+  const facultyId =
+    selectedFaculty && allowedFacultyIds.includes(selectedFaculty)
+      ? selectedFaculty
+      : allowedFacultyIds[0]
   const canLoadFaculties = hasRole('ADMIN') || hasAppointment('DEAN')
 
-  const loadPublic = useCallback(
-    (isCurrent: () => boolean = () => true) =>
-      Promise.all([
-        allPages((page) => announcementApi.list({ page, size: 100 })),
-        allPages((page) => notificationApi.list(page, 100)),
-      ])
-        .then(([official, personal]) => {
-          if (!isCurrent()) return
-          setAnnouncements(official)
-          setNotifications(personal)
-        })
-        .catch((error) => {
-          if (isCurrent()) showError(messageOf(error))
-        })
-        .finally(() => {
-          if (isCurrent()) setLoading(false)
-        }),
-    [showError, setLoading],
+  const fetchGeneral = useCallback(
+    (query: { page: number; size: number; search: string }) => announcementApi.list(query),
+    [],
   )
-
-  const loadPersonal = useCallback(
-    (isCurrent: () => boolean) =>
-      allPages((page) => notificationApi.list(page, 100))
-        .then((personal) => {
-          if (!isCurrent()) return
-          setNotifications(personal)
-        })
-        .catch((error) => {
-          if (isCurrent()) showError(messageOf(error))
-        })
-        .finally(() => {
-          if (isCurrent()) setPersonalLoading(false)
-        }),
-    [showError, setPersonalLoading],
+  const fetchPersonal = useCallback(
+    (query: { page: number; size: number; search: string }) =>
+      notificationApi.list(query.page, query.size, query.search),
+    [],
   )
-
-  const loadManaged = useCallback(
-    (id = facultyId) => {
-      if (!id || !canManage) return
-      return allPages((page) =>
-        announcementApi.listForManagement({ facultyId: id, page, size: 100 }),
-      )
-        .then(setManaged)
-        .catch((error) => {
-          showError(messageOf(error))
-        })
-    },
-    [facultyId, canManage, showError],
+  const fetchManaged = useCallback(
+    (query: { page: number; size: number; search: string }) =>
+      announcementApi.listForManagement({
+        ...query,
+        facultyId: facultyId!,
+        status: managedStatus || undefined,
+      }),
+    [facultyId, managedStatus],
   )
-
+  const general = useCommunicationPage(String(user?.id), activeTab === 'general', fetchGeneral)
+  const personal = useCommunicationPage(String(user?.id), activeTab === 'personal', fetchPersonal)
+  const management = useCommunicationPage(
+    JSON.stringify([user?.id, facultyId, managedStatus]),
+    managing && canManage,
+    fetchManaged,
+  )
+  const announcements = general.items
+  const notifications = personal.items
+  const managed = management.items
+  const refreshLists = () => {
+    management.refresh()
+    general.refresh()
+  }
   useEffect(() => {
     let active = true
-    if (activeTab === 'general') void loadPublic(() => active)
-    else void loadPersonal(() => active)
-    return () => {
-      active = false
-    }
-  }, [user?.id, activeTab, loadPublic, loadPersonal])
-
-  useEffect(() => {
     if (canLoadFaculties)
       academicApi
         .getFaculties()
-        .then(setFaculties)
-        .catch((error) => showError(messageOf(error)))
+        .then((items) => {
+          if (active) setFaculties(items)
+        })
+        .catch((error) => {
+          if (active) showError(messageOf(error))
+        })
+    return () => {
+      active = false
+    }
   }, [user?.id, canLoadFaculties, showError])
-
   useEffect(() => {
-    if (managing && facultyId) void loadManaged(facultyId)
-  }, [facultyId, managing, loadManaged])
+    let active = true
+    if (activeTab === 'general' && !general.loading && !general.error) {
+      notificationApi
+        .forAnnouncements(announcements.map((item) => item.id))
+        .then((items) => {
+          if (active) setGeneralReadState(items)
+        })
+        .catch(() => {
+          if (active) setGeneralReadState([])
+        })
+    }
+    return () => {
+      active = false
+    }
+  }, [activeTab, announcements, general.loading, general.error, user?.id])
+  useEffect(() => {
+    const updateReadState = (event: Event) => {
+      const updated = (event as CustomEvent<{ notification?: NotificationResponse }>).detail
+        ?.notification
+      if (updated) {
+        personal.update((item) => (item.id === updated.id ? updated : item))
+        setGeneralReadState((items) =>
+          items.map((item) => (item.id === updated.id ? updated : item)),
+        )
+      }
+    }
+    window.addEventListener('notifications-updated', updateReadState)
+    return () => window.removeEventListener('notifications-updated', updateReadState)
+  })
+  const pageControls = (label: string, state: typeof general | typeof personal) => (
+    <CommunicationPagination
+      label={label}
+      page={state.query.page}
+      size={state.query.size}
+      totalPages={state.result?.totalPages ?? 0}
+      totalElements={state.result?.totalElements ?? 0}
+      loading={state.loading}
+      onPage={state.go}
+      onSize={state.resize}
+    />
+  )
 
   const markRead = async (item: NotificationResponse) => {
     if (item.readAt) return
     try {
       const updated = await notificationApi.markRead(item.id)
-      setNotifications((items) =>
+      personal.update((candidate) => (candidate.id === item.id ? updated : candidate))
+      setGeneralReadState((items) =>
         items.map((candidate) => (candidate.id === item.id ? updated : candidate)),
       )
       window.dispatchEvent(
@@ -192,7 +201,7 @@ export function AnnouncementsPage() {
         showSuccess('Đã tạo thông báo ở trạng thái nháp.')
       }
       resetEditor()
-      await Promise.all([loadManaged(), loadPublic()])
+      refreshLists()
     } catch (error) {
       showError(messageOf(error))
     }
@@ -209,7 +218,7 @@ export function AnnouncementsPage() {
     try {
       await announcementApi.publish(announcement.id)
       showSuccess('Đã công bố thông báo.')
-      await Promise.all([loadManaged(), loadPublic()])
+      refreshLists()
     } catch (error) {
       showError(messageOf(error))
     }
@@ -220,11 +229,11 @@ export function AnnouncementsPage() {
     setArchiving(true)
     try {
       const updated = await announcementApi.archive(pendingArchive.id)
-      setManaged((items) => items.map((item) => (item.id === updated.id ? updated : item)))
+      management.update((item) => (item.id === updated.id ? updated : item))
       if (editing?.id === pendingArchive.id) resetEditor()
       setPendingArchive(undefined)
       showSuccess('Đã lưu trữ thông báo.')
-      await Promise.all([loadManaged(), loadPublic()])
+      refreshLists()
     } catch (error) {
       showError(messageOf(error))
     } finally {
@@ -326,8 +335,64 @@ export function AnnouncementsPage() {
                     </button>
                   </div>
                 </form>
+                <div className="form-row">
+                  <label>
+                    Khoa quản lý
+                    <select
+                      aria-label="Khoa quản lý"
+                      value={facultyId}
+                      onChange={(event) => {
+                        setSelectedFaculty(Number(event.target.value))
+                        management.go(0)
+                        resetEditor()
+                      }}
+                    >
+                      {faculties
+                        .filter((item) => allowedFacultyIds.includes(item.id))
+                        .map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label>
+                    Trạng thái thông báo
+                    <select
+                      aria-label="Trạng thái thông báo"
+                      value={managedStatus}
+                      onChange={(event) => {
+                        setManagedStatus(event.target.value as AnnouncementStatus | '')
+                        management.go(0)
+                      }}
+                    >
+                      <option value="">Tất cả</option>
+                      <option value="DRAFT">Nháp</option>
+                      <option value="PUBLISHED">Đã công bố</option>
+                      <option value="ARCHIVED">Đã lưu trữ</option>
+                    </select>
+                  </label>
+                  <input
+                    type="search"
+                    maxLength={250}
+                    aria-label="Tìm kiếm thông báo quản lý"
+                    placeholder="Tìm kiếm thông báo"
+                    value={management.query.search}
+                    onChange={(event) => management.search(event.target.value)}
+                  />
+                </div>
+                {management.loading ? (
+                  <p role="status">Đang tải thông báo...</p>
+                ) : management.error ? (
+                  <div role="alert">
+                    {management.error}
+                    <button onClick={management.refresh}>Thử lại</button>
+                  </div>
+                ) : !managed.length ? (
+                  <p>Không tìm thấy thông báo phù hợp.</p>
+                ) : null}
                 <div className="stack-list">
-                  {managed.map((announcement) => (
+                  {(!management.loading && !management.error ? managed : []).map((announcement) => (
                     <article
                       key={announcement.id}
                       className="notification-item announcement-management-item"
@@ -370,56 +435,61 @@ export function AnnouncementsPage() {
                     </article>
                   ))}
                 </div>
+                <CommunicationPagination
+                  label="Quản lý thông báo khoa"
+                  page={management.query.page}
+                  size={management.query.size}
+                  totalPages={management.result?.totalPages ?? 0}
+                  totalElements={management.result?.totalElements ?? 0}
+                  loading={management.loading}
+                  onPage={management.go}
+                  onSize={management.resize}
+                />
               </>
             )}
           </section>
         )}
         <section className="page-card announcement-inbox-card">
           <h2 className="section-title">Thông báo chung</h2>
-          {loading ? (
-            <div className="content-state">
-              <span className="spinner" />
-              <p>Đang tải thông báo...</p>
-            </div>
-          ) : announcements.length === 0 ? (
-            <div className="content-state">
-              <strong>Chưa có thông báo chung.</strong>
-            </div>
-          ) : (
-            <AnnouncementTable
-              label="Thông báo chung"
-              items={announcements.map((announcement) => ({
-                id: announcement.id,
-                title: announcement.title,
-                content: announcement.content,
-                senderName: announcement.createdByName,
-                sentAt: announcement.publishedAt ?? announcement.createdAt,
-                attachmentPath: announcement.attachmentPath,
-                attachmentName: announcement.attachmentName,
-                unread: notifications.some(
+          <AnnouncementTable
+            label="Thông báo chung"
+            search={general.query.search}
+            onSearch={general.search}
+            loading={general.loading}
+            error={general.error}
+            onRetry={general.refresh}
+            items={announcements.map((announcement) => ({
+              id: announcement.id,
+              title: announcement.title,
+              content: announcement.content,
+              senderName: announcement.createdByName,
+              sentAt: announcement.publishedAt ?? announcement.createdAt,
+              attachmentPath: announcement.attachmentPath,
+              attachmentName: announcement.attachmentName,
+              unread: generalReadState.some(
+                (item) =>
+                  item.targetPath === '/announcements' &&
+                  item.title === announcement.title &&
+                  item.content === announcement.content &&
+                  !item.readAt,
+              ),
+            }))}
+            onOpen={(id) => {
+              const announcement = announcements.find((item) => item.id === id)
+              if (!announcement) return
+              generalReadState
+                .filter(
                   (item) =>
                     item.targetPath === '/announcements' &&
                     item.title === announcement.title &&
-                    item.content === announcement.content &&
-                    !item.readAt,
-                ),
-              }))}
-              onOpen={(id) => {
-                const announcement = announcements.find((item) => item.id === id)
-                if (!announcement) return
-                notifications
-                  .filter(
-                    (item) =>
-                      item.targetPath === '/announcements' &&
-                      item.title === announcement.title &&
-                      item.content === announcement.content,
-                  )
-                  .forEach((item) => {
-                    void markRead(item)
-                  })
-              }}
-            />
-          )}
+                    item.content === announcement.content,
+                )
+                .forEach((item) => {
+                  void markRead(item)
+                })
+            }}
+          />
+          {pageControls('Thông báo chung', general)}
         </section>
       </div>
       <section
@@ -431,38 +501,33 @@ export function AnnouncementsPage() {
         tabIndex={0}
       >
         <h2 className="section-title">Thông báo cá nhân</h2>
-        {personalLoading ? (
-          <div className="content-state">
-            <span className="spinner" />
-            <p>Đang tải thông báo...</p>
-          </div>
-        ) : notifications.length === 0 ? (
-          <div className="content-state">
-            <strong>Bạn chưa có thông báo cá nhân nào.</strong>
-          </div>
-        ) : (
-          <AnnouncementTable
-            label="Thông báo cá nhân"
-            items={notifications.map((item) => ({
-              id: item.id,
-              title: item.title,
-              content: item.content,
-              senderName:
-                item.targetPath === '/announcements'
-                  ? (announcements.find(
-                      (announcement) =>
-                        announcement.title === item.title && announcement.content === item.content,
-                    )?.createdByName ?? 'Hệ thống')
-                  : 'Hệ thống',
-              sentAt: item.createdAt,
-              unread: !item.readAt,
-            }))}
-            onOpen={(id) => {
-              const item = notifications.find((notification) => notification.id === id)
-              if (item) void markRead(item)
-            }}
-          />
-        )}
+        <AnnouncementTable
+          label="Thông báo cá nhân"
+          search={personal.query.search}
+          onSearch={personal.search}
+          loading={personal.loading}
+          error={personal.error}
+          onRetry={personal.refresh}
+          items={notifications.map((item) => ({
+            id: item.id,
+            title: item.title,
+            content: item.content,
+            senderName:
+              item.targetPath === '/announcements'
+                ? (announcements.find(
+                    (announcement) =>
+                      announcement.title === item.title && announcement.content === item.content,
+                  )?.createdByName ?? 'Hệ thống')
+                : 'Hệ thống',
+            sentAt: item.createdAt,
+            unread: !item.readAt,
+          }))}
+          onOpen={(id) => {
+            const item = notifications.find((notification) => notification.id === id)
+            if (item) void markRead(item)
+          }}
+        />
+        {pageControls('Thông báo cá nhân', personal)}
       </section>
       <ConfirmModal
         isOpen={!!pendingArchive}

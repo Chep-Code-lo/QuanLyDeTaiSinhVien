@@ -10,7 +10,9 @@ type AnnouncementPayload = {
 }
 
 export const announcementApi = {
-  list: async (params: { facultyId?: number; page?: number; size?: number } = {}) =>
+  list: async (
+    params: { facultyId?: number; search?: string; page?: number; size?: number } = {},
+  ) =>
     (
       await apiClient.get<ApiResponse<PageResponse<AnnouncementResponse>>>('/announcements', {
         params,
@@ -18,6 +20,7 @@ export const announcementApi = {
     ).data.data,
   listForManagement: async (params: {
     facultyId: number
+    search?: string
     status?: AnnouncementStatus
     page?: number
     size?: number
