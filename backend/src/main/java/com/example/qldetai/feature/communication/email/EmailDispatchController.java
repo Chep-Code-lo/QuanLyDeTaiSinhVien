@@ -7,10 +7,13 @@ import com.example.qldetai.feature.communication.email.EmailDispatchDtos.EmailRe
 import com.example.qldetai.feature.communication.email.EmailDispatchDtos.SendEmailRequest;
 import com.example.qldetai.feature.identity.domain.RoleCode;
 import com.example.qldetai.security.UserPrincipal;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -45,6 +48,8 @@ public class EmailDispatchController {
             @PathVariable EmailNotificationEventType eventType,
             @Valid @RequestBody SendEmailRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Đã xếp hàng gửi email đến người nhận đã chọn.", service.send(principal.id(), eventType, request));
+        return ApiResponse.success(
+                "Đã xếp hàng gửi email đến người nhận đã chọn.",
+                service.send(principal.id(), eventType, request));
     }
 }

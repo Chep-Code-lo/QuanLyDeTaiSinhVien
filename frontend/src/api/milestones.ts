@@ -13,9 +13,11 @@ export const milestoneApi = {
   update: async (id: number, payload: UpdateMilestoneRequest) =>
     (await apiClient.put<ApiResponse<MilestoneResponse>>(`/milestones/${id}`, payload)).data.data,
   remind: async (assignmentId: number) =>
-    (await apiClient.post<ApiResponse<MilestoneReminderResponse>>(
-      `/project-assignments/${assignmentId}/milestones/reminders`,
-    )).data.data,
+    (
+      await apiClient.post<ApiResponse<MilestoneReminderResponse>>(
+        `/project-assignments/${assignmentId}/milestones/reminders`,
+      )
+    ).data.data,
   create: async (payload: CreateMilestoneRequest) => {
     const response = await apiClient.post<ApiResponse<MilestoneResponse>>('/milestones', payload)
     return response.data.data

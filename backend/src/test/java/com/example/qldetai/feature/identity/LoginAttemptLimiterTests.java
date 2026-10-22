@@ -7,6 +7,11 @@ import static org.mockito.Mockito.when;
 
 import com.example.qldetai.exception.TooManyRequestsException;
 import com.example.qldetai.security.LoginAttemptLimiter;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.BadCredentialsException;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -15,9 +20,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.security.authentication.BadCredentialsException;
 
 class LoginAttemptLimiterTests {
     private final Instant start = Instant.parse("2026-10-22T00:00:00Z");
@@ -32,9 +34,15 @@ class LoginAttemptLimiterTests {
     }
 
     private void fail(String username, String ip) {
-        assertThatThrownBy(() -> limiter.authenticate(username, ip, () -> {
-            throw new BadCredentialsException("invalid");
-        })).isExactlyInstanceOf(BadCredentialsException.class);
+        assertThatThrownBy(
+                        () ->
+                                limiter.authenticate(
+                                        username,
+                                        ip,
+                                        () -> {
+                                            throw new BadCredentialsException("invalid");
+                                        }))
+                .isExactlyInstanceOf(BadCredentialsException.class);
     }
 
     @Test
@@ -91,38 +99,57 @@ class LoginAttemptLimiterTests {
         var field = LoginAttemptLimiter.class.getDeclaredField("attempts");
         field.setAccessible(true);
         var cache = (com.github.benmanes.caffeine.cache.Cache<?, ?>) field.get(limiter);
-        limiter.authenticate("valid", "ip", () -> {
-            assertThat(cache.estimatedSize()).isZero();
-            return "ok";
-        });
+        limiter.authenticate(
+                "valid",
+                "ip",
+                () -> {
+                    assertThat(cache.estimatedSize()).isZero();
+                    return "ok";
+                });
         assertThat(cache.estimatedSize()).isZero();
-        assertThatThrownBy(() -> limiter.authenticate("unresolved", "ip", () -> {
-            throw new IllegalStateException("service unavailable");
-        })).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(
+                        () ->
+                                limiter.authenticate(
+                                        "unresolved",
+                                        "ip",
+                                        () -> {
+                                            throw new IllegalStateException("service unavailable");
+                                        }))
+                .isInstanceOf(IllegalStateException.class);
         assertThat(cache.estimatedSize()).isZero();
     }
 
     @Test
-    void concurrentDistributedFailuresCannotBypassUsernameLimitOrBlockOtherAccounts() throws Exception {
+    void concurrentDistributedFailuresCannotBypassUsernameLimitOrBlockOtherAccounts()
+            throws Exception {
         var calls = new AtomicInteger();
         var gate = new CountDownLatch(1);
         try (var pool = Executors.newFixedThreadPool(8)) {
             var tasks = new ArrayList<Future<?>>();
             for (int index = 0; index < 64; index++) {
                 String ip = "ip-" + index;
-                tasks.add(pool.submit(() -> {
-                    gate.await();
-                    try {
-                        limiter.authenticate("distributed", ip, () -> {
-                            calls.incrementAndGet();
-                            throw new BadCredentialsException("invalid");
-                        });
-                    } catch (BadCredentialsException | TooManyRequestsException expected) {
-                        // Independent IPs share the same account budget.
-                    }
-                    assertThat(limiter.authenticate("other-" + ip, "shared-ip", () -> "ok")).isEqualTo("ok");
-                    return null;
-                }));
+                tasks.add(
+                        pool.submit(
+                                () -> {
+                                    gate.await();
+                                    try {
+                                        limiter.authenticate(
+                                                "distributed",
+                                                ip,
+                                                () -> {
+                                                    calls.incrementAndGet();
+                                                    throw new BadCredentialsException("invalid");
+                                                });
+                                    } catch (BadCredentialsException
+                                            | TooManyRequestsException expected) {
+                                        // Independent IPs share the same account budget.
+                                    }
+                                    assertThat(
+                                                    limiter.authenticate(
+                                                            "other-" + ip, "shared-ip", () -> "ok"))
+                                            .isEqualTo("ok");
+                                    return null;
+                                }));
             }
             gate.countDown();
             for (var task : tasks) task.get();
@@ -137,18 +164,24 @@ class LoginAttemptLimiterTests {
         try (var pool = Executors.newFixedThreadPool(8)) {
             var tasks = new ArrayList<Future<?>>();
             for (int index = 0; index < 20; index++) {
-                tasks.add(pool.submit(() -> {
-                    startGate.await();
-                    try {
-                        limiter.authenticate("user", "ip", () -> {
-                            calls.incrementAndGet();
-                            throw new BadCredentialsException("invalid");
-                        });
-                    } catch (BadCredentialsException | TooManyRequestsException expected) {
-                        // Both outcomes must count against the same pair.
-                    }
-                    return null;
-                }));
+                tasks.add(
+                        pool.submit(
+                                () -> {
+                                    startGate.await();
+                                    try {
+                                        limiter.authenticate(
+                                                "user",
+                                                "ip",
+                                                () -> {
+                                                    calls.incrementAndGet();
+                                                    throw new BadCredentialsException("invalid");
+                                                });
+                                    } catch (BadCredentialsException
+                                            | TooManyRequestsException expected) {
+                                        // Both outcomes must count against the same pair.
+                                    }
+                                    return null;
+                                }));
             }
             startGate.countDown();
             for (var task : tasks) task.get();

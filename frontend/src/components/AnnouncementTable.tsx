@@ -23,7 +23,7 @@ type AnnouncementTableProps = {
 export function AnnouncementTable({ label, items, onOpen }: AnnouncementTableProps) {
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const selected = items.find(item => item.id === selectedId)
+  const selected = items.find((item) => item.id === selectedId)
   const query = search.trim().toLocaleLowerCase('vi')
   const visibleItems = items.filter((item) =>
     `${item.title} ${item.senderName}`.toLocaleLowerCase('vi').includes(query),
@@ -57,9 +57,13 @@ export function AnnouncementTable({ label, items, onOpen }: AnnouncementTablePro
                   Không tìm thấy thông báo phù hợp.
                 </td>
               </tr>
-            ) : visibleItems.map((item) => {
-              return (
-                  <tr key={item.id} className={item.unread ? 'announcement-table__row--unread' : undefined}>
+            ) : (
+              visibleItems.map((item) => {
+                return (
+                  <tr
+                    key={item.id}
+                    className={item.unread ? 'announcement-table__row--unread' : undefined}
+                  >
                     <td>
                       <button
                         className="announcement-table__title"
@@ -74,10 +78,13 @@ export function AnnouncementTable({ label, items, onOpen }: AnnouncementTablePro
                       </button>
                     </td>
                     <td>{item.senderName}</td>
-                    <td><time dateTime={item.sentAt}>{formatDateTime(item.sentAt)}</time></td>
+                    <td>
+                      <time dateTime={item.sentAt}>{formatDateTime(item.sentAt)}</time>
+                    </td>
                   </tr>
-              )
-            })}
+                )
+              })
+            )}
           </tbody>
         </table>
       </div>

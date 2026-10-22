@@ -19,7 +19,14 @@ import com.example.qldetai.feature.evaluation.repository.CommitteeMemberReposito
 import com.example.qldetai.feature.evaluation.repository.EvaluationCommitteeRepository;
 import com.example.qldetai.feature.evaluation.repository.RubricRepository;
 import com.example.qldetai.feature.identity.repository.LecturerRepository;
+
 import jakarta.persistence.EntityManager;
+
+import lombok.RequiredArgsConstructor;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.text.Normalizer;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -27,9 +34,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /** Saves the complete editable committee roster in one transaction. */
 @Service
@@ -49,10 +53,15 @@ public class CommitteeConfigurationService {
     @BusinessAudit(action = "COMMITTEE_CONFIGURE", entityType = "EVALUATION_COMMITTEE")
     public EvaluationCommitteeResponse save(Long id, SaveCommitteeRequest request, Long actorId) {
         actorAccess.manager(actorId);
-        RegistrationPeriod period = periods.findById(request.periodId())
-                .orElseThrow(() -> new ResourceNotFoundException("Registration period was not found."));
-        Rubric rubric = rubrics.findById(request.rubricId())
-                .orElseThrow(() -> new ResourceNotFoundException("Rubric was not found."));
+        RegistrationPeriod period =
+                periods.findById(request.periodId())
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Registration period was not found."));
+        Rubric rubric =
+                rubrics.findById(request.rubricId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Rubric was not found."));
         validateRubric(period, rubric);
         validateMembers(period, request.members());
 
@@ -64,23 +73,29 @@ public class CommitteeConfigurationService {
             committee.setFaculty(period.getFaculty());
             committee.setCreatedBy(actorAccess.user(actorId));
         } else {
-            committee = committees.findByIdForUpdate(id)
-                    .orElseThrow(() -> new ResourceNotFoundException("Committee was not found."));
+            committee =
+                    committees
+                            .findByIdForUpdate(id)
+                            .orElseThrow(
+                                    () ->
+                                            new ResourceNotFoundException(
+                                                    "Committee was not found."));
             if (!committee.getPeriod().getId().equals(period.getId())) {
                 throw new BusinessRuleException("Hội đồng không thuộc đợt đăng ký đã chọn.");
             }
             if (request.version() == null || request.version() != committee.getVersion()) {
-                throw new ConflictException("Hội đồng đã được cập nhật. Vui lòng tải lại trước khi lưu.");
+                throw new ConflictException(
+                        "Hội đồng đã được cập nhật. Vui lòng tải lại trước khi lưu.");
             }
-            List<CommitteeMember> current = members.findByCommitteeIdForUpdate(id).stream()
-                    .sorted(Comparator.comparingInt(CommitteeMember::getSlotNo))
-                    .toList();
+            List<CommitteeMember> current =
+                    members.findByCommitteeIdForUpdate(id).stream()
+                            .sorted(Comparator.comparingInt(CommitteeMember::getSlotNo))
+                            .toList();
             if (sameConfiguration(committee, rubric, request, current)) {
                 return committeeService.committee(committee, current);
             }
             if (committee.getStatus() != CommitteeStatus.DRAFT) {
-                throw new BusinessRuleException(
-                        "Chỉ có thể thay đổi hội đồng ở trạng thái nháp.");
+                throw new BusinessRuleException("Chỉ có thể thay đổi hội đồng ở trạng thái nháp.");
             }
             originalVersion = committee.getVersion();
             members.deleteAll(current);
@@ -103,7 +118,8 @@ public class CommitteeConfigurationService {
         members.flush();
         if (originalVersion != null && committee.getVersion() == originalVersion) {
             if (committees.advanceVersion(committee.getId(), originalVersion) != 1) {
-                throw new ConflictException("Hội đồng đã được cập nhật. Vui lòng tải lại trước khi lưu.");
+                throw new ConflictException(
+                        "Hội đồng đã được cập nhật. Vui lòng tải lại trước khi lưu.");
             }
             entityManager.refresh(committee);
         }
@@ -120,12 +136,16 @@ public class CommitteeConfigurationService {
         }
     }
 
-    private void validateMembers(RegistrationPeriod period, List<CommitteeMemberInput> requestedMembers) {
+    private void validateMembers(
+            RegistrationPeriod period, List<CommitteeMemberInput> requestedMembers) {
         if (requestedMembers.size() < period.getMinCommitteeMembers()
                 || requestedMembers.size() > period.getMaxCommitteeMembers()) {
-            throw new BusinessRuleException("Hội đồng cần từ " + period.getMinCommitteeMembers()
-                    + " đến " + period.getMaxCommitteeMembers()
-                    + " thành viên theo cấu hình đợt đăng ký.");
+            throw new BusinessRuleException(
+                    "Hội đồng cần từ "
+                            + period.getMinCommitteeMembers()
+                            + " đến "
+                            + period.getMaxCommitteeMembers()
+                            + " thành viên theo cấu hình đợt đăng ký.");
         }
 
         Set<Long> lecturerIds = new HashSet<>();
@@ -133,7 +153,8 @@ public class CommitteeConfigurationService {
         int secretaries = 0;
         for (CommitteeMemberInput member : requestedMembers) {
             if (!lecturerIds.add(member.lecturerId())) {
-                throw new BusinessRuleException("Mỗi giảng viên chỉ đảm nhiệm một vai trò trong hội đồng.");
+                throw new BusinessRuleException(
+                        "Mỗi giảng viên chỉ đảm nhiệm một vai trò trong hội đồng.");
             }
             if (!lecturers.existsById(member.lecturerId())) {
                 throw new ResourceNotFoundException("Lecturer was not found.");
@@ -174,10 +195,11 @@ public class CommitteeConfigurationService {
     }
 
     private static CommitteeRole role(String label) {
-        String normalized = Normalizer.normalize(label.trim(), Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .toLowerCase(Locale.ROOT)
-                .replaceAll("\\s+", " ");
+        String normalized =
+                Normalizer.normalize(label.trim(), Normalizer.Form.NFD)
+                        .replaceAll("\\p{M}", "")
+                        .toLowerCase(Locale.ROOT)
+                        .replaceAll("\\s+", " ");
         return switch (normalized) {
             case "chu tich", "chu tich hoi dong", "chair" -> CommitteeRole.CHAIR;
             case "thu ky", "thu ky hoi dong", "secretary" -> CommitteeRole.SECRETARY;

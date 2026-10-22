@@ -92,14 +92,20 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
 function normalizeUtcDates(value: unknown): void {
   if (!value || typeof value !== 'object') return
   for (const [key, child] of Object.entries(value)) {
-    if (typeof child === 'string' && key.endsWith('At') &&
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(child)) {
-      (value as Record<string, unknown>)[key] = `${child}Z`
+    if (
+      typeof child === 'string' &&
+      key.endsWith('At') &&
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(child)
+    ) {
+      ;(value as Record<string, unknown>)[key] = `${child}Z`
     } else if (typeof child === 'object') normalizeUtcDates(child)
   }
 }
 apiClient.interceptors.response.use(
-  (response) => { normalizeUtcDates(response.data); return response },
+  (response) => {
+    normalizeUtcDates(response.data)
+    return response
+  },
   (error) => {
     if (error.response?.status === 401) {
       // Clear local auth token if unauthenticated
@@ -111,7 +117,7 @@ apiClient.interceptors.response.use(
       clearCsrfToken()
     }
     return Promise.reject(error)
-  }
+  },
 )
 
 export const tokenStorage = {

@@ -19,7 +19,9 @@ import type {
 
 type NextPeriodStatus = 'ACTIVE' | 'CLOSED'
 
-const nextPeriodStatus = (status: RegistrationPeriodResponse['status']): NextPeriodStatus | null => {
+const nextPeriodStatus = (
+  status: RegistrationPeriodResponse['status'],
+): NextPeriodStatus | null => {
   if (status === 'DRAFT') return 'ACTIVE'
   if (status === 'ACTIVE') return 'CLOSED'
   if (status === 'CLOSED') return 'ACTIVE'
@@ -40,7 +42,9 @@ export const AcademicManagementPage: React.FC = () => {
   const [periodRevision, setPeriodRevision] = useState(0)
   const [totalPeriodPages, setTotalPeriodPages] = useState(0)
   const [periodError, setPeriodError] = useState('')
-  const [loadingPeriods, setLoadingPeriods] = useRequestLoading(JSON.stringify([user?.id, periodPage, periodRevision]))
+  const [loadingPeriods, setLoadingPeriods] = useRequestLoading(
+    JSON.stringify([user?.id, periodPage, periodRevision]),
+  )
   const [isPeriodModalOpen, setIsPeriodModalOpen] = useState(false)
   const [submittingPeriod, setSubmittingPeriod] = useState(false)
   const [pendingStatusChange, setPendingStatusChange] = useState<{
@@ -74,7 +78,8 @@ export const AcademicManagementPage: React.FC = () => {
     reviewDeadlineAt: null,
     defenseDate: null,
   })
-  const requiresReview = newPeriod.projectType === 'SPECIALIZED' || newPeriod.projectType === 'GRADUATION'
+  const requiresReview =
+    newPeriod.projectType === 'SPECIALIZED' || newPeriod.projectType === 'GRADUATION'
   const requiresDefense = newPeriod.projectType === 'GRADUATION'
 
   const scheduleErrors: Partial<Record<keyof CreateRegistrationPeriodRequest, string>> = {}
@@ -111,29 +116,41 @@ export const AcademicManagementPage: React.FC = () => {
       .getFaculties()
       .then(setFaculties)
       .catch((error) => showError(error.message))
-    academicApi.getSemesters().then(setSemesters)
-      .catch(() => showError('Không tải được danh sách học kỳ. Vui lòng tải lại trang trước khi tạo đợt.'))
+    academicApi
+      .getSemesters()
+      .then(setSemesters)
+      .catch(() =>
+        showError('Không tải được danh sách học kỳ. Vui lòng tải lại trang trước khi tạo đợt.'),
+      )
   }, [showError])
 
   // Load registration periods
-  const loadRegistrationPeriods = useCallback((isCurrent: () => boolean) => {
-    return academicApi.getRegistrationPeriods(undefined, periodPage, 10)
-      .then(result => {
-        if (!isCurrent()) return
-        setPeriods(result.content)
-        setTotalPeriodPages(result.totalPages)
-        setPeriodError('')
-      })
-      .catch(() => {
-        if (isCurrent()) setPeriodError('Không tải được danh sách đợt đăng ký. Vui lòng thử lại.')
-      })
-      .finally(() => { if (isCurrent()) setLoadingPeriods(false) })
-  }, [periodPage, setLoadingPeriods])
+  const loadRegistrationPeriods = useCallback(
+    (isCurrent: () => boolean) => {
+      return academicApi
+        .getRegistrationPeriods(undefined, periodPage, 10)
+        .then((result) => {
+          if (!isCurrent()) return
+          setPeriods(result.content)
+          setTotalPeriodPages(result.totalPages)
+          setPeriodError('')
+        })
+        .catch(() => {
+          if (isCurrent()) setPeriodError('Không tải được danh sách đợt đăng ký. Vui lòng thử lại.')
+        })
+        .finally(() => {
+          if (isCurrent()) setLoadingPeriods(false)
+        })
+    },
+    [periodPage, setLoadingPeriods],
+  )
 
   useEffect(() => {
     let current = true
     void loadRegistrationPeriods(() => current)
-    return () => { current = false }
+    return () => {
+      current = false
+    }
   }, [loadRegistrationPeriods, periodRevision])
 
   const handleCreatePeriod = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -216,14 +233,15 @@ export const AcademicManagementPage: React.FC = () => {
         proposalEndAt: new Date(newPeriod.proposalEndAt).toISOString(),
         registrationStartAt: new Date(newPeriod.registrationStartAt).toISOString(),
         registrationEndAt: new Date(newPeriod.registrationEndAt).toISOString(),
-        reviewDeadlineAt: requiresReview && newPeriod.reviewDeadlineAt
-          ? new Date(newPeriod.reviewDeadlineAt).toISOString()
-          : null,
+        reviewDeadlineAt:
+          requiresReview && newPeriod.reviewDeadlineAt
+            ? new Date(newPeriod.reviewDeadlineAt).toISOString()
+            : null,
         defenseDate: requiresDefense ? newPeriod.defenseDate : null,
       })
       showSuccess('Tạo đợt đăng ký thành công ở trạng thái nháp!')
       setPeriodPage(0)
-      setPeriodRevision(value => value + 1)
+      setPeriodRevision((value) => value + 1)
       setIsPeriodModalOpen(false)
       setNewPeriod({
         facultyId: 0,
@@ -292,7 +310,18 @@ export const AcademicManagementPage: React.FC = () => {
           )}
         </div>
 
-        {periodError && !loadingPeriods && <div role="alert"><p>{periodError}</p><button type="button" className="btn btn-secondary" onClick={() => setPeriodRevision(value => value + 1)}>Thử lại</button></div>}
+        {periodError && !loadingPeriods && (
+          <div role="alert">
+            <p>{periodError}</p>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setPeriodRevision((value) => value + 1)}
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
         {loadingPeriods ? (
           <div className="text-center py-8">
             <div className="spinner" />
@@ -326,73 +355,104 @@ export const AcademicManagementPage: React.FC = () => {
               <tbody>
                 {periods.map((p, idx) => {
                   const nextStatus = nextPeriodStatus(p.status)
-                  return <tr key={p.id}>
-                    <td>{periodPage * 10 + idx + 1}</td>
-                    <td className="registration-periods-table__period">
-                      <strong>{p.name}</strong>
-                      <span>
-                        {projectTypeLabel(p.projectType)} · HK {p.semesterNo} · {p.academicYear}
-                      </span>
-                    </td>
-                    <td className="registration-periods-table__schedule">
-                      <span>
-                        <strong>GV:</strong> {formatDateTime(p.proposalStartAt)} – {formatDateTime(p.proposalEndAt)}
-                      </span>
-                      <span>
-                        <strong>SV:</strong> {formatDateTime(p.registrationStartAt)} – {formatDateTime(p.registrationEndAt)}
-                      </span>
-                    </td>
-                    <td className="registration-periods-table__milestones">
-                      <span>
-                        <strong>GVPB:</strong>{' '}
-                        {p.projectType === 'SPECIALIZED' || p.projectType === 'GRADUATION'
-                          ? (p.reviewDeadlineAt ? formatDateTime(p.reviewDeadlineAt) : 'Chưa thiết lập')
-                          : '—'}
-                      </span>
-                      <span>
-                        <strong>Hội đồng:</strong>{' '}
-                        {p.projectType === 'GRADUATION'
-                          ? (p.defenseDate ? formatDateInput(p.defenseDate, false) : 'Chưa thiết lập')
-                          : '—'}
-                      </span>
-                    </td>
-                    <td className="registration-periods-table__rules">
-                      <span>Nhóm: {p.minGroupMembers}–{p.maxGroupMembers} SV</span>
-                      <span>Lời mời: {p.invitationExpiryHours} giờ</span>
-                      <span>Hội đồng: {p.minCommitteeMembers}–{p.maxCommitteeMembers} GV</span>
-                    </td>
-                    <td className="registration-period-status">
-                      <StatusBadge status={p.status} />
-                    </td>
-                    <td className="registration-periods-table__action">
-                      {(isAdmin || isDean) && nextStatus && (
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          disabled={changingPeriodStatus}
-                          onClick={() =>
-                            setPendingStatusChange({
-                              period: p,
-                              nextStatus,
-                            })
-                          }
-                        >
-                          {periodStatusActionLabel(nextStatus)}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                  return (
+                    <tr key={p.id}>
+                      <td>{periodPage * 10 + idx + 1}</td>
+                      <td className="registration-periods-table__period">
+                        <strong>{p.name}</strong>
+                        <span>
+                          {projectTypeLabel(p.projectType)} · HK {p.semesterNo} · {p.academicYear}
+                        </span>
+                      </td>
+                      <td className="registration-periods-table__schedule">
+                        <span>
+                          <strong>GV:</strong> {formatDateTime(p.proposalStartAt)} –{' '}
+                          {formatDateTime(p.proposalEndAt)}
+                        </span>
+                        <span>
+                          <strong>SV:</strong> {formatDateTime(p.registrationStartAt)} –{' '}
+                          {formatDateTime(p.registrationEndAt)}
+                        </span>
+                      </td>
+                      <td className="registration-periods-table__milestones">
+                        <span>
+                          <strong>GVPB:</strong>{' '}
+                          {p.projectType === 'SPECIALIZED' || p.projectType === 'GRADUATION'
+                            ? p.reviewDeadlineAt
+                              ? formatDateTime(p.reviewDeadlineAt)
+                              : 'Chưa thiết lập'
+                            : '—'}
+                        </span>
+                        <span>
+                          <strong>Hội đồng:</strong>{' '}
+                          {p.projectType === 'GRADUATION'
+                            ? p.defenseDate
+                              ? formatDateInput(p.defenseDate, false)
+                              : 'Chưa thiết lập'
+                            : '—'}
+                        </span>
+                      </td>
+                      <td className="registration-periods-table__rules">
+                        <span>
+                          Nhóm: {p.minGroupMembers}–{p.maxGroupMembers} SV
+                        </span>
+                        <span>Lời mời: {p.invitationExpiryHours} giờ</span>
+                        <span>
+                          Hội đồng: {p.minCommitteeMembers}–{p.maxCommitteeMembers} GV
+                        </span>
+                      </td>
+                      <td className="registration-period-status">
+                        <StatusBadge status={p.status} />
+                      </td>
+                      <td className="registration-periods-table__action">
+                        {(isAdmin || isDean) && nextStatus && (
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            disabled={changingPeriodStatus}
+                            onClick={() =>
+                              setPendingStatusChange({
+                                period: p,
+                                nextStatus,
+                              })
+                            }
+                          >
+                            {periodStatusActionLabel(nextStatus)}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
                 })}
               </tbody>
             </table>
           </div>
         )}
-        {totalPeriodPages > 1 && <nav className="table-pagination" aria-label="Phân trang đợt đăng ký">
-          <span>Trang {periodPage + 1} / {totalPeriodPages}</span><div>
-            <button type="button" className="btn btn-secondary btn-sm" disabled={loadingPeriods || periodPage === 0} onClick={() => setPeriodPage(value => value - 1)}>Trang trước</button>
-            <button type="button" className="btn btn-secondary btn-sm" disabled={loadingPeriods || periodPage + 1 >= totalPeriodPages} onClick={() => setPeriodPage(value => value + 1)}>Trang sau</button>
-          </div>
-        </nav>}
+        {totalPeriodPages > 1 && (
+          <nav className="table-pagination" aria-label="Phân trang đợt đăng ký">
+            <span>
+              Trang {periodPage + 1} / {totalPeriodPages}
+            </span>
+            <div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={loadingPeriods || periodPage === 0}
+                onClick={() => setPeriodPage((value) => value - 1)}
+              >
+                Trang trước
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={loadingPeriods || periodPage + 1 >= totalPeriodPages}
+                onClick={() => setPeriodPage((value) => value + 1)}
+              >
+                Trang sau
+              </button>
+            </div>
+          </nav>
+        )}
       </div>
 
       <ConfirmModal
@@ -413,9 +473,17 @@ export const AcademicManagementPage: React.FC = () => {
       {/* Modal Create Registration Period */}
       {isPeriodModalOpen && (
         <div className="modal-backdrop fade-in" onClick={() => setIsPeriodModalOpen(false)}>
-          <div className="modal-content registration-period-modal scale-in" role="dialog" aria-modal="true" aria-labelledby="period-dialog-title" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-content registration-period-modal scale-in"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="period-dialog-title"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
-              <h3 id="period-dialog-title" className="font-semibold text-lg">Tạo Đợt Đăng Ký Đề Tài Mới</h3>
+              <h3 id="period-dialog-title" className="font-semibold text-lg">
+                Tạo Đợt Đăng Ký Đề Tài Mới
+              </h3>
               <button
                 type="button"
                 className="btn-close"
@@ -502,11 +570,15 @@ export const AcademicManagementPage: React.FC = () => {
                     className="form-select"
                     value={newPeriod.projectType}
                     onChange={(e) => {
-                      const projectType = e.target.value as CreateRegistrationPeriodRequest['projectType']
-                      setNewPeriod(previous => ({
+                      const projectType = e.target
+                        .value as CreateRegistrationPeriodRequest['projectType']
+                      setNewPeriod((previous) => ({
                         ...previous,
                         projectType,
-                        reviewDeadlineAt: projectType === 'SPECIALIZED' || projectType === 'GRADUATION' ? previous.reviewDeadlineAt : null,
+                        reviewDeadlineAt:
+                          projectType === 'SPECIALIZED' || projectType === 'GRADUATION'
+                            ? previous.reviewDeadlineAt
+                            : null,
                         defenseDate: projectType === 'GRADUATION' ? previous.defenseDate : null,
                       }))
                     }}
@@ -642,7 +714,9 @@ export const AcademicManagementPage: React.FC = () => {
                         name="reviewDeadlineAt"
                         aria-invalid={Boolean(scheduleErrors.reviewDeadlineAt)}
                         aria-describedby={
-                          scheduleErrors.reviewDeadlineAt ? 'period-review-deadline-error' : undefined
+                          scheduleErrors.reviewDeadlineAt
+                            ? 'period-review-deadline-error'
+                            : undefined
                         }
                         value={newPeriod.reviewDeadlineAt || ''}
                         onValueChange={(value) =>
@@ -688,9 +762,7 @@ export const AcademicManagementPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">
-                    Quy tắc nhóm thực hiện
-                  </label>
+                  <label className="form-label">Quy tắc nhóm thực hiện</label>
                   <div className="grid-cols-2">
                     <div className="form-group">
                       <label className="form-label">
@@ -733,9 +805,7 @@ export const AcademicManagementPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">
-                    Thời hạn lời mời tham gia nhóm (giờ)
-                  </label>
+                  <label className="form-label">Thời hạn lời mời tham gia nhóm (giờ)</label>
                   <input
                     type="number"
                     min="1"
@@ -752,9 +822,7 @@ export const AcademicManagementPage: React.FC = () => {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">
-                    Quy tắc hội đồng
-                  </label>
+                  <label className="form-label">Quy tắc hội đồng</label>
                   <div className="grid-cols-2">
                     <div className="form-group">
                       <label className="form-label">
@@ -770,7 +838,9 @@ export const AcademicManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setNewPeriod({
                             ...newPeriod,
-                            minCommitteeMembers: e.target.value ? Number(e.target.value) : undefined,
+                            minCommitteeMembers: e.target.value
+                              ? Number(e.target.value)
+                              : undefined,
                           })
                         }
                       />
@@ -789,14 +859,15 @@ export const AcademicManagementPage: React.FC = () => {
                         onChange={(e) =>
                           setNewPeriod({
                             ...newPeriod,
-                            maxCommitteeMembers: e.target.value ? Number(e.target.value) : undefined,
+                            maxCommitteeMembers: e.target.value
+                              ? Number(e.target.value)
+                              : undefined,
                           })
                         }
                       />
                     </div>
                   </div>
                 </div>
-
               </div>
 
               <div

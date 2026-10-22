@@ -88,19 +88,23 @@ export const evaluationApi = {
     return response.data.data
   },
   assignBatch: async (assignments: CreateEvaluationRequest[]) => {
-    const response = await apiClient.post<ApiResponse<{ assignedCount: number; skippedCount: number }>>(
-      '/evaluation-assignments/batch', { assignments },
-    )
+    const response = await apiClient.post<
+      ApiResponse<{ assignedCount: number; skippedCount: number }>
+    >('/evaluation-assignments/batch', { assignments })
     return response.data.data
   },
   defenseEligibility: async (assignmentId: number, committeeId: number) => {
-    const response = await apiClient.get<ApiResponse<{ eligible: boolean; reason: string | null }>>('/defense-sessions/eligibility', { params: { assignmentId, committeeId } })
+    const response = await apiClient.get<ApiResponse<{ eligible: boolean; reason: string | null }>>(
+      '/defense-sessions/eligibility',
+      { params: { assignmentId, committeeId } },
+    )
     return response.data.data
   },
 
   listCommittees: async (params: { periodId?: number; page?: number; size?: number } = {}) => {
     const response = await apiClient.get<ApiResponse<PageResponse<EvaluationCommitteeResponse>>>(
-      '/evaluation-committees', { params },
+      '/evaluation-committees',
+      { params },
     )
     return response.data.data
   },
@@ -108,9 +112,13 @@ export const evaluationApi = {
   saveCommittee: async (id: number | null, payload: SaveCommitteeRequest) => {
     const response = id
       ? await apiClient.put<ApiResponse<EvaluationCommitteeResponse>>(
-        '/evaluation-committees/' + id + '/configuration', payload)
+          '/evaluation-committees/' + id + '/configuration',
+          payload,
+        )
       : await apiClient.post<ApiResponse<EvaluationCommitteeResponse>>(
-        '/evaluation-committees/configuration', payload)
+          '/evaluation-committees/configuration',
+          payload,
+        )
     return response.data.data
   },
 

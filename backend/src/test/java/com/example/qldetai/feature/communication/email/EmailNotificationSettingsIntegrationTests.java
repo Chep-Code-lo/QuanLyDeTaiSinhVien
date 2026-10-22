@@ -4,27 +4,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.qldetai.feature.academic.domain.Department;
-import com.example.qldetai.feature.academic.repository.DepartmentRepository;
 import com.example.qldetai.feature.academic.domain.Faculty;
+import com.example.qldetai.feature.academic.repository.DepartmentRepository;
 import com.example.qldetai.feature.academic.repository.FacultyRepository;
 import com.example.qldetai.feature.communication.email.EmailNotificationDtos.EmailNotificationSettingResponse;
 import com.example.qldetai.feature.communication.email.EmailNotificationDtos.SendTestEmailRequest;
 import com.example.qldetai.feature.communication.email.EmailNotificationDtos.UpdateNotificationSettingRequest;
 import com.example.qldetai.feature.identity.domain.AcademicAppointment;
-import com.example.qldetai.feature.identity.repository.AcademicAppointmentRepository;
 import com.example.qldetai.feature.identity.domain.Lecturer;
-import com.example.qldetai.feature.identity.repository.LecturerRepository;
 import com.example.qldetai.feature.identity.domain.PositionCode;
 import com.example.qldetai.feature.identity.domain.Role;
 import com.example.qldetai.feature.identity.domain.RoleCode;
-import com.example.qldetai.feature.identity.repository.RoleRepository;
 import com.example.qldetai.feature.identity.domain.User;
-import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.identity.domain.UserStatus;
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import com.example.qldetai.feature.identity.repository.AcademicAppointmentRepository;
+import com.example.qldetai.feature.identity.repository.LecturerRepository;
+import com.example.qldetai.feature.identity.repository.RoleRepository;
+import com.example.qldetai.feature.identity.repository.UserRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,6 +29,11 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @SpringBootTest
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
@@ -90,10 +92,11 @@ class EmailNotificationSettingsIntegrationTests {
 
     @Test
     void administratorCanSaveSystemDefault() {
-        EmailNotificationSettingResponse saved = settingsService.update(
-                admin.getId(),
-                EmailNotificationEventType.TASK_ASSIGNED,
-                taskRequest(NotificationScopeType.SYSTEM, 0L));
+        EmailNotificationSettingResponse saved =
+                settingsService.update(
+                        admin.getId(),
+                        EmailNotificationEventType.TASK_ASSIGNED,
+                        taskRequest(NotificationScopeType.SYSTEM, 0L));
 
         assertThat(saved.enabled()).isTrue();
         assertThat(saved.scopeType()).isEqualTo(NotificationScopeType.SYSTEM);
@@ -103,9 +106,22 @@ class EmailNotificationSettingsIntegrationTests {
     @Test
     void resultEmailCannotUseBroadRecipientGroups() {
         var template = EmailTemplateCatalog.definition(EmailNotificationEventType.RESULT_PUBLISHED);
-        assertThatThrownBy(() -> settingsService.update(admin.getId(), EmailNotificationEventType.RESULT_PUBLISHED,
-                new UpdateNotificationSettingRequest(NotificationScopeType.SYSTEM, 0L, true, "University", "thongbao@test.local",
-                        null, template.defaultSubject(), template.defaultBody(), Set.of(EmailRecipientGroup.FACULTY_STUDENTS), null)))
+        assertThatThrownBy(
+                        () ->
+                                settingsService.update(
+                                        admin.getId(),
+                                        EmailNotificationEventType.RESULT_PUBLISHED,
+                                        new UpdateNotificationSettingRequest(
+                                                NotificationScopeType.SYSTEM,
+                                                0L,
+                                                true,
+                                                "University",
+                                                "thongbao@test.local",
+                                                null,
+                                                template.defaultSubject(),
+                                                template.defaultBody(),
+                                                Set.of(EmailRecipientGroup.FACULTY_STUDENTS),
+                                                null)))
                 .isInstanceOf(com.example.qldetai.exception.BusinessRuleException.class);
     }
 
@@ -113,9 +129,13 @@ class EmailNotificationSettingsIntegrationTests {
     void studentCannotManageNotificationSettings() {
         User student = createUser("email-student", Set.of(RoleCode.STUDENT));
 
-        assertThatThrownBy(() -> settingsService.update(
-                student.getId(), EmailNotificationEventType.TASK_ASSIGNED,
-                taskRequest(NotificationScopeType.LECTURER, student.getId())))
+        assertThatThrownBy(
+                        () ->
+                                settingsService.update(
+                                        student.getId(),
+                                        EmailNotificationEventType.TASK_ASSIGNED,
+                                        taskRequest(
+                                                NotificationScopeType.LECTURER, student.getId())))
                 .isInstanceOf(AccessDeniedException.class);
     }
 
@@ -130,16 +150,19 @@ class EmailNotificationSettingsIntegrationTests {
         appointment.setAssignedBy(admin);
         appointmentRepository.save(appointment);
 
-        EmailNotificationSettingResponse saved = settingsService.update(
-                dean.getUser().getId(),
-                EmailNotificationEventType.REGISTRATION_OPENED,
-                registrationOpenedRequest(facultyOne.getId()));
+        EmailNotificationSettingResponse saved =
+                settingsService.update(
+                        dean.getUser().getId(),
+                        EmailNotificationEventType.REGISTRATION_OPENED,
+                        registrationOpenedRequest(facultyOne.getId()));
         assertThat(saved.scopeId()).isEqualTo(facultyOne.getId());
 
-        assertThatThrownBy(() -> settingsService.update(
-                dean.getUser().getId(),
-                EmailNotificationEventType.REGISTRATION_OPENED,
-                registrationOpenedRequest(facultyTwo.getId())))
+        assertThatThrownBy(
+                        () ->
+                                settingsService.update(
+                                        dean.getUser().getId(),
+                                        EmailNotificationEventType.REGISTRATION_OPENED,
+                                        registrationOpenedRequest(facultyTwo.getId())))
                 .isInstanceOf(AccessDeniedException.class);
     }
 
@@ -158,15 +181,23 @@ class EmailNotificationSettingsIntegrationTests {
                 dean.getUser().getId(),
                 EmailNotificationEventType.REGISTRATION_OPENED,
                 registrationOpenedRequest(facultyOne.getId()));
-        Long outboxId = settingsService.queueTest(
-                dean.getUser().getId(),
-                EmailNotificationEventType.REGISTRATION_OPENED,
-                new SendTestEmailRequest(NotificationScopeType.FACULTY, facultyOne.getId(), null, null)).outboxId();
+        Long outboxId =
+                settingsService
+                        .queueTest(
+                                dean.getUser().getId(),
+                                EmailNotificationEventType.REGISTRATION_OPENED,
+                                new SendTestEmailRequest(
+                                        NotificationScopeType.FACULTY,
+                                        facultyOne.getId(),
+                                        null,
+                                        null))
+                        .outboxId();
 
         assertThat(emailLogService.list(dean.getUser().getId(), 0, 20).content())
                 .extracting(log -> log.id())
                 .contains(outboxId);
-        assertThat(emailLogService.get(dean.getUser().getId(), outboxId).log().id()).isEqualTo(outboxId);
+        assertThat(emailLogService.get(dean.getUser().getId(), outboxId).log().id())
+                .isEqualTo(outboxId);
         assertThat(emailOutboxRepository.findById(outboxId)).isPresent();
     }
 
@@ -174,20 +205,24 @@ class EmailNotificationSettingsIntegrationTests {
     void lecturerCanConfigureOnlyTaskAndDeadlineEventsForSelf() {
         Lecturer lecturer = createLecturer("email-lecturer");
 
-        EmailNotificationSettingResponse taskSetting = settingsService.update(
-                lecturer.getUser().getId(),
-                EmailNotificationEventType.TASK_ASSIGNED,
-                taskRequest(NotificationScopeType.LECTURER, lecturer.getUser().getId()));
+        EmailNotificationSettingResponse taskSetting =
+                settingsService.update(
+                        lecturer.getUser().getId(),
+                        EmailNotificationEventType.TASK_ASSIGNED,
+                        taskRequest(NotificationScopeType.LECTURER, lecturer.getUser().getId()));
         assertThat(taskSetting.scopeId()).isEqualTo(lecturer.getUser().getId());
 
-        assertThatThrownBy(() -> settingsService.update(
-                lecturer.getUser().getId(),
-                EmailNotificationEventType.REGISTRATION_OPENED,
-                registrationOpenedRequest(facultyOne.getId())))
+        assertThatThrownBy(
+                        () ->
+                                settingsService.update(
+                                        lecturer.getUser().getId(),
+                                        EmailNotificationEventType.REGISTRATION_OPENED,
+                                        registrationOpenedRequest(facultyOne.getId())))
                 .isInstanceOf(AccessDeniedException.class);
     }
 
-    private UpdateNotificationSettingRequest taskRequest(NotificationScopeType scopeType, Long scopeId) {
+    private UpdateNotificationSettingRequest taskRequest(
+            NotificationScopeType scopeType, Long scopeId) {
         return new UpdateNotificationSettingRequest(
                 scopeType,
                 scopeId,

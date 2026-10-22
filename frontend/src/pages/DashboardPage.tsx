@@ -23,9 +23,12 @@ const dateTime = (value: string) => formatDateTime(value)
 export function DashboardPage() {
   const { user, hasRole } = useAuth()
   const isLecturer = hasRole('LECTURER') || hasRole('ADMIN')
-  const [snapshot, setSnapshot] = useState<{ userId: number | undefined; summary: DashboardSummary } | null>(null)
+  const [snapshot, setSnapshot] = useState<{
+    userId: number | undefined
+    summary: DashboardSummary
+  } | null>(null)
   const [failedUserId, setFailedUserId] = useState<number | undefined | null>(null)
-  const summary = snapshot?.userId === user?.id ? snapshot?.summary ?? null : null
+  const summary = snapshot?.userId === user?.id ? (snapshot?.summary ?? null) : null
   const error = failedUserId === user?.id
   const loading = !summary && !error
   const [revision, setRevision] = useState(0)
@@ -69,7 +72,9 @@ export function DashboardPage() {
   }))
   const chartSegments = counts.map((item, index) => {
     const percentage = summary?.totalTopics ? (item.count / summary.totalTopics) * 100 : 0
-    const previousCount = counts.slice(0, index).reduce((total, previous) => total + previous.count, 0)
+    const previousCount = counts
+      .slice(0, index)
+      .reduce((total, previous) => total + previous.count, 0)
     const offset = summary?.totalTopics ? (previousCount / summary.totalTopics) * 100 : 0
     return { ...item, percentage, offset }
   })
@@ -155,10 +160,38 @@ export function DashboardPage() {
             ) : loading ? (
               'Đang tải dữ liệu tổng quan...'
             ) : (
-              <>Chưa tải được dữ liệu tổng quan.{' '}{error && <button className="welcome-panel__retry" type="button" onClick={() => { setFailedUserId(null); setRevision((value) => value + 1) }}>Thử lại</button>}</>
+              <>
+                Chưa tải được dữ liệu tổng quan.{' '}
+                {error && (
+                  <button
+                    className="welcome-panel__retry"
+                    type="button"
+                    onClick={() => {
+                      setFailedUserId(null)
+                      setRevision((value) => value + 1)
+                    }}
+                  >
+                    Thử lại
+                  </button>
+                )}
+              </>
             )}
           </p>
-          {summary && error && <p role="status">Chưa cập nhật được dữ liệu mới. Đang hiển thị dữ liệu lần tải thành công gần nhất. <button type="button" className="welcome-panel__retry" onClick={() => { setFailedUserId(null); setRevision((value) => value + 1) }}>Thử lại</button></p>}
+          {summary && error && (
+            <p role="status">
+              Chưa cập nhật được dữ liệu mới. Đang hiển thị dữ liệu lần tải thành công gần nhất.{' '}
+              <button
+                type="button"
+                className="welcome-panel__retry"
+                onClick={() => {
+                  setFailedUserId(null)
+                  setRevision((value) => value + 1)
+                }}
+              >
+                Thử lại
+              </button>
+            </p>
+          )}
           {user?.activeAppointments?.length ? (
             <div className="welcome-panel__roles">
               {user.activeAppointments.map((item) => (
@@ -176,7 +209,9 @@ export function DashboardPage() {
       <section className="dashboard-grid" aria-label="Chỉ số tổng quan" aria-busy={loading}>
         {metrics.map((metric) => (
           <article key={metric.label} className={`metric-card metric-card--${metric.color}`}>
-            <span className="metric-card__icon"><metric.icon size={20} strokeWidth={1.8} aria-hidden="true" /></span>
+            <span className="metric-card__icon">
+              <metric.icon size={20} strokeWidth={1.8} aria-hidden="true" />
+            </span>
             <div>
               <span className="metric-card__label">{metric.label}</span>
               <strong className="metric-card__value">
@@ -200,7 +235,10 @@ export function DashboardPage() {
             <button
               className="text-button"
               disabled={loading}
-              onClick={() => { setFailedUserId(null); setRevision((value) => value + 1) }}
+              onClick={() => {
+                setFailedUserId(null)
+                setRevision((value) => value + 1)
+              }}
             >
               {loading ? 'Đang tải...' : 'Cập nhật'}
             </button>
@@ -221,40 +259,63 @@ export function DashboardPage() {
                 aria-label="Biểu đồ phân bố đề tài theo loại"
               >
                 <g transform="rotate(-90 50 50)">
-                  <circle className="donut__track" cx="50" cy="50" r="42" fill="none" strokeWidth="16" />
-                  {chartSegments.filter((item) => item.percentage > 0).map((item) => (
-                    <circle
-                      key={item.type}
-                      className={`donut__segment${hoveredTopicType === item.type ? ' donut__segment--active' : ''}`}
-                      cx="50"
-                      cy="50"
-                      r="42"
-                      fill="none"
-                      stroke={item.color}
-                      strokeWidth="16"
-                      pathLength="100"
-                      strokeDasharray={`${item.percentage} ${100 - item.percentage}`}
-                      strokeDashoffset={-item.offset}
-                      tabIndex={0}
-                      role="img"
-                      aria-label={`${item.label}: ${number(item.count)} đề tài`}
-                      aria-describedby="dashboard-topic-chart-tooltip"
-                      onPointerEnter={(event) => {
-                        setHoveredTopicType(item.type)
-                        updateTooltipPosition(event.clientX, event.clientY)
-                      }}
-                      onPointerMove={(event) => updateTooltipPosition(event.clientX, event.clientY)}
-                      onPointerLeave={clearHoveredTopic}
-                      onFocus={() => focusTopicSegment(item)}
-                      onBlur={clearHoveredTopic}
-                    />
-                  ))}
+                  <circle
+                    className="donut__track"
+                    cx="50"
+                    cy="50"
+                    r="42"
+                    fill="none"
+                    strokeWidth="16"
+                  />
+                  {chartSegments
+                    .filter((item) => item.percentage > 0)
+                    .map((item) => (
+                      <circle
+                        key={item.type}
+                        className={`donut__segment${hoveredTopicType === item.type ? ' donut__segment--active' : ''}`}
+                        cx="50"
+                        cy="50"
+                        r="42"
+                        fill="none"
+                        stroke={item.color}
+                        strokeWidth="16"
+                        pathLength="100"
+                        strokeDasharray={`${item.percentage} ${100 - item.percentage}`}
+                        strokeDashoffset={-item.offset}
+                        tabIndex={0}
+                        role="img"
+                        aria-label={`${item.label}: ${number(item.count)} đề tài`}
+                        aria-describedby="dashboard-topic-chart-tooltip"
+                        onPointerEnter={(event) => {
+                          setHoveredTopicType(item.type)
+                          updateTooltipPosition(event.clientX, event.clientY)
+                        }}
+                        onPointerMove={(event) =>
+                          updateTooltipPosition(event.clientX, event.clientY)
+                        }
+                        onPointerLeave={clearHoveredTopic}
+                        onFocus={() => focusTopicSegment(item)}
+                        onBlur={clearHoveredTopic}
+                      />
+                    ))}
                 </g>
                 <circle className="donut__center" cx="50" cy="50" r="34" />
-                <text className="donut__value" x="50" y="47" textAnchor="middle" dominantBaseline="middle">
+                <text
+                  className="donut__value"
+                  x="50"
+                  y="47"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                >
                   {summary ? number(summary.totalTopics) : '—'}
                 </text>
-                <text className="donut__label" x="50" y="62" textAnchor="middle" dominantBaseline="middle">
+                <text
+                  className="donut__label"
+                  x="50"
+                  y="62"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                >
                   Đề tài
                 </text>
               </svg>
@@ -262,7 +323,11 @@ export function DashboardPage() {
                 className={`donut__tooltip${tooltipPosition?.side === 'left' ? ' donut__tooltip--left' : ''}`}
                 id="dashboard-topic-chart-tooltip"
                 role="tooltip"
-                style={tooltipPosition ? { left: `${tooltipPosition.x}px`, top: `${tooltipPosition.y}px` } : undefined}
+                style={
+                  tooltipPosition
+                    ? { left: `${tooltipPosition.x}px`, top: `${tooltipPosition.y}px` }
+                    : undefined
+                }
               >
                 <strong>
                   {hoveredTopic
@@ -298,7 +363,9 @@ export function DashboardPage() {
           </div>
           <div className="task-list">
             <Link to="/announcements">
-              <span className="task-list__icon task-list__icon--blue"><Bell size={18} aria-hidden="true" /></span>
+              <span className="task-list__icon task-list__icon--blue">
+                <Bell size={18} aria-hidden="true" />
+              </span>
               <div>
                 <strong>Thông báo của bạn</strong>
                 <small>
@@ -307,7 +374,9 @@ export function DashboardPage() {
               </div>
             </Link>
             <Link to="/registrations">
-              <span className="task-list__icon task-list__icon--warning"><Clock size={18} aria-hidden="true" /></span>
+              <span className="task-list__icon task-list__icon--warning">
+                <Clock size={18} aria-hidden="true" />
+              </span>
               <div>
                 <strong>Đợt đang mở đăng ký</strong>
                 <small>
@@ -318,7 +387,9 @@ export function DashboardPage() {
               </div>
             </Link>
             <Link to="/topics">
-              <span className="task-list__icon task-list__icon--red"><FolderOpen size={18} aria-hidden="true" /></span>
+              <span className="task-list__icon task-list__icon--red">
+                <FolderOpen size={18} aria-hidden="true" />
+              </span>
               <div>
                 <strong>Đề tài đang mở đăng ký</strong>
                 <small>

@@ -18,6 +18,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -33,7 +35,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
@@ -43,22 +44,22 @@ public class TopicController {
 
     private final TopicService topicService;
 
-
     @GetMapping
     public ApiResponse<PageResponse<TopicResponse>> list(
             @RequestParam(required = false) Long periodId,
             @RequestParam(required = false) TopicStatus status,
-            @RequestParam(required = false) @jakarta.validation.constraints.Size(max = 200) String q,
+            @RequestParam(required = false) @jakarta.validation.constraints.Size(max = 200)
+                    String q,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success(topicService.list(periodId, status, q, page, size, principal.id()));
+        return ApiResponse.success(
+                topicService.list(periodId, status, q, page, size, principal.id()));
     }
 
     @GetMapping("/{id}")
     public ApiResponse<TopicResponse> get(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserPrincipal principal) {
+            @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(topicService.get(id, principal.id()));
     }
 
@@ -73,7 +74,8 @@ public class TopicController {
     }
 
     @PostMapping("/for-registration")
-    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageDepartment(#request.departmentId, authentication)")
+    @PreAuthorize(
+            "hasRole('ADMIN') or @academicAuthorization.canManageDepartment(#request.departmentId, authentication)")
     public ResponseEntity<ApiResponse<TopicResponse>> createForRegistration(
             @Valid @RequestBody CreateRegistrationTopicRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -110,7 +112,8 @@ public class TopicController {
             @Valid @RequestBody ReviewTopicRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Đã ghi nhận kết quả xét duyệt đề tài.", topicService.review(id, request, principal.id()));
+                "Đã ghi nhận kết quả xét duyệt đề tài.",
+                topicService.review(id, request, principal.id()));
     }
 
     @PatchMapping("/{id}/publish")

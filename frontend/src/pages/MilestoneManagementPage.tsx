@@ -28,7 +28,10 @@ export const MilestoneManagementPage: React.FC = () => {
   const [loadingAssignments, setLoadingAssignments] = useState(true)
   const [milestoneError, setMilestoneError] = useState<string | null>(null)
   const [milestoneReload, setMilestoneReload] = useState(0)
-  const [loadingMilestones, setLoadingMilestones] = useRequestLoading(JSON.stringify([selectedAssignmentId, milestoneReload]), !!selectedAssignmentId)
+  const [loadingMilestones, setLoadingMilestones] = useRequestLoading(
+    JSON.stringify([selectedAssignmentId, milestoneReload]),
+    !!selectedAssignmentId,
+  )
 
   // Create Milestone Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -58,7 +61,7 @@ export const MilestoneManagementPage: React.FC = () => {
   // Load project assignments
   useEffect(() => {
     let active = true
-    allPages(page => academicApi.getProjectAssignments(undefined, page, 100))
+    allPages((page) => academicApi.getProjectAssignments(undefined, page, 100))
       .then((res) => {
         if (!active) return
         setAssignments(res)
@@ -70,8 +73,12 @@ export const MilestoneManagementPage: React.FC = () => {
         if (!active) return
         showError('Không thể tải danh sách dự án: ' + (err.response?.data?.message || err.message))
       })
-      .finally(() => { if (active) setLoadingAssignments(false) })
-    return () => { active = false }
+      .finally(() => {
+        if (active) setLoadingAssignments(false)
+      })
+    return () => {
+      active = false
+    }
   }, [showError])
 
   // Load milestones when project assignment selection changes
@@ -81,18 +88,23 @@ export const MilestoneManagementPage: React.FC = () => {
     milestoneApi
       .listByAssignment(selectedAssignmentId)
       .then((res) => {
-        if (active) { setMilestones(res); setMilestoneError(null) }
+        if (active) {
+          setMilestones(res)
+          setMilestoneError(null)
+        }
       })
       .catch((err) => {
         if (!active) return
         const detail = err.response?.data?.message || err.message || 'Vui lòng thử lại.'
         setMilestoneError(detail)
-        showError(
-          'Không thể tải danh sách mốc tiến độ: ' + detail,
-        )
+        showError('Không thể tải danh sách mốc tiến độ: ' + detail)
       })
-      .finally(() => { if (active) setLoadingMilestones(false) })
-    return () => { active = false }
+      .finally(() => {
+        if (active) setLoadingMilestones(false)
+      })
+    return () => {
+      active = false
+    }
   }, [selectedAssignmentId, showError, milestoneReload, setLoadingMilestones])
 
   const handleCreateMilestone = async (e: React.FormEvent) => {
@@ -109,9 +121,11 @@ export const MilestoneManagementPage: React.FC = () => {
 
     try {
       setSubmittingMilestone(true)
-      const dueAt = editingMilestone && newMilestone.dueAt === toLocalDateTimeInput(parseUtcDateTime(editingMilestone.dueAt))
-        ? parseUtcDateTime(editingMilestone.dueAt).toISOString()
-        : new Date(newMilestone.dueAt).toISOString()
+      const dueAt =
+        editingMilestone &&
+        newMilestone.dueAt === toLocalDateTimeInput(parseUtcDateTime(editingMilestone.dueAt))
+          ? parseUtcDateTime(editingMilestone.dueAt).toISOString()
+          : new Date(newMilestone.dueAt).toISOString()
       const milestoneDetails = {
         title: newMilestone.title.trim(),
         milestoneType: newMilestone.milestoneType,
@@ -119,17 +133,25 @@ export const MilestoneManagementPage: React.FC = () => {
         dueAt,
       }
       const saved = editingMilestone
-        ? await milestoneApi.update(editingMilestone.id, { version: editingMilestone.version, ...milestoneDetails })
+        ? await milestoneApi.update(editingMilestone.id, {
+            version: editingMilestone.version,
+            ...milestoneDetails,
+          })
         : await milestoneApi.create({ assignmentId: selectedAssignmentId, ...milestoneDetails })
       showSuccess(editingMilestone ? 'Đã cập nhật mốc báo cáo.' : 'Tạo mốc tiến độ thành công!')
-      setMilestones((prev) => editingMilestone
-        ? prev.map((milestone) => milestone.id === saved.id ? saved : milestone)
-        : [...prev, saved])
+      setMilestones((prev) =>
+        editingMilestone
+          ? prev.map((milestone) => (milestone.id === saved.id ? saved : milestone))
+          : [...prev, saved],
+      )
       setIsCreateModalOpen(false)
       setEditingMilestone(null)
       setNewMilestone({ title: '', milestoneType: 'PROGRESS', description: '', dueAt: '' })
     } catch (err: any) {
-      showError((editingMilestone ? 'Lỗi cập nhật mốc báo cáo: ' : 'Lỗi tạo mốc tiến độ: ') + (err.response?.data?.message || err.message))
+      showError(
+        (editingMilestone ? 'Lỗi cập nhật mốc báo cáo: ' : 'Lỗi tạo mốc tiến độ: ') +
+          (err.response?.data?.message || err.message),
+      )
     } finally {
       setSubmittingMilestone(false)
     }
@@ -151,11 +173,13 @@ export const MilestoneManagementPage: React.FC = () => {
     setReminding(true)
     try {
       const result = await milestoneApi.remind(selectedAssignmentId)
-      showSuccess(result.milestoneCount === 0
-        ? 'Không có mốc báo cáo sắp tới chưa nộp cần nhắc hạn.'
-        : result.recipientCount === 0
-          ? 'Nhóm chưa có thành viên đang hoạt động để nhận nhắc hạn.'
-          : `Đã gửi nhắc hạn ${result.milestoneCount} mốc báo cáo cho ${result.recipientCount} sinh viên.`)
+      showSuccess(
+        result.milestoneCount === 0
+          ? 'Không có mốc báo cáo sắp tới chưa nộp cần nhắc hạn.'
+          : result.recipientCount === 0
+            ? 'Nhóm chưa có thành viên đang hoạt động để nhận nhắc hạn.'
+            : `Đã gửi nhắc hạn ${result.milestoneCount} mốc báo cáo cho ${result.recipientCount} sinh viên.`,
+      )
       setReminderOpen(false)
     } catch (error: any) {
       showError(error.response?.data?.message || 'Không thể gửi nhắc hạn. Vui lòng thử lại.')
@@ -192,7 +216,9 @@ export const MilestoneManagementPage: React.FC = () => {
         prev.map((m: MilestoneResponse) => ({
           ...m,
           status: m.submissions.some((sub) => sub.id === updatedSubmission.id)
-            ? feedbackAccepted ? 'ACCEPTED' : 'REVISION_REQUIRED'
+            ? feedbackAccepted
+              ? 'ACCEPTED'
+              : 'REVISION_REQUIRED'
             : m.status,
           submissions: m.submissions.map((sub: SubmissionResponse) =>
             sub.id === updatedSubmission.id ? updatedSubmission : sub,
@@ -209,7 +235,9 @@ export const MilestoneManagementPage: React.FC = () => {
   }
 
   const isLecturerOrAdmin = hasAnyRole(['LECTURER', 'ADMIN'])
-  const selectedAssignment = assignments.find((assignment) => assignment.id === selectedAssignmentId)
+  const selectedAssignment = assignments.find(
+    (assignment) => assignment.id === selectedAssignmentId,
+  )
 
   return (
     <div className="milestone-page">
@@ -232,7 +260,12 @@ export const MilestoneManagementPage: React.FC = () => {
               disabled={selectedAssignment?.status !== 'IN_PROGRESS'}
               onClick={() => {
                 setEditingMilestone(null)
-                setNewMilestone({ title: '', milestoneType: 'PROGRESS', description: '', dueAt: '' })
+                setNewMilestone({
+                  title: '',
+                  milestoneType: 'PROGRESS',
+                  description: '',
+                  dueAt: '',
+                })
                 setIsCreateModalOpen(true)
               }}
             >
@@ -266,7 +299,7 @@ export const MilestoneManagementPage: React.FC = () => {
 
       <MilestoneBoard
         key={selectedAssignmentId ?? 'no-assignment'}
-        milestones={milestones.filter(item => item.assignmentId === selectedAssignmentId)}
+        milestones={milestones.filter((item) => item.assignmentId === selectedAssignmentId)}
         loading={loadingAssignments || loadingMilestones}
         error={selectedAssignmentId ? milestoneError : null}
         onRetry={() => setMilestoneReload((value) => value + 1)}
@@ -281,10 +314,23 @@ export const MilestoneManagementPage: React.FC = () => {
 
       {/* Modal Create Milestone */}
       {isCreateModalOpen && (
-        <div className="modal-backdrop fade-in" onClick={() => { if (!submittingMilestone) setIsCreateModalOpen(false) }}>
-          <div className="modal-content scale-in" role="dialog" aria-modal="true" aria-labelledby="milestone-editor-title" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-backdrop fade-in"
+          onClick={() => {
+            if (!submittingMilestone) setIsCreateModalOpen(false)
+          }}
+        >
+          <div
+            className="modal-content scale-in"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="milestone-editor-title"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header" style={{ borderBottom: 'none' }}>
-              <h3 id="milestone-editor-title" className="font-semibold text-lg">{editingMilestone ? 'Chỉnh sửa mốc báo cáo' : 'Tạo mốc tiến độ mới'}</h3>
+              <h3 id="milestone-editor-title" className="font-semibold text-lg">
+                {editingMilestone ? 'Chỉnh sửa mốc báo cáo' : 'Tạo mốc tiến độ mới'}
+              </h3>
               <button
                 type="button"
                 className="btn-close"
@@ -362,7 +408,10 @@ export const MilestoneManagementPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <div
+                className="modal-footer"
+                style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}
+              >
                 <button
                   type="button"
                   className="btn btn-secondary"
@@ -372,7 +421,11 @@ export const MilestoneManagementPage: React.FC = () => {
                   Hủy
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={submittingMilestone}>
-                  {submittingMilestone ? 'Đang lưu...' : editingMilestone ? 'Lưu thay đổi' : 'Tạo mốc tiến độ'}
+                  {submittingMilestone
+                    ? 'Đang lưu...'
+                    : editingMilestone
+                      ? 'Lưu thay đổi'
+                      : 'Tạo mốc tiến độ'}
                 </button>
               </div>
             </form>
@@ -382,14 +435,21 @@ export const MilestoneManagementPage: React.FC = () => {
 
       {/* Modal Feedback Report Submission */}
       {isFeedbackModalOpen && selectedSubmission && (
-        <div className="modal-backdrop fade-in" onClick={() => { if (!submittingFeedback) setIsFeedbackModalOpen(false) }}>
+        <div
+          className="modal-backdrop fade-in"
+          onClick={() => {
+            if (!submittingFeedback) setIsFeedbackModalOpen(false)
+          }}
+        >
           <div className="modal-content scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="font-semibold text-lg">Gửi nhận xét báo cáo</h3>
               <button
                 type="button"
                 className="btn-close"
-                onClick={() => { if (!submittingFeedback) setIsFeedbackModalOpen(false) }}
+                onClick={() => {
+                  if (!submittingFeedback) setIsFeedbackModalOpen(false)
+                }}
               >
                 &times;
               </button>
@@ -439,7 +499,9 @@ export const MilestoneManagementPage: React.FC = () => {
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => { if (!submittingFeedback) setIsFeedbackModalOpen(false) }}
+                  onClick={() => {
+                    if (!submittingFeedback) setIsFeedbackModalOpen(false)
+                  }}
                   disabled={submittingFeedback}
                 >
                   Hủy
@@ -460,7 +522,9 @@ export const MilestoneManagementPage: React.FC = () => {
         variant="primary"
         loading={reminding}
         onConfirm={handleRemind}
-        onCancel={() => { if (!reminding) setReminderOpen(false) }}
+        onCancel={() => {
+          if (!reminding) setReminderOpen(false)
+        }}
       />
     </div>
   )

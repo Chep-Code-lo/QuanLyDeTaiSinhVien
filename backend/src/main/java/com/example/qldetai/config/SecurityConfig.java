@@ -1,13 +1,10 @@
 package com.example.qldetai.config;
 
 import com.example.qldetai.common.api.ApiResponse;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.function.Supplier;
-import tools.jackson.databind.ObjectMapper;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,8 +19,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.password.Pbkdf2PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
@@ -40,6 +37,13 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import tools.jackson.databind.ObjectMapper;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Supplier;
 
 @Configuration
 @EnableWebSecurity
@@ -59,10 +63,11 @@ public class SecurityConfig {
             @Value("${app.security.csrf.cookie.secure}") boolean csrfCookieSecure,
             @Value("${app.security.csrf.cookie.domain:}") String csrfCookieDomain) {
         this.objectMapper = objectMapper;
-        this.allowedOriginPatterns = Arrays.stream(allowedOrigins.split(","))
-                .map(String::trim)
-                .filter(origin -> !origin.isBlank())
-                .toList();
+        this.allowedOriginPatterns =
+                Arrays.stream(allowedOrigins.split(","))
+                        .map(String::trim)
+                        .filter(origin -> !origin.isBlank())
+                        .toList();
         this.csrfCookieSameSite = csrfCookieSameSite;
         this.csrfCookieSecure = csrfCookieSecure;
         this.csrfCookieDomain = csrfCookieDomain;
@@ -72,50 +77,74 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             SecurityContextRepository securityContextRepository,
-            com.example.qldetai.security.CurrentUserRefreshFilter currentUserRefreshFilter) throws Exception {
+            com.example.qldetai.security.CurrentUserRefreshFilter currentUserRefreshFilter)
+            throws Exception {
         CookieCsrfTokenRepository csrfRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        csrfRepository.setCookieCustomizer((ResponseCookie.ResponseCookieBuilder builder) -> {
-            builder.path("/");
-            builder.sameSite(csrfCookieSameSite);
-            builder.secure(csrfCookieSecure);
-            if (StringUtils.hasText(csrfCookieDomain)) {
-                builder.domain(csrfCookieDomain);
-            }
-        });
+        csrfRepository.setCookieCustomizer(
+                (ResponseCookie.ResponseCookieBuilder builder) -> {
+                    builder.path("/");
+                    builder.sameSite(csrfCookieSameSite);
+                    builder.secure(csrfCookieSecure);
+                    if (StringUtils.hasText(csrfCookieDomain)) {
+                        builder.domain(csrfCookieDomain);
+                    }
+                });
         SpaCsrfTokenRequestHandler csrfTokenRequestHandler = new SpaCsrfTokenRequestHandler();
 
-        return http
-                .csrf(csrf -> csrf
-                        .ignoringRequestMatchers(request ->
-                                HttpMethod.POST.matches(request.getMethod())
-                                        && "/api/v1/auth/login".equals(request.getServletPath()))
-                        .csrfTokenRepository(csrfRepository)
-                        .csrfTokenRequestHandler(csrfTokenRequestHandler))
+        return http.csrf(
+                        csrf ->
+                                csrf.ignoringRequestMatchers(
+                                                request ->
+                                                        HttpMethod.POST.matches(request.getMethod())
+                                                                && "/api/v1/auth/login"
+                                                                        .equals(
+                                                                                request
+                                                                                        .getServletPath()))
+                                        .csrfTokenRepository(csrfRepository)
+                                        .csrfTokenRequestHandler(csrfTokenRequestHandler))
                 .cors(Customizer.withDefaults())
-                .securityContext(context -> context
-                        .securityContextRepository(securityContextRepository)
-                        .requireExplicitSave(true))
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(HttpMethod.GET,
-                                "/api/v1/health",
-                                "/api/v1/meta",
-                                "/api/v1/auth/csrf").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
-                        .anyRequest().authenticated())
-                .exceptionHandling(exceptions -> exceptions
-                        .authenticationEntryPoint((request, response, exception) -> {
-                            response.setStatus(401);
-                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            objectMapper.writeValue(response.getOutputStream(),
-                                    ApiResponse.failure("Authentication is required."));
-                        })
-                        .accessDeniedHandler((request, response, exception) -> {
-                            response.setStatus(403);
-                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            objectMapper.writeValue(response.getOutputStream(),
-                                    ApiResponse.failure("You do not have permission to perform this action."));
-                        }))
+                .securityContext(
+                        context ->
+                                context.securityContextRepository(securityContextRepository)
+                                        .requireExplicitSave(true))
+                .authorizeHttpRequests(
+                        authorize ->
+                                authorize
+                                        .requestMatchers(HttpMethod.OPTIONS, "/**")
+                                        .permitAll()
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/api/v1/health",
+                                                "/api/v1/meta",
+                                                "/api/v1/auth/csrf")
+                                        .permitAll()
+                                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/login")
+                                        .permitAll()
+                                        .anyRequest()
+                                        .authenticated())
+                .exceptionHandling(
+                        exceptions ->
+                                exceptions
+                                        .authenticationEntryPoint(
+                                                (request, response, exception) -> {
+                                                    response.setStatus(401);
+                                                    response.setContentType(
+                                                            MediaType.APPLICATION_JSON_VALUE);
+                                                    objectMapper.writeValue(
+                                                            response.getOutputStream(),
+                                                            ApiResponse.failure(
+                                                                    "Authentication is required."));
+                                                })
+                                        .accessDeniedHandler(
+                                                (request, response, exception) -> {
+                                                    response.setStatus(403);
+                                                    response.setContentType(
+                                                            MediaType.APPLICATION_JSON_VALUE);
+                                                    objectMapper.writeValue(
+                                                            response.getOutputStream(),
+                                                            ApiResponse.failure(
+                                                                    "You do not have permission to perform this action."));
+                                                }))
                 .addFilterAfter(currentUserRefreshFilter, SecurityContextHolderFilter.class)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -126,8 +155,14 @@ public class SecurityConfig {
     @Bean
     PasswordEncoder passwordEncoder() {
         PasswordEncoder bcrypt = new BCryptPasswordEncoder(12);
-        var encoder = new DelegatingPasswordEncoder("bcrypt", Map.of(
-                "pbkdf2", Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8(), "bcrypt", bcrypt));
+        var encoder =
+                new DelegatingPasswordEncoder(
+                        "bcrypt",
+                        Map.of(
+                                "pbkdf2",
+                                Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8(),
+                                "bcrypt",
+                                bcrypt));
         // Keep BCrypt for new passwords. Retain readers for previously stored hashes.
         // PasswordByteLength validates new passwords against BCrypt's 72-byte UTF-8 limit.
         encoder.setDefaultPasswordEncoderForMatches(bcrypt);
@@ -135,7 +170,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+    AuthenticationManager authenticationManager(AuthenticationConfiguration configuration)
+            throws Exception {
         return configuration.getAuthenticationManager();
     }
 
@@ -153,7 +189,8 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(allowedOriginPatterns);
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(
+                List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN", "X-Request-Id"));
         configuration.setExposedHeaders(List.of("Location", "X-Request-Id"));
         configuration.setAllowCredentials(true);
@@ -183,7 +220,8 @@ public class SecurityConfig {
             String headerValue = request.getHeader(csrfToken.getHeaderName());
             if (StringUtils.hasText(headerValue)) {
                 String resolvedHeader = plain.resolveCsrfTokenValue(request, csrfToken);
-                if (StringUtils.hasText(resolvedHeader) && resolvedHeader.equals(csrfToken.getToken())) {
+                if (StringUtils.hasText(resolvedHeader)
+                        && resolvedHeader.equals(csrfToken.getToken())) {
                     return resolvedHeader;
                 }
                 return xor.resolveCsrfTokenValue(request, csrfToken);

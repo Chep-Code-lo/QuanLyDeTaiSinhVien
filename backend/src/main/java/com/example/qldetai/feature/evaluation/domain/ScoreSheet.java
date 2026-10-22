@@ -1,3 +1,38 @@
 package com.example.qldetai.feature.evaluation.domain;
-import jakarta.persistence.*; import java.time.LocalDateTime; import lombok.*;
-@Entity @Table(name="score_sheets") @Getter @Setter @NoArgsConstructor public class ScoreSheet { @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id; @OneToOne(fetch=FetchType.LAZY) @JoinColumn(name="evaluation_id") private EvaluationAssignment evaluation; @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="rubric_id") private Rubric rubric; @Column(name="overall_comment",columnDefinition="TEXT") private String overallComment; @Enumerated(EnumType.STRING) @Column(nullable=false) private ScoreSheetStatus status=ScoreSheetStatus.DRAFT; @Column(name="submitted_at") private LocalDateTime submittedAt; @Version private int version; }
+
+import jakarta.persistence.*;
+
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "score_sheets")
+@Getter
+@Setter
+@NoArgsConstructor
+public class ScoreSheet {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "evaluation_id")
+    private EvaluationAssignment evaluation;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rubric_id")
+    private Rubric rubric;
+
+    @Column(name = "overall_comment", columnDefinition = "TEXT")
+    private String overallComment;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ScoreSheetStatus status = ScoreSheetStatus.DRAFT;
+
+    @Column(name = "submitted_at")
+    private LocalDateTime submittedAt;
+
+    @Version private int version;
+}

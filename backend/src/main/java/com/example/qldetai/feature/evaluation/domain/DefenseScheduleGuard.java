@@ -3,6 +3,7 @@ package com.example.qldetai.feature.evaluation.domain;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -12,6 +13,5 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 public class DefenseScheduleGuard {
-    @Id
-    private Integer id;
+    @Id private Integer id;
 }

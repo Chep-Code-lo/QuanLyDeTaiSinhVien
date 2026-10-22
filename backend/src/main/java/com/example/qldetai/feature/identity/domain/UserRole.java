@@ -10,14 +10,20 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.LocalDateTime;
+
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Entity
-@Table(name = "user_roles", uniqueConstraints = @UniqueConstraint(
-        name = "uq_user_roles_01", columnNames = {"user_id", "role_id"}))
+@Table(
+        name = "user_roles",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uq_user_roles_01",
+                        columnNames = {"user_id", "role_id"}))
 @Getter
 @Setter
 @NoArgsConstructor

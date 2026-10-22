@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { criterionScore, defaultAssessmentCriteria, fromApiCriteria, rubricTotal, toApiCriteria, validRubric } from '../src/utils/assessmentRubric.ts'
+import {
+  criterionScore,
+  defaultAssessmentCriteria,
+  fromApiCriteria,
+  rubricTotal,
+  toApiCriteria,
+  validRubric,
+} from '../src/utils/assessmentRubric.ts'
 
 test('the reference template totals 100 without counting parent scores twice', () => {
   const criteria = defaultAssessmentCriteria()
@@ -9,7 +16,10 @@ test('the reference template totals 100 without counting parent scores twice', (
   assert.equal(validRubric(criteria), true)
   const payload = toApiCriteria(criteria)
   assert.equal(payload.length, 12)
-  assert.equal(payload.reduce((total, criterion) => total + Math.round(criterion.maxScore * 100), 0), 1000)
+  assert.equal(
+    payload.reduce((total, criterion) => total + Math.round(criterion.maxScore * 100), 0),
+    1000,
+  )
   assert.ok(!payload.some((criterion) => criterion.name.startsWith('[TC2]')))
 })
 
@@ -33,7 +43,10 @@ test('existing flat rubrics remain usable and preserve decimal scores', () => {
   assert.equal(restored[0].score, 37.5)
   assert.equal(rubricTotal(restored), 100)
   assert.equal(validRubric(restored), true)
-  assert.deepEqual(toApiCriteria(restored).map((criterion) => criterion.maxScore), [3.75, 6.25])
+  assert.deepEqual(
+    toApiCriteria(restored).map((criterion) => criterion.maxScore),
+    [3.75, 6.25],
+  )
 })
 
 test('incomplete, non-finite, non-positive, and over-precision scores cannot be saved', () => {

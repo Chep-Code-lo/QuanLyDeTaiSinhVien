@@ -38,10 +38,7 @@ import com.example.qldetai.feature.topic.domain.TopicStatus;
 import com.example.qldetai.feature.topic.domain.VisibilityType;
 import com.example.qldetai.feature.topic.repository.TopicRepository;
 import com.example.qldetai.security.UserPrincipal;
-import java.time.Clock;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Set;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -49,6 +46,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Set;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -152,56 +154,89 @@ class TopicVisibilityIntegrationTests {
 
         currentStudentGroup = createGroup("Nhóm của người xem " + suffix, currentStudent, now);
         otherStudentGroup = createGroup("Nhóm khác " + suffix, otherStudent, now);
-        publishedOpen = createTopic("OPEN-" + suffix, otherStudent.getUser(), VisibilityType.OPEN, null, TopicStatus.PUBLISHED, now);
-        publishedReservedForCurrentStudent = createTopic(
-                "OWN-GROUP-" + suffix,
-                otherStudent.getUser(),
-                VisibilityType.RESERVED,
-                currentStudentGroup,
-                TopicStatus.PUBLISHED,
-                now);
-        publishedReservedForOtherStudent = createTopic(
-                "OTHER-GROUP-" + suffix,
-                otherStudent.getUser(),
-                VisibilityType.RESERVED,
-                otherStudentGroup,
-                TopicStatus.PUBLISHED,
-                now);
-        pendingOwn = createTopic("OWN-PENDING-" + suffix, currentStudent.getUser(), VisibilityType.OPEN, null, TopicStatus.PENDING, now);
-        pendingOther = createTopic("OTHER-PENDING-" + suffix, otherStudent.getUser(), VisibilityType.OPEN, null, TopicStatus.PENDING, now);
+        publishedOpen =
+                createTopic(
+                        "OPEN-" + suffix,
+                        otherStudent.getUser(),
+                        VisibilityType.OPEN,
+                        null,
+                        TopicStatus.PUBLISHED,
+                        now);
+        publishedReservedForCurrentStudent =
+                createTopic(
+                        "OWN-GROUP-" + suffix,
+                        otherStudent.getUser(),
+                        VisibilityType.RESERVED,
+                        currentStudentGroup,
+                        TopicStatus.PUBLISHED,
+                        now);
+        publishedReservedForOtherStudent =
+                createTopic(
+                        "OTHER-GROUP-" + suffix,
+                        otherStudent.getUser(),
+                        VisibilityType.RESERVED,
+                        otherStudentGroup,
+                        TopicStatus.PUBLISHED,
+                        now);
+        pendingOwn =
+                createTopic(
+                        "OWN-PENDING-" + suffix,
+                        currentStudent.getUser(),
+                        VisibilityType.OPEN,
+                        null,
+                        TopicStatus.PENDING,
+                        now);
+        pendingOther =
+                createTopic(
+                        "OTHER-PENDING-" + suffix,
+                        otherStudent.getUser(),
+                        VisibilityType.OPEN,
+                        null,
+                        TopicStatus.PENDING,
+                        now);
     }
 
     @Test
     void studentSeesOnlyOwnAndEligiblePublishedTopics() throws Exception {
-        mockMvc.perform(get("/api/v1/topics").with(user(UserPrincipal.from(currentStudent.getUser()))))
+        mockMvc.perform(
+                        get("/api/v1/topics")
+                                .with(user(UserPrincipal.from(currentStudent.getUser()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalElements").value(3))
-                .andExpect(jsonPath("$.data.content[*].code", containsInAnyOrder(
-                        publishedOpen.getCode(),
-                        publishedReservedForCurrentStudent.getCode(),
-                        pendingOwn.getCode())));
+                .andExpect(
+                        jsonPath(
+                                "$.data.content[*].code",
+                                containsInAnyOrder(
+                                        publishedOpen.getCode(),
+                                        publishedReservedForCurrentStudent.getCode(),
+                                        pendingOwn.getCode())));
 
-        mockMvc.perform(get("/api/v1/topics")
-                        .param("status", "PENDING")
-                        .with(user(UserPrincipal.from(currentStudent.getUser()))))
+        mockMvc.perform(
+                        get("/api/v1/topics")
+                                .param("status", "PENDING")
+                                .with(user(UserPrincipal.from(currentStudent.getUser()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.content[0].code").value(pendingOwn.getCode()));
 
-        mockMvc.perform(get("/api/v1/topics/{id}", publishedReservedForCurrentStudent.getId())
-                        .with(user(UserPrincipal.from(currentStudent.getUser()))))
+        mockMvc.perform(
+                        get("/api/v1/topics/{id}", publishedReservedForCurrentStudent.getId())
+                                .with(user(UserPrincipal.from(currentStudent.getUser()))))
                 .andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/topics/{id}", publishedReservedForOtherStudent.getId())
-                        .with(user(UserPrincipal.from(currentStudent.getUser()))))
+        mockMvc.perform(
+                        get("/api/v1/topics/{id}", publishedReservedForOtherStudent.getId())
+                                .with(user(UserPrincipal.from(currentStudent.getUser()))))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/v1/topics/{id}", pendingOther.getId())
-                        .with(user(UserPrincipal.from(currentStudent.getUser()))))
+        mockMvc.perform(
+                        get("/api/v1/topics/{id}", pendingOther.getId())
+                                .with(user(UserPrincipal.from(currentStudent.getUser()))))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void studentCannotReserveTopicForAnotherGroup() throws Exception {
-        String request = """
+        String request =
+                """
                 {
                   "periodId": %d,
                   "code": "RESERVED-%s",
@@ -212,13 +247,18 @@ class TopicVisibilityIntegrationTests {
                   "visibilityType": "RESERVED",
                   "reservedGroupId": %d
                 }
-                """.formatted(period.getId(), Long.toUnsignedString(System.nanoTime(), 36), otherStudentGroup.getId());
+                """
+                        .formatted(
+                                period.getId(),
+                                Long.toUnsignedString(System.nanoTime(), 36),
+                                otherStudentGroup.getId());
 
-        mockMvc.perform(post("/api/v1/topics")
-                        .with(user(UserPrincipal.from(currentStudent.getUser())))
-                        .with(csrf())
-                        .contentType("application/json")
-                        .content(request))
+        mockMvc.perform(
+                        post("/api/v1/topics")
+                                .with(user(UserPrincipal.from(currentStudent.getUser())))
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content(request))
                 .andExpect(status().isForbidden());
     }
 

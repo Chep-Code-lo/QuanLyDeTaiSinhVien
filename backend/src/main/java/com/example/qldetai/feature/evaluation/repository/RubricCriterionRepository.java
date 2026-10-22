@@ -1,9 +1,11 @@
 package com.example.qldetai.feature.evaluation.repository;
 
 import com.example.qldetai.feature.evaluation.domain.RubricCriterion;
-import java.util.List;
-import java.util.Collection;
+
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Collection;
+import java.util.List;
 
 public interface RubricCriterionRepository extends JpaRepository<RubricCriterion, Long> {
 

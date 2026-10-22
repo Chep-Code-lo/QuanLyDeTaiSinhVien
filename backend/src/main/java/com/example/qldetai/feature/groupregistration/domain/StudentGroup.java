@@ -3,6 +3,7 @@ package com.example.qldetai.feature.groupregistration.domain;
 import com.example.qldetai.common.persistence.CreatedAtEntity;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriod;
 import com.example.qldetai.feature.identity.domain.Student;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -15,6 +16,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;

@@ -8,13 +8,16 @@ import com.example.qldetai.feature.communication.dto.CommunicationDtos.UnreadCou
 import com.example.qldetai.feature.communication.repository.NotificationRepository;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.UserRepository;
-import java.time.Clock;
-import java.time.LocalDateTime;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -24,12 +27,14 @@ public class NotificationService {
     private final UserRepository userRepository;
     private final Clock clock;
 
-
     @Transactional(readOnly = true)
     public PageResponse<NotificationResponse> list(Long userId, int page, int size) {
-        return PageResponse.from(notificationRepository.findByUserId(
-                        userId, PageRequest.of(page, size, Sort.by("createdAt").descending()))
-                .map(this::toResponse));
+        return PageResponse.from(
+                notificationRepository
+                        .findByUserId(
+                                userId,
+                                PageRequest.of(page, size, Sort.by("createdAt").descending()))
+                        .map(this::toResponse));
     }
 
     @Transactional(readOnly = true)
@@ -39,8 +44,11 @@ public class NotificationService {
 
     @Transactional
     public NotificationResponse markRead(Long notificationId, Long userId) {
-        Notification notification = notificationRepository.findByIdAndUserId(notificationId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Notification was not found."));
+        Notification notification =
+                notificationRepository
+                        .findByIdAndUserId(notificationId, userId)
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException("Notification was not found."));
         if (notification.getReadAt() == null) {
             notification.setReadAt(LocalDateTime.now(clock));
         }
@@ -49,16 +57,17 @@ public class NotificationService {
 
     @Transactional
     public void publish(
-            Long userId,
-            String eventKey,
-            String title,
-            String content,
-            String targetPath) {
+            Long userId, String eventKey, String title, String content, String targetPath) {
         if (notificationRepository.existsByUserIdAndEventKey(userId, eventKey)) {
             return;
         }
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Notification recipient was not found."));
+        User user =
+                userRepository
+                        .findById(userId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Notification recipient was not found."));
         Notification notification = new Notification();
         notification.setUser(user);
         notification.setEventKey(eventKey);

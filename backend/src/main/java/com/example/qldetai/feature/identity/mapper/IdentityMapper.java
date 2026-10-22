@@ -13,13 +13,14 @@ import com.example.qldetai.feature.identity.dto.IdentityDtos.LecturerProfileResp
 import com.example.qldetai.feature.identity.dto.IdentityDtos.StudentProfileResponse;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UserResponse;
 
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 import org.mapstruct.ReportingPolicy;
+
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface IdentityMapper {

@@ -8,6 +8,8 @@ import com.example.qldetai.security.UserPrincipal;
 
 import jakarta.validation.Valid;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -17,7 +19,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
@@ -26,7 +27,6 @@ import lombok.RequiredArgsConstructor;
 public class ScoreSheetController {
 
     private final EvaluationService service;
-
 
     @GetMapping("/evaluation-assignments/{id}/score-sheet")
     @PreAuthorize("hasRole('LECTURER')")

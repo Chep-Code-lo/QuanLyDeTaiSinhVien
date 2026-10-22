@@ -8,12 +8,15 @@ import com.example.qldetai.feature.evaluation.repository.RubricRepository;
 import com.example.qldetai.feature.identity.domain.RoleCode;
 import com.example.qldetai.feature.project.repository.ProjectAssignmentRepository;
 import com.example.qldetai.feature.project.service.ProjectAuthorization;
-import java.util.Comparator;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Comparator;
 
 /** All assignments succeed together; existing identical active assignments are idempotent. */
 @Service
@@ -29,28 +32,52 @@ public class EvaluationAssignmentBatchService {
     @Transactional
     public BatchEvaluationResponse assign(BatchEvaluationRequest batch, Long actorId) {
         access.manager(actorId);
-        if (batch.assignments() == null || batch.assignments().isEmpty() || batch.assignments().size() > 100) {
-            throw new BusinessRuleException("Mỗi lần chỉ phân công từ 1 đến 100 giảng viên/đề tài.");
+        if (batch.assignments() == null
+                || batch.assignments().isEmpty()
+                || batch.assignments().size() > 100) {
+            throw new BusinessRuleException(
+                    "Mỗi lần chỉ phân công từ 1 đến 100 giảng viên/đề tài.");
         }
-        boolean admin = access.user(actorId).getUserRoles().stream()
-                .anyMatch(role -> role.getRole().getCode() == RoleCode.ADMIN);
+        boolean admin =
+                access.user(actorId).getUserRoles().stream()
+                        .anyMatch(role -> role.getRole().getCode() == RoleCode.ADMIN);
         int assigned = 0;
         int skipped = 0;
-        for (CreateEvaluationRequest request : batch.assignments().stream()
-                .sorted(Comparator.comparing(CreateEvaluationRequest::assignmentId)
-                        .thenComparing(CreateEvaluationRequest::lecturerId)).toList()) {
-            if (!admin && !authorization.canManageAssignment(request.assignmentId(),
-                    SecurityContextHolder.getContext().getAuthentication())) {
+        for (CreateEvaluationRequest request :
+                batch.assignments().stream()
+                        .sorted(
+                                Comparator.comparing(CreateEvaluationRequest::assignmentId)
+                                        .thenComparing(CreateEvaluationRequest::lecturerId))
+                        .toList()) {
+            if (!admin
+                    && !authorization.canManageAssignment(
+                            request.assignmentId(),
+                            SecurityContextHolder.getContext().getAuthentication())) {
                 throw new AccessDeniedException("Bạn không có quyền phân công đề tài này.");
             }
-            projects.findByIdForUpdate(request.assignmentId()).orElseThrow(() ->
-                    new ResourceNotFoundException("Project assignment was not found."));
-            var rubric = rubrics.findById(request.rubricId()).orElseThrow(() ->
-                    new ResourceNotFoundException("Rubric was not found."));
-            var existing = evaluations.findActiveForUpdate(request.assignmentId(), rubric.getComponent().getId())
-                    .stream().filter(item -> item.getLecturer().getId().equals(request.lecturerId())).findFirst();
-            if (existing.isPresent() && existing.get().getRubric().getId().equals(request.rubricId())
-                    && java.util.Objects.equals(existing.get().getDefense() == null ? null : existing.get().getDefense().getId(), request.defenseId())) {
+            projects.findByIdForUpdate(request.assignmentId())
+                    .orElseThrow(
+                            () ->
+                                    new ResourceNotFoundException(
+                                            "Project assignment was not found."));
+            var rubric =
+                    rubrics.findById(request.rubricId())
+                            .orElseThrow(
+                                    () -> new ResourceNotFoundException("Rubric was not found."));
+            var existing =
+                    evaluations
+                            .findActiveForUpdate(
+                                    request.assignmentId(), rubric.getComponent().getId())
+                            .stream()
+                            .filter(item -> item.getLecturer().getId().equals(request.lecturerId()))
+                            .findFirst();
+            if (existing.isPresent()
+                    && existing.get().getRubric().getId().equals(request.rubricId())
+                    && java.util.Objects.equals(
+                            existing.get().getDefense() == null
+                                    ? null
+                                    : existing.get().getDefense().getId(),
+                            request.defenseId())) {
                 skipped++;
             } else {
                 evaluation.assign(request, actorId);

@@ -1,7 +1,11 @@
 import { formatDate, formatDateTime, parseUtcDateTime } from './dateTime'
 
 // Date-only configuration and form values are Vietnamese calendar dates, never UTC dates.
-export function defenseDateError(date: string | undefined | null, startsAt: string, endsAt: string): string {
+export function defenseDateError(
+  date: string | undefined | null,
+  startsAt: string,
+  endsAt: string,
+): string {
   if (!date || !startsAt || !endsAt) return ''
   return startsAt.slice(0, 10) === date && endsAt.slice(0, 10) === date
     ? ''
@@ -18,7 +22,15 @@ export function formatDefenseTime(value: string, vietnameseDate: boolean): strin
   const date = parseUtcDateTime(value)
   if (!Number.isFinite(date.getTime())) return '—'
   return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
-  }).format(date).replace(',', '')
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  })
+    .format(date)
+    .replace(',', '')
 }

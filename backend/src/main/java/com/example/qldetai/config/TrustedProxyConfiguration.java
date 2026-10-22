@@ -4,11 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.Arrays;
-import java.util.List;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -17,6 +13,12 @@ import org.springframework.core.Ordered;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.web.filter.ForwardedHeaderFilter;
 import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 public class TrustedProxyConfiguration {
@@ -34,14 +36,20 @@ public class TrustedProxyConfiguration {
         private final ForwardedHeaderFilter untrusted = new ForwardedHeaderFilter();
 
         TrustedProxyFilter(String configured) {
-            proxies = Arrays.stream(configured.split(",")).map(String::trim).filter(value -> !value.isEmpty()).toList();
+            proxies =
+                    Arrays.stream(configured.split(","))
+                            .map(String::trim)
+                            .filter(value -> !value.isEmpty())
+                            .toList();
             untrusted.setRemoveOnly(true);
         }
 
         @Override
-        protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+        protected void doFilterInternal(
+                HttpServletRequest request, HttpServletResponse response, FilterChain chain)
                 throws ServletException, IOException {
-            (isTrusted(request.getRemoteAddr()) ? trusted : untrusted).doFilter(request, response, chain);
+            (isTrusted(request.getRemoteAddr()) ? trusted : untrusted)
+                    .doFilter(request, response, chain);
         }
 
         private boolean isTrusted(String peer) {
@@ -50,7 +58,8 @@ public class TrustedProxyConfiguration {
                 if (proxy.contains("/")) {
                     if (new IpAddressMatcher(proxy).matches(peer)) return true;
                 } else {
-                    // Compose service names let the explicit Nginx peer survive container recreation.
+                    // Compose service names let the explicit Nginx peer survive container
+                    // recreation.
                     // DNS failure is fail-closed; incoming headers never determine this identity.
                     try {
                         for (InetAddress address : InetAddress.getAllByName(proxy)) {

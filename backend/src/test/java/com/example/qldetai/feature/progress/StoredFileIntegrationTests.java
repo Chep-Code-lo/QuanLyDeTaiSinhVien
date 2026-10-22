@@ -3,26 +3,21 @@ package com.example.qldetai.feature.progress;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.qldetai.feature.identity.domain.Role;
 import com.example.qldetai.feature.identity.domain.RoleCode;
-import com.example.qldetai.feature.identity.repository.RoleRepository;
 import com.example.qldetai.feature.identity.domain.User;
-import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.identity.domain.UserStatus;
-import java.nio.charset.StandardCharsets;
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.example.qldetai.feature.identity.repository.RoleRepository;
+import com.example.qldetai.feature.identity.repository.UserRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,6 +31,13 @@ import org.springframework.test.context.TestConstructor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @SpringBootTest
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
@@ -84,30 +86,29 @@ class StoredFileIntegrationTests {
     void uploadStoresMetadataAndAllowsFileLookup() throws Exception {
         MockHttpSession session = login("admin@test.local", "TestPassword123!");
         byte[] fileBytes = "%PDF-1.7\nhello backend\n%%EOF".getBytes(StandardCharsets.UTF_8);
-        MockMultipartFile file = new MockMultipartFile(
-                "file",
-                "C:\\fakepath\\report-final.pdf",
-                MediaType.APPLICATION_PDF_VALUE,
-                fileBytes);
+        MockMultipartFile file =
+                new MockMultipartFile(
+                        "file",
+                        "C:\\fakepath\\report-final.pdf",
+                        MediaType.APPLICATION_PDF_VALUE,
+                        fileBytes);
 
-        MvcResult upload = mockMvc.perform(multipart("/api/v1/files")
-                        .file(file)
-                        .session(session)
-                        .with(csrf()))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.originalName").value("report-final.pdf"))
-                .andExpect(jsonPath("$.data.mimeType").value(MediaType.APPLICATION_PDF_VALUE))
-                .andExpect(jsonPath("$.data.sizeBytes").value(fileBytes.length))
-                .andExpect(jsonPath("$.data.status").value("READY"))
-                .andReturn();
+        MvcResult upload =
+                mockMvc.perform(multipart("/api/v1/files").file(file).session(session).with(csrf()))
+                        .andExpect(status().isCreated())
+                        .andExpect(jsonPath("$.data.originalName").value("report-final.pdf"))
+                        .andExpect(
+                                jsonPath("$.data.mimeType").value(MediaType.APPLICATION_PDF_VALUE))
+                        .andExpect(jsonPath("$.data.sizeBytes").value(fileBytes.length))
+                        .andExpect(jsonPath("$.data.status").value("READY"))
+                        .andReturn();
 
         String responseBody = upload.getResponse().getContentAsString();
         long storedFileId = extractLong(responseBody, "\"id\"\\s*:\\s*(\\d+)");
         assertThat(storedFileId).isPositive();
         assertThat(extractText(responseBody, "\"storageKey\"\\s*:\\s*\"([^\"]+)\""))
                 .endsWith("-report-final.pdf");
-        assertThat(extractText(responseBody, "\"sha256\"\\s*:\\s*\"([^\"]+)\""))
-                .hasSize(64);
+        assertThat(extractText(responseBody, "\"sha256\"\\s*:\\s*\"([^\"]+)\"")).hasSize(64);
 
         mockMvc.perform(get("/api/v1/files/{id}", storedFileId).session(session))
                 .andExpect(status().isOk())
@@ -125,22 +126,28 @@ class StoredFileIntegrationTests {
 
         mockMvc.perform(get("/api/v1/files/{id}/preview", storedFileId).session(session))
                 .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("inline")))
-                .andExpect(header().string("Content-Security-Policy", "sandbox; default-src 'none'"))
+                .andExpect(
+                        header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("inline")))
+                .andExpect(
+                        header().string("Content-Security-Policy", "sandbox; default-src 'none'"))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF))
                 .andExpect(content().bytes(fileBytes));
     }
 
     private MockHttpSession login(String username, String password) throws Exception {
-        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        MvcResult login =
+                mockMvc.perform(
+                                post("/api/v1/auth/login")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                """
                                 {"username":"%s","password":"%s"}
-                                """.formatted(username, password)))
-                .andExpect(status().isOk())
-                .andReturn();
+                                """
+                                                        .formatted(username, password)))
+                        .andExpect(status().isOk())
+                        .andReturn();
         return (MockHttpSession) login.getRequest().getSession(false);
     }
 

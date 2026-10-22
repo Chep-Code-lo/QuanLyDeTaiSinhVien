@@ -2,8 +2,21 @@ package com.example.qldetai.feature.communication.email;
 
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.feature.identity.domain.User;
-import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.identity.domain.UserStatus;
+import com.example.qldetai.feature.identity.repository.UserRepository;
+
+import jakarta.mail.internet.InternetAddress;
+
+import lombok.RequiredArgsConstructor;
+
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -12,15 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
-import jakarta.mail.internet.InternetAddress;
 
 /** Persists immutable delivery snapshots and performs SMTP work outside business transactions. */
 @Service
@@ -34,7 +38,6 @@ public class EmailOutboxService {
     private final EmailOutboxDeliveryStateService deliveryStateService;
     private final EmailNotificationProperties properties;
     private final Clock clock;
-
 
     /** Called while the source business transaction is still active. */
     @Transactional(propagation = Propagation.MANDATORY, noRollbackFor = RuntimeException.class)
@@ -55,27 +58,44 @@ public class EmailOutboxService {
             }
             Map<String, String> variables = new LinkedHashMap<>(context.variables());
             variables.put("studentName", recipient.getFullName());
-            EmailTemplateRenderer.RenderedEmail rendered = templateRenderer.render(
-                    context.eventType(), setting.getSubjectTemplate(), setting.getBodyTemplate(), variables);
-            EmailOutbox outbox = newOutbox(setting, context, recipient, rendered, context.eventKey(), now);
+            EmailTemplateRenderer.RenderedEmail rendered =
+                    templateRenderer.render(
+                            context.eventType(),
+                            setting.getSubjectTemplate(),
+                            setting.getBodyTemplate(),
+                            variables);
+            EmailOutbox outbox =
+                    newOutbox(setting, context, recipient, rendered, context.eventKey(), now);
             insertIfAbsent(outbox, now);
         }
     }
 
     @Transactional
     public EmailOutbox enqueueTest(
-            EmailNotificationSetting setting,
-            User recipient,
-            EmailEventContext context) {
-        if (recipient.getStatus() != UserStatus.ACTIVE || recipient.getEmail() == null || recipient.getEmail().isBlank()) {
-            throw new BusinessRuleException("The current account does not have an active email address for testing.");
+            EmailNotificationSetting setting, User recipient, EmailEventContext context) {
+        if (recipient.getStatus() != UserStatus.ACTIVE
+                || recipient.getEmail() == null
+                || recipient.getEmail().isBlank()) {
+            throw new BusinessRuleException(
+                    "The current account does not have an active email address for testing.");
         }
         Map<String, String> variables = new LinkedHashMap<>(context.variables());
         variables.put("studentName", recipient.getFullName());
-        EmailTemplateRenderer.RenderedEmail rendered = templateRenderer.render(
-                context.eventType(), setting.getSubjectTemplate(), setting.getBodyTemplate(), variables);
+        EmailTemplateRenderer.RenderedEmail rendered =
+                templateRenderer.render(
+                        context.eventType(),
+                        setting.getSubjectTemplate(),
+                        setting.getBodyTemplate(),
+                        variables);
         String testEventKey = "email-test:" + setting.getEventType() + ":" + UUID.randomUUID();
-        EmailOutbox outbox = newOutbox(setting, context, recipient, rendered, testEventKey, LocalDateTime.now(clock));
+        EmailOutbox outbox =
+                newOutbox(
+                        setting,
+                        context,
+                        recipient,
+                        rendered,
+                        testEventKey,
+                        LocalDateTime.now(clock));
         return outboxRepository.save(outbox);
     }
 
@@ -83,24 +103,33 @@ public class EmailOutboxService {
     public List<EmailDeliveryClaim> claimReadyMessages() {
         LocalDateTime now = LocalDateTime.now(clock);
         int batchSize = Math.max(1, Math.min(properties.getMaxPerRun(), 100));
-        List<EmailOutbox> messages = outboxRepository.lockReadyForDelivery(now, PageRequest.of(0, batchSize));
+        List<EmailOutbox> messages =
+                outboxRepository.lockReadyForDelivery(now, PageRequest.of(0, batchSize));
         for (EmailOutbox message : messages) {
             message.setStatus(EmailOutboxStatus.SENDING);
             message.setClaimedAt(now);
             message.setClaimToken(UUID.randomUUID().toString());
             message.setAttemptCount(message.getAttemptCount() + 1);
         }
-        return messages.stream().map(message -> new EmailDeliveryClaim(message.getId(), message.getClaimToken())).toList();
+        return messages.stream()
+                .map(message -> new EmailDeliveryClaim(message.getId(), message.getClaimToken()))
+                .toList();
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    public void enqueueManual(EmailNotificationSetting setting, User recipient, EmailEventContext context) {
+    public void enqueueManual(
+            EmailNotificationSetting setting, User recipient, EmailEventContext context) {
         Map<String, String> variables = new LinkedHashMap<>(context.variables());
         variables.put("studentName", recipient.getFullName());
-        EmailTemplateRenderer.RenderedEmail rendered = templateRenderer.render(
-                context.eventType(), setting.getSubjectTemplate(), setting.getBodyTemplate(), variables);
+        EmailTemplateRenderer.RenderedEmail rendered =
+                templateRenderer.render(
+                        context.eventType(),
+                        setting.getSubjectTemplate(),
+                        setting.getBodyTemplate(),
+                        variables);
         LocalDateTime now = LocalDateTime.now(clock);
-        insertIfAbsent(newOutbox(setting, context, recipient, rendered, context.eventKey(), now), now);
+        insertIfAbsent(
+                newOutbox(setting, context, recipient, rendered, context.eventKey(), now), now);
     }
 
     public void recoverStaleClaims() {
@@ -115,19 +144,26 @@ public class EmailOutboxService {
         }
         DeliveryPayload message = payload.get();
         if (!message.recipientActive()) {
-            deliveryStateService.markFailure(claim, "Recipient account is no longer active.", false);
+            deliveryStateService.markFailure(
+                    claim, "Recipient account is no longer active.", false);
             return;
         }
         JavaMailSender sender = mailSenderProvider.getIfAvailable();
         if (sender == null) {
-            deliveryStateService.markFailure(claim, "SMTP sender is not configured in this environment.", false);
+            deliveryStateService.markFailure(
+                    claim, "SMTP sender is not configured in this environment.", false);
             return;
         }
         try {
             var mimeMessage = sender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, false, StandardCharsets.UTF_8.name());
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(mimeMessage, false, StandardCharsets.UTF_8.name());
             helper.setTo(message.recipientEmail());
-            helper.setFrom(new InternetAddress(message.fromEmail(), message.senderName(), StandardCharsets.UTF_8.name()));
+            helper.setFrom(
+                    new InternetAddress(
+                            message.fromEmail(),
+                            message.senderName(),
+                            StandardCharsets.UTF_8.name()));
             if (message.replyToEmail() != null) {
                 helper.setReplyTo(message.replyToEmail());
             }
@@ -137,21 +173,30 @@ public class EmailOutboxService {
             deliveryStateService.sendIfOwned(claim, () -> sender.send(mimeMessage));
         } catch (Exception exception) {
             deliveryStateService.markFailure(
-                    claim, exception.getClass().getSimpleName() + ": SMTP delivery failed. Check mail server configuration and connectivity.", true);
+                    claim,
+                    exception.getClass().getSimpleName()
+                            + ": SMTP delivery failed. Check mail server configuration and connectivity.",
+                    true);
         }
     }
 
     protected Optional<DeliveryPayload> loadDeliveryPayload(EmailDeliveryClaim claim) {
-        return outboxRepository.findByIdAndStatus(claim.id(), EmailOutboxStatus.SENDING)
-                .filter(message -> claim.token() != null && claim.token().equals(message.getClaimToken()))
-                .map(message -> new DeliveryPayload(
-                        message.getRecipientUser().getStatus() == UserStatus.ACTIVE,
-                        message.getRecipientEmail(),
-                        message.getSenderName(),
-                        message.getFromEmail(),
-                        message.getReplyToEmail(),
-                        message.getSubject(),
-                        message.getBody()));
+        return outboxRepository
+                .findByIdAndStatus(claim.id(), EmailOutboxStatus.SENDING)
+                .filter(
+                        message ->
+                                claim.token() != null
+                                        && claim.token().equals(message.getClaimToken()))
+                .map(
+                        message ->
+                                new DeliveryPayload(
+                                        message.getRecipientUser().getStatus() == UserStatus.ACTIVE,
+                                        message.getRecipientEmail(),
+                                        message.getSenderName(),
+                                        message.getFromEmail(),
+                                        message.getReplyToEmail(),
+                                        message.getSubject(),
+                                        message.getBody()));
     }
 
     private EmailOutbox newOutbox(
@@ -183,9 +228,10 @@ public class EmailOutboxService {
         outbox.setRelatedMilestoneId(context.milestoneId());
         outbox.setResolvedScopeType(setting.getScopeType());
         outbox.setResolvedScopeId(setting.getScopeId());
-        outbox.setCreatedBy(context.actorUserId() == null
-                ? null
-                : userRepository.getReferenceById(context.actorUserId()));
+        outbox.setCreatedBy(
+                context.actorUserId() == null
+                        ? null
+                        : userRepository.getReferenceById(context.actorUserId()));
         return outbox;
     }
 
@@ -223,6 +269,5 @@ public class EmailOutboxService {
             String fromEmail,
             String replyToEmail,
             String subject,
-            String body) {
-    }
+            String body) {}
 }

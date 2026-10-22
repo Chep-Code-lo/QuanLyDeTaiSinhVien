@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.qldetai.exception.BusinessRuleException;
-import com.example.qldetai.feature.communication.repository.NotificationRepository;
 import com.example.qldetai.feature.academic.domain.Department;
 import com.example.qldetai.feature.academic.domain.Faculty;
 import com.example.qldetai.feature.academic.domain.ProjectType;
@@ -15,6 +14,7 @@ import com.example.qldetai.feature.academic.repository.DepartmentRepository;
 import com.example.qldetai.feature.academic.repository.FacultyRepository;
 import com.example.qldetai.feature.academic.repository.RegistrationPeriodRepository;
 import com.example.qldetai.feature.academic.repository.SemesterRepository;
+import com.example.qldetai.feature.communication.repository.NotificationRepository;
 import com.example.qldetai.feature.groupregistration.domain.GroupInvitation;
 import com.example.qldetai.feature.groupregistration.domain.GroupInvitationStatus;
 import com.example.qldetai.feature.groupregistration.domain.GroupMemberRole;
@@ -37,6 +37,17 @@ import com.example.qldetai.feature.identity.domain.UserStatus;
 import com.example.qldetai.feature.identity.repository.RoleRepository;
 import com.example.qldetai.feature.identity.repository.StudentRepository;
 import com.example.qldetai.feature.identity.repository.UserRepository;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
+import org.springframework.test.context.TestConstructor;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -47,15 +58,6 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 import java.util.Set;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.TestConstructor;
-import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @Import(GroupInvitationServiceIntegrationTests.InvitationClockConfiguration.class)
@@ -173,15 +175,24 @@ class GroupInvitationServiceIntegrationTests {
         StudentGroupResponse group = createGroup();
         GroupInvitationResponse invitation = createInvitation(group, now().plusMinutes(30));
 
-        GroupInvitationResponse accepted = invitationService.accept(invitation.id(), invitee.getUser().getId());
+        GroupInvitationResponse accepted =
+                invitationService.accept(invitation.id(), invitee.getUser().getId());
 
         assertThat(accepted.status()).isEqualTo(GroupInvitationStatus.ACCEPTED);
         assertThat(accepted.respondedAt()).isNotNull();
-        assertThat(groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(group.id(), invitee.getId()))
-                .hasValueSatisfying(member -> assertThat(member.getMemberRole()).isEqualTo(GroupMemberRole.MEMBER));
+        assertThat(
+                        groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(
+                                group.id(), invitee.getId()))
+                .hasValueSatisfying(
+                        member ->
+                                assertThat(member.getMemberRole())
+                                        .isEqualTo(GroupMemberRole.MEMBER));
         assertThat(groupService.get(group.id()).status()).isEqualTo(GroupStatus.ACTIVE);
         assertThat(invitationRepository.findById(invitation.id()))
-                .hasValueSatisfying(saved -> assertThat(saved.getStatus()).isEqualTo(GroupInvitationStatus.ACCEPTED));
+                .hasValueSatisfying(
+                        saved ->
+                                assertThat(saved.getStatus())
+                                        .isEqualTo(GroupInvitationStatus.ACCEPTED));
     }
 
     @Test
@@ -191,15 +202,21 @@ class GroupInvitationServiceIntegrationTests {
         Long recipientId = invitee.getUser().getId();
         long unreadBefore = notificationRepository.countByUserIdAndReadAtIsNull(recipientId);
 
-        GroupInvitationResponse cancelled = invitationService.cancel(invitation.id(), leader.getUser().getId());
+        GroupInvitationResponse cancelled =
+                invitationService.cancel(invitation.id(), leader.getUser().getId());
 
         assertThat(cancelled.status()).isEqualTo(GroupInvitationStatus.CANCELLED);
         assertThat(cancelled.respondedAt()).isNotNull();
-        assertThat(notificationRepository.countByUserIdAndReadAtIsNull(recipientId)).isEqualTo(unreadBefore);
-        assertThat(notificationRepository.existsByUserIdAndEventKey(recipientId,
-                "group-invitation-cancelled-" + invitation.id())).isFalse();
-        assertThat(notificationRepository.existsByUserIdAndEventKey(recipientId,
-                "group-invitation-" + invitation.id())).isTrue();
+        assertThat(notificationRepository.countByUserIdAndReadAtIsNull(recipientId))
+                .isEqualTo(unreadBefore);
+        assertThat(
+                        notificationRepository.existsByUserIdAndEventKey(
+                                recipientId, "group-invitation-cancelled-" + invitation.id()))
+                .isFalse();
+        assertThat(
+                        notificationRepository.existsByUserIdAndEventKey(
+                                recipientId, "group-invitation-" + invitation.id()))
+                .isTrue();
     }
 
     @Test
@@ -207,14 +224,20 @@ class GroupInvitationServiceIntegrationTests {
         StudentGroupResponse group = createGroup();
         GroupInvitationResponse invitation = createInvitation(group, now().plusMinutes(30));
 
-        GroupInvitationResponse rejected = invitationService.reject(invitation.id(), invitee.getUser().getId());
+        GroupInvitationResponse rejected =
+                invitationService.reject(invitation.id(), invitee.getUser().getId());
 
         assertThat(rejected.status()).isEqualTo(GroupInvitationStatus.REJECTED);
         assertThat(rejected.respondedAt()).isNotNull();
-        assertThat(groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(group.id(), invitee.getId()))
+        assertThat(
+                        groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(
+                                group.id(), invitee.getId()))
                 .isEmpty();
         assertThat(invitationRepository.findById(invitation.id()))
-                .hasValueSatisfying(saved -> assertThat(saved.getStatus()).isEqualTo(GroupInvitationStatus.REJECTED));
+                .hasValueSatisfying(
+                        saved ->
+                                assertThat(saved.getStatus())
+                                        .isEqualTo(GroupInvitationStatus.REJECTED));
     }
 
     @Test
@@ -234,25 +257,37 @@ class GroupInvitationServiceIntegrationTests {
 
         // The first instant is used by the bulk sweep; the second is reached after the row lock.
         LocalDateTime expiredAtLock = sweepTime.plusSeconds(2);
-        clock.schedule(sweepTime.toInstant(ZoneOffset.UTC), expiredAtLock.toInstant(ZoneOffset.UTC));
+        clock.schedule(
+                sweepTime.toInstant(ZoneOffset.UTC), expiredAtLock.toInstant(ZoneOffset.UTC));
 
-        GroupInvitationResponse response = invitationService.accept(invitation.getId(), invitee.getUser().getId());
+        GroupInvitationResponse response =
+                invitationService.accept(invitation.getId(), invitee.getUser().getId());
 
         assertThat(response.status()).isEqualTo(GroupInvitationStatus.EXPIRED);
         assertThat(response.respondedAt()).isEqualTo(expiredAtLock);
-        assertThat(groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(group.id(), invitee.getId()))
+        assertThat(
+                        groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(
+                                group.id(), invitee.getId()))
                 .isEmpty();
         assertThat(invitationRepository.findById(invitation.getId()))
-                .hasValueSatisfying(saved -> assertThat(saved.getStatus()).isEqualTo(GroupInvitationStatus.EXPIRED));
+                .hasValueSatisfying(
+                        saved ->
+                                assertThat(saved.getStatus())
+                                        .isEqualTo(GroupInvitationStatus.EXPIRED));
     }
 
     @Test
     void createRejectsAnExpiryBeyondThePeriodConfiguredLifetime() {
         StudentGroupResponse group = createGroup();
 
-        assertThatThrownBy(() -> invitationService.create(
-                        new CreateGroupInvitationRequest(group.id(), invitee.getStudentCode(), now().plusHours(3)),
-                        leader.getUser().getId()))
+        assertThatThrownBy(
+                        () ->
+                                invitationService.create(
+                                        new CreateGroupInvitationRequest(
+                                                group.id(),
+                                                invitee.getStudentCode(),
+                                                now().plusHours(3)),
+                                        leader.getUser().getId()))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("configured invitation lifetime");
     }
@@ -274,22 +309,30 @@ class GroupInvitationServiceIntegrationTests {
         other.setCreatedBy(leader.getUser());
         other.setCreatedAt(now());
         other = periodRepository.saveAndFlush(other);
-        StudentGroupResponse concurrent = groupService.create(
-                new CreateGroupRequest(other.getId(), "Concurrent group"), invitee.getUser().getId());
+        StudentGroupResponse concurrent =
+                groupService.create(
+                        new CreateGroupRequest(other.getId(), "Concurrent group"),
+                        invitee.getUser().getId());
         assertThat(invitationService.accept(invitation.id(), invitee.getUser().getId()).status())
                 .isEqualTo(GroupInvitationStatus.ACCEPTED);
-        assertThat(groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(group.id(), invitee.getId()))
+        assertThat(
+                        groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(
+                                group.id(), invitee.getId()))
                 .isPresent();
-        assertThat(groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(concurrent.id(), invitee.getId()))
+        assertThat(
+                        groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(
+                                concurrent.id(), invitee.getId()))
                 .isPresent();
     }
 
     private StudentGroupResponse createGroup() {
         return groupService.create(
-                new CreateGroupRequest(period.getId(), "Nhóm mời " + System.nanoTime()), leader.getUser().getId());
+                new CreateGroupRequest(period.getId(), "Nhóm mời " + System.nanoTime()),
+                leader.getUser().getId());
     }
 
-    private GroupInvitationResponse createInvitation(StudentGroupResponse group, LocalDateTime expiresAt) {
+    private GroupInvitationResponse createInvitation(
+            StudentGroupResponse group, LocalDateTime expiresAt) {
         return invitationService.create(
                 new CreateGroupInvitationRequest(group.id(), invitee.getStudentCode(), expiresAt),
                 leader.getUser().getId());

@@ -94,8 +94,7 @@ export function DateTimeInput({
   const validationMessage = useCallback(
     (text: string, parsed: string | null) => {
       if (!text) return ''
-      if (!parsed)
-        return `Vui lòng nhập ngày hợp lệ theo định dạng ${formatHint}.`
+      if (!parsed) return `Vui lòng nhập ngày hợp lệ theo định dạng ${formatHint}.`
       if (min && parsed < min)
         return `Vui lòng chọn thời điểm từ ${formatDateInput(min, withTime)} trở đi.`
       if (max && parsed > max)

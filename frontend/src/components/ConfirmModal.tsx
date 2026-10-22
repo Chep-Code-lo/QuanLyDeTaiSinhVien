@@ -27,13 +27,18 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   const messageId = useId()
   const contentRef = useRef<HTMLDivElement>(null)
   const latest = useRef({ loading, onCancel })
-  useEffect(() => { latest.current = { loading, onCancel } }, [loading, onCancel])
+  useEffect(() => {
+    latest.current = { loading, onCancel }
+  }, [loading, onCancel])
   useEffect(() => {
     if (!isOpen) return
     const previous = document.activeElement as HTMLElement | null
-    const focusable = () => Array.from(contentRef.current?.querySelectorAll<HTMLElement>(
-      'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
-    ) ?? [])
+    const focusable = () =>
+      Array.from(
+        contentRef.current?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
+        ) ?? [],
+      )
     focusable()[0]?.focus()
     const keydown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -45,13 +50,25 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         const elements = focusable()
         const first = elements[0]
         const last = elements[elements.length - 1]
-        if (!first) { event.preventDefault(); contentRef.current?.focus(); return }
-        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
-        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+        if (!first) {
+          event.preventDefault()
+          contentRef.current?.focus()
+          return
+        }
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault()
+          last.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first.focus()
+        }
       }
     }
     document.addEventListener('keydown', keydown)
-    return () => { document.removeEventListener('keydown', keydown); if (previous?.isConnected) previous.focus() }
+    return () => {
+      document.removeEventListener('keydown', keydown)
+      if (previous?.isConnected) previous.focus()
+    }
   }, [isOpen])
   if (!isOpen) return null
 

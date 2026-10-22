@@ -5,12 +5,14 @@ import static org.mockito.Mockito.mock;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
+
 import tools.jackson.databind.ObjectMapper;
 
 class CorsConfigurationTests {
     private org.springframework.web.cors.CorsConfiguration configuration(String origins) {
         return new SecurityConfig(mock(ObjectMapper.class), origins, "lax", false, "")
-                .corsConfigurationSource().getCorsConfiguration(new MockHttpServletRequest("GET", "/api/v1/auth/csrf"));
+                .corsConfigurationSource()
+                .getCorsConfiguration(new MockHttpServletRequest("GET", "/api/v1/auth/csrf"));
     }
 
     @Test
@@ -24,7 +26,8 @@ class CorsConfigurationTests {
     @Test
     void tunnelPatternsWorkOnlyWhenExplicitlyConfigured() {
         var cors = configuration("https://*.trycloudflare.com");
-        assertThat(cors.checkOrigin("https://configured.trycloudflare.com")).isEqualTo("https://configured.trycloudflare.com");
+        assertThat(cors.checkOrigin("https://configured.trycloudflare.com"))
+                .isEqualTo("https://configured.trycloudflare.com");
         assertThat(cors.getAllowCredentials()).isTrue();
         assertThat(cors.checkOrigin("https://example.com")).isNull();
     }

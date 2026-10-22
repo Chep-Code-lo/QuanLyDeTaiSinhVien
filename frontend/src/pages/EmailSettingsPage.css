@@ -55,7 +55,10 @@
   background: transparent;
   font: inherit;
   text-align: left;
-  transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    transform 180ms ease;
 }
 .email-settings__event:hover {
   border-color: #cbdaf3;

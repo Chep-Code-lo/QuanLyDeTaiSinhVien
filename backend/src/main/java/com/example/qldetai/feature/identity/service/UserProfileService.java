@@ -10,6 +10,8 @@ import com.example.qldetai.feature.identity.repository.AcademicAppointmentReposi
 import com.example.qldetai.feature.identity.repository.LecturerRepository;
 import com.example.qldetai.feature.identity.repository.StudentRepository;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
 
 /** Loads profile data before passing it to the query-free identity mapper. */
 @Service
@@ -32,7 +33,6 @@ public class UserProfileService {
     private final AcademicAppointmentRepository appointments;
     private final IdentityMapper mapper;
     private final Clock clock;
-
 
     public CurrentUserResponse toCurrentUser(User user) {
         return mapper.toCurrentUser(

@@ -1,3 +1,44 @@
 package com.example.qldetai.feature.evaluation.domain;
-import jakarta.persistence.*; import java.math.BigDecimal; import lombok.*;
-@Entity @Table(name="score_details") @Getter @Setter @NoArgsConstructor public class ScoreDetail { @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id; @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="sheet_id") private ScoreSheet sheet; @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="rubric_id") private Rubric rubric; @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="criterion_id") private RubricCriterion criterion; @Column(name="max_score",nullable=false,precision=5,scale=2) private BigDecimal maxScore; @Column(nullable=false,precision=5,scale=2) private BigDecimal score; @Column(columnDefinition="TEXT") private String comment; @PrePersist void setDerivedRubric() { if (rubric == null && criterion != null) rubric = criterion.getRubric(); } }
+
+import jakarta.persistence.*;
+
+import lombok.*;
+
+import java.math.BigDecimal;
+
+@Entity
+@Table(name = "score_details")
+@Getter
+@Setter
+@NoArgsConstructor
+public class ScoreDetail {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sheet_id")
+    private ScoreSheet sheet;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rubric_id")
+    private Rubric rubric;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "criterion_id")
+    private RubricCriterion criterion;
+
+    @Column(name = "max_score", nullable = false, precision = 5, scale = 2)
+    private BigDecimal maxScore;
+
+    @Column(nullable = false, precision = 5, scale = 2)
+    private BigDecimal score;
+
+    @Column(columnDefinition = "TEXT")
+    private String comment;
+
+    @PrePersist
+    void setDerivedRubric() {
+        if (rubric == null && criterion != null) rubric = criterion.getRubric();
+    }
+}

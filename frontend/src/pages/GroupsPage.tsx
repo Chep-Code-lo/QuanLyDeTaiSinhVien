@@ -86,47 +86,76 @@ export function GroupsPage() {
   const [totalPages, setTotalPages] = useState(0)
   const [loadError, setLoadError] = useState('')
   const loadRequest = useRef(0)
-  const [pendingAction, setPendingAction] = useState<{ message: string; action: () => Promise<void> } | null>(null)
+  const [pendingAction, setPendingAction] = useState<{
+    message: string
+    action: () => Promise<void>
+  } | null>(null)
   const [actionBusy, setActionBusy] = useState(false)
   const [currentTime, setCurrentTime] = useState(() => new Date().getTime())
   const student = hasRole('STUDENT')
-  const [loading, setLoading] = useRequestLoading(JSON.stringify([periodId, student, user?.id, page]))
+  const [loading, setLoading] = useRequestLoading(
+    JSON.stringify([periodId, student, user?.id, page]),
+  )
 
-  const isLeader = useCallback((group: StudentGroupResponse) =>
-    group.members.some((member) => member.userId === user?.id && member.memberRole === 'LEADER'), [user?.id])
+  const isLeader = useCallback(
+    (group: StudentGroupResponse) =>
+      group.members.some((member) => member.userId === user?.id && member.memberRole === 'LEADER'),
+    [user?.id],
+  )
 
   useEffect(() => {
     const timer = window.setInterval(() => setCurrentTime(new Date().getTime()), 30_000)
     return () => window.clearInterval(timer)
   }, [])
 
-  const load = useCallback((isCurrent: () => boolean = () => true) => {
-    const requestId = ++loadRequest.current
-    const request = student ? Promise.all([
-          groupApi.mine(),
-          allPages(page => groupApi.myInvitations(page, 100, 'PENDING')),
-        ]).then(async ([myGroups, invitations]) => {
-        const leaderGroups = myGroups.filter(group => isLeader(group) && group.status !== 'LOCKED' && group.status !== 'CLOSED')
-        const invitationLists = await Promise.all(
-          leaderGroups.map(
-            async (group) => [group.id, await groupApi.invitationsForGroup(group.id)] as const,
-          ),
-        )
-        return { groups: myGroups, incoming: invitations, outgoing: Object.fromEntries(invitationLists), totalPages: 0 }
-      }) : groupApi.list({ periodId, page, size: 10 }).then(result => ({
-        groups: result.content, incoming: [], outgoing: {}, totalPages: result.totalPages,
-      }))
-    return request.then(result => {
-      if (!isCurrent() || requestId !== loadRequest.current) return
-      setGroups(result.groups); setIncoming(result.incoming); setOutgoing(result.outgoing)
-      setTotalPages(result.totalPages); setLoadError('')
-    }).catch(error => {
-      if (!isCurrent() || requestId !== loadRequest.current) return
-      setLoadError(messageOf(error))
-    }).finally(() => {
-      if (isCurrent() && requestId === loadRequest.current) setLoading(false)
-    })
-  }, [student, isLeader, periodId, page, setLoading])
+  const load = useCallback(
+    (isCurrent: () => boolean = () => true) => {
+      const requestId = ++loadRequest.current
+      const request = student
+        ? Promise.all([
+            groupApi.mine(),
+            allPages((page) => groupApi.myInvitations(page, 100, 'PENDING')),
+          ]).then(async ([myGroups, invitations]) => {
+            const leaderGroups = myGroups.filter(
+              (group) => isLeader(group) && group.status !== 'LOCKED' && group.status !== 'CLOSED',
+            )
+            const invitationLists = await Promise.all(
+              leaderGroups.map(
+                async (group) => [group.id, await groupApi.invitationsForGroup(group.id)] as const,
+              ),
+            )
+            return {
+              groups: myGroups,
+              incoming: invitations,
+              outgoing: Object.fromEntries(invitationLists),
+              totalPages: 0,
+            }
+          })
+        : groupApi.list({ periodId, page, size: 10 }).then((result) => ({
+            groups: result.content,
+            incoming: [],
+            outgoing: {},
+            totalPages: result.totalPages,
+          }))
+      return request
+        .then((result) => {
+          if (!isCurrent() || requestId !== loadRequest.current) return
+          setGroups(result.groups)
+          setIncoming(result.incoming)
+          setOutgoing(result.outgoing)
+          setTotalPages(result.totalPages)
+          setLoadError('')
+        })
+        .catch((error) => {
+          if (!isCurrent() || requestId !== loadRequest.current) return
+          setLoadError(messageOf(error))
+        })
+        .finally(() => {
+          if (isCurrent() && requestId === loadRequest.current) setLoading(false)
+        })
+    },
+    [student, isLeader, periodId, page, setLoading],
+  )
 
   useEffect(() => {
     const loadPeriods = async () => {
@@ -144,7 +173,9 @@ export function GroupsPage() {
   useEffect(() => {
     let active = true
     void load(() => active)
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [load])
 
   const create = async (event: React.FormEvent) => {
@@ -287,7 +318,10 @@ export function GroupsPage() {
             <AnimatedSelect
               className="form-select"
               value={periodId ?? ''}
-              onChange={(event) => { setPage(0); setPeriodId(Number(event.target.value) || undefined) }}
+              onChange={(event) => {
+                setPage(0)
+                setPeriodId(Number(event.target.value) || undefined)
+              }}
               required
             >
               <option value="">Chọn đợt đăng ký</option>
@@ -315,7 +349,10 @@ export function GroupsPage() {
             id="group-period-filter"
             className="form-select"
             value={periodId ?? ''}
-            onChange={(event) => { setPage(0); setPeriodId(Number(event.target.value) || undefined) }}
+            onChange={(event) => {
+              setPage(0)
+              setPeriodId(Number(event.target.value) || undefined)
+            }}
           >
             <option value="">Tất cả đợt</option>
             {periods.map((period) => (
@@ -328,7 +365,14 @@ export function GroupsPage() {
       )}
 
       <section className="page-card">
-        {loadError && <p role="alert">{loadError} <button type="button" className="text-button" onClick={() => void load()}>Thử lại</button></p>}
+        {loadError && (
+          <p role="alert">
+            {loadError}{' '}
+            <button type="button" className="text-button" onClick={() => void load()}>
+              Thử lại
+            </button>
+          </p>
+        )}
         {loading ? (
           <div className="content-state">
             <span className="spinner" />
@@ -379,7 +423,12 @@ export function GroupsPage() {
                         ) : student && leader ? (
                           <button
                             className="text-button"
-                            onClick={() => setPendingAction({ message: `Xóa ${member.fullName} khỏi nhóm ${group.name}?`, action: () => remove(group.id, member.studentId) })}
+                            onClick={() =>
+                              setPendingAction({
+                                message: `Xóa ${member.fullName} khỏi nhóm ${group.name}?`,
+                                action: () => remove(group.id, member.studentId),
+                              })
+                            }
                           >
                             Xóa
                           </button>
@@ -444,7 +493,12 @@ export function GroupsPage() {
                                 {invitation.status === 'PENDING' && (
                                   <button
                                     className="text-button"
-                                    onClick={() => setPendingAction({ message: `Hủy lời mời vào nhóm dành cho ${invitation.invitedStudentName}?`, action: () => cancelInvitation(invitation) })}
+                                    onClick={() =>
+                                      setPendingAction({
+                                        message: `Hủy lời mời vào nhóm dành cho ${invitation.invitedStudentName}?`,
+                                        action: () => cancelInvitation(invitation),
+                                      })
+                                    }
                                   >
                                     Hủy lời mời
                                   </button>
@@ -461,17 +515,49 @@ export function GroupsPage() {
             })}
           </div>
         )}
-        {!student && totalPages > 1 && <div className="table-pagination"><span>Trang {page + 1} / {totalPages}</span><div>
-          <button type="button" className="btn btn-secondary" disabled={loading || page === 0} onClick={() => setPage(page - 1)}>Trước</button>
-          <button type="button" className="btn btn-secondary" disabled={loading || page >= totalPages - 1} onClick={() => setPage(page + 1)}>Sau</button>
-        </div></div>}
+        {!student && totalPages > 1 && (
+          <div className="table-pagination">
+            <span>
+              Trang {page + 1} / {totalPages}
+            </span>
+            <div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={loading || page === 0}
+                onClick={() => setPage(page - 1)}
+              >
+                Trước
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={loading || page >= totalPages - 1}
+                onClick={() => setPage(page + 1)}
+              >
+                Sau
+              </button>
+            </div>
+          </div>
+        )}
       </section>
-      <ConfirmModal isOpen={pendingAction !== null} title="Xác nhận thay đổi nhóm" message={pendingAction?.message ?? ''}
-        loading={actionBusy} onCancel={() => { if (!actionBusy) setPendingAction(null) }} onConfirm={() => {
+      <ConfirmModal
+        isOpen={pendingAction !== null}
+        title="Xác nhận thay đổi nhóm"
+        message={pendingAction?.message ?? ''}
+        loading={actionBusy}
+        onCancel={() => {
+          if (!actionBusy) setPendingAction(null)
+        }}
+        onConfirm={() => {
           if (!pendingAction || actionBusy) return
           setActionBusy(true)
-          void pendingAction.action().finally(() => { setActionBusy(false); setPendingAction(null) })
-        }} />
+          void pendingAction.action().finally(() => {
+            setActionBusy(false)
+            setPendingAction(null)
+          })
+        }}
+      />
     </>
   )
 }

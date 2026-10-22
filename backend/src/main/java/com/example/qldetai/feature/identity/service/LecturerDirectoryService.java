@@ -5,11 +5,13 @@ import com.example.qldetai.feature.identity.domain.UserStatus;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.LecturerDirectoryResponse;
 import com.example.qldetai.feature.identity.mapper.IdentityMapper;
 import com.example.qldetai.feature.identity.repository.LecturerRepository;
+
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -18,23 +20,19 @@ public class LecturerDirectoryService {
     private final LecturerRepository lecturerRepository;
     private final IdentityMapper identityMapper;
 
-
     @Transactional(readOnly = true)
     public PageResponse<LecturerDirectoryResponse> list(
-            Long lecturerId,
-            String search,
-            Long facultyId,
-            Long departmentId,
-            int page,
-            int size) {
+            Long lecturerId, String search, Long facultyId, Long departmentId, int page, int size) {
         String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
-        return PageResponse.from(lecturerRepository.search(
-                        lecturerId,
-                        normalizedSearch,
-                        facultyId,
-                        departmentId,
-                        UserStatus.ACTIVE,
-                        PageRequest.of(page, size, Sort.by("lecturerCode").ascending()))
-                .map(identityMapper::toLecturerDirectory));
+        return PageResponse.from(
+                lecturerRepository
+                        .search(
+                                lecturerId,
+                                normalizedSearch,
+                                facultyId,
+                                departmentId,
+                                UserStatus.ACTIVE,
+                                PageRequest.of(page, size, Sort.by("lecturerCode").ascending()))
+                        .map(identityMapper::toLecturerDirectory));
     }
 }

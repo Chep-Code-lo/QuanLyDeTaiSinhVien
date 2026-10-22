@@ -8,6 +8,8 @@ import com.example.qldetai.security.UserPrincipal;
 
 import jakarta.validation.Valid;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,7 +25,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
@@ -32,7 +33,6 @@ import lombok.RequiredArgsConstructor;
 public class AssessmentComponentController {
 
     private final EvaluationService service;
-
 
     @GetMapping("/assessment-components")
     public ApiResponse<List<AssessmentComponentResponse>> components(
@@ -43,7 +43,7 @@ public class AssessmentComponentController {
     @PostMapping("/assessment-components")
     @PreAuthorize(
             "hasRole('ADMIN') or @academicAuthorization.canManagePeriod(#request.periodId,"
-                + " authentication)")
+                    + " authentication)")
     public ResponseEntity<ApiResponse<AssessmentComponentResponse>> createComponent(
             @Valid @RequestBody CreateAssessmentComponentRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -55,7 +55,7 @@ public class AssessmentComponentController {
     @PatchMapping("/assessment-components/{id}/lock")
     @PreAuthorize(
             "hasRole('ADMIN') or @evaluationAuthorization.canManageAssessmentComponent(#id,"
-                + " authentication)")
+                    + " authentication)")
     public ApiResponse<AssessmentComponentResponse> lockComponent(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(

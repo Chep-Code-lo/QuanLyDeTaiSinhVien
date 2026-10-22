@@ -208,7 +208,10 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
         <div className="create-account-form__grid">
           <div className="form-group">
             <label className="form-label" htmlFor="create-role">
-              Vai trò <span className="text-red" aria-hidden="true">*</span>
+              Vai trò{' '}
+              <span className="text-red" aria-hidden="true">
+                *
+              </span>
             </label>
             <AnimatedSelect
               id="create-role"
@@ -225,7 +228,10 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
           </div>
           <div className="form-group">
             <label className="form-label" htmlFor="create-name">
-              Họ và tên <span className="text-red" aria-hidden="true">*</span>
+              Họ và tên{' '}
+              <span className="text-red" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="create-name"
@@ -239,7 +245,10 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
           </div>
           <div className="form-group">
             <label className="form-label" htmlFor="create-email">
-              Email đăng nhập <span className="text-red" aria-hidden="true">*</span>
+              Email đăng nhập{' '}
+              <span className="text-red" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="create-email"
@@ -253,7 +262,9 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
             />
           </div>
           <div className="form-group">
-            <label className="form-label" htmlFor="create-phone">Số điện thoại</label>
+            <label className="form-label" htmlFor="create-phone">
+              Số điện thoại
+            </label>
             <input
               id="create-phone"
               className="form-input"
@@ -266,7 +277,10 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
           </div>
           <div className="form-group">
             <label className="form-label" htmlFor="create-password">
-              Mật khẩu <span className="text-red" aria-hidden="true">*</span>
+              Mật khẩu{' '}
+              <span className="text-red" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="create-password"
@@ -286,7 +300,10 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
           </div>
           <div className="form-group">
             <label className="form-label" htmlFor="create-confirm-password">
-              Xác nhận mật khẩu <span className="text-red" aria-hidden="true">*</span>
+              Xác nhận mật khẩu{' '}
+              <span className="text-red" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="create-confirm-password"
@@ -306,7 +323,10 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
         <div className="create-account-form__grid">
           <div className="form-group">
             <label className="form-label" htmlFor="create-department">
-              Bộ môn <span className="text-red" aria-hidden="true">*</span>
+              Bộ môn{' '}
+              <span className="text-red" aria-hidden="true">
+                *
+              </span>
             </label>
             <AnimatedSelect
               id="create-department"
@@ -328,7 +348,10 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
             <>
               <div className="form-group">
                 <label className="form-label" htmlFor="create-student-code">
-                  Mã sinh viên <span className="text-red" aria-hidden="true">*</span>
+                  Mã sinh viên{' '}
+                  <span className="text-red" aria-hidden="true">
+                    *
+                  </span>
                 </label>
                 <input
                   id="create-student-code"
@@ -341,7 +364,10 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="create-class">
-                  Lớp <span className="text-red" aria-hidden="true">*</span>
+                  Lớp{' '}
+                  <span className="text-red" aria-hidden="true">
+                    *
+                  </span>
                 </label>
                 <input
                   id="create-class"
@@ -354,7 +380,10 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="create-cohort">
-                  Khóa <span className="text-red" aria-hidden="true">*</span>
+                  Khóa{' '}
+                  <span className="text-red" aria-hidden="true">
+                    *
+                  </span>
                 </label>
                 <input
                   id="create-cohort"
@@ -371,7 +400,10 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
             <>
               <div className="form-group">
                 <label className="form-label" htmlFor="create-lecturer-code">
-                  Mã giảng viên <span className="text-red" aria-hidden="true">*</span>
+                  Mã giảng viên{' '}
+                  <span className="text-red" aria-hidden="true">
+                    *
+                  </span>
                 </label>
                 <input
                   id="create-lecturer-code"
@@ -383,7 +415,9 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
                 />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="create-degree">Học vị</label>
+                <label className="form-label" htmlFor="create-degree">
+                  Học vị
+                </label>
                 <AnimatedSelect
                   id="create-degree"
                   value={form.academicDegree}
@@ -391,7 +425,9 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
                 >
                   <option value="">Chọn học vị</option>
                   {academicDegrees.map((degree) => (
-                    <option key={degree} value={degree}>{degree}</option>
+                    <option key={degree} value={degree}>
+                      {degree}
+                    </option>
                   ))}
                 </AnimatedSelect>
               </div>
@@ -399,9 +435,18 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
           )}
         </div>
 
-        {errorMessage && <p className="create-account-form__error" role="alert">{errorMessage}</p>}
+        {errorMessage && (
+          <p className="create-account-form__error" role="alert">
+            {errorMessage}
+          </p>
+        )}
         <div className="create-account-form__actions">
-          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={submitting}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onCancel}
+            disabled={submitting}
+          >
             Hủy
           </button>
           <button type="submit" className="btn btn-primary" disabled={submitting}>

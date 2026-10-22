@@ -1,7 +1,7 @@
 package com.example.qldetai.feature.groupregistration.service;
 
-import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ResourceNotFoundException;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriod;
@@ -14,8 +14,8 @@ import com.example.qldetai.feature.groupregistration.domain.GroupStatus;
 import com.example.qldetai.feature.groupregistration.domain.RegistrationStatus;
 import com.example.qldetai.feature.groupregistration.domain.StudentGroup;
 import com.example.qldetai.feature.groupregistration.dto.GroupRegistrationDtos.AddGroupMemberRequest;
-import com.example.qldetai.feature.groupregistration.dto.GroupRegistrationDtos.GroupMemberResponse;
 import com.example.qldetai.feature.groupregistration.dto.GroupRegistrationDtos.CreateGroupRequest;
+import com.example.qldetai.feature.groupregistration.dto.GroupRegistrationDtos.GroupMemberResponse;
 import com.example.qldetai.feature.groupregistration.dto.GroupRegistrationDtos.StudentGroupResponse;
 import com.example.qldetai.feature.groupregistration.repository.GroupMemberRepository;
 import com.example.qldetai.feature.groupregistration.repository.StudentGroupRepository;
@@ -26,18 +26,21 @@ import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.StudentRepository;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.project.repository.ProjectAssignmentRepository;
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -53,25 +56,43 @@ public class GroupService {
     private final NotificationService notificationService;
     private final Clock clock;
 
-
     @Transactional(readOnly = true)
     public PageResponse<StudentGroupResponse> list(Long periodId, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<StudentGroup> groups = periodId == null
-                ? studentGroupRepository.findAll(pageable)
-                : studentGroupRepository.findByPeriodId(periodId, pageable);
-        Map<Long, List<GroupMember>> membersByGroup = groups.isEmpty() ? Map.of() : groupMemberRepository
-                .findByGroupIdInAndLeftAtIsNullOrderBySlotNoAsc(groups.getContent().stream().map(StudentGroup::getId).toList())
-                .stream().collect(java.util.stream.Collectors.groupingBy(member -> member.getGroup().getId()));
-        return PageResponse.from(groups.map(group -> toResponse(group, membersByGroup.getOrDefault(group.getId(), List.of()))));
+        Page<StudentGroup> groups =
+                periodId == null
+                        ? studentGroupRepository.findAll(pageable)
+                        : studentGroupRepository.findByPeriodId(periodId, pageable);
+        Map<Long, List<GroupMember>> membersByGroup =
+                groups.isEmpty()
+                        ? Map.of()
+                        : groupMemberRepository
+                                .findByGroupIdInAndLeftAtIsNullOrderBySlotNoAsc(
+                                        groups.getContent().stream()
+                                                .map(StudentGroup::getId)
+                                                .toList())
+                                .stream()
+                                .collect(
+                                        java.util.stream.Collectors.groupingBy(
+                                                member -> member.getGroup().getId()));
+        return PageResponse.from(
+                groups.map(
+                        group ->
+                                toResponse(
+                                        group,
+                                        membersByGroup.getOrDefault(group.getId(), List.of()))));
     }
 
     @Transactional(readOnly = true)
     public List<StudentGroupResponse> mine(Long actorId) {
         Student student = requireStudent(actorId);
         Map<Long, StudentGroupResponse> groups = new LinkedHashMap<>();
-        groupMemberRepository.findByStudentIdAndLeftAtIsNullOrderByJoinedAtDesc(student.getId())
-                .forEach(member -> groups.putIfAbsent(member.getGroup().getId(), toResponse(member.getGroup())));
+        groupMemberRepository
+                .findByStudentIdAndLeftAtIsNullOrderByJoinedAtDesc(student.getId())
+                .forEach(
+                        member ->
+                                groups.putIfAbsent(
+                                        member.getGroup().getId(), toResponse(member.getGroup())));
         return List.copyOf(groups.values());
     }
 
@@ -86,11 +107,14 @@ public class GroupService {
         Student creator = requireStudent(actorId);
         RegistrationPeriod period = requireRegistrationWindow(request.periodId());
         studentRepository.findByIdForUpdate(creator.getId()).orElseThrow();
-        if (!groupMemberRepository.findConflictingMemberships(period.getId(), creator.getId()).isEmpty()) {
+        if (!groupMemberRepository
+                .findConflictingMemberships(period.getId(), creator.getId())
+                .isEmpty()) {
             throw new BusinessRuleException("Student already belongs to an active group.");
         }
         if (!creator.getDepartment().getFaculty().getId().equals(period.getFaculty().getId())) {
-            throw new BusinessRuleException("Student must belong to the same faculty as the registration period.");
+            throw new BusinessRuleException(
+                    "Student must belong to the same faculty as the registration period.");
         }
 
         LocalDateTime now = LocalDateTime.now(clock);
@@ -116,26 +140,33 @@ public class GroupService {
 
     @Transactional
     @BusinessAudit(action = "GROUP_MEMBER_ADD", entityType = "STUDENT_GROUP", entityIdArgument = 0)
-    public StudentGroupResponse addMember(Long groupId, AddGroupMemberRequest request, Long actorId) {
+    public StudentGroupResponse addMember(
+            Long groupId, AddGroupMemberRequest request, Long actorId) {
         Student actor = requireStudent(actorId);
         StudentGroup group = requireGroupForUpdate(groupId);
         RegistrationPeriod period = group.getPeriod();
         requireLeader(groupId, actor.getId());
         ensureGroupMutable(group);
 
-        Student member = studentRepository.findByStudentCodeIgnoreCase(request.studentCode().trim())
-                .orElseThrow(() -> new ResourceNotFoundException("Student was not found."));
+        Student member =
+                studentRepository
+                        .findByStudentCodeIgnoreCase(request.studentCode().trim())
+                        .orElseThrow(() -> new ResourceNotFoundException("Student was not found."));
         if (!member.getDepartment().getFaculty().getId().equals(period.getFaculty().getId())) {
-            throw new BusinessRuleException("All group members must belong to the same faculty as the registration period.");
+            throw new BusinessRuleException(
+                    "All group members must belong to the same faculty as the registration period.");
         }
         studentRepository.findByIdForUpdate(member.getId()).orElseThrow();
-        if (!groupMemberRepository.findConflictingMemberships(period.getId(), member.getId()).isEmpty()) {
+        if (!groupMemberRepository
+                .findConflictingMemberships(period.getId(), member.getId())
+                .isEmpty()) {
             throw new BusinessRuleException("Student already belongs to an active group.");
         }
         List<GroupMember> activeMembers =
                 groupMemberRepository.findActiveByGroupIdForUpdate(groupId);
         if (activeMembers.size() >= period.getMaxGroupMembers()) {
-            throw new BusinessRuleException("The group has reached its configured maximum number of members.");
+            throw new BusinessRuleException(
+                    "The group has reached its configured maximum number of members.");
         }
 
         GroupMember groupMember = new GroupMember();
@@ -159,15 +190,23 @@ public class GroupService {
     }
 
     @Transactional
-    @BusinessAudit(action = "GROUP_MEMBER_REMOVE", entityType = "STUDENT_GROUP", entityIdArgument = 0)
+    @BusinessAudit(
+            action = "GROUP_MEMBER_REMOVE",
+            entityType = "STUDENT_GROUP",
+            entityIdArgument = 0)
     public StudentGroupResponse removeMember(Long groupId, Long studentId, Long actorId) {
         Student actor = requireStudent(actorId);
         StudentGroup group = requireGroupForUpdate(groupId);
         requireLeader(groupId, actor.getId());
         ensureGroupMutable(group);
 
-        GroupMember member = groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(groupId, studentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Active group member was not found."));
+        GroupMember member =
+                groupMemberRepository
+                        .findByGroupIdAndStudentIdAndLeftAtIsNull(groupId, studentId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Active group member was not found."));
         if (member.getMemberRole() == GroupMemberRole.LEADER) {
             throw new BusinessRuleException("The group leader cannot be removed from the group.");
         }
@@ -179,93 +218,128 @@ public class GroupService {
 
     private void ensureGroupMutable(StudentGroup group) {
         if (group.getStatus() == GroupStatus.LOCKED || group.getStatus() == GroupStatus.CLOSED) {
-            throw new BusinessRuleException("This group is locked and can no longer change members.");
+            throw new BusinessRuleException(
+                    "This group is locked and can no longer change members.");
         }
         if (projectAssignmentRepository.existsByGroupId(group.getId())) {
-            throw new BusinessRuleException("This group already has a project assignment and can no longer change members.");
+            throw new BusinessRuleException(
+                    "This group already has a project assignment and can no longer change members.");
         }
-        if (!topicRegistrationRepository.findByGroupIdAndStatusInForUpdate(
-                group.getId(), List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED)).isEmpty()) {
-            throw new BusinessRuleException("Group members cannot change after a topic registration is pending or approved.");
+        if (!topicRegistrationRepository
+                .findByGroupIdAndStatusInForUpdate(
+                        group.getId(),
+                        List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED))
+                .isEmpty()) {
+            throw new BusinessRuleException(
+                    "Group members cannot change after a topic registration is pending or approved.");
         }
     }
 
     private RegistrationPeriod requireRegistrationWindow(Long periodId) {
-        RegistrationPeriod period = registrationPeriodRepository.findById(periodId)
-                .orElseThrow(() -> new ResourceNotFoundException("Registration period was not found."));
+        RegistrationPeriod period =
+                registrationPeriodRepository
+                        .findById(periodId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Registration period was not found."));
         if (period.getStatus() != RegistrationPeriodStatus.ACTIVE) {
-            throw new BusinessRuleException("Student groups can only be created in an active registration period.");
+            throw new BusinessRuleException(
+                    "Student groups can only be created in an active registration period.");
         }
         LocalDateTime now = LocalDateTime.now(clock);
-        if (now.isBefore(period.getRegistrationStartAt()) || now.isAfter(period.getRegistrationEndAt())) {
-            throw new BusinessRuleException("Student groups can only be managed during the registration window.");
+        if (now.isBefore(period.getRegistrationStartAt())
+                || now.isAfter(period.getRegistrationEndAt())) {
+            throw new BusinessRuleException(
+                    "Student groups can only be managed during the registration window.");
         }
         return period;
     }
 
     private void requireLeader(Long groupId, Long studentId) {
-        GroupMember membership = groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(groupId, studentId)
-                .orElseThrow(() -> new AccessDeniedException("Only active group members can manage this group."));
+        GroupMember membership =
+                groupMemberRepository
+                        .findByGroupIdAndStudentIdAndLeftAtIsNull(groupId, studentId)
+                        .orElseThrow(
+                                () ->
+                                        new AccessDeniedException(
+                                                "Only active group members can manage this group."));
         if (membership.getMemberRole() != GroupMemberRole.LEADER) {
             throw new AccessDeniedException("Only the group leader can manage group members.");
         }
     }
 
     private StudentGroup requireGroup(Long id) {
-        return studentGroupRepository.findById(id)
+        return studentGroupRepository
+                .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Student group was not found."));
     }
 
     private StudentGroup requireGroupForUpdate(Long id) {
-        return studentGroupRepository.findByIdForUpdate(id)
+        return studentGroupRepository
+                .findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Student group was not found."));
     }
 
     private Student requireStudent(Long actorId) {
-        User user = userRepository.findWithRolesById(actorId)
-                .orElseThrow(() -> new ResourceNotFoundException("User account was not found."));
-        if (user.getUserRoles().stream().noneMatch(userRole -> userRole.getRole().getCode() == RoleCode.STUDENT)) {
+        User user =
+                userRepository
+                        .findWithRolesById(actorId)
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException("User account was not found."));
+        if (user.getUserRoles().stream()
+                .noneMatch(userRole -> userRole.getRole().getCode() == RoleCode.STUDENT)) {
             throw new AccessDeniedException("A student account is required for this action.");
         }
-        return studentRepository.findByUserId(actorId)
+        return studentRepository
+                .findByUserId(actorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student profile was not found."));
     }
 
     private void refreshGroupStatus(StudentGroup group) {
-        long activeMembers = groupMemberRepository.findActiveByGroupIdForUpdate(group.getId()).size();
-        group.setStatus(activeMembers >= group.getPeriod().getMinGroupMembers()
-                ? GroupStatus.ACTIVE
-                : GroupStatus.FORMING);
+        long activeMembers =
+                groupMemberRepository.findActiveByGroupIdForUpdate(group.getId()).size();
+        group.setStatus(
+                activeMembers >= group.getPeriod().getMinGroupMembers()
+                        ? GroupStatus.ACTIVE
+                        : GroupStatus.FORMING);
     }
 
     private int nextAvailableSlot(List<GroupMember> activeMembers, int maxGroupMembers) {
         for (int slot = 1; slot <= maxGroupMembers; slot++) {
             int candidate = slot;
-            boolean used = activeMembers.stream().anyMatch(member -> member.getSlotNo() == candidate);
+            boolean used =
+                    activeMembers.stream().anyMatch(member -> member.getSlotNo() == candidate);
             if (!used) {
                 return candidate;
             }
         }
-        throw new BusinessRuleException("The group has reached its configured maximum number of members.");
+        throw new BusinessRuleException(
+                "The group has reached its configured maximum number of members.");
     }
 
     private StudentGroupResponse toResponse(StudentGroup group) {
-        return toResponse(group, groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(group.getId()));
+        return toResponse(
+                group,
+                groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(group.getId()));
     }
 
     private StudentGroupResponse toResponse(StudentGroup group, List<GroupMember> activeMembers) {
-        List<GroupMemberResponse> members = activeMembers.stream()
-                .map(member -> new GroupMemberResponse(
-                        member.getStudent().getId(),
-                        member.getStudent().getUser().getId(),
-                        member.getStudent().getStudentCode(),
-                        member.getStudent().getUser().getFullName(),
-                        member.getStudent().getClassName(),
-                        member.getStudent().getCohort(),
-                        member.getSlotNo(),
-                        member.getMemberRole(),
-                        member.getJoinedAt()))
-                .toList();
+        List<GroupMemberResponse> members =
+                activeMembers.stream()
+                        .map(
+                                member ->
+                                        new GroupMemberResponse(
+                                                member.getStudent().getId(),
+                                                member.getStudent().getUser().getId(),
+                                                member.getStudent().getStudentCode(),
+                                                member.getStudent().getUser().getFullName(),
+                                                member.getStudent().getClassName(),
+                                                member.getStudent().getCohort(),
+                                                member.getSlotNo(),
+                                                member.getMemberRole(),
+                                                member.getJoinedAt()))
+                        .toList();
 
         return new StudentGroupResponse(
                 group.getId(),

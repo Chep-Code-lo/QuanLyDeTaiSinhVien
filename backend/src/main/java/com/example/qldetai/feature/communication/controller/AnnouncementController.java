@@ -8,11 +8,13 @@ import com.example.qldetai.feature.communication.dto.CommunicationDtos.CreateAnn
 import com.example.qldetai.feature.communication.dto.CommunicationDtos.UpdateAnnouncementRequest;
 import com.example.qldetai.feature.communication.service.AnnouncementService;
 import com.example.qldetai.security.UserPrincipal;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import java.net.URI;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,6 +30,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URI;
+
 /** Public feed plus faculty-scoped management APIs for official announcements. */
 @Validated
 @RestController
@@ -36,7 +40,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class AnnouncementController {
 
     private final AnnouncementService announcementService;
-
 
     @GetMapping
     public ApiResponse<PageResponse<AnnouncementResponse>> listPublished(
@@ -47,13 +50,15 @@ public class AnnouncementController {
     }
 
     @GetMapping("/manage")
-    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageFaculty(#facultyId, authentication)")
+    @PreAuthorize(
+            "hasRole('ADMIN') or @academicAuthorization.canManageFaculty(#facultyId, authentication)")
     public ApiResponse<PageResponse<AnnouncementResponse>> listForManagement(
             @RequestParam Long facultyId,
             @RequestParam(required = false) AnnouncementStatus status,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(announcementService.listForManagement(facultyId, status, page, size));
+        return ApiResponse.success(
+                announcementService.listForManagement(facultyId, status, page, size));
     }
 
     @GetMapping("/{id}")
@@ -63,7 +68,8 @@ public class AnnouncementController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageFaculty(#request.facultyId, authentication)")
+    @PreAuthorize(
+            "hasRole('ADMIN') or @academicAuthorization.canManageFaculty(#request.facultyId, authentication)")
     public ResponseEntity<ApiResponse<AnnouncementResponse>> create(
             @Valid @RequestBody CreateAnnouncementRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -76,7 +82,8 @@ public class AnnouncementController {
     @PreAuthorize("hasRole('ADMIN') or @announcementAuthorization.canManage(#id, authentication)")
     public ApiResponse<AnnouncementResponse> update(
             @PathVariable Long id, @Valid @RequestBody UpdateAnnouncementRequest request) {
-        return ApiResponse.success("Đã cập nhật thông báo.", announcementService.update(id, request));
+        return ApiResponse.success(
+                "Đã cập nhật thông báo.", announcementService.update(id, request));
     }
 
     @PatchMapping("/{id}/publish")

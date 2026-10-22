@@ -9,7 +9,11 @@ import type {
 } from '../types/domain'
 
 export const adminApi = {
-  listUsers: async ({ search, page = 0, size = 20 }: { search?: string; page?: number; size?: number } = {}) => {
+  listUsers: async ({
+    search,
+    page = 0,
+    size = 20,
+  }: { search?: string; page?: number; size?: number } = {}) => {
     const response = await apiClient.get<ApiResponse<PageResponse<UserResponse>>>('/admin/users', {
       params: { search, page, size },
     })

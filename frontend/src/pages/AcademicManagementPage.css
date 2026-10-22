@@ -33,13 +33,27 @@
   white-space: normal;
 }
 
-.registration-periods-table__number-column { width: 4%; }
-.registration-periods-table__period-column { width: 16%; }
-.registration-periods-table__schedule-column { width: 26%; }
-.registration-periods-table__milestone-column { width: 18%; }
-.registration-periods-table__rules-column { width: 15%; }
-.registration-periods-table__status-column { width: 10%; }
-.registration-periods-table__action-column { width: 11%; }
+.registration-periods-table__number-column {
+  width: 4%;
+}
+.registration-periods-table__period-column {
+  width: 16%;
+}
+.registration-periods-table__schedule-column {
+  width: 26%;
+}
+.registration-periods-table__milestone-column {
+  width: 18%;
+}
+.registration-periods-table__rules-column {
+  width: 15%;
+}
+.registration-periods-table__status-column {
+  width: 10%;
+}
+.registration-periods-table__action-column {
+  width: 11%;
+}
 
 .academic-management-page .registration-periods-table__period strong,
 .academic-management-page .registration-periods-table__period span,

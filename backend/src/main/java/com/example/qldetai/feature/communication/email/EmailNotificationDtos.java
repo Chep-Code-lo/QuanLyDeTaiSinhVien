@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -12,8 +13,7 @@ import java.util.Set;
 
 public final class EmailNotificationDtos {
 
-    private EmailNotificationDtos() {
-    }
+    private EmailNotificationDtos() {}
 
     public record UpdateNotificationSettingRequest(
             NotificationScopeType scopeType,
@@ -25,8 +25,7 @@ public final class EmailNotificationDtos {
             @NotBlank @Size(max = 500) String subjectTemplate,
             @NotBlank @Size(max = 30000) String bodyTemplate,
             @NotEmpty Set<EmailRecipientGroup> recipientGroups,
-            Integer reminderHours) {
-    }
+            Integer reminderHours) {}
 
     /**
      * Template fields are optional so callers can preview the saved template or
@@ -42,16 +41,14 @@ public final class EmailNotificationDtos {
             @Size(max = 30000) String bodyTemplate,
             EmailNotificationReferenceType referenceType,
             Long eventReferenceId,
-            Map<String, String> sampleData) {
-    }
+            Map<String, String> sampleData) {}
 
     /** Test messages are always sent only to the authenticated user's account. */
     public record SendTestEmailRequest(
             NotificationScopeType scopeType,
             Long scopeId,
             EmailNotificationReferenceType referenceType,
-            Long eventReferenceId) {
-    }
+            Long eventReferenceId) {}
 
     public record EmailNotificationSettingResponse(
             Long id,
@@ -70,8 +67,7 @@ public final class EmailNotificationDtos {
             String updatedByName,
             LocalDateTime updatedAt,
             int version,
-            List<String> allowedVariables) {
-    }
+            List<String> allowedVariables) {}
 
     public record EmailPreviewResponse(
             EmailNotificationEventType eventType,
@@ -81,25 +77,22 @@ public final class EmailNotificationDtos {
             String subject,
             String body,
             List<String> allowedVariables,
-            boolean sampleDataUsed) {
-    }
+            boolean sampleDataUsed) {}
 
-    public record EmailTestQueuedResponse(Long outboxId, String recipientEmail, EmailOutboxStatus status) {
-    }
+    public record EmailTestQueuedResponse(
+            Long outboxId, String recipientEmail, EmailOutboxStatus status) {}
 
-    public record RecipientCandidateResponse(Long userId, String fullName, String email, String category) {
-    }
+    public record RecipientCandidateResponse(
+            Long userId, String fullName, String email, String category) {}
 
-    public record RecipientCandidatesResponse(List<RecipientCandidateResponse> recipients) {
-    }
+    public record RecipientCandidatesResponse(List<RecipientCandidateResponse> recipients) {}
 
     public record DeliveryAttemptResponse(
             Long id,
             int attemptNo,
             EmailOutboxStatus status,
             String errorMessage,
-            LocalDateTime createdAt) {
-    }
+            LocalDateTime createdAt) {}
 
     public record EmailLogResponse(
             Long id,
@@ -117,9 +110,8 @@ public final class EmailNotificationDtos {
             Long relatedTopicId,
             Long relatedGroupId,
             Long relatedAssignmentId,
-            LocalDateTime createdAt) {
-    }
+            LocalDateTime createdAt) {}
 
-    public record EmailLogDetailResponse(EmailLogResponse log, List<DeliveryAttemptResponse> attempts) {
-    }
+    public record EmailLogDetailResponse(
+            EmailLogResponse log, List<DeliveryAttemptResponse> attempts) {}
 }

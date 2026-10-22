@@ -11,6 +11,8 @@ import com.example.qldetai.security.UserPrincipal;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -22,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
@@ -31,7 +32,6 @@ import lombok.RequiredArgsConstructor;
 public class EvaluationResultController {
 
     private final EvaluationResultService service;
-
 
     @GetMapping("/results")
     @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")

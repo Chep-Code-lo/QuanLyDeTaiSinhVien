@@ -4,9 +4,9 @@ import com.example.qldetai.common.api.ApiResponse;
 import com.example.qldetai.feature.progress.dto.ProgressDtos.StoredFileResponse;
 import com.example.qldetai.feature.progress.service.StoredFileService;
 import com.example.qldetai.security.UserPrincipal;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
@@ -23,13 +23,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+
 @RestController
 @RequestMapping("/api/v1/files")
 @RequiredArgsConstructor
 public class StoredFileController {
 
     private final StoredFileService storedFileService;
-
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<StoredFileResponse>> upload(
@@ -60,20 +62,20 @@ public class StoredFileController {
 
     private ResponseEntity<Resource> fileResponse(
             StoredFileService.DownloadedFile file, boolean attachment) {
-        ContentDisposition contentDisposition = attachment
-                ? ContentDisposition.attachment()
-                        .filename(file.originalName(), StandardCharsets.UTF_8)
-                        .build()
-                : ContentDisposition.inline()
-                        .filename(file.originalName(), StandardCharsets.UTF_8)
-                        .build();
-        var response = ResponseEntity.ok()
-                .contentType(contentType(file.mimeType()))
-                .contentLength(file.sizeBytes())
-                .header(
-                        HttpHeaders.CONTENT_DISPOSITION,
-                        contentDisposition.toString())
-                .header("X-Content-Type-Options", "nosniff");
+        ContentDisposition contentDisposition =
+                attachment
+                        ? ContentDisposition.attachment()
+                                .filename(file.originalName(), StandardCharsets.UTF_8)
+                                .build()
+                        : ContentDisposition.inline()
+                                .filename(file.originalName(), StandardCharsets.UTF_8)
+                                .build();
+        var response =
+                ResponseEntity.ok()
+                        .contentType(contentType(file.mimeType()))
+                        .contentLength(file.sizeBytes())
+                        .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
+                        .header("X-Content-Type-Options", "nosniff");
         if (!attachment) response.header("Content-Security-Policy", "sandbox; default-src 'none'");
         return response.body(new FileSystemResource(file.path()));
     }

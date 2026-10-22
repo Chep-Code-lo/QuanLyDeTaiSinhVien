@@ -15,22 +15,19 @@ import com.example.qldetai.feature.academic.dto.AcademicDtos.UpdateRegistrationP
 import com.example.qldetai.feature.academic.repository.FacultyRepository;
 import com.example.qldetai.feature.academic.repository.SemesterRepository;
 import com.example.qldetai.feature.academic.service.RegistrationPeriodService;
+import com.example.qldetai.feature.communication.email.EmailNotificationDtos.UpdateNotificationSettingRequest;
 import com.example.qldetai.feature.communication.email.EmailNotificationEventType;
 import com.example.qldetai.feature.communication.email.EmailNotificationSettingsService;
-import com.example.qldetai.feature.communication.email.EmailNotificationDtos.UpdateNotificationSettingRequest;
 import com.example.qldetai.feature.communication.email.EmailOutboxRepository;
 import com.example.qldetai.feature.communication.email.EmailRecipientGroup;
 import com.example.qldetai.feature.communication.email.NotificationScopeType;
 import com.example.qldetai.feature.identity.domain.Role;
 import com.example.qldetai.feature.identity.domain.RoleCode;
-import com.example.qldetai.feature.identity.repository.RoleRepository;
 import com.example.qldetai.feature.identity.domain.User;
-import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.identity.domain.UserStatus;
-import java.time.Clock;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Set;
+import com.example.qldetai.feature.identity.repository.RoleRepository;
+import com.example.qldetai.feature.identity.repository.UserRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -39,6 +36,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Set;
 
 @SpringBootTest
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
@@ -110,39 +112,47 @@ class RegistrationPeriodServiceTests {
 
     @Test
     void graduationPeriodCannotActivateWithoutRequiredDates() {
-        CreateRegistrationPeriodRequest request = new CreateRegistrationPeriodRequest(
-                faculty.getId(),
-                semester.getId(),
-                "Graduation draft",
-                ProjectType.GRADUATION,
-                LocalDateTime.of(2027, 2, 1, 0, 0),
-                LocalDateTime.of(2027, 2, 10, 0, 0),
-                LocalDateTime.of(2027, 2, 10, 0, 0),
-                LocalDateTime.of(2027, 2, 20, 0, 0),
-                null,
-                null);
+        CreateRegistrationPeriodRequest request =
+                new CreateRegistrationPeriodRequest(
+                        faculty.getId(),
+                        semester.getId(),
+                        "Graduation draft",
+                        ProjectType.GRADUATION,
+                        LocalDateTime.of(2027, 2, 1, 0, 0),
+                        LocalDateTime.of(2027, 2, 10, 0, 0),
+                        LocalDateTime.of(2027, 2, 10, 0, 0),
+                        LocalDateTime.of(2027, 2, 20, 0, 0),
+                        null,
+                        null);
 
-        RegistrationPeriodResponse created = registrationPeriodService.create(request, admin.getId());
+        RegistrationPeriodResponse created =
+                registrationPeriodService.create(request, admin.getId());
 
-        assertThatThrownBy(() -> registrationPeriodService.changeStatus(
-                        created.id(), new ChangePeriodStatusRequest(created.version(), RegistrationPeriodStatus.ACTIVE)))
+        assertThatThrownBy(
+                        () ->
+                                registrationPeriodService.changeStatus(
+                                        created.id(),
+                                        new ChangePeriodStatusRequest(
+                                                created.version(),
+                                                RegistrationPeriodStatus.ACTIVE)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Review deadline");
     }
 
     @Test
     void invalidScheduleIsRejected() {
-        CreateRegistrationPeriodRequest request = new CreateRegistrationPeriodRequest(
-                faculty.getId(),
-                semester.getId(),
-                "Invalid period",
-                ProjectType.COURSE,
-                LocalDateTime.of(2027, 2, 10, 0, 0),
-                LocalDateTime.of(2027, 2, 1, 0, 0),
-                LocalDateTime.of(2027, 2, 12, 0, 0),
-                LocalDateTime.of(2027, 2, 20, 0, 0),
-                null,
-                null);
+        CreateRegistrationPeriodRequest request =
+                new CreateRegistrationPeriodRequest(
+                        faculty.getId(),
+                        semester.getId(),
+                        "Invalid period",
+                        ProjectType.COURSE,
+                        LocalDateTime.of(2027, 2, 10, 0, 0),
+                        LocalDateTime.of(2027, 2, 1, 0, 0),
+                        LocalDateTime.of(2027, 2, 12, 0, 0),
+                        LocalDateTime.of(2027, 2, 20, 0, 0),
+                        null,
+                        null);
 
         assertThatThrownBy(() -> registrationPeriodService.create(request, admin.getId()))
                 .isInstanceOf(BusinessRuleException.class)
@@ -163,7 +173,8 @@ class RegistrationPeriodServiceTests {
             var created = registrationPeriodService.create(request, admin.getId());
             assertThat(created.reviewDeadlineAt()).isEqualTo(deadline);
             assertThat(created.defenseDate()).isEqualTo(LocalDate.of(2027, 5, 1));
-            assertThat(registrationPeriodService.get(created.id()).defenseDate()).isEqualTo(created.defenseDate());
+            assertThat(registrationPeriodService.get(created.id()).defenseDate())
+                    .isEqualTo(created.defenseDate());
         } else {
             assertThatThrownBy(() -> registrationPeriodService.create(request, admin.getId()))
                     .isInstanceOf(BusinessRuleException.class)
@@ -175,22 +186,39 @@ class RegistrationPeriodServiceTests {
     void updatingPeriodWithReviewAfterDefenseIsRejectedWithoutChangingItsDates() {
         var request = graduationPeriod(LocalDateTime.of(2027, 4, 30, 10, 0));
         var created = registrationPeriodService.create(request, admin.getId());
-        var update = new UpdateRegistrationPeriodRequest(created.version(), semester.getId(), created.name(),
-                ProjectType.GRADUATION, request.proposalStartAt(), request.proposalEndAt(),
-                request.registrationStartAt(), request.registrationEndAt(),
-                LocalDateTime.of(2027, 5, 5, 1, 0), request.defenseDate());
+        var update =
+                new UpdateRegistrationPeriodRequest(
+                        created.version(),
+                        semester.getId(),
+                        created.name(),
+                        ProjectType.GRADUATION,
+                        request.proposalStartAt(),
+                        request.proposalEndAt(),
+                        request.registrationStartAt(),
+                        request.registrationEndAt(),
+                        LocalDateTime.of(2027, 5, 5, 1, 0),
+                        request.defenseDate());
         assertThatThrownBy(() -> registrationPeriodService.update(created.id(), update))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Hạn phản biện");
-        assertThat(registrationPeriodService.get(created.id()).reviewDeadlineAt()).isEqualTo(request.reviewDeadlineAt());
-        assertThat(registrationPeriodService.get(created.id()).defenseDate()).isEqualTo(request.defenseDate());
+        assertThat(registrationPeriodService.get(created.id()).reviewDeadlineAt())
+                .isEqualTo(request.reviewDeadlineAt());
+        assertThat(registrationPeriodService.get(created.id()).defenseDate())
+                .isEqualTo(request.defenseDate());
     }
 
     private CreateRegistrationPeriodRequest graduationPeriod(LocalDateTime deadline) {
-        return new CreateRegistrationPeriodRequest(faculty.getId(), semester.getId(), "Graduation dates",
-                ProjectType.GRADUATION, LocalDateTime.of(2027, 2, 1, 0, 0), LocalDateTime.of(2027, 2, 10, 0, 0),
-                LocalDateTime.of(2027, 2, 10, 0, 0), LocalDateTime.of(2027, 2, 20, 0, 0),
-                deadline, LocalDate.of(2027, 5, 1));
+        return new CreateRegistrationPeriodRequest(
+                faculty.getId(),
+                semester.getId(),
+                "Graduation dates",
+                ProjectType.GRADUATION,
+                LocalDateTime.of(2027, 2, 1, 0, 0),
+                LocalDateTime.of(2027, 2, 10, 0, 0),
+                LocalDateTime.of(2027, 2, 10, 0, 0),
+                LocalDateTime.of(2027, 2, 20, 0, 0),
+                deadline,
+                LocalDate.of(2027, 5, 1));
     }
 
     @Test
@@ -200,17 +228,35 @@ class RegistrationPeriodServiceTests {
             assertThatThrownBy(() -> registrationPeriodService.create(request, admin.getId()))
                     .isInstanceOf(BusinessRuleException.class);
         }
-        assertThat(registrationPeriodService.create(committeePeriod(3, 5), admin.getId()).maxCommitteeMembers())
+        assertThat(
+                        registrationPeriodService
+                                .create(committeePeriod(3, 5), admin.getId())
+                                .maxCommitteeMembers())
                 .isEqualTo(5);
-        assertThat(registrationPeriodService.create(committeePeriod(5, 5), admin.getId()).minCommitteeMembers())
+        assertThat(
+                        registrationPeriodService
+                                .create(committeePeriod(5, 5), admin.getId())
+                                .minCommitteeMembers())
                 .isEqualTo(5);
     }
 
     private CreateRegistrationPeriodRequest committeePeriod(int minimum, int maximum) {
-        return new CreateRegistrationPeriodRequest(faculty.getId(), semester.getId(), "Committee limits",
-                ProjectType.COURSE, LocalDateTime.of(2027, 2, 1, 0, 0), LocalDateTime.of(2027, 2, 10, 0, 0),
-                LocalDateTime.of(2027, 2, 10, 0, 0), LocalDateTime.of(2027, 2, 20, 0, 0),
-                null, null, 1, 3, 72, minimum, maximum);
+        return new CreateRegistrationPeriodRequest(
+                faculty.getId(),
+                semester.getId(),
+                "Committee limits",
+                ProjectType.COURSE,
+                LocalDateTime.of(2027, 2, 1, 0, 0),
+                LocalDateTime.of(2027, 2, 10, 0, 0),
+                LocalDateTime.of(2027, 2, 10, 0, 0),
+                LocalDateTime.of(2027, 2, 20, 0, 0),
+                null,
+                null,
+                1,
+                3,
+                72,
+                minimum,
+                maximum);
     }
 
     @Test
@@ -230,58 +276,74 @@ class RegistrationPeriodServiceTests {
                         Set.of(EmailRecipientGroup.ADMINS),
                         null));
 
-        RegistrationPeriodResponse created = registrationPeriodService.create(new CreateRegistrationPeriodRequest(
-                faculty.getId(),
-                semester.getId(),
-                "Course draft",
-                ProjectType.COURSE,
-                LocalDateTime.of(2027, 2, 1, 0, 0),
-                LocalDateTime.of(2027, 2, 10, 0, 0),
-                LocalDateTime.of(2027, 2, 10, 0, 0),
-                LocalDateTime.of(2027, 2, 20, 0, 0),
-                null,
-                null), admin.getId());
+        RegistrationPeriodResponse created =
+                registrationPeriodService.create(
+                        new CreateRegistrationPeriodRequest(
+                                faculty.getId(),
+                                semester.getId(),
+                                "Course draft",
+                                ProjectType.COURSE,
+                                LocalDateTime.of(2027, 2, 1, 0, 0),
+                                LocalDateTime.of(2027, 2, 10, 0, 0),
+                                LocalDateTime.of(2027, 2, 10, 0, 0),
+                                LocalDateTime.of(2027, 2, 20, 0, 0),
+                                null,
+                                null),
+                        admin.getId());
 
-        RegistrationPeriodResponse activated = registrationPeriodService.changeStatus(
-                created.id(),
-                new ChangePeriodStatusRequest(created.version(), RegistrationPeriodStatus.ACTIVE),
-                admin.getId());
+        RegistrationPeriodResponse activated =
+                registrationPeriodService.changeStatus(
+                        created.id(),
+                        new ChangePeriodStatusRequest(
+                                created.version(), RegistrationPeriodStatus.ACTIVE),
+                        admin.getId());
 
         assertThat(activated.status()).isEqualTo(RegistrationPeriodStatus.ACTIVE);
         assertThat(emailOutboxRepository.findAll())
                 .singleElement()
-                .satisfies(outbox -> {
-                    assertThat(outbox.getEventType()).isEqualTo(EmailNotificationEventType.REGISTRATION_OPENED);
-                    assertThat(outbox.getRecipientUser().getId()).isEqualTo(admin.getId());
-                });
+                .satisfies(
+                        outbox -> {
+                            assertThat(outbox.getEventType())
+                                    .isEqualTo(EmailNotificationEventType.REGISTRATION_OPENED);
+                            assertThat(outbox.getRecipientUser().getId()).isEqualTo(admin.getId());
+                        });
     }
 
     @Test
     void closedPeriodCanBeReactivated() {
-        RegistrationPeriodResponse created = registrationPeriodService.create(new CreateRegistrationPeriodRequest(
-                faculty.getId(),
-                semester.getId(),
-                "Course period",
-                ProjectType.COURSE,
-                LocalDateTime.of(2027, 2, 1, 0, 0),
-                LocalDateTime.of(2027, 2, 10, 0, 0),
-                LocalDateTime.of(2027, 2, 10, 0, 0),
-                LocalDateTime.of(2027, 2, 20, 0, 0),
-                null,
-                null), admin.getId());
+        RegistrationPeriodResponse created =
+                registrationPeriodService.create(
+                        new CreateRegistrationPeriodRequest(
+                                faculty.getId(),
+                                semester.getId(),
+                                "Course period",
+                                ProjectType.COURSE,
+                                LocalDateTime.of(2027, 2, 1, 0, 0),
+                                LocalDateTime.of(2027, 2, 10, 0, 0),
+                                LocalDateTime.of(2027, 2, 10, 0, 0),
+                                LocalDateTime.of(2027, 2, 20, 0, 0),
+                                null,
+                                null),
+                        admin.getId());
 
-        RegistrationPeriodResponse active = registrationPeriodService.changeStatus(
-                created.id(),
-                new ChangePeriodStatusRequest(created.version(), RegistrationPeriodStatus.ACTIVE),
-                admin.getId());
-        RegistrationPeriodResponse closed = registrationPeriodService.changeStatus(
-                active.id(),
-                new ChangePeriodStatusRequest(active.version(), RegistrationPeriodStatus.CLOSED),
-                admin.getId());
-        RegistrationPeriodResponse reactivated = registrationPeriodService.changeStatus(
-                closed.id(),
-                new ChangePeriodStatusRequest(closed.version(), RegistrationPeriodStatus.ACTIVE),
-                admin.getId());
+        RegistrationPeriodResponse active =
+                registrationPeriodService.changeStatus(
+                        created.id(),
+                        new ChangePeriodStatusRequest(
+                                created.version(), RegistrationPeriodStatus.ACTIVE),
+                        admin.getId());
+        RegistrationPeriodResponse closed =
+                registrationPeriodService.changeStatus(
+                        active.id(),
+                        new ChangePeriodStatusRequest(
+                                active.version(), RegistrationPeriodStatus.CLOSED),
+                        admin.getId());
+        RegistrationPeriodResponse reactivated =
+                registrationPeriodService.changeStatus(
+                        closed.id(),
+                        new ChangePeriodStatusRequest(
+                                closed.version(), RegistrationPeriodStatus.ACTIVE),
+                        admin.getId());
 
         assertThat(active.status()).isEqualTo(RegistrationPeriodStatus.ACTIVE);
         assertThat(closed.status()).isEqualTo(RegistrationPeriodStatus.CLOSED);

@@ -2,24 +2,34 @@ package com.example.qldetai.feature.evaluation.repository;
 
 import com.example.qldetai.feature.evaluation.domain.ResultStatus;
 import com.example.qldetai.feature.evaluation.domain.ResultVersion;
-import java.util.List;
-import java.util.Optional;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+
 import jakarta.persistence.LockModeType;
-import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.domain.Specification;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+import java.util.Optional;
 
 public interface ResultVersionRepository
         extends JpaRepository<ResultVersion, Long>, JpaSpecificationExecutor<ResultVersion> {
 
     @Override
-    @EntityGraph(attributePaths = {"assignment.period", "assignment.group", "assignment.topic", "finalizedBy", "publishedBy"})
+    @EntityGraph(
+            attributePaths = {
+                "assignment.period",
+                "assignment.group",
+                "assignment.topic",
+                "finalizedBy",
+                "publishedBy"
+            })
     Page<ResultVersion> findAll(Specification<ResultVersion> specification, Pageable pageable);
 
     long countByAssignmentId(Long assignmentId);
@@ -34,7 +44,8 @@ public interface ResultVersionRepository
 
     Optional<ResultVersion> findByAssignmentIdAndStatus(Long assignmentId, ResultStatus status);
 
-    @Query("""
+    @Query(
+            """
             select resultVersion from ResultVersion resultVersion
             join ResultMember member on member.result.id = resultVersion.id
             where member.student.user.id = :userId

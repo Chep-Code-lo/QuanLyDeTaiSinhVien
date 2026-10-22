@@ -13,6 +13,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,7 +30,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
@@ -37,7 +38,6 @@ import lombok.RequiredArgsConstructor;
 public class ProjectAssignmentController {
 
     private final ProjectAssignmentService projectAssignmentService;
-
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('LECTURER')")
@@ -65,8 +65,8 @@ public class ProjectAssignmentController {
     @PostMapping
     @PreAuthorize(
             "hasRole('ADMIN') or"
-                + " @registrationAuthorization.canManageRegistration(#request.registrationId,"
-                + " authentication)")
+                    + " @registrationAuthorization.canManageRegistration(#request.registrationId,"
+                    + " authentication)")
     public ResponseEntity<ApiResponse<ProjectAssignmentResponse>> create(
             @Valid @RequestBody CreateAssignmentRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {

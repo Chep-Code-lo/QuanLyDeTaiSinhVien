@@ -17,11 +17,14 @@ import com.example.qldetai.feature.academic.dto.AcademicDtos.UpdateCatalogReques
 import com.example.qldetai.feature.academic.repository.DepartmentRepository;
 import com.example.qldetai.feature.academic.repository.FacultyRepository;
 import com.example.qldetai.feature.academic.repository.SemesterRepository;
-import java.util.List;
-import java.util.Locale;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -30,7 +33,6 @@ public class AcademicCatalogService {
     private final FacultyRepository facultyRepository;
     private final DepartmentRepository departmentRepository;
     private final SemesterRepository semesterRepository;
-
 
     @Transactional(readOnly = true)
     public List<FacultyResponse> faculties() {
@@ -62,9 +64,10 @@ public class AcademicCatalogService {
 
     @Transactional(readOnly = true)
     public List<DepartmentResponse> departments(Long facultyId) {
-        List<Department> departments = facultyId == null
-                ? departmentRepository.findAllByOrderByNameAsc()
-                : departmentRepository.findByFacultyIdOrderByNameAsc(facultyId);
+        List<Department> departments =
+                facultyId == null
+                        ? departmentRepository.findAllByOrderByNameAsc()
+                        : departmentRepository.findByFacultyIdOrderByNameAsc(facultyId);
         return departments.stream().map(this::toDepartment).toList();
     }
 
@@ -98,7 +101,9 @@ public class AcademicCatalogService {
 
     @Transactional(readOnly = true)
     public List<SemesterResponse> semesters() {
-        return semesterRepository.findAllByOrderByStartsOnDesc().stream().map(this::toSemester).toList();
+        return semesterRepository.findAllByOrderByStartsOnDesc().stream()
+                .map(this::toSemester)
+                .toList();
     }
 
     @Transactional
@@ -108,7 +113,8 @@ public class AcademicCatalogService {
             throw new BusinessRuleException("Semester start date must be before its end date.");
         }
         String academicYear = request.academicYear().trim();
-        if (semesterRepository.existsByAcademicYearIgnoreCaseAndSemesterNo(academicYear, request.semesterNo())) {
+        if (semesterRepository.existsByAcademicYearIgnoreCaseAndSemesterNo(
+                academicYear, request.semesterNo())) {
             throw new ConflictException("This semester already exists for the academic year.");
         }
         Semester semester = new Semester();
@@ -120,17 +126,20 @@ public class AcademicCatalogService {
     }
 
     private Faculty requireFaculty(Long id) {
-        return facultyRepository.findById(id)
+        return facultyRepository
+                .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Faculty was not found."));
     }
 
     private Department requireDepartment(Long id) {
-        return departmentRepository.findById(id)
+        return departmentRepository
+                .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Department was not found."));
     }
 
     private FacultyResponse toFaculty(Faculty faculty) {
-        return new FacultyResponse(faculty.getId(), faculty.getCode(), faculty.getName(), faculty.isActive());
+        return new FacultyResponse(
+                faculty.getId(), faculty.getCode(), faculty.getName(), faculty.isActive());
     }
 
     private DepartmentResponse toDepartment(Department department) {

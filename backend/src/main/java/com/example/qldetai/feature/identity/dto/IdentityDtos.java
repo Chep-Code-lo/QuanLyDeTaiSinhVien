@@ -4,14 +4,16 @@ import com.example.qldetai.feature.identity.domain.PositionCode;
 import com.example.qldetai.feature.identity.domain.RoleCode;
 import com.example.qldetai.feature.identity.domain.UserStatus;
 import com.example.qldetai.feature.identity.validation.PasswordByteLength;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
 import java.time.LocalDateTime;
 import java.util.Set;
 
@@ -22,18 +24,26 @@ public final class IdentityDtos {
     private static final String PASSWORD_REQUIREMENTS =
             "Mật khẩu phải có ít nhất 8 ký tự, chữ in hoa, chữ số và ký tự đặc biệt, tối đa 72 byte UTF-8 (tiếng Việt có dấu/emoji chiếm nhiều byte hơn).";
 
-    private IdentityDtos() {
-    }
+    private IdentityDtos() {}
 
     public record LoginRequest(@NotBlank String username, @NotBlank String password) {
-        @Override public String toString() { return "LoginRequest[credentials=REDACTED]"; }
+        @Override
+        public String toString() {
+            return "LoginRequest[credentials=REDACTED]";
+        }
     }
 
     public record ChangePasswordRequest(
             @NotBlank String currentPassword,
-            @NotBlank @PasswordByteLength @Size(min = 8, max = 100)
-            @Pattern(regexp = PASSWORD_PATTERN, message = PASSWORD_REQUIREMENTS) String newPassword) {
-        @Override public String toString() { return "ChangePasswordRequest[credentials=REDACTED]"; }
+            @NotBlank
+                    @PasswordByteLength
+                    @Size(min = 8, max = 100)
+                    @Pattern(regexp = PASSWORD_PATTERN, message = PASSWORD_REQUIREMENTS)
+                    String newPassword) {
+        @Override
+        public String toString() {
+            return "ChangePasswordRequest[credentials=REDACTED]";
+        }
     }
 
     public record CurrentUserResponse(
@@ -43,36 +53,38 @@ public final class IdentityDtos {
             Set<RoleCode> roles,
             StudentProfileResponse student,
             LecturerProfileResponse lecturer,
-            java.util.List<AppointmentResponse> activeAppointments) {
-    }
+            java.util.List<AppointmentResponse> activeAppointments) {}
 
-    public record LoginResponse(CurrentUserResponse user) {
-    }
+    public record LoginResponse(CurrentUserResponse user) {}
 
     public record StudentProfileInput(
             @NotNull Long departmentId,
             @NotBlank @Size(max = 20) String studentCode,
             @NotBlank @Size(max = 50) String className,
-            @NotBlank @Size(max = 20) String cohort) {
-    }
+            @NotBlank @Size(max = 20) String cohort) {}
 
     public record LecturerProfileInput(
             @NotNull Long departmentId,
             @NotBlank @Size(max = 20) String lecturerCode,
             @Size(max = 50) String academicDegree,
-            String specialization) {
-    }
+            String specialization) {}
 
     public record CreateUserRequest(
             @NotBlank @Email @Size(max = 254) String email,
-            @NotBlank @PasswordByteLength @Size(min = 8, max = 100)
-            @Pattern(regexp = PASSWORD_PATTERN, message = PASSWORD_REQUIREMENTS) String password,
+            @NotBlank
+                    @PasswordByteLength
+                    @Size(min = 8, max = 100)
+                    @Pattern(regexp = PASSWORD_PATTERN, message = PASSWORD_REQUIREMENTS)
+                    String password,
             @NotBlank @Size(max = 150) String fullName,
             @Size(max = 20) String phone,
             @NotEmpty Set<RoleCode> roles,
             @Valid StudentProfileInput student,
             @Valid LecturerProfileInput lecturer) {
-        @Override public String toString() { return "CreateUserRequest[credentials=REDACTED]"; }
+        @Override
+        public String toString() {
+            return "CreateUserRequest[credentials=REDACTED]";
+        }
     }
 
     public record UpdateUserRequest(
@@ -81,14 +93,11 @@ public final class IdentityDtos {
             @NotBlank @Size(max = 150) String fullName,
             @Size(max = 20) String phone,
             @Valid StudentProfileInput student,
-            @Valid LecturerProfileInput lecturer) {
-    }
+            @Valid LecturerProfileInput lecturer) {}
 
-    public record UpdateUserStatusRequest(@NotNull UserStatus status) {
-    }
+    public record UpdateUserStatusRequest(@NotNull UserStatus status) {}
 
-    public record UpdateUserRolesRequest(@NotEmpty Set<RoleCode> roles) {
-    }
+    public record UpdateUserRolesRequest(@NotEmpty Set<RoleCode> roles) {}
 
     public record UserResponse(
             Long id,
@@ -102,16 +111,17 @@ public final class IdentityDtos {
             LocalDateTime lastLoginAt,
             String lastLoginIp,
             LocalDateTime createdAt,
-            int version) {
-    }
+            int version) {}
 
     public record StudentProfileResponse(
-            Long id, String studentCode, String className, String cohort, Long departmentId) {
-    }
+            Long id, String studentCode, String className, String cohort, Long departmentId) {}
 
     public record LecturerProfileResponse(
-            Long id, String lecturerCode, String academicDegree, String specialization, Long departmentId) {
-    }
+            Long id,
+            String lecturerCode,
+            String academicDegree,
+            String specialization,
+            Long departmentId) {}
 
     public record LecturerDirectoryResponse(
             Long id,
@@ -123,8 +133,7 @@ public final class IdentityDtos {
             Long facultyId,
             String facultyName,
             Long departmentId,
-            String departmentName) {
-    }
+            String departmentName) {}
 
     public record CreateAppointmentRequest(
             @NotNull Long lecturerId,
@@ -132,11 +141,9 @@ public final class IdentityDtos {
             Long departmentId,
             @NotNull PositionCode positionCode,
             @NotNull LocalDateTime startsAt,
-            LocalDateTime endsAt) {
-    }
+            LocalDateTime endsAt) {}
 
-    public record EndAppointmentRequest(@NotNull LocalDateTime endsAt) {
-    }
+    public record EndAppointmentRequest(@NotNull LocalDateTime endsAt) {}
 
     public record AppointmentResponse(
             Long id,
@@ -147,6 +154,5 @@ public final class IdentityDtos {
             Long departmentId,
             PositionCode positionCode,
             LocalDateTime startsAt,
-            LocalDateTime endsAt) {
-    }
+            LocalDateTime endsAt) {}
 }

@@ -14,6 +14,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,7 +30,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
@@ -58,13 +59,13 @@ public class EvaluationCommitteeController {
         return ApiResponse.success(configurationService.save(id, request, principal.id()));
     }
 
-
     @GetMapping("/evaluation-committees")
     @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
     public ApiResponse<PageResponse<EvaluationCommitteeResponse>> committees(
             @RequestParam(required = false) Long periodId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size, @AuthenticationPrincipal UserPrincipal principal) {
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(service.listCommittees(periodId, page, size, principal.id()));
     }
 

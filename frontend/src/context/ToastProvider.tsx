@@ -23,7 +23,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   )
 
   const showSuccess = useCallback((msg: string) => addToast('success', msg), [addToast])
-  const showError = useCallback((msg: string) => addToast('error', vietnameseErrorMessage(msg)), [addToast])
+  const showError = useCallback(
+    (msg: string) => addToast('error', vietnameseErrorMessage(msg)),
+    [addToast],
+  )
   const showInfo = useCallback((msg: string) => addToast('info', msg), [addToast])
 
   return (

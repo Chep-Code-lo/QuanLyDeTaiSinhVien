@@ -1,12 +1,14 @@
 package com.example.qldetai.feature.topic.repository;
 
 import com.example.qldetai.feature.topic.domain.TopicReview;
+
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.Collection;
-import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TopicReviewRepository extends JpaRepository<TopicReview, Long> {
 
@@ -16,7 +18,8 @@ public interface TopicReviewRepository extends JpaRepository<TopicReview, Long> 
     Optional<TopicReview> findFirstByTopicIdOrderByReviewedAtDesc(Long topicId);
 
     @EntityGraph(attributePaths = "reviewedBy")
-    @Query("""
+    @Query(
+            """
             select review from TopicReview review
             where review.topic.id in :topicIds and not exists (
                 select newer.id from TopicReview newer where newer.topic = review.topic

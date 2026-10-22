@@ -1,7 +1,7 @@
 package com.example.qldetai.feature.identity.service;
 
-import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ConflictException;
 import com.example.qldetai.exception.ResourceNotFoundException;
@@ -25,6 +25,8 @@ import com.example.qldetai.feature.identity.repository.RoleRepository;
 import com.example.qldetai.feature.identity.repository.StudentRepository;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -37,7 +39,6 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
-import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -51,7 +52,6 @@ public class UserAdminService {
     private final PasswordEncoder passwordEncoder;
     private final UserProfileService userProfileService;
     private final Clock clock;
-
 
     @Transactional(readOnly = true)
     public PageResponse<UserResponse> list(String search, int page, int size) {
@@ -99,7 +99,8 @@ public class UserAdminService {
     public UserResponse update(Long id, UpdateUserRequest request) {
         User user = requireUser(id);
         if (user.getVersion() != request.version()) {
-            throw new ConflictException("The account information was updated by another user. Refresh and try again.");
+            throw new ConflictException(
+                    "The account information was updated by another user. Refresh and try again.");
         }
 
         String email = request.email().trim().toLowerCase(Locale.ROOT);
@@ -182,14 +183,19 @@ public class UserAdminService {
     }
 
     private void lockAdministratorChanges() {
-        roleRepository.findByCodeForUpdate(RoleCode.ADMIN).orElseThrow(() ->
-                new ResourceNotFoundException("Administrator role was not found."));
+        roleRepository
+                .findByCodeForUpdate(RoleCode.ADMIN)
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Administrator role was not found."));
     }
 
     private void requireAdministratorRemains(User user) {
-        if (user.getStatus() == UserStatus.ACTIVE && hasRole(user, RoleCode.ADMIN)
-                && userRepository.findActiveAdministratorsForUpdate(PageRequest.of(0, 2)).size() <= 1) {
-            throw new BusinessRuleException("At least one active administrator account is required.");
+        if (user.getStatus() == UserStatus.ACTIVE
+                && hasRole(user, RoleCode.ADMIN)
+                && userRepository.findActiveAdministratorsForUpdate(PageRequest.of(0, 2)).size()
+                        <= 1) {
+            throw new BusinessRuleException(
+                    "At least one active administrator account is required.");
         }
     }
 
@@ -232,7 +238,8 @@ public class UserAdminService {
 
     private void updateLecturer(Lecturer lecturer, LecturerProfileInput input) {
         String lecturerCode = input.lecturerCode().trim().toUpperCase(Locale.ROOT);
-        if (lecturerRepository.existsByLecturerCodeIgnoreCaseAndIdNot(lecturerCode, lecturer.getId())) {
+        if (lecturerRepository.existsByLecturerCodeIgnoreCaseAndIdNot(
+                lecturerCode, lecturer.getId())) {
             throw new ConflictException("Lecturer code is already in use.");
         }
         lecturer.setDepartment(requireDepartment(input.departmentId()));
@@ -253,12 +260,15 @@ public class UserAdminService {
         }
     }
 
-    private void validateProfileUpdate(Student student, Lecturer lecturer, UpdateUserRequest request) {
+    private void validateProfileUpdate(
+            Student student, Lecturer lecturer, UpdateUserRequest request) {
         if ((student != null) != (request.student() != null)) {
-            throw new BusinessRuleException("The student profile cannot be added or removed while editing the account.");
+            throw new BusinessRuleException(
+                    "The student profile cannot be added or removed while editing the account.");
         }
         if ((lecturer != null) != (request.lecturer() != null)) {
-            throw new BusinessRuleException("The lecturer profile cannot be added or removed while editing the account.");
+            throw new BusinessRuleException(
+                    "The lecturer profile cannot be added or removed while editing the account.");
         }
     }
 

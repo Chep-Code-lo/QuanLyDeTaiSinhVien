@@ -16,13 +16,23 @@ export const rubricTotal = (criteria: AssessmentCriterion[]): number =>
   Math.round(criteria.reduce((sum, criterion) => sum + criterionScore(criterion), 0) * 10) / 10
 
 export function validRubric(criteria: AssessmentCriterion[]): boolean {
-  return criteria.length > 0 && rubricTotal(criteria) === 100 && criteria.every((criterion) =>
-    criterion.name.trim().length > 0 && criterion.name.length <= 220 &&
-    (criterion.children.length ? criterion.children : [criterion]).every((leaf) =>
-      leaf.name.trim().length > 0 && leaf.name.length <= 220 && Number.isFinite(leaf.score) &&
-      leaf.score >= 0.1 && leaf.score <= 100 &&
-      Math.abs(leaf.score * 10 - Math.round(leaf.score * 10)) < 0.000001,
-    ),
+  return (
+    criteria.length > 0 &&
+    rubricTotal(criteria) === 100 &&
+    criteria.every(
+      (criterion) =>
+        criterion.name.trim().length > 0 &&
+        criterion.name.length <= 220 &&
+        (criterion.children.length ? criterion.children : [criterion]).every(
+          (leaf) =>
+            leaf.name.trim().length > 0 &&
+            leaf.name.length <= 220 &&
+            Number.isFinite(leaf.score) &&
+            leaf.score >= 0.1 &&
+            leaf.score <= 100 &&
+            Math.abs(leaf.score * 10 - Math.round(leaf.score * 10)) < 0.000001,
+        ),
+    )
   )
 }
 
@@ -31,7 +41,8 @@ export function defaultAssessmentCriteria(): AssessmentCriterion[] {
   return [
     leaf('Tính thực tiễn và hiểu biết vấn đề', 10),
     {
-      name: 'Phương pháp, thiết kế và hoàn thiện sản phẩm', score: 0,
+      name: 'Phương pháp, thiết kế và hoàn thiện sản phẩm',
+      score: 0,
       children: [
         leaf('Phân tích nghiệp vụ, đặc tả yêu cầu và thiết kế', 10),
         leaf('Hoàn thiện sản phẩm và khối lượng công việc', 10),

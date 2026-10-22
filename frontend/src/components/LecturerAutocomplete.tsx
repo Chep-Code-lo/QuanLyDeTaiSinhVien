@@ -2,7 +2,8 @@ import React, { useEffect, useId, useRef, useState } from 'react'
 import { lecturerApi } from '../api/lecturers'
 import type { LecturerDirectoryResponse } from '../types/domain'
 
-type LecturerOption = Pick<LecturerDirectoryResponse, 'id' | 'fullName' | 'lecturerCode'> & Partial<LecturerDirectoryResponse>
+type LecturerOption = Pick<LecturerDirectoryResponse, 'id' | 'fullName' | 'lecturerCode'> &
+  Partial<LecturerDirectoryResponse>
 
 interface LecturerAutocompleteProps {
   inputId?: string
@@ -36,12 +37,23 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
   departmentId,
 }) => {
   const [query, setQuery] = useState('')
-  const [searchResult, setSearchResult] = useState<{ key: string; items: LecturerDirectoryResponse[] } | null>(null)
+  const [searchResult, setSearchResult] = useState<{
+    key: string
+    items: LecturerDirectoryResponse[]
+  } | null>(null)
   const [resolvedLecturer, setResolvedLecturer] = useState<LecturerOption | null>(null)
   const [searchVersion, setSearchVersion] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
-  const selectedLecturer = value === undefined ? resolvedLecturer : !value ? null
-    : selectedOption?.id === value ? selectedOption : resolvedLecturer?.id === value ? resolvedLecturer : null
+  const selectedLecturer =
+    value === undefined
+      ? resolvedLecturer
+      : !value
+        ? null
+        : selectedOption?.id === value
+          ? selectedOption
+          : resolvedLecturer?.id === value
+            ? resolvedLecturer
+            : null
   const searchKey = JSON.stringify([query, facultyId, departmentId, searchVersion])
   const results = searchResult?.key === searchKey ? searchResult.items : []
   const loading = isOpen && searchResult?.key !== searchKey
@@ -62,7 +74,8 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
     let active = true
     if (value && selectedOption?.id === value) return
     if (value && (!selectedLecturer || selectedLecturer.id !== value)) {
-      lecturerApi.list({ lecturerId: value, facultyId, departmentId, page: 0, size: 1 })
+      lecturerApi
+        .list({ lecturerId: value, facultyId, departmentId, page: 0, size: 1 })
         .then((res) => {
           const found = res.content.find((l) => l.id === value)
           if (active && found) {
@@ -71,7 +84,9 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
         })
         .catch(() => {})
     }
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [value, selectedLecturer, selectedOption, facultyId, departmentId])
 
   // Search with debounce
@@ -89,7 +104,10 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
         })
     }, 300)
 
-    return () => { active = false; clearTimeout(timer) }
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
   }, [query, isOpen, facultyId, departmentId, searchKey])
 
   const handleSelect = (lecturer: LecturerDirectoryResponse) => {
@@ -107,7 +125,13 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
   }
 
   return (
-    <div className="autocomplete-container" ref={containerRef} onKeyDown={event => { if (event.key === 'Escape') setIsOpen(false) }}>
+    <div
+      className="autocomplete-container"
+      ref={containerRef}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') setIsOpen(false)
+      }}
+    >
       {label && (
         <label className="form-label" htmlFor={fieldId}>
           {label} {required && <span className="text-red">*</span>}
@@ -145,7 +169,10 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
               setQuery(e.target.value)
               setIsOpen(true)
             }}
-            onFocus={() => { setIsOpen(true); setSearchVersion(version => version + 1) }}
+            onFocus={() => {
+              setIsOpen(true)
+              setSearchVersion((version) => version + 1)
+            }}
           />
           {loading && <div className="autocomplete-spinner" />}
 
@@ -154,28 +181,31 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
               {loading && (
                 <div className="dropdown-item text-secondary py-2 px-3">Đang tìm kiếm...</div>
               )}
-              {!loading && results.filter((lecturer) => !excludedIds.includes(lecturer.id)).length === 0 && (
-                <div className="dropdown-item text-secondary py-2 px-3">
-                  Không tìm thấy giảng viên
-                </div>
-              )}
               {!loading &&
-                results.filter((lecturer) => !excludedIds.includes(lecturer.id)).map((lecturer) => (
-                  <button
-                    key={lecturer.id}
-                    type="button"
-                    className="dropdown-item cursor-pointer py-2 px-3 hover:bg-light"
-                    onClick={() => handleSelect(lecturer)}
-                  >
-                    <div className="font-semibold text-primary">
-                      {lecturer.fullName} ({lecturer.lecturerCode})
-                    </div>
-                    <div className="text-sm text-secondary">
-                      {lecturer.academicDegree ? `${lecturer.academicDegree} - ` : ''}
-                      {lecturer.departmentName}
-                    </div>
-                  </button>
-                ))}
+                results.filter((lecturer) => !excludedIds.includes(lecturer.id)).length === 0 && (
+                  <div className="dropdown-item text-secondary py-2 px-3">
+                    Không tìm thấy giảng viên
+                  </div>
+                )}
+              {!loading &&
+                results
+                  .filter((lecturer) => !excludedIds.includes(lecturer.id))
+                  .map((lecturer) => (
+                    <button
+                      key={lecturer.id}
+                      type="button"
+                      className="dropdown-item cursor-pointer py-2 px-3 hover:bg-light"
+                      onClick={() => handleSelect(lecturer)}
+                    >
+                      <div className="font-semibold text-primary">
+                        {lecturer.fullName} ({lecturer.lecturerCode})
+                      </div>
+                      <div className="text-sm text-secondary">
+                        {lecturer.academicDegree ? `${lecturer.academicDegree} - ` : ''}
+                        {lecturer.departmentName}
+                      </div>
+                    </button>
+                  ))}
             </div>
           )}
         </div>

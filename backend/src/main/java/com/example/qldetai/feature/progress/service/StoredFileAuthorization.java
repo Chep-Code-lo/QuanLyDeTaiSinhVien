@@ -11,6 +11,7 @@ import com.example.qldetai.feature.project.domain.ProjectAssignment;
 import com.example.qldetai.feature.project.service.ProjectAuthorization;
 import com.example.qldetai.feature.topic.repository.TopicSupervisorRepository;
 import com.example.qldetai.security.UserPrincipal;
+
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,14 +65,17 @@ public class StoredFileAuthorization {
                                     .anyMatch(
                                             announcement ->
                                                     announcementAuthorization.canView(
-                                                            announcement.getId(), authentication))) {
+                                                            announcement.getId(),
+                                                            authentication))) {
                                 return true;
                             }
                             return reportSubmissionRepository.findByFileId(fileId).stream()
                                     .anyMatch(
                                             submission ->
                                                     canViewAssignment(
-                                                            submission.getMilestone().getAssignment(),
+                                                            submission
+                                                                    .getMilestone()
+                                                                    .getAssignment(),
                                                             principal,
                                                             authentication));
                         })
@@ -89,9 +93,8 @@ public class StoredFileAuthorization {
                 .findByUserId(principal.id())
                 .map(
                         student ->
-                                groupMemberRepository
-                                        .existsByGroupIdAndStudentIdAndLeftAtIsNull(
-                                                assignment.getGroup().getId(), student.getId()))
+                                groupMemberRepository.existsByGroupIdAndStudentIdAndLeftAtIsNull(
+                                        assignment.getGroup().getId(), student.getId()))
                 .orElse(false);
     }
 

@@ -8,6 +8,8 @@ import com.example.qldetai.security.UserPrincipal;
 
 import jakarta.validation.Valid;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,7 +17,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -24,11 +25,10 @@ public class ProgressController {
     private final ProgressService service;
     private final MilestoneReminderService milestoneReminderService;
 
-
     @PostMapping("/milestones")
     @PreAuthorize(
             "hasRole('ADMIN') or @projectAuthorization.canManageAssignment(#request.assignmentId,"
-                + " authentication)")
+                    + " authentication)")
     public ResponseEntity<ApiResponse<MilestoneResponse>> create(
             @Valid @RequestBody CreateMilestoneRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -38,7 +38,8 @@ public class ProgressController {
     }
 
     @PutMapping("/milestones/{id}")
-    @PreAuthorize("hasRole('ADMIN') or @progressAuthorization.canManageMilestone(#id, authentication)")
+    @PreAuthorize(
+            "hasRole('ADMIN') or @progressAuthorization.canManageMilestone(#id, authentication)")
     public ApiResponse<MilestoneResponse> update(
             @PathVariable Long id, @Valid @RequestBody UpdateMilestoneRequest request) {
         return ApiResponse.success("Đã cập nhật mốc tiến độ.", service.update(id, request));
@@ -54,8 +55,7 @@ public class ProgressController {
     @PreAuthorize(
             "hasRole('ADMIN') or @projectAuthorization.canManageAssignment(#assignmentId, authentication)")
     public ApiResponse<MilestoneReminderResponse> sendReminder(@PathVariable Long assignmentId) {
-        return ApiResponse.success(
-                "Đã gửi nhắc hạn.", milestoneReminderService.send(assignmentId));
+        return ApiResponse.success("Đã gửi nhắc hạn.", milestoneReminderService.send(assignmentId));
     }
 
     @PostMapping("/milestones/{id}/submissions")

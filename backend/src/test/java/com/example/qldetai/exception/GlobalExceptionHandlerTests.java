@@ -20,8 +20,10 @@ class GlobalExceptionHandlerTests {
 
     @BeforeEach
     void setup() {
-        mvc = MockMvcBuilders.standaloneSetup(new ProbeController())
-                .setControllerAdvice(new GlobalExceptionHandler()).build();
+        mvc =
+                MockMvcBuilders.standaloneSetup(new ProbeController())
+                        .setControllerAdvice(new GlobalExceptionHandler())
+                        .build();
     }
 
     @Test
@@ -37,33 +39,50 @@ class GlobalExceptionHandlerTests {
         mvc.perform(get("/probe/optimistic"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("The data was changed by another request. Reload and try again."))
+                .andExpect(
+                        jsonPath("$.message")
+                                .value(
+                                        "The data was changed by another request. Reload and try again."))
                 .andExpect(jsonPath("$.stackTrace").doesNotExist());
     }
 
     @Test
     void databaseLockConflictReturns409() throws Exception {
-        mvc.perform(get("/probe/lock")).andExpect(status().isConflict())
+        mvc.perform(get("/probe/lock"))
+                .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test
     void malformedAndMissingParametersReturn400WithEnvelope() throws Exception {
         mvc.perform(get("/probe/parameter").param("id", "abc"))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
         mvc.perform(get("/probe/parameter"))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     @RestController
     static class ProbeController {
         @GetMapping("/probe/upload-size")
-        void uploadSize() { throw new MaxUploadSizeExceededException(20 * 1024 * 1024); }
+        void uploadSize() {
+            throw new MaxUploadSizeExceededException(20 * 1024 * 1024);
+        }
+
         @GetMapping("/probe/optimistic")
-        void optimistic() { throw new OptimisticLockingFailureException("internal entity and SQL diagnostic"); }
+        void optimistic() {
+            throw new OptimisticLockingFailureException("internal entity and SQL diagnostic");
+        }
+
         @GetMapping("/probe/lock")
-        void lock() { throw new CannotAcquireLockException("internal database lock diagnostic"); }
+        void lock() {
+            throw new CannotAcquireLockException("internal database lock diagnostic");
+        }
+
         @GetMapping("/probe/parameter")
-        Long parameter(@RequestParam Long id) { return id; }
+        Long parameter(@RequestParam Long id) {
+            return id;
+        }
     }
 }

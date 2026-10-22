@@ -9,10 +9,11 @@ import com.example.qldetai.feature.academic.dto.AcademicDtos.FacultyResponse;
 import com.example.qldetai.feature.academic.dto.AcademicDtos.SemesterResponse;
 import com.example.qldetai.feature.academic.dto.AcademicDtos.UpdateCatalogRequest;
 import com.example.qldetai.feature.academic.service.AcademicCatalogService;
+
 import jakarta.validation.Valid;
-import java.net.URI;
-import java.util.List;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,13 +25,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URI;
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
 public class AcademicController {
 
     private final AcademicCatalogService academicCatalogService;
-
 
     @GetMapping("/faculties")
     public ApiResponse<List<FacultyResponse>> faculties() {
@@ -50,16 +53,19 @@ public class AcademicController {
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<FacultyResponse> updateFaculty(
             @PathVariable Long id, @Valid @RequestBody UpdateCatalogRequest request) {
-        return ApiResponse.success("Đã cập nhật khoa.", academicCatalogService.updateFaculty(id, request));
+        return ApiResponse.success(
+                "Đã cập nhật khoa.", academicCatalogService.updateFaculty(id, request));
     }
 
     @GetMapping("/departments")
-    public ApiResponse<List<DepartmentResponse>> departments(@RequestParam(required = false) Long facultyId) {
+    public ApiResponse<List<DepartmentResponse>> departments(
+            @RequestParam(required = false) Long facultyId) {
         return ApiResponse.success(academicCatalogService.departments(facultyId));
     }
 
     @PostMapping("/departments")
-    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageFaculty(#request.facultyId, authentication)")
+    @PreAuthorize(
+            "hasRole('ADMIN') or @academicAuthorization.canManageFaculty(#request.facultyId, authentication)")
     public ResponseEntity<ApiResponse<DepartmentResponse>> createDepartment(
             @Valid @RequestBody CreateDepartmentRequest request) {
         DepartmentResponse created = academicCatalogService.createDepartment(request);
@@ -68,10 +74,12 @@ public class AcademicController {
     }
 
     @PatchMapping("/departments/{id}")
-    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageDepartment(#id, authentication)")
+    @PreAuthorize(
+            "hasRole('ADMIN') or @academicAuthorization.canManageDepartment(#id, authentication)")
     public ApiResponse<DepartmentResponse> updateDepartment(
             @PathVariable Long id, @Valid @RequestBody UpdateCatalogRequest request) {
-        return ApiResponse.success("Đã cập nhật bộ môn.", academicCatalogService.updateDepartment(id, request));
+        return ApiResponse.success(
+                "Đã cập nhật bộ môn.", academicCatalogService.updateDepartment(id, request));
     }
 
     @GetMapping("/semesters")

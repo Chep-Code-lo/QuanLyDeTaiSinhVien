@@ -59,19 +59,28 @@ export function RegistrationsPage() {
   const [totalReviewPages, setTotalReviewPages] = useState(0)
   const [loadError, setLoadError] = useState('')
   const [reloadVersion, setReloadVersion] = useState(0)
-  const [loading, setLoading] = useRequestLoading(JSON.stringify([student, user?.id, reviewPage, reloadVersion]))
+  const [loading, setLoading] = useRequestLoading(
+    JSON.stringify([student, user?.id, reviewPage, reloadVersion]),
+  )
   const [submitting, setSubmitting] = useState(false)
   const [currentTime, setCurrentTime] = useState(Date.now)
   const selectedGroup = groups.find((group) => group.id === Number(groupId))
   const selectedPeriod = periods.find((period) => period.id === selectedGroup?.periodId)
-  const availableTopics = topics.filter((topic) => topic.periodId === selectedGroup?.periodId && topic.availableForRegistration && (!topic.reservedGroupId || topic.reservedGroupId === selectedGroup?.id))
+  const availableTopics = topics.filter(
+    (topic) =>
+      topic.periodId === selectedGroup?.periodId &&
+      topic.availableForRegistration &&
+      (!topic.reservedGroupId || topic.reservedGroupId === selectedGroup?.id),
+  )
   const canWithdraw = (item: TopicRegistrationResponse) =>
     student &&
     item.status === 'PENDING' &&
     groups.some(
       (group) =>
         group.id === item.groupId &&
-        group.members.some((member) => member.userId === user?.id && member.memberRole === 'LEADER'),
+        group.members.some(
+          (member) => member.userId === user?.id && member.memberRole === 'LEADER',
+        ),
     )
   const registrationError = (now: number) => {
     if (!selectedGroup) return 'Chọn nhóm của bạn để xem đề tài cùng đợt đăng ký.'
@@ -95,33 +104,50 @@ export function RegistrationsPage() {
     return ''
   }
   const blockedReason = registrationError(currentTime)
-  const load = useCallback((isCurrent: () => boolean = () => true) => Promise.all([
-      student ? allPages(page => registrationApi.mine({ page, size: 100 })).then(content => ({ content, totalPages: 0 }))
-        : registrationApi.list({ page: reviewPage, size: 10 }),
-      student ? groupApi.mine() : Promise.resolve([]),
-      student ? allPages(page => academicApi.getRegistrationPeriods(undefined, page, 100)) : Promise.resolve([]),
-      student ? allPages(page => topicApi.list({ status: 'PUBLISHED', page, size: 100 })) : Promise.resolve([]),
-    ]).then(([xs, mine, periodPage, topicRows]) => {
-      if (!isCurrent()) return
-      setItems(xs.content)
-      setTotalReviewPages(xs.totalPages)
-      setLoadError('')
-      if (student) {
-        setGroups(mine)
-        setPeriods(periodPage)
-      }
-      setTopics(topicRows)
-    }).catch(error => {
-      if (!isCurrent()) return
-      setLoadError('Không tải được hồ sơ đăng ký. Vui lòng thử lại.')
-      showError(messageOf(error))
-    }).finally(() => {
-      if (isCurrent()) setLoading(false)
-    }), [student, reviewPage, showError, setLoading])
+  const load = useCallback(
+    (isCurrent: () => boolean = () => true) =>
+      Promise.all([
+        student
+          ? allPages((page) => registrationApi.mine({ page, size: 100 })).then((content) => ({
+              content,
+              totalPages: 0,
+            }))
+          : registrationApi.list({ page: reviewPage, size: 10 }),
+        student ? groupApi.mine() : Promise.resolve([]),
+        student
+          ? allPages((page) => academicApi.getRegistrationPeriods(undefined, page, 100))
+          : Promise.resolve([]),
+        student
+          ? allPages((page) => topicApi.list({ status: 'PUBLISHED', page, size: 100 }))
+          : Promise.resolve([]),
+      ])
+        .then(([xs, mine, periodPage, topicRows]) => {
+          if (!isCurrent()) return
+          setItems(xs.content)
+          setTotalReviewPages(xs.totalPages)
+          setLoadError('')
+          if (student) {
+            setGroups(mine)
+            setPeriods(periodPage)
+          }
+          setTopics(topicRows)
+        })
+        .catch((error) => {
+          if (!isCurrent()) return
+          setLoadError('Không tải được hồ sơ đăng ký. Vui lòng thử lại.')
+          showError(messageOf(error))
+        })
+        .finally(() => {
+          if (isCurrent()) setLoading(false)
+        }),
+    [student, reviewPage, showError, setLoading],
+  )
   useEffect(() => {
     let current = true
     void load(() => current)
-    return () => { current = false }
+    return () => {
+      current = false
+    }
   }, [load, reloadVersion])
   useEffect(() => {
     if (!student) return
@@ -184,9 +210,7 @@ export function RegistrationsPage() {
   }
   return (
     <>
-      <PageHeader
-        title="Đăng ký đề tài"
-      />
+      <PageHeader title="Đăng ký đề tài" />
       {canCreateTopic && (
         <RegistrationTopicForm onCreated={(topic) => setTopics((current) => [topic, ...current])} />
       )}
@@ -258,7 +282,18 @@ export function RegistrationsPage() {
       )}
       <section className="page-card">
         <h2 className="section-title">Danh sách hồ sơ</h2>
-        {loadError && !loading && <div role="alert"><p>{loadError}</p><button type="button" className="btn btn-secondary" onClick={() => setReloadVersion(value => value + 1)}>Thử lại</button></div>}
+        {loadError && !loading && (
+          <div role="alert">
+            <p>{loadError}</p>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setReloadVersion((value) => value + 1)}
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
         {loading ? (
           <div className="content-state">
             <span className="spinner" />
@@ -278,7 +313,16 @@ export function RegistrationsPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.length === 0 && <tr><td colSpan={6}><div className="content-state"><strong>Chưa có hồ sơ đăng ký</strong><p>Hồ sơ sẽ xuất hiện tại đây khi nhóm gửi đăng ký đề tài.</p></div></td></tr>}
+                {items.length === 0 && (
+                  <tr>
+                    <td colSpan={6}>
+                      <div className="content-state">
+                        <strong>Chưa có hồ sơ đăng ký</strong>
+                        <p>Hồ sơ sẽ xuất hiện tại đây khi nhóm gửi đăng ký đề tài.</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
                 {items.map((item) => (
                   <tr key={item.id}>
                     <td>
@@ -323,12 +367,31 @@ export function RegistrationsPage() {
             </table>
           </div>
         )}
-        {!student && totalReviewPages > 1 && <nav className="table-pagination" aria-label="Phân trang hồ sơ đăng ký">
-          <span>Trang {reviewPage + 1} / {totalReviewPages}</span><div>
-            <button type="button" className="btn btn-secondary btn-sm" disabled={loading || reviewPage === 0} onClick={() => setReviewPage(value => value - 1)}>Trang trước</button>
-            <button type="button" className="btn btn-secondary btn-sm" disabled={loading || reviewPage + 1 >= totalReviewPages} onClick={() => setReviewPage(value => value + 1)}>Trang sau</button>
-          </div>
-        </nav>}
+        {!student && totalReviewPages > 1 && (
+          <nav className="table-pagination" aria-label="Phân trang hồ sơ đăng ký">
+            <span>
+              Trang {reviewPage + 1} / {totalReviewPages}
+            </span>
+            <div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={loading || reviewPage === 0}
+                onClick={() => setReviewPage((value) => value - 1)}
+              >
+                Trang trước
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={loading || reviewPage + 1 >= totalReviewPages}
+                onClick={() => setReviewPage((value) => value + 1)}
+              >
+                Trang sau
+              </button>
+            </div>
+          </nav>
+        )}
       </section>
     </>
   )

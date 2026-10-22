@@ -5,23 +5,26 @@ import com.example.qldetai.exception.ResourceNotFoundException;
 import com.example.qldetai.feature.communication.email.EmailNotificationDtos.DeliveryAttemptResponse;
 import com.example.qldetai.feature.communication.email.EmailNotificationDtos.EmailLogDetailResponse;
 import com.example.qldetai.feature.communication.email.EmailNotificationDtos.EmailLogResponse;
-import com.example.qldetai.feature.identity.repository.AcademicAppointmentRepository;
-import com.example.qldetai.feature.identity.repository.LecturerRepository;
 import com.example.qldetai.feature.identity.domain.RoleCode;
 import com.example.qldetai.feature.identity.domain.User;
-import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.identity.domain.UserStatus;
+import com.example.qldetai.feature.identity.repository.AcademicAppointmentRepository;
+import com.example.qldetai.feature.identity.repository.LecturerRepository;
+import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.topic.repository.TopicSupervisorRepository;
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.util.List;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -35,7 +38,6 @@ public class EmailLogService {
     private final TopicSupervisorRepository topicSupervisorRepository;
     private final Clock clock;
 
-
     @Transactional(readOnly = true)
     public PageResponse<EmailLogResponse> list(Long actorId, int page, int size) {
         User actor = requireAuthorizedActor(actorId);
@@ -44,14 +46,16 @@ public class EmailLogService {
         if (hasRole(actor, RoleCode.ADMIN)) {
             results = outboxRepository.findAll(pageable);
         } else {
-            List<Long> facultyIds = academicAppointmentRepository.findActiveDeanFacultyIds(
-                    actorId, LocalDateTime.now(clock));
+            List<Long> facultyIds =
+                    academicAppointmentRepository.findActiveDeanFacultyIds(
+                            actorId, LocalDateTime.now(clock));
             if (!facultyIds.isEmpty()) {
                 results = outboxRepository.findAccessibleToDean(facultyIds, actorId, pageable);
             } else if (lecturerRepository.findByUserId(actorId).isPresent()) {
                 results = outboxRepository.findAccessibleToLecturer(actorId, pageable);
             } else {
-                throw new AccessDeniedException("A lecturer, dean, or administrator account is required.");
+                throw new AccessDeniedException(
+                        "A lecturer, dean, or administrator account is required.");
             }
         }
         return PageResponse.from(results.map(this::toResponse));
@@ -60,15 +64,25 @@ public class EmailLogService {
     @Transactional(readOnly = true)
     public EmailLogDetailResponse get(Long actorId, Long outboxId) {
         User actor = requireAuthorizedActor(actorId);
-        EmailOutbox outbox = outboxRepository.findById(outboxId)
-                .orElseThrow(() -> new ResourceNotFoundException("Email log was not found."));
+        EmailOutbox outbox =
+                outboxRepository
+                        .findById(outboxId)
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException("Email log was not found."));
         if (!canAccess(actor, outbox)) {
             throw new AccessDeniedException("You do not have permission to view this email log.");
         }
-        List<DeliveryAttemptResponse> attempts = deliveryLogRepository.findByOutboxIdOrderByCreatedAtAsc(outboxId).stream()
-                .map(log -> new DeliveryAttemptResponse(
-                        log.getId(), log.getAttemptNo(), log.getStatus(), log.getErrorMessage(), log.getCreatedAt()))
-                .toList();
+        List<DeliveryAttemptResponse> attempts =
+                deliveryLogRepository.findByOutboxIdOrderByCreatedAtAsc(outboxId).stream()
+                        .map(
+                                log ->
+                                        new DeliveryAttemptResponse(
+                                                log.getId(),
+                                                log.getAttemptNo(),
+                                                log.getStatus(),
+                                                log.getErrorMessage(),
+                                                log.getCreatedAt()))
+                        .toList();
         return new EmailLogDetailResponse(toResponse(outbox), attempts);
     }
 
@@ -76,9 +90,12 @@ public class EmailLogService {
         if (hasRole(actor, RoleCode.ADMIN)) {
             return true;
         }
-        List<Long> facultyIds = academicAppointmentRepository.findActiveDeanFacultyIds(
-                actor.getId(), LocalDateTime.now(clock));
-        if (!facultyIds.isEmpty() && outbox.getFacultyId() != null && facultyIds.contains(outbox.getFacultyId())) {
+        List<Long> facultyIds =
+                academicAppointmentRepository.findActiveDeanFacultyIds(
+                        actor.getId(), LocalDateTime.now(clock));
+        if (!facultyIds.isEmpty()
+                && outbox.getFacultyId() != null
+                && facultyIds.contains(outbox.getFacultyId())) {
             return true;
         }
         if (!facultyIds.isEmpty()
@@ -94,12 +111,16 @@ public class EmailLogService {
             return true;
         }
         return outbox.getRelatedTopicId() != null
-                && topicSupervisorRepository.existsByTopicIdAndLecturerUserId(outbox.getRelatedTopicId(), actor.getId());
+                && topicSupervisorRepository.existsByTopicIdAndLecturerUserId(
+                        outbox.getRelatedTopicId(), actor.getId());
     }
 
     private User requireAuthorizedActor(Long actorId) {
-        User actor = userRepository.findWithRolesById(actorId)
-                .orElseThrow(() -> new ResourceNotFoundException("User account was not found."));
+        User actor =
+                userRepository
+                        .findWithRolesById(actorId)
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException("User account was not found."));
         if (actor.getStatus() != UserStatus.ACTIVE) {
             throw new AccessDeniedException("An active user account is required.");
         }
@@ -107,7 +128,8 @@ public class EmailLogService {
     }
 
     private boolean hasRole(User user, RoleCode role) {
-        return user.getUserRoles().stream().anyMatch(userRole -> userRole.getRole().getCode() == role);
+        return user.getUserRoles().stream()
+                .anyMatch(userRole -> userRole.getRole().getCode() == role);
     }
 
     private EmailLogResponse toResponse(EmailOutbox outbox) {

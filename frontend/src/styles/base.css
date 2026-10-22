@@ -1,21 +1,60 @@
 :root {
   color: #263238;
   background: #f5f7fb;
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  font-family:
+    'Segoe UI',
+    -apple-system,
+    BlinkMacSystemFont,
+    Arial,
+    sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-* { box-sizing: border-box; }
-html { min-width: 320px; min-height: 100%; }
-body { min-width: 320px; min-height: 100vh; margin: 0; font-size: 14px; line-height: 1.55; }
-button, input, select, textarea, optgroup { font: inherit; }
-button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
-textarea { resize: vertical; }
-[hidden] { display: none !important; }
-button { cursor: pointer; }
-button:disabled { cursor: not-allowed; }
-a { color: inherit; }
-#root { min-height: 100vh; }
+* {
+  box-sizing: border-box;
+}
+html {
+  min-width: 320px;
+  min-height: 100%;
+}
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+button,
+input,
+select,
+textarea,
+optgroup {
+  font: inherit;
+}
+button,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+textarea {
+  resize: vertical;
+}
+[hidden] {
+  display: none !important;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+a {
+  color: inherit;
+}
+#root {
+  min-height: 100vh;
+}

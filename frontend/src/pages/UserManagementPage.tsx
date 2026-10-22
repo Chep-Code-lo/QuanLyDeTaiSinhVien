@@ -96,7 +96,7 @@ export function UserManagementPage() {
   }
 
   const handleUpdated = (updated: UserResponse) => {
-    setUsers((items) => items.map((item) => item.id === updated.id ? updated : item))
+    setUsers((items) => items.map((item) => (item.id === updated.id ? updated : item)))
     setUserToEdit(null)
     if (updated.id === currentUser?.id) {
       void refreshUser()
@@ -138,7 +138,9 @@ export function UserManagementPage() {
         </div>
 
         <form className="user-management__search" onSubmit={submitSearch}>
-          <label className="sr-only" htmlFor="user-management-search">Tìm tài khoản</label>
+          <label className="sr-only" htmlFor="user-management-search">
+            Tìm tài khoản
+          </label>
           <div className="user-management__search-input">
             <Search size={18} aria-hidden="true" />
             <input
@@ -148,7 +150,9 @@ export function UserManagementPage() {
               placeholder="Tìm theo họ tên hoặc email"
             />
           </div>
-          <button type="submit" className="btn btn-secondary">Tìm kiếm</button>
+          <button type="submit" className="btn btn-secondary">
+            Tìm kiếm
+          </button>
         </form>
 
         {loading ? (
@@ -160,14 +164,22 @@ export function UserManagementPage() {
           <div className="content-state" role="alert">
             <strong>Không thể tải dữ liệu</strong>
             <p>{loadError}</p>
-            <button type="button" className="btn btn-secondary" onClick={() => setReload((value) => value + 1)}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setReload((value) => value + 1)}
+            >
               Thử lại
             </button>
           </div>
         ) : users.length === 0 ? (
           <div className="content-state">
             <strong>Chưa có tài khoản phù hợp</strong>
-            <p>{search ? 'Hãy thử từ khóa tìm kiếm khác.' : 'Tạo tài khoản đầu tiên để bắt đầu quản lý người dùng.'}</p>
+            <p>
+              {search
+                ? 'Hãy thử từ khóa tìm kiếm khác.'
+                : 'Tạo tài khoản đầu tiên để bắt đầu quản lý người dùng.'}
+            </p>
           </div>
         ) : (
           <div className="table-container">
@@ -198,24 +210,26 @@ export function UserManagementPage() {
                       <td>{accessDate(user.lastLoginAt)}</td>
                       <td>{user.lastLoginIp || '—'}</td>
                       <td>
-                         <div className="user-management__actions">
-                           <button
-                             type="button"
-                             className="btn btn-secondary btn-sm"
-                             onClick={() => setUserToEdit(user)}
-                           >
-                             <PencilLine size={15} aria-hidden="true" /> Chỉnh sửa
-                           </button>
-                           <button
-                             type="button"
-                             className="btn btn-danger btn-sm user-management__delete"
-                             onClick={() => setUserToDelete(user)}
-                             disabled={isCurrentUser}
-                             title={isCurrentUser ? 'Không thể xóa tài khoản đang đăng nhập' : undefined}
-                           >
-                             <Trash2 size={15} aria-hidden="true" /> Xóa
-                           </button>
-                         </div>
+                        <div className="user-management__actions">
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setUserToEdit(user)}
+                          >
+                            <PencilLine size={15} aria-hidden="true" /> Chỉnh sửa
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm user-management__delete"
+                            onClick={() => setUserToDelete(user)}
+                            disabled={isCurrentUser}
+                            title={
+                              isCurrentUser ? 'Không thể xóa tài khoản đang đăng nhập' : undefined
+                            }
+                          >
+                            <Trash2 size={15} aria-hidden="true" /> Xóa
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -227,12 +241,24 @@ export function UserManagementPage() {
 
         {totalPages > 1 && (
           <div className="user-management__pagination">
-            <span>Trang {page + 1} / {totalPages}</span>
+            <span>
+              Trang {page + 1} / {totalPages}
+            </span>
             <div>
-              <button type="button" className="btn btn-secondary btn-sm" disabled={page === 0 || loading} onClick={() => setPage((currentPage) => currentPage - 1)}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={page === 0 || loading}
+                onClick={() => setPage((currentPage) => currentPage - 1)}
+              >
                 Trang trước
               </button>
-              <button type="button" className="btn btn-secondary btn-sm" disabled={page >= totalPages - 1 || loading} onClick={() => setPage((currentPage) => currentPage + 1)}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={page >= totalPages - 1 || loading}
+                onClick={() => setPage((currentPage) => currentPage + 1)}
+              >
                 Trang sau
               </button>
             </div>
@@ -243,7 +269,11 @@ export function UserManagementPage() {
       <ConfirmModal
         isOpen={userToDelete !== null}
         title="Xóa tài khoản"
-        message={userToDelete ? `Xóa tài khoản ${userToDelete.fullName} (${userToDelete.email})? Tài khoản sẽ không thể đăng nhập, nhưng dữ liệu học vụ đã tạo vẫn được lưu lại.` : ''}
+        message={
+          userToDelete
+            ? `Xóa tài khoản ${userToDelete.fullName} (${userToDelete.email})? Tài khoản sẽ không thể đăng nhập, nhưng dữ liệu học vụ đã tạo vẫn được lưu lại.`
+            : ''
+        }
         confirmText="Xóa tài khoản"
         variant="danger"
         loading={deleting}
@@ -263,13 +293,24 @@ export function UserManagementPage() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="modal-header">
-              <h3 id="edit-account-dialog-title" className="modal-title">Chỉnh sửa tài khoản</h3>
-              <button type="button" className="btn-close" onClick={() => setUserToEdit(null)} aria-label="Đóng hộp thoại">
+              <h3 id="edit-account-dialog-title" className="modal-title">
+                Chỉnh sửa tài khoản
+              </h3>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setUserToEdit(null)}
+                aria-label="Đóng hộp thoại"
+              >
                 <X size={22} aria-hidden="true" />
               </button>
             </div>
             <div className="modal-body">
-              <EditAccountForm user={userToEdit} onCancel={() => setUserToEdit(null)} onUpdated={handleUpdated} />
+              <EditAccountForm
+                user={userToEdit}
+                onCancel={() => setUserToEdit(null)}
+                onUpdated={handleUpdated}
+              />
             </div>
           </div>
         </div>
@@ -285,8 +326,15 @@ export function UserManagementPage() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="modal-header">
-              <h3 id="create-account-dialog-title" className="modal-title">Tạo tài khoản mới</h3>
-              <button type="button" className="btn-close" onClick={() => setCreateOpen(false)} aria-label="Đóng hộp thoại">
+              <h3 id="create-account-dialog-title" className="modal-title">
+                Tạo tài khoản mới
+              </h3>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setCreateOpen(false)}
+                aria-label="Đóng hộp thoại"
+              >
                 <X size={22} aria-hidden="true" />
               </button>
             </div>

@@ -1,12 +1,15 @@
 package com.example.qldetai.feature.communication.email;
 
 import com.example.qldetai.feature.groupregistration.repository.GroupMemberRepository;
+import com.example.qldetai.feature.identity.domain.User;
+import com.example.qldetai.feature.identity.domain.UserStatus;
 import com.example.qldetai.feature.identity.repository.LecturerRepository;
 import com.example.qldetai.feature.identity.repository.StudentRepository;
-import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.UserRepository;
-import com.example.qldetai.feature.identity.domain.UserStatus;
 import com.example.qldetai.feature.topic.repository.TopicSupervisorRepository;
+
+import org.springframework.stereotype.Component;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -14,7 +17,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.stereotype.Component;
 
 /** Resolves predefined recipient groups from real application relations only. */
 @Component
@@ -39,7 +41,8 @@ public class EmailRecipientResolver {
         this.topicSupervisorRepository = topicSupervisorRepository;
     }
 
-    public List<ResolvedRecipient> resolve(Set<EmailRecipientGroup> groups, EmailEventContext context) {
+    public List<ResolvedRecipient> resolve(
+            Set<EmailRecipientGroup> groups, EmailEventContext context) {
         // MySQL's email unique key is case-sensitive in this schema. SMTP addresses
         // are not, so deduplicate on a canonical email address rather than user id.
         Map<String, ResolvedRecipient> recipients = new LinkedHashMap<>();
@@ -48,45 +51,76 @@ public class EmailRecipientResolver {
                 case DIRECT_PARTICIPANTS -> {
                     List<Long> directIds = nonNullIds(context.directRecipientUserIds());
                     if (!directIds.isEmpty()) {
-                        addAll(recipients, userRepository.findActiveByIdIn(directIds), group.name());
+                        addAll(
+                                recipients,
+                                userRepository.findActiveByIdIn(directIds),
+                                group.name());
                     }
                 }
                 case FACULTY_STUDENTS -> {
                     if (context.facultyId() != null) {
-                        addAll(recipients, studentRepository.findActiveByFacultyId(context.facultyId())
-                                .stream().map(student -> student.getUser()).toList(), group.name());
+                        addAll(
+                                recipients,
+                                studentRepository
+                                        .findActiveByFacultyId(context.facultyId())
+                                        .stream()
+                                        .map(student -> student.getUser())
+                                        .toList(),
+                                group.name());
                     }
                 }
                 case FACULTY_LECTURERS -> {
                     if (context.facultyId() != null) {
-                        addAll(recipients, lecturerRepository.findActiveByFacultyId(context.facultyId())
-                                .stream().map(lecturer -> lecturer.getUser()).toList(), group.name());
+                        addAll(
+                                recipients,
+                                lecturerRepository
+                                        .findActiveByFacultyId(context.facultyId())
+                                        .stream()
+                                        .map(lecturer -> lecturer.getUser())
+                                        .toList(),
+                                group.name());
                     }
                 }
                 case GROUP_STUDENTS, TOPIC_STUDENTS -> {
                     if (context.groupId() != null) {
-                        addAll(recipients, groupMemberRepository
-                                .findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(context.groupId())
-                                .stream().map(member -> member.getStudent().getUser()).toList(), group.name());
+                        addAll(
+                                recipients,
+                                groupMemberRepository
+                                        .findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(
+                                                context.groupId())
+                                        .stream()
+                                        .map(member -> member.getStudent().getUser())
+                                        .toList(),
+                                group.name());
                     }
                 }
                 case SUPERVISORS -> {
                     if (context.topicId() != null) {
-                        addAll(recipients, topicSupervisorRepository.findByTopicIdOrderBySlotNoAsc(context.topicId())
-                                .stream().map(supervisor -> supervisor.getLecturer().getUser()).toList(), group.name());
+                        addAll(
+                                recipients,
+                                topicSupervisorRepository
+                                        .findByTopicIdOrderBySlotNoAsc(context.topicId())
+                                        .stream()
+                                        .map(supervisor -> supervisor.getLecturer().getUser())
+                                        .toList(),
+                                group.name());
                     }
                 }
-                case ADMINS -> addAll(recipients, userRepository.findActiveAdministrators(), group.name());
+                case ADMINS ->
+                        addAll(recipients, userRepository.findActiveAdministrators(), group.name());
             }
         }
         return new ArrayList<>(recipients.values());
     }
 
     private List<Long> nonNullIds(List<Long> values) {
-        return values == null ? List.of() : values.stream().filter(id -> id != null).distinct().toList();
+        return values == null
+                ? List.of()
+                : values.stream().filter(id -> id != null).distinct().toList();
     }
 
-    private void addAll(Map<String, ResolvedRecipient> target, Collection<User> users, String category) {
+    private void addAll(
+            Map<String, ResolvedRecipient> target, Collection<User> users, String category) {
         for (User user : users) {
             if (user.getId() == null
                     || user.getStatus() != UserStatus.ACTIVE
@@ -94,10 +128,11 @@ public class EmailRecipientResolver {
                     || user.getEmail().isBlank()) {
                 continue;
             }
-            target.putIfAbsent(user.getEmail().trim().toLowerCase(Locale.ROOT), new ResolvedRecipient(user, category));
+            target.putIfAbsent(
+                    user.getEmail().trim().toLowerCase(Locale.ROOT),
+                    new ResolvedRecipient(user, category));
         }
     }
 
-    public record ResolvedRecipient(User user, String category) {
-    }
+    public record ResolvedRecipient(User user, String category) {}
 }

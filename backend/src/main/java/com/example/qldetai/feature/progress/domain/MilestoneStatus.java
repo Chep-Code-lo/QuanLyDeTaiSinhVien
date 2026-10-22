@@ -1,3 +1,8 @@
 package com.example.qldetai.feature.progress.domain;
 
-public enum MilestoneStatus { OPEN, SUBMITTED, ACCEPTED, REVISION_REQUIRED }
+public enum MilestoneStatus {
+    OPEN,
+    SUBMITTED,
+    ACCEPTED,
+    REVISION_REQUIRED
+}

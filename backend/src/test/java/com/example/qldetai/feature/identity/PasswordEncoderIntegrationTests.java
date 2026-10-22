@@ -18,25 +18,29 @@ class PasswordEncoderIntegrationTests {
 
     @Test
     void newPasswordsUseBcryptWithoutTruncatingTheSuffixWithinItsByteLimit() {
-        for (String password : new String[] { "A1!" + "a".repeat(69), "ĐồÁn2026!" }) {
+        for (String password : new String[] {"A1!" + "a".repeat(69), "ĐồÁn2026!"}) {
             String encoded = encoder.encode(password);
             assertThat(encoded).startsWith("{bcrypt}$2a$12$").hasSizeLessThanOrEqualTo(255);
             assertThat(encoder.matches(password, encoded)).isTrue();
-            assertThat(encoder.matches(password.substring(0, password.length() - 1) + "b", encoded)).isFalse();
+            assertThat(encoder.matches(password.substring(0, password.length() - 1) + "b", encoded))
+                    .isFalse();
         }
     }
 
     @Test
     void bcryptByteLimitRemainsExplicitAndDoesNotSilentlyTruncate() {
-        for (String password : new String[] { "A1!" + "a".repeat(97), "Đ1!" + "ề".repeat(60) }) {
-            assertThatThrownBy(() -> encoder.encode(password)).isInstanceOf(IllegalArgumentException.class);
+        for (String password : new String[] {"A1!" + "a".repeat(97), "Đ1!" + "ề".repeat(60)}) {
+            assertThatThrownBy(() -> encoder.encode(password))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
     }
 
     @Test
     void previouslyStoredPbkdf2HashesRemainReadable() {
         String password = "A1!" + "a".repeat(97);
-        String hash = "{pbkdf2}" + Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8().encode(password);
+        String hash =
+                "{pbkdf2}"
+                        + Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8().encode(password);
         assertThat(encoder.matches(password, hash)).isTrue();
         assertThat(encoder.matches(password + "wrong", hash)).isFalse();
     }

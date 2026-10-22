@@ -4,16 +4,17 @@ import com.example.qldetai.feature.topic.domain.ProposalSource;
 import com.example.qldetai.feature.topic.domain.TopicReviewDecision;
 import com.example.qldetai.feature.topic.domain.TopicStatus;
 import com.example.qldetai.feature.topic.domain.VisibilityType;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
 public final class TopicDtos {
 
-    private TopicDtos() {
-    }
+    private TopicDtos() {}
 
     public record CreateTopicRequest(
             @NotNull Long periodId,
@@ -24,8 +25,7 @@ public final class TopicDtos {
             @NotBlank String expectedOutcomes,
             String prerequisites,
             @NotNull VisibilityType visibilityType,
-            Long reservedGroupId) {
-    }
+            Long reservedGroupId) {}
 
     public record CreateRegistrationTopicRequest(
             @NotNull Long periodId,
@@ -37,8 +37,7 @@ public final class TopicDtos {
             @NotBlank String expectedOutcomes,
             String prerequisites,
             @NotNull Long primaryLecturerId,
-            Long secondaryLecturerId) {
-    }
+            Long secondaryLecturerId) {}
 
     public record UpdateTopicRequest(
             @NotNull Integer version,
@@ -48,35 +47,22 @@ public final class TopicDtos {
             @NotBlank String expectedOutcomes,
             String prerequisites,
             @NotNull VisibilityType visibilityType,
-            Long reservedGroupId) {
-    }
+            Long reservedGroupId) {}
 
     public record AssignSupervisorsRequest(
-            @NotNull Integer version,
-            @NotNull Long primaryLecturerId,
-            Long secondaryLecturerId) {
-    }
+            @NotNull Integer version, @NotNull Long primaryLecturerId, Long secondaryLecturerId) {}
 
     public record ReviewTopicRequest(
             @NotNull Integer version,
             @NotNull TopicReviewDecision decision,
-            @NotBlank String comment) {
-    }
+            @NotBlank String comment) {}
 
-    public record PublishTopicRequest(@NotNull Integer version) {
-    }
+    public record PublishTopicRequest(@NotNull Integer version) {}
 
-    public record WithdrawTopicRequest(
-            @NotNull Integer version,
-            @NotBlank String reason) {
-    }
+    public record WithdrawTopicRequest(@NotNull Integer version, @NotBlank String reason) {}
 
     public record TopicSupervisorResponse(
-            Long lecturerId,
-            String lecturerCode,
-            String lecturerName,
-            int slotNo) {
-    }
+            Long lecturerId, String lecturerCode, String lecturerName, int slotNo) {}
 
     public record TopicReviewResponse(
             Long id,
@@ -84,8 +70,7 @@ public final class TopicDtos {
             String comment,
             Long reviewedBy,
             String reviewerName,
-            LocalDateTime reviewedAt) {
-    }
+            LocalDateTime reviewedAt) {}
 
     public record TopicResponse(
             Long id,
@@ -114,6 +99,5 @@ public final class TopicDtos {
             LocalDateTime updatedAt,
             int version,
             List<TopicSupervisorResponse> supervisors,
-            TopicReviewResponse latestReview) {
-    }
+            TopicReviewResponse latestReview) {}
 }

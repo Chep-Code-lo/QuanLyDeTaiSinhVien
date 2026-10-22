@@ -1,7 +1,8 @@
 package com.example.qldetai.feature.academic.service;
 
-import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
+import com.example.qldetai.common.audit.BusinessAudit;
+import com.example.qldetai.common.time.VietnamTime;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ConflictException;
 import com.example.qldetai.exception.ResourceNotFoundException;
@@ -20,18 +21,20 @@ import com.example.qldetai.feature.academic.repository.SemesterRepository;
 import com.example.qldetai.feature.communication.email.EmailNotificationEventService;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.UserRepository;
-import com.example.qldetai.common.time.VietnamTime;
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.util.EnumSet;
-import java.util.Map;
-import java.util.Set;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.EnumSet;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -43,15 +46,16 @@ public class RegistrationPeriodService {
     private static final int DEFAULT_MIN_COMMITTEE_MEMBERS = 3;
     private static final int DEFAULT_MAX_COMMITTEE_MEMBERS = 5;
 
-    private static final Map<RegistrationPeriodStatus, Set<RegistrationPeriodStatus>> TRANSITIONS = Map.of(
-            RegistrationPeriodStatus.DRAFT,
-            EnumSet.of(RegistrationPeriodStatus.ACTIVE, RegistrationPeriodStatus.CANCELLED),
-            RegistrationPeriodStatus.ACTIVE,
-            EnumSet.of(RegistrationPeriodStatus.CLOSED, RegistrationPeriodStatus.CANCELLED),
-            RegistrationPeriodStatus.CLOSED,
-            EnumSet.of(RegistrationPeriodStatus.ACTIVE),
-            RegistrationPeriodStatus.CANCELLED,
-            EnumSet.noneOf(RegistrationPeriodStatus.class));
+    private static final Map<RegistrationPeriodStatus, Set<RegistrationPeriodStatus>> TRANSITIONS =
+            Map.of(
+                    RegistrationPeriodStatus.DRAFT,
+                    EnumSet.of(RegistrationPeriodStatus.ACTIVE, RegistrationPeriodStatus.CANCELLED),
+                    RegistrationPeriodStatus.ACTIVE,
+                    EnumSet.of(RegistrationPeriodStatus.CLOSED, RegistrationPeriodStatus.CANCELLED),
+                    RegistrationPeriodStatus.CLOSED,
+                    EnumSet.of(RegistrationPeriodStatus.ACTIVE),
+                    RegistrationPeriodStatus.CANCELLED,
+                    EnumSet.noneOf(RegistrationPeriodStatus.class));
 
     private final RegistrationPeriodRepository registrationPeriodRepository;
     private final FacultyRepository facultyRepository;
@@ -60,13 +64,14 @@ public class RegistrationPeriodService {
     private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
 
-
     @Transactional(readOnly = true)
     public PageResponse<RegistrationPeriodResponse> list(Long facultyId, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<RegistrationPeriodResponse> periods = (facultyId == null
-                ? registrationPeriodRepository.findAll(pageable)
-                : registrationPeriodRepository.findByFacultyId(facultyId, pageable)).map(this::toResponse);
+        Page<RegistrationPeriodResponse> periods =
+                (facultyId == null
+                                ? registrationPeriodRepository.findAll(pageable)
+                                : registrationPeriodRepository.findByFacultyId(facultyId, pageable))
+                        .map(this::toResponse);
         return PageResponse.from(periods);
     }
 
@@ -77,11 +82,17 @@ public class RegistrationPeriodService {
 
     @Transactional
     @BusinessAudit(action = "REGISTRATION_PERIOD_CREATE", entityType = "REGISTRATION_PERIOD")
-    public RegistrationPeriodResponse create(CreateRegistrationPeriodRequest request, Long creatorId) {
+    public RegistrationPeriodResponse create(
+            CreateRegistrationPeriodRequest request, Long creatorId) {
         Faculty faculty = requireFaculty(request.facultyId());
         Semester semester = requireSemester(request.semesterId());
-        User creator = userRepository.findById(creatorId)
-                .orElseThrow(() -> new ResourceNotFoundException("Creating user was not found."));
+        User creator =
+                userRepository
+                        .findById(creatorId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Creating user was not found."));
         validateSchedule(
                 request.projectType(),
                 request.proposalStartAt(),
@@ -97,15 +108,27 @@ public class RegistrationPeriodService {
         RegistrationPeriod period = new RegistrationPeriod();
         period.setFaculty(faculty);
         period.setSemester(semester);
-        apply(period, request.name(), request.projectType(), request.proposalStartAt(), request.proposalEndAt(),
-                request.registrationStartAt(), request.registrationEndAt(), request.reviewDeadlineAt(), request.defenseDate(), rules);
+        apply(
+                period,
+                request.name(),
+                request.projectType(),
+                request.proposalStartAt(),
+                request.proposalEndAt(),
+                request.registrationStartAt(),
+                request.registrationEndAt(),
+                request.reviewDeadlineAt(),
+                request.defenseDate(),
+                rules);
         period.setStatus(RegistrationPeriodStatus.DRAFT);
         period.setCreatedBy(creator);
         return toResponse(registrationPeriodRepository.save(period));
     }
 
     @Transactional
-    @BusinessAudit(action = "REGISTRATION_PERIOD_UPDATE", entityType = "REGISTRATION_PERIOD", entityIdArgument = 0)
+    @BusinessAudit(
+            action = "REGISTRATION_PERIOD_UPDATE",
+            entityType = "REGISTRATION_PERIOD",
+            entityIdArgument = 0)
     public RegistrationPeriodResponse update(Long id, UpdateRegistrationPeriodRequest request) {
         RegistrationPeriod period = requirePeriod(id);
         verifyVersion(period, request.version());
@@ -125,25 +148,45 @@ public class RegistrationPeriodService {
         PeriodRules rules = rulesForUpdate(period, request);
         validateRules(rules);
         period.setSemester(semester);
-        apply(period, request.name(), request.projectType(), request.proposalStartAt(), request.proposalEndAt(),
-                request.registrationStartAt(), request.registrationEndAt(), request.reviewDeadlineAt(), request.defenseDate(), rules);
+        apply(
+                period,
+                request.name(),
+                request.projectType(),
+                request.proposalStartAt(),
+                request.proposalEndAt(),
+                request.registrationStartAt(),
+                request.registrationEndAt(),
+                request.reviewDeadlineAt(),
+                request.defenseDate(),
+                rules);
         return toResponse(period);
     }
 
     @Transactional
-    @BusinessAudit(action = "REGISTRATION_PERIOD_STATUS_CHANGE", entityType = "REGISTRATION_PERIOD", entityIdArgument = 0)
+    @BusinessAudit(
+            action = "REGISTRATION_PERIOD_STATUS_CHANGE",
+            entityType = "REGISTRATION_PERIOD",
+            entityIdArgument = 0)
     public RegistrationPeriodResponse changeStatus(Long id, ChangePeriodStatusRequest request) {
         return changeStatus(id, request, null);
     }
 
     @Transactional
-    @BusinessAudit(action = "REGISTRATION_PERIOD_STATUS_CHANGE", entityType = "REGISTRATION_PERIOD", entityIdArgument = 0)
-    public RegistrationPeriodResponse changeStatus(Long id, ChangePeriodStatusRequest request, Long actorId) {
+    @BusinessAudit(
+            action = "REGISTRATION_PERIOD_STATUS_CHANGE",
+            entityType = "REGISTRATION_PERIOD",
+            entityIdArgument = 0)
+    public RegistrationPeriodResponse changeStatus(
+            Long id, ChangePeriodStatusRequest request, Long actorId) {
         RegistrationPeriod period = requirePeriod(id);
         verifyVersion(period, request.version());
         if (!TRANSITIONS.get(period.getStatus()).contains(request.status())) {
             throw new BusinessRuleException(
-                    "Registration period cannot change from " + period.getStatus() + " to " + request.status() + ".");
+                    "Registration period cannot change from "
+                            + period.getStatus()
+                            + " to "
+                            + request.status()
+                            + ".");
         }
         validateSchedule(
                 period.getProjectType(),
@@ -157,11 +200,17 @@ public class RegistrationPeriodService {
         validateRules(rulesFor(period));
         RegistrationPeriodStatus previousStatus = period.getStatus();
         period.setStatus(request.status());
-        if (previousStatus == RegistrationPeriodStatus.DRAFT && request.status() == RegistrationPeriodStatus.ACTIVE) {
-            User actor = actorId == null
-                    ? period.getCreatedBy()
-                    : userRepository.findById(actorId)
-                            .orElseThrow(() -> new ResourceNotFoundException("Activating user was not found."));
+        if (previousStatus == RegistrationPeriodStatus.DRAFT
+                && request.status() == RegistrationPeriodStatus.ACTIVE) {
+            User actor =
+                    actorId == null
+                            ? period.getCreatedBy()
+                            : userRepository
+                                    .findById(actorId)
+                                    .orElseThrow(
+                                            () ->
+                                                    new ResourceNotFoundException(
+                                                            "Activating user was not found."));
             emailNotificationEventService.registrationOpened(period, actor);
         }
         registrationPeriodRepository.flush();
@@ -209,9 +258,11 @@ public class RegistrationPeriodService {
             throw new BusinessRuleException(
                     "Required order: proposal start < proposal end <= registration start < registration end.");
         }
-        boolean requiresReview = projectType == ProjectType.SPECIALIZED || projectType == ProjectType.GRADUATION;
+        boolean requiresReview =
+                projectType == ProjectType.SPECIALIZED || projectType == ProjectType.GRADUATION;
         if (!requiresReview && reviewDeadlineAt != null) {
-            throw new BusinessRuleException("Only specialized or graduation projects may have a review deadline.");
+            throw new BusinessRuleException(
+                    "Only specialized or graduation projects may have a review deadline.");
         }
         if (reviewDeadlineAt != null && !reviewDeadlineAt.isAfter(registrationEndAt)) {
             throw new BusinessRuleException("Review deadline must be after registration closes.");
@@ -219,40 +270,51 @@ public class RegistrationPeriodService {
         if (projectType != ProjectType.GRADUATION && defenseDate != null) {
             throw new BusinessRuleException("Only graduation projects may have a defense date.");
         }
-        if (projectType == ProjectType.GRADUATION && defenseDate != null && reviewDeadlineAt != null
+        if (projectType == ProjectType.GRADUATION
+                && defenseDate != null
+                && reviewDeadlineAt != null
                 && VietnamTime.dateOf(reviewDeadlineAt).isAfter(defenseDate)) {
-            throw new BusinessRuleException("Hạn phản biện không được sau ngày bảo vệ KLTN theo giờ Việt Nam.");
+            throw new BusinessRuleException(
+                    "Hạn phản biện không được sau ngày bảo vệ KLTN theo giờ Việt Nam.");
         }
-        if (status != RegistrationPeriodStatus.DRAFT && status != RegistrationPeriodStatus.CANCELLED) {
+        if (status != RegistrationPeriodStatus.DRAFT
+                && status != RegistrationPeriodStatus.CANCELLED) {
             if (requiresReview && reviewDeadlineAt == null) {
-                throw new BusinessRuleException("Review deadline is required before this period can be activated.");
+                throw new BusinessRuleException(
+                        "Review deadline is required before this period can be activated.");
             }
             if (projectType == ProjectType.GRADUATION && defenseDate == null) {
-                throw new BusinessRuleException("Defense date is required before a graduation period can be activated.");
+                throw new BusinessRuleException(
+                        "Defense date is required before a graduation period can be activated.");
             }
         }
     }
 
     private void verifyVersion(RegistrationPeriod period, int requestedVersion) {
         if (period.getVersion() != requestedVersion) {
-            throw new ConflictException("The registration period was changed by another user. Reload and try again.");
+            throw new ConflictException(
+                    "The registration period was changed by another user. Reload and try again.");
         }
     }
 
     private Faculty requireFaculty(Long id) {
-        return facultyRepository.findById(id)
+        return facultyRepository
+                .findById(id)
                 .filter(Faculty::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Active faculty was not found."));
     }
 
     private Semester requireSemester(Long id) {
-        return semesterRepository.findById(id)
+        return semesterRepository
+                .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Semester was not found."));
     }
 
     private RegistrationPeriod requirePeriod(Long id) {
-        return registrationPeriodRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Registration period was not found."));
+        return registrationPeriodRepository
+                .findById(id)
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Registration period was not found."));
     }
 
     private PeriodRules rulesForCreate(CreateRegistrationPeriodRequest request) {
@@ -264,10 +326,15 @@ public class RegistrationPeriodService {
                 orDefault(request.maxCommitteeMembers(), DEFAULT_MAX_COMMITTEE_MEMBERS));
     }
 
-    private PeriodRules rulesForUpdate(RegistrationPeriod period, UpdateRegistrationPeriodRequest request) {
+    private PeriodRules rulesForUpdate(
+            RegistrationPeriod period, UpdateRegistrationPeriodRequest request) {
         return new PeriodRules(
-                request.minGroupMembers() == null ? period.getMinGroupMembers() : request.minGroupMembers(),
-                request.maxGroupMembers() == null ? period.getMaxGroupMembers() : request.maxGroupMembers(),
+                request.minGroupMembers() == null
+                        ? period.getMinGroupMembers()
+                        : request.minGroupMembers(),
+                request.maxGroupMembers() == null
+                        ? period.getMaxGroupMembers()
+                        : request.maxGroupMembers(),
                 request.invitationExpiryHours() == null
                         ? period.getInvitationExpiryHours()
                         : request.invitationExpiryHours(),
@@ -289,22 +356,27 @@ public class RegistrationPeriodService {
     }
 
     private void validateRules(PeriodRules rules) {
-        if (rules.minGroupMembers() < 1 || rules.minGroupMembers() > 10
-                || rules.maxGroupMembers() < 1 || rules.maxGroupMembers() > 10) {
+        if (rules.minGroupMembers() < 1
+                || rules.minGroupMembers() > 10
+                || rules.maxGroupMembers() < 1
+                || rules.maxGroupMembers() > 10) {
             throw new BusinessRuleException("Group size limits must be between 1 and 10.");
         }
         if (rules.invitationExpiryHours() < 1 || rules.invitationExpiryHours() > 720) {
             throw new BusinessRuleException("Invitation expiry must be between 1 and 720 hours.");
         }
-        if (rules.minCommitteeMembers() < 3 || rules.minCommitteeMembers() > 5
-                || rules.maxCommitteeMembers() < 3 || rules.maxCommitteeMembers() > 5) {
+        if (rules.minCommitteeMembers() < 3
+                || rules.minCommitteeMembers() > 5
+                || rules.maxCommitteeMembers() < 3
+                || rules.maxCommitteeMembers() > 5) {
             throw new BusinessRuleException("Committee size limits must be between 3 and 5.");
         }
         if (rules.minGroupMembers() > rules.maxGroupMembers()) {
             throw new BusinessRuleException("Minimum group size cannot exceed maximum group size.");
         }
         if (rules.minCommitteeMembers() > rules.maxCommitteeMembers()) {
-            throw new BusinessRuleException("Minimum committee size cannot exceed maximum committee size.");
+            throw new BusinessRuleException(
+                    "Minimum committee size cannot exceed maximum committee size.");
         }
     }
 
@@ -344,6 +416,5 @@ public class RegistrationPeriodService {
             int maxGroupMembers,
             int invitationExpiryHours,
             int minCommitteeMembers,
-            int maxCommitteeMembers) {
-    }
+            int maxCommitteeMembers) {}
 }

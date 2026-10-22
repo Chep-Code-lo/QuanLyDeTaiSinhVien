@@ -1,3 +1,7 @@
 package com.example.qldetai.feature.progress.domain;
 
-public enum MilestoneType { PROPOSAL, PROGRESS, FINAL }
+public enum MilestoneType {
+    PROPOSAL,
+    PROGRESS,
+    FINAL
+}
