@@ -50,7 +50,7 @@ it('phân trang hồ sơ giảng viên và không tải dữ liệu dành cho bi
   expect(mocks.topics).not.toHaveBeenCalled()
   expect(mocks.periods).not.toHaveBeenCalled()
   expect(mocks.groups).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Sau' }))
   await screen.findByText('Đề tài trang sau')
   expect(mocks.list).toHaveBeenLastCalledWith({ page: 1, size: 10 })
   expect(mocks.list).toHaveBeenCalledTimes(2)

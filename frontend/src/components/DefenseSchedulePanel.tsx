@@ -363,28 +363,27 @@ export function DefenseSchedulePanel({
               />
             </div>
           </div>
-          <button
-            className="btn ea-save"
-            disabled={
-              !available.length ||
-              !committeeId ||
-              !projectId ||
-              checking ||
-              !eligibility?.eligible ||
-              missingDate ||
-              !!dateError ||
-              unlockedReviews.length > 0
-            }
-          >
-            {saving ? 'Đang xếp lịch...' : 'Xếp lịch bảo vệ'}
-          </button>
+          <div className="ea-defense-schedule__actions">
+            <button
+              className="btn ea-save"
+              disabled={
+                !available.length ||
+                !committeeId ||
+                !projectId ||
+                checking ||
+                !eligibility?.eligible ||
+                missingDate ||
+                !!dateError ||
+                unlockedReviews.length > 0
+              }
+            >
+              {saving ? 'Đang xếp lịch...' : 'Xếp lịch bảo vệ'}
+            </button>
+          </div>
         </fieldset>
       </form>
       <h2 className="ea-scheduled-title">Lịch đã xếp</h2>
-      <p className="ea-hint">
-        Xếp lịch chưa tạo phiếu chấm. Cần phân công bộ tiêu chí và hạn chấm cho các thành viên hội
-        đồng.
-      </p>
+
       {!defenses.length ? (
         <p className="ea-empty">Chưa có lịch bảo vệ trong đợt này.</p>
       ) : (

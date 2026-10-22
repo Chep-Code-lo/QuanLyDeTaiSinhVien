@@ -34,38 +34,40 @@ export function TopicWorkflowPage() {
     <>
       <PageHeader title="Đề xuất & Xét duyệt đề tài" />
       <section className="page-card">
-        {(user?.student || user?.lecturer) && (
-          <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
-            Đề xuất đề tài
-          </button>
-        )}
-        <label>
-          Trạng thái đề xuất
-          <select
-            className="form-select"
-            value={status}
-            onChange={(event) => {
-              setStatus(event.target.value)
-              setPage(0)
-              setSelected(null)
-            }}
-          >
-            <option value="">Tất cả được phép xem</option>
-            {[
-              'PENDING',
-              'REVISION_REQUIRED',
-              'APPROVED',
-              'PUBLISHED',
-              'REJECTED',
-              'WITHDRAWN',
-              'DRAFT',
-            ].map((value) => (
-              <option key={value} value={value}>
-                {statusLabel(value)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="topic-workflow-toolbar">
+          {(user?.student || user?.lecturer) && (
+            <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+              Đề xuất đề tài
+            </button>
+          )}
+          <label className="topic-workflow-toolbar__filter">
+            Trạng thái đề xuất
+            <select
+              className="form-select"
+              value={status}
+              onChange={(event) => {
+                setStatus(event.target.value)
+                setPage(0)
+                setSelected(null)
+              }}
+            >
+              <option value="">Tất cả được phép xem</option>
+              {[
+                'PENDING',
+                'REVISION_REQUIRED',
+                'APPROVED',
+                'PUBLISHED',
+                'REJECTED',
+                'WITHDRAWN',
+                'DRAFT',
+              ].map((value) => (
+                <option key={value} value={value}>
+                  {statusLabel(value)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <RemoteState loading={loading} error={error} retry={refresh} />
         {data && (
           <>

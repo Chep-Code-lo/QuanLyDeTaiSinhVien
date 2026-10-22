@@ -329,7 +329,7 @@ it('nhật ký lọc/phân trang trên server, bỏ qua phản hồi cũ', async
   )
   render(<AuditLogsPage />)
   await screen.findByText('Không có nhật ký phù hợp.')
-  await userEvent.click(screen.getByRole('button', { name: 'Trang sau' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Sau' }))
   await waitFor(() =>
     expect(mocks.audit).toHaveBeenLastCalledWith({ page: 1, size: 20, entityType: undefined }),
   )
@@ -526,7 +526,7 @@ it('đổi bộ lọc yêu cầu trả về trang đầu và không duyệt ph�
   }
   mocks.gradeList.mockResolvedValue(page([request], 2))
   render(<GradeChangesPage />)
-  await userEvent.click(await screen.findByRole('button', { name: 'Trang sau' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Sau' }))
   await waitFor(() =>
     expect(mocks.gradeList).toHaveBeenLastCalledWith({ page: 1, size: 10, status: undefined }),
   )

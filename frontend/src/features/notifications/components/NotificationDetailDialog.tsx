@@ -60,7 +60,9 @@ export function NotificationDetailDialog({
             <X size={20} aria-hidden="true" />
           </button>
         </header>
-        <div className="notification-detail__content">{item.content}</div>
+        <div className="notification-detail__content">
+          {item.content.replaceAll('(Asia/Ho_Chi_Minh)', '(giờ Việt Nam)')}
+        </div>
         {item.attachmentPath && (
           <a className="text-button notification-detail__attachment" href={item.attachmentPath}>
             {item.attachmentName || 'Tệp đính kèm'}

@@ -649,7 +649,7 @@ it('phân trang lịch sử email tại server không làm mất cấu hình đa
   fireEvent.change(subject, { target: { value: 'Bản nháp chưa lưu' } })
   const settingCount = settingScopes.length
   const pager = screen.getByRole('navigation', { name: 'Phân trang lịch sử email' })
-  await userEvent.click(within(pager).getByRole('button', { name: 'Trang sau' }))
+  await userEvent.click(within(pager).getByRole('button', { name: 'Sau' }))
   await screen.findByText('Email trang hai')
   expect(logRequests).toEqual([0, 1])
   expect((screen.getByLabelText('Tiêu đề thư') as HTMLInputElement).value).toBe('Bản nháp chưa lưu')

@@ -55,7 +55,7 @@ export function AccountAccessForm({
         />{' '}
         Quyền quản trị viên
       </label>
-      <p>Vai trò sinh viên/giảng viên được giữ theo hồ sơ học vụ của tài khoản.</p>
+
       <button
         type="button"
         className="btn btn-primary"
