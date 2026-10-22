@@ -96,6 +96,72 @@ class StoredFileSecurityTests {
     }
 
     @Test
+    void databaseFailureDoesNotLeavePhysicalContent() throws Exception {
+        when(files.save(any())).thenThrow(new IllegalStateException("metadata persistence failed"));
+        assertThatThrownBy(
+                        () ->
+                                service.store(
+                                        new MockMultipartFile(
+                                                "file",
+                                                "report.txt",
+                                                "text/plain",
+                                                "Report".getBytes()),
+                                        1L))
+                .isInstanceOf(IllegalStateException.class);
+        try (var paths = Files.walk(root)) {
+            assertThat(paths.filter(Files::isRegularFile)).isEmpty();
+        }
+    }
+
+    @Test
+    void transactionRollbackRemovesContentWhileCommitRetainsIt() throws Exception {
+        org.springframework.transaction.support.TransactionSynchronizationManager
+                .initSynchronization();
+        try {
+            var result =
+                    service.store(
+                            new MockMultipartFile(
+                                    "file", "report.txt", "text/plain", "Report".getBytes()),
+                            1L);
+            assertThat(root.resolve(result.storageKey())).exists();
+            var callbacks =
+                    org.springframework.transaction.support.TransactionSynchronizationManager
+                            .getSynchronizations();
+            assertThat(callbacks).isNotEmpty();
+            callbacks.forEach(
+                    callback ->
+                            callback.afterCompletion(
+                                    org.springframework.transaction.support
+                                            .TransactionSynchronization.STATUS_ROLLED_BACK));
+            assertThat(root.resolve(result.storageKey())).doesNotExist();
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager
+                    .clearSynchronization();
+        }
+    }
+
+    @Test
+    void streamSizeLimitCannotBeBypassedWithFalseMultipartMetadata() throws Exception {
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                service, "maxFileSize", org.springframework.util.unit.DataSize.ofBytes(8));
+        var file =
+                new MockMultipartFile(
+                        "file", "report.txt", "text/plain", "More than eight bytes".getBytes()) {
+                    @Override
+                    public long getSize() {
+                        return 4;
+                    }
+                };
+        assertThatThrownBy(() -> service.store(file, 1L))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("dung lượng");
+        verifyNoInteractions(files);
+        try (var paths = Files.walk(root)) {
+            assertThat(paths.filter(Files::isRegularFile)).isEmpty();
+        }
+    }
+
+    @Test
     void legacySvgCanBeDownloadedButCannotBePreviewed() throws Exception {
         var file = new StoredFile();
         file.setStorageKey("legacy.svg");

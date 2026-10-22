@@ -475,6 +475,84 @@ class EvaluationConcurrencyIntegrationTests {
                 .isEqualTo(ScoreSheetStatus.LOCKED);
     }
 
+    @Test
+    void concurrentReviewSubmissionsProduceOneCompletionNotification() throws Exception {
+        var fixture = fixture(false, AssessmentComponentType.REVIEW);
+        Long second = evaluationService.assign(reviewer(fixture, lecturerFour), admin.getId());
+        var outcomes =
+                race(
+                        () ->
+                                evaluationService.saveSheet(
+                                        fixture.evaluationId(),
+                                        new SaveSheetRequest(
+                                                fixture.version(),
+                                                "First",
+                                                scoreRequests(
+                                                        fixture.catalog().rubric(),
+                                                        new BigDecimal("6"),
+                                                        new BigDecimal("4")),
+                                                true),
+                                        lecturerThree.getUser().getId()),
+                        () ->
+                                evaluationService.saveSheet(
+                                        second,
+                                        new SaveSheetRequest(
+                                                0,
+                                                "Second",
+                                                scoreRequests(
+                                                        fixture.catalog().rubric(),
+                                                        new BigDecimal("6"),
+                                                        new BigDecimal("4")),
+                                                true),
+                                        lecturerFour.getUser().getId()));
+        assertThat(outcomes).allSatisfy(outcome -> assertThat(outcome.error()).isNull());
+        assertThat(
+                        jdbc.queryForObject(
+                                "select count(*) from notifications where user_id = ? and event_key like ?",
+                                Long.class,
+                                admin.getId(),
+                                "review-complete-" + fixture.projectId() + "-%"))
+                .isEqualTo(1);
+        var progress = evaluationService.reviewProgress(period.getId(), admin.getId());
+        assertThat(progress.submittedCount()).isEqualTo(2);
+        assertThat(progress.draftCount()).isZero();
+    }
+
+    @Test
+    void rolledBackReviewSubmissionDoesNotLeaveNotificationsOrSubmittedState() {
+        var fixture = fixture(false, AssessmentComponentType.REVIEW);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () ->
+                                tx().executeWithoutResult(
+                                                status -> {
+                                                    evaluationService.saveSheet(
+                                                            fixture.evaluationId(),
+                                                            new SaveSheetRequest(
+                                                                    fixture.version(),
+                                                                    "Rollback",
+                                                                    scoreRequests(
+                                                                            fixture.catalog()
+                                                                                    .rubric(),
+                                                                            new BigDecimal("6"),
+                                                                            new BigDecimal("4")),
+                                                                    true),
+                                                            lecturerThree.getUser().getId());
+                                                    throw new IllegalStateException(
+                                                            "Force source transaction rollback");
+                                                }))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(
+                        evaluationService
+                                .mySheet(fixture.evaluationId(), lecturerThree.getUser().getId())
+                                .status())
+                .isEqualTo(ScoreSheetStatus.DRAFT);
+        assertThat(
+                        jdbc.queryForObject(
+                                "select count(*) from notifications where user_id = ? and event_key like 'review-%'",
+                                Long.class, admin.getId()))
+                .isZero();
+    }
+
     private CreateEvaluationRequest reviewer(Fixture fixture, Lecturer lecturer) {
         return new CreateEvaluationRequest(
                 fixture.projectId(),

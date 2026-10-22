@@ -14,6 +14,17 @@ public interface AcademicAppointmentRepository extends JpaRepository<AcademicApp
 
     @Query(
             """
+            select distinct a.lecturer.user.id from AcademicAppointment a
+            where a.faculty.id = :facultyId
+              and (a.positionCode = com.example.qldetai.feature.identity.domain.PositionCode.DEAN
+                   or (a.positionCode = com.example.qldetai.feature.identity.domain.PositionCode.DEPARTMENT_HEAD and a.department.id = :departmentId))
+              and a.startsAt <= :now and (a.endsAt is null or a.endsAt > :now)
+              and a.lecturer.user.status = com.example.qldetai.feature.identity.domain.UserStatus.ACTIVE
+            """)
+    List<Long> findActiveManagerUserIds(Long facultyId, Long departmentId, LocalDateTime now);
+
+    @Query(
+            """
             select a from AcademicAppointment a
             join fetch a.lecturer l
             join fetch l.user

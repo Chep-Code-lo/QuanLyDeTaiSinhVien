@@ -13,6 +13,7 @@ import jakarta.validation.constraints.Min;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,6 +26,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Validated
@@ -44,8 +47,32 @@ public class DefenseSessionController {
             eligibility(
                     @RequestParam Long assignmentId,
                     @RequestParam Long committeeId,
+                    @RequestParam(required = false) @jakarta.validation.constraints.Size(max = 200)
+                            String location,
+                    @RequestParam(required = false)
+                            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+                            OffsetDateTime startsAt,
+                    @RequestParam(required = false)
+                            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+                            OffsetDateTime endsAt,
                     @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success(service.eligibility(assignmentId, committeeId, principal.id()));
+        CreateDefenseRequest proposed =
+                location == null && startsAt == null && endsAt == null
+                        ? null
+                        : new CreateDefenseRequest(
+                                assignmentId,
+                                committeeId,
+                                location,
+                                startsAt == null
+                                        ? null
+                                        : startsAt.withOffsetSameInstant(ZoneOffset.UTC)
+                                                .toLocalDateTime(),
+                                endsAt == null
+                                        ? null
+                                        : endsAt.withOffsetSameInstant(ZoneOffset.UTC)
+                                                .toLocalDateTime());
+        return ApiResponse.success(
+                service.eligibility(assignmentId, committeeId, principal.id(), proposed));
     }
 
     @GetMapping("/defense-sessions")

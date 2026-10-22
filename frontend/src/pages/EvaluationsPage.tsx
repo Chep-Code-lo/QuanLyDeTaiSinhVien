@@ -179,7 +179,13 @@ function ScoreSheetEditor({ assignment }: { assignment: EvaluationAssignmentResp
       })
       setSheet(updated)
       setConfirmSubmit(false)
-      showSuccess(submit ? 'Đã nộp phiếu chấm.' : 'Đã lưu phiếu chấm nháp.')
+      showSuccess(
+        submit
+          ? assignment.evaluatorRole === 'REVIEWER'
+            ? 'Đã nộp phiếu điểm phản biện. Hệ thống đã thông báo cho người quản lý.'
+            : 'Đã nộp phiếu chấm.'
+          : 'Đã lưu phiếu chấm nháp.',
+      )
     } catch (error) {
       showError(errorMessage(error))
     } finally {

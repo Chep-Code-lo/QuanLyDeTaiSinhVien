@@ -712,3 +712,10 @@ export interface SaveCommitteeRequest {
   members: { lecturerId: number; roleName: string }[]
   version?: number
 }
+
+export interface ReviewProgressResponse {
+  assignedCount: number
+  submittedCount: number
+  draftCount: number
+  notStartedCount: number
+}

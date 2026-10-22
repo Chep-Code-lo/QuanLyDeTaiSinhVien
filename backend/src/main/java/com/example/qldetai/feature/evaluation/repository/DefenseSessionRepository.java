@@ -52,6 +52,25 @@ public interface DefenseSessionRepository
     List<DefenseSession> findLecturerConflictsForUpdate(
             List<Long> lecturerIds, LocalDateTime startsAt, LocalDateTime endsAt);
 
+    @Query(
+            """
+            select count(d) > 0 from DefenseSession d
+            where d.status = 'SCHEDULED' and d.startsAt < :endsAt and d.endsAt > :startsAt
+              and function('regexp_replace', lower(trim(d.location)), :pattern, '') = :locationKey
+            """)
+    boolean hasRoomConflict(
+            String locationKey, String pattern, LocalDateTime startsAt, LocalDateTime endsAt);
+
+    @Query(
+            """
+            select count(d) > 0 from DefenseSession d
+            where d.status = 'SCHEDULED' and d.startsAt < :endsAt and d.endsAt > :startsAt
+              and exists (select m.id from CommitteeMember m
+                          where m.committee = d.committee and m.lecturer.id in :lecturerIds)
+            """)
+    boolean hasLecturerConflict(
+            List<Long> lecturerIds, LocalDateTime startsAt, LocalDateTime endsAt);
+
     @EntityGraph(attributePaths = {"assignment.topic", "assignment.group", "period", "committee"})
     @Query(
             """

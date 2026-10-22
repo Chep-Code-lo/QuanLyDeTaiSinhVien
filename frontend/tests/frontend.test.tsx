@@ -64,6 +64,12 @@ vi.mock('../src/api/academic', () => ({
 }))
 vi.mock('../src/api/evaluation', () => ({
   evaluationApi: {
+    reviewProgress: async () => ({
+      assignedCount: 3,
+      submittedCount: 1,
+      draftCount: 1,
+      notStartedCount: 1,
+    }),
     listAssignments: mocks.assignments,
     listRubrics: mocks.rubrics,
     listComponents: mocks.components,
@@ -375,6 +381,24 @@ describe('Hồi quy frontend', () => {
       }),
     )
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Nộp phiếu chấm' })).toBeNull())
+  })
+
+  it('nộp phản biện xác nhận đã thông báo quản lý và chuyển phiếu sang chỉ xem', async () => {
+    mocks.assignments.mockResolvedValue(page([{ ...assignment, evaluatorRole: 'REVIEWER' }]))
+    mount(<EvaluationsPage />)
+    fireEvent.change(await screen.findByLabelText('Chất lượng sản phẩm (tối đa 10 điểm)'), {
+      target: { value: '8' },
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Nộp phiếu chấm' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Nộp phiếu', exact: true }))
+    await waitFor(() =>
+      expect(mocks.showSuccess).toHaveBeenCalledWith(
+        'Đã nộp phiếu điểm phản biện. Hệ thống đã thông báo cho người quản lý.',
+      ),
+    )
+    expect(
+      screen.getByLabelText('Chất lượng sản phẩm (tối đa 10 điểm)').closest('fieldset')?.disabled,
+    ).toBe(true)
   })
 
   it('phiếu đã nộp chỉ cho xem, không cho sửa hoặc nộp lại', async () => {

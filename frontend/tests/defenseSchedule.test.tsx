@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { EvaluatorAssignmentPage } from '../src/pages/EvaluatorAssignmentPage'
 
@@ -33,6 +33,12 @@ vi.mock('../src/api/evaluation', () => ({
     listDefenses: mocks.defenses,
     listCommittees: mocks.committees,
     listRubrics: mocks.rubrics,
+    reviewProgress: async () => ({
+      assignedCount: 3,
+      submittedCount: 1,
+      draftCount: 1,
+      notStartedCount: 1,
+    }),
     listAssignments: mocks.assignments,
     scheduleDefense: mocks.scheduleDefense,
     saveCommittee: mocks.saveCommittee,
@@ -223,6 +229,37 @@ async function confirmSchedule() {
 }
 
 describe('Xếp lịch bảo vệ', () => {
+  it('kiểm tra lại phòng/khung giờ và bỏ qua kết quả cũ đến muộn', async () => {
+    render(<EvaluatorAssignmentPage />)
+    await openSchedule()
+    await fillSchedule()
+    expect(mocks.eligibility).toHaveBeenLastCalledWith(project.id, committee.id, {
+      location: 'Phòng A101',
+      startsAt: '2099-02-20T02:00:00.000Z',
+      endsAt: '2099-02-20T03:00:00.000Z',
+    })
+    let resolveOld!: (value: { eligible: boolean; reason: string | null }) => void
+    mocks.eligibility.mockImplementation((_assignment, _committee, proposed) =>
+      proposed?.location === 'A102'
+        ? new Promise((resolve) => {
+            resolveOld = resolve
+          })
+        : Promise.resolve({
+            eligible: false,
+            reason: 'Phòng đã có lịch bảo vệ trong khoảng thời gian này.',
+          }),
+    )
+    fireEvent.change(screen.getByLabelText(/Địa điểm/), { target: { value: 'A102' } })
+    await waitFor(() => expect(resolveOld).toBeDefined())
+    fireEvent.change(screen.getByLabelText(/Địa điểm/), { target: { value: 'A103' } })
+    await screen.findByText('Phòng đã có lịch bảo vệ trong khoảng thời gian này.')
+    await act(async () => resolveOld({ eligible: true, reason: null }))
+    expect(
+      (screen.getByRole('button', { name: 'Xếp lịch bảo vệ' }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+    expect(mocks.scheduleDefense).not.toHaveBeenCalled()
+  })
+
   it('báo rõ phản biện chưa khóa trước khi người dùng bấm xếp lịch', async () => {
     mocks.components.mockResolvedValue([
       {

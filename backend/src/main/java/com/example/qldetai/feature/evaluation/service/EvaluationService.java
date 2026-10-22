@@ -99,6 +99,8 @@ public class EvaluationService {
     private final Clock clock;
     private final EntityManager entityManager;
     private final NotificationService notifications;
+    private final com.example.qldetai.feature.identity.repository.AcademicAppointmentRepository
+            appointments;
 
     @Value("${app.email.display-time-zone:Asia/Ho_Chi_Minh}")
     private String displayTimeZone;
@@ -458,6 +460,19 @@ public class EvaluationService {
     @Transactional
     @BusinessAudit(action = "SCORE_SHEET_SAVE", entityType = "SCORE_SHEET", entityIdArgument = 0)
     public ScoreSheetResponse saveSheet(Long evaluationId, SaveSheetRequest request, Long actorId) {
+        // Serialize review completion with other submissions and evaluator assignments.
+        // Read only the ID before locking, so a waiting transaction has no stale entity state.
+        Long projectId =
+                evaluations
+                        .findProjectIdByEvaluationId(evaluationId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Evaluation assignment was not found."));
+        assignments
+                .findByIdForUpdate(projectId)
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Project assignment was not found."));
         EvaluationAssignment evaluation =
                 evaluations
                         .findByIdForUpdate(evaluationId)
@@ -576,7 +591,101 @@ public class EvaluationService {
                             requestedChange.setAppliedAt(LocalDateTime.now(clock));
                         });
 
+        if (request.submit()
+                && evaluation.getComponent().getComponentType() == AssessmentComponentType.REVIEW) {
+            notifyReviewSubmitted(evaluation, sheet);
+        }
         return sheet(sheet);
+    }
+
+    private void notifyReviewSubmitted(EvaluationAssignment evaluation, ScoreSheet sheet) {
+        var project = evaluation.getAssignment();
+        var topic = project.getTopic();
+        Set<Long> recipients =
+                new java.util.LinkedHashSet<>(
+                        appointments.findActiveManagerUserIds(
+                                topic.getFaculty().getId(),
+                                topic.getDepartment().getId(),
+                                LocalDateTime.now(clock)));
+        users.findActiveAdministrators().forEach(user -> recipients.add(user.getId()));
+        String content =
+                evaluation.getLecturer().getUser().getFullName()
+                        + " đã nộp phiếu điểm phản biện cho đề tài "
+                        + topic.getCode()
+                        + " - "
+                        + topic.getTitle()
+                        + ".\nNhóm: "
+                        + project.getGroup().getName()
+                        + ".\nThành phần đánh giá: "
+                        + evaluation.getComponent().getName()
+                        + ".";
+        String revision = sheet.getId() + "-" + sheet.getVersion();
+        for (Long recipient : recipients) {
+            notifications.publish(
+                    recipient,
+                    "review-submitted-" + revision,
+                    "Đã nộp phiếu điểm phản biện",
+                    content,
+                    "/evaluator-assignment");
+        }
+        try {
+            ensureReviewCompleteBeforeCommittee(project);
+        } catch (BusinessRuleException incomplete) {
+            return;
+        }
+        for (Long recipient : recipients) {
+            notifications.publish(
+                    recipient,
+                    "review-complete-" + project.getId() + "-" + revision,
+                    "Đề tài đã hoàn tất phản biện",
+                    "Đề tài "
+                            + topic.getCode()
+                            + " - "
+                            + topic.getTitle()
+                            + " đã có đầy đủ phiếu điểm phản biện hợp lệ. Vui lòng kiểm tra điều kiện xếp lịch bảo vệ.",
+                    "/evaluator-assignment");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public com.example.qldetai.feature.evaluation.dto.EvaluationDtos.ReviewProgressResponse
+            reviewProgress(Long periodId, Long actorId) {
+        Specification<EvaluationAssignment> scope =
+                readScope
+                        .assignments(actorId)
+                        .and(
+                                (root, query, cb) ->
+                                        cb.and(
+                                                cb.equal(root.get("period").get("id"), periodId),
+                                                cb.equal(
+                                                        root.get("status"),
+                                                        EvaluationStatus.ACTIVE),
+                                                cb.equal(
+                                                        root.get("component").get("componentType"),
+                                                        AssessmentComponentType.REVIEW)));
+        long assigned = evaluations.count(scope);
+        long submitted =
+                evaluations.count(
+                        scope.and(
+                                withSheetStatus(
+                                        Set.of(
+                                                ScoreSheetStatus.SUBMITTED,
+                                                ScoreSheetStatus.LOCKED))));
+        long draft = evaluations.count(scope.and(withSheetStatus(Set.of(ScoreSheetStatus.DRAFT))));
+        return new com.example.qldetai.feature.evaluation.dto.EvaluationDtos.ReviewProgressResponse(
+                assigned, submitted, draft, Math.max(0, assigned - submitted - draft));
+    }
+
+    private Specification<EvaluationAssignment> withSheetStatus(Set<ScoreSheetStatus> statuses) {
+        return (root, query, cb) -> {
+            var found = query.subquery(Long.class);
+            var sheet = found.from(ScoreSheet.class);
+            found.select(sheet.get("id"))
+                    .where(
+                            cb.equal(sheet.get("evaluation"), root),
+                            sheet.get("status").in(statuses));
+            return cb.exists(found);
+        };
     }
 
     private void validateScoringDeadline(
@@ -610,8 +719,7 @@ public class EvaluationService {
                         "Lock every review component before assigning committee evaluators.");
             }
             List<EvaluationAssignment> reviewerAssignments =
-                    evaluations.findByAssignmentIdAndComponentIdAndStatus(
-                            assignment.getId(), reviewComponent.getId(), EvaluationStatus.ACTIVE);
+                    evaluations.findActiveForUpdate(assignment.getId(), reviewComponent.getId());
             if (reviewerAssignments.isEmpty()
                     || reviewerAssignments.stream()
                             .anyMatch(evaluation -> !hasCompletedScoreSheet(evaluation))) {
@@ -622,7 +730,7 @@ public class EvaluationService {
     }
 
     private boolean hasCompletedScoreSheet(EvaluationAssignment evaluation) {
-        return sheets.findByEvaluationId(evaluation.getId())
+        return sheets.findByEvaluationIdForUpdate(evaluation.getId())
                 .filter(
                         sheet ->
                                 sheet.getStatus() == ScoreSheetStatus.SUBMITTED
@@ -639,7 +747,7 @@ public class EvaluationService {
                 criteria.findByRubricIdOrderBySortOrder(sheet.getRubric().getId()).stream()
                         .map(RubricCriterion::getId)
                         .collect(java.util.stream.Collectors.toSet());
-        List<ScoreDetail> scoreDetails = details.findBySheetId(sheet.getId());
+        List<ScoreDetail> scoreDetails = details.findBySheetIdForUpdate(sheet.getId());
         Set<Long> scoredCriterionIds =
                 scoreDetails.stream()
                         .map(detail -> detail.getCriterion().getId())
