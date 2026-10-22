@@ -217,3 +217,34 @@ it('hiển thị tiến độ toàn đợt, phân biệt trạng thái phân cô
   await userEvent.click(screen.getByRole('button', { name: 'Làm mới tiến độ phản biện' }))
   expect(await screen.findByText(/Đã nộp 21\/32 phiếu/)).toBeTruthy()
 })
+
+it('mở đúng hội đồng và đề tài từ lịch đã xếp, chưa tự gửi phân công khi thiếu hạn chấm', async () => {
+  render(<EvaluatorAssignmentPage />)
+  await screen.findByLabelText('Hội đồng đã tạo')
+  await userEvent.click(screen.getByRole('tab', { name: 'Lịch bảo vệ' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Phân công chấm' }))
+  await screen.findByLabelText(/Hạn chót chấm điểm/)
+  await waitFor(() =>
+    expect((screen.getByLabelText('Hội đồng đã tạo') as HTMLSelectElement).value).toBe('11'),
+  )
+  await waitFor(() =>
+    expect((screen.getByRole('combobox', { name: /Bộ tiêu chí/ }) as HTMLSelectElement).value).toBe(
+      '7',
+    ),
+  )
+  expect(screen.getByText('Đã chọn 1 đề tài')).toBeTruthy()
+  expect(mocks.assignBatch).not.toHaveBeenCalled()
+  fireEvent.change(screen.getByLabelText(/Hạn chót chấm điểm/), {
+    target: { value: '21/02/2099 10:00 AM' },
+  })
+  await userEvent.click(screen.getByRole('button', { name: 'Lưu phân công' }))
+  await waitFor(() => expect(mocks.assignBatch).toHaveBeenCalledOnce())
+  expect(mocks.assignBatch.mock.calls[0][0]).toHaveLength(3)
+  expect(mocks.assignBatch.mock.calls[0][0]).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ assignmentId: 51, defenseId: 71, lecturerId: 3, rubricId: 7 }),
+      expect.objectContaining({ lecturerId: 4 }),
+      expect.objectContaining({ lecturerId: 5 }),
+    ]),
+  )
+})

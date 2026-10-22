@@ -92,6 +92,8 @@ public final class EvaluationAdminDtos {
             DefenseStatus status,
             int version) {}
 
+    public record ResultActionsResponse(boolean canFinalize, boolean canPublish) {}
+
     public record ResultResponse(
             Long id,
             Long assignmentId,

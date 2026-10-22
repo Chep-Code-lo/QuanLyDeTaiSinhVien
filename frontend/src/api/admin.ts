@@ -6,6 +6,9 @@ import type {
   CreateUserRequest,
   UpdateUserRequest,
   UserResponse,
+  UserStatus,
+  RoleCode,
+  AuditLogResponse,
 } from '../types/domain'
 
 export const adminApi = {
@@ -19,6 +22,8 @@ export const adminApi = {
     })
     return response.data.data
   },
+  getUser: async (id: number) =>
+    (await apiClient.get<ApiResponse<UserResponse>>(`/admin/users/${id}`)).data.data,
   createUser: async (payload: CreateUserRequest) => {
     const response = await apiClient.post<ApiResponse<UserResponse>>('/admin/users', payload)
     return response.data.data
@@ -27,6 +32,18 @@ export const adminApi = {
     const response = await apiClient.put<ApiResponse<UserResponse>>(`/admin/users/${id}`, payload)
     return response.data.data
   },
+  updateStatus: async (id: number, status: UserStatus) =>
+    (await apiClient.patch<ApiResponse<UserResponse>>(`/admin/users/${id}/status`, { status })).data
+      .data,
+  updateRoles: async (id: number, roles: RoleCode[]) =>
+    (await apiClient.put<ApiResponse<UserResponse>>(`/admin/users/${id}/roles`, { roles })).data
+      .data,
+  listAuditLogs: async (params: { entityType?: string; page: number; size: number }) =>
+    (
+      await apiClient.get<ApiResponse<PageResponse<AuditLogResponse>>>('/admin/audit-logs', {
+        params,
+      })
+    ).data.data,
   deleteUser: async (id: number) => {
     await apiClient.delete(`/admin/users/${id}`)
   },

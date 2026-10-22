@@ -3,6 +3,7 @@ package com.example.qldetai.feature.evaluation.controller;
 import com.example.qldetai.common.api.ApiResponse;
 import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.feature.evaluation.domain.ResultStatus;
+import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultActionsResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultDetailResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultResponse;
 import com.example.qldetai.feature.evaluation.service.EvaluationResultService;
@@ -57,6 +58,13 @@ public class EvaluationResultController {
     public ApiResponse<List<ResultDetailResponse>> studentResults(
             @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(service.listPublishedForStudent(principal.id()));
+    }
+
+    @GetMapping("/project-assignments/{id}/results/actions")
+    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    public ApiResponse<ResultActionsResponse> actions(
+            @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(service.actions(id, principal.id()));
     }
 
     @PostMapping("/project-assignments/{id}/results/finalize")

@@ -65,3 +65,18 @@ test('password errors match the backend Vietnamese messages', () => {
     'Mật khẩu mới phải khác mật khẩu hiện tại.',
   )
 })
+
+test('result finalization errors identify missing assignments and score sheets', () => {
+  assert.equal(
+    vietnameseErrorMessage('Cannot finalize while a required evaluator assignment is missing.'),
+    'Chưa thể chốt: có thành phần đánh giá bắt buộc chưa được phân công giảng viên.',
+  )
+  assert.equal(
+    vietnameseErrorMessage('Cannot finalize while a required score sheet is missing.'),
+    'Chưa thể chốt: còn phiếu điểm bắt buộc chưa được nộp.',
+  )
+  assert.equal(
+    vietnameseErrorMessage('Only a finalized result can be published.'),
+    'Chỉ có thể công bố kết quả đã được chốt.',
+  )
+})

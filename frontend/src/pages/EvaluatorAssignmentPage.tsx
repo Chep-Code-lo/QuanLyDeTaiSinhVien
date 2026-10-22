@@ -76,6 +76,7 @@ export function EvaluatorAssignmentPage() {
   const [memberDrafts, setMemberDrafts] = useState<MemberDraft[]>(initialMembers)
   const nextMemberKey = useRef(4)
   const [committeeTask, setCommitteeTask] = useState<'CONFIGURE' | 'ASSIGN'>('CONFIGURE')
+  const [pendingDefense, setPendingDefense] = useState<DefenseSessionResponse | null>(null)
   const [lecturerId, setLecturerId] = useState<number | null>(null)
   const [projectIds, setProjectIds] = useState<number[]>([])
   const [deadline, setDeadline] = useState('')
@@ -188,6 +189,15 @@ export function EvaluatorAssignmentPage() {
     setLecturerId(null)
     setTopicOpen(false)
     setQuery('')
+  }
+  if (pendingDefense && mode === 'COMMITTEE') {
+    const saved = committees.find((item) => item.id === pendingDefense.committeeId)
+    if (saved) {
+      selectCommittee(saved)
+      setCommitteeTask('ASSIGN')
+      setProjectIds([pendingDefense.assignmentId])
+      setPendingDefense(null)
+    }
   }
   const rubricKey = JSON.stringify([
     componentId,
@@ -333,7 +343,7 @@ export function EvaluatorAssignmentPage() {
         ? [...item.members]
             .sort((a, b) => a.slotNo - b.slotNo)
             .map((member) => ({
-              key: nextMemberKey.current++,
+              key: -member.slotNo,
               lecturerId: member.lecturerId,
               roleName: member.roleName || roleLabels[member.role],
               lecturerName: member.lecturerName,
@@ -525,6 +535,10 @@ export function EvaluatorAssignmentPage() {
             </p>
           ) : (
             <DefenseSchedulePanel
+              onAssign={(defense) => {
+                setPendingDefense(defense)
+                setMode('COMMITTEE')
+              }}
               onBusyChange={setScheduleBusy}
               key={periodId}
               committees={committees}

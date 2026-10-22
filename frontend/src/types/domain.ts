@@ -42,6 +42,7 @@ export type CreateUserRequest = {
 } & (
   | { roles: ['STUDENT']; student: Omit<StudentProfileResponse, 'id'>; lecturer?: never }
   | { roles: ['LECTURER']; lecturer: Omit<LecturerProfileResponse, 'id'>; student?: never }
+  | { roles: ['ADMIN']; student?: never; lecturer?: never }
 )
 
 export interface UpdateUserRequest {
@@ -301,12 +302,14 @@ export interface DefenseSessionResponse {
 
 // Academic Catalog & Periods
 export interface FacultyResponse {
+  active?: boolean
   id: number
   code: string
   name: string
 }
 
 export interface DepartmentResponse {
+  active?: boolean
   id: number
   facultyId: number
   facultyName: string
@@ -315,6 +318,8 @@ export interface DepartmentResponse {
 }
 
 export interface SemesterResponse {
+  startsOn?: string
+  endsOn?: string
   id: number
   semesterNo: number
   code: string
@@ -393,6 +398,7 @@ export interface CreateAppointmentRequest {
 }
 
 export interface ProjectAssignmentResponse {
+  version?: number
   id: number
   periodId: number
   periodName: string
@@ -631,13 +637,7 @@ export interface TopicRegistrationResponse {
 }
 
 export type TopicStatus =
-  | 'DRAFT'
-  | 'PENDING'
-  | 'APPROVED'
-  | 'PUBLISHED'
-  | 'REJECTED'
-  | 'WITHDRAWN'
-  | string
+  'DRAFT' | 'PENDING' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'WITHDRAWN' | string
 export interface TopicSupervisorResponse {
   lecturerId: number
   lecturerCode: string
@@ -718,4 +718,93 @@ export interface ReviewProgressResponse {
   submittedCount: number
   draftCount: number
   notStartedCount: number
+}
+
+export type ResultStatus = 'FINALIZED' | 'PUBLISHED' | 'SUPERSEDED'
+
+export interface ResultResponse {
+  id: number
+  assignmentId: number
+  versionNo: number
+  finalScore: number
+  status: ResultStatus
+}
+
+export interface ResultDetailResponse extends ResultResponse {
+  groupId: number
+  groupName: string
+  topicId: number
+  topicCode: string
+  topicTitle: string
+  periodId: number
+  periodName: string
+  finalizedBy: number
+  finalizedByName: string
+  finalizedAt: string
+  publishedBy?: number | null
+  publishedByName?: string | null
+  publishedAt?: string | null
+  inputs: {
+    id: number
+    sheetId: number
+    componentId: number
+    componentCode: string
+    sheetVersion: number
+    scoreSnapshot: number
+    rubricSnapshot: string
+  }[]
+  members: { studentId: number; studentCodeSnapshot: string; fullNameSnapshot: string }[]
+}
+
+export interface TopicInput {
+  title: string
+  description: string
+  objectives: string
+  expectedOutcomes: string
+  prerequisites?: string
+  visibilityType: 'OPEN' | 'RESERVED'
+  reservedGroupId?: number | null
+}
+export interface CreateTopicRequest extends TopicInput {
+  periodId: number
+  code: string
+}
+export type TopicReviewDecision = 'APPROVED' | 'REVISION_REQUIRED' | 'REJECTED'
+export interface GradeChangeResponse {
+  id: number
+  sheetId: number
+  evaluationId: number
+  assignmentId: number
+  requestedBy: number
+  requestedByName: string
+  reason: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'APPLIED'
+  reviewedBy?: number | null
+  reviewedByName?: string | null
+  reviewComment?: string | null
+  createdAt: string
+  reviewedAt?: string | null
+  appliedAt?: string | null
+}
+export interface AuditLogResponse {
+  id: number
+  actorId?: number | null
+  actorName?: string | null
+  action: string
+  entityType: string
+  entityId?: number | null
+  outcome: 'SUCCESS' | 'FAILURE'
+  requestId?: string | null
+  durationMs?: number | null
+  createdAt: string
+}
+export interface EmailLogDetailResponse {
+  log: EmailLogResponse
+  attempts: {
+    id: number
+    attemptNo: number
+    status: EmailOutboxStatus
+    errorMessage?: string | null
+    createdAt: string
+  }[]
 }

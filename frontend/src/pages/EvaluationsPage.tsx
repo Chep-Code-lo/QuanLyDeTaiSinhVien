@@ -1,3 +1,4 @@
+import { GradeChangeRequestForm } from '../components/GradeChangeRequestForm'
 import { useEffect, useState, type FormEvent } from 'react'
 import { evaluationApi } from '../api/evaluation'
 import { allPages, errorMessage } from '../api/student'
@@ -222,6 +223,11 @@ function ScoreSheetEditor({ assignment }: { assignment: EvaluationAssignmentResp
               Phiếu đã nộp, đã khóa hoặc phân công đã hủy. Bạn có thể xem lại điểm và nhận xét.
             </p>
           )}
+          {sheet.id &&
+            assignment.status === 'ACTIVE' &&
+            (sheet.status === 'SUBMITTED' || sheet.status === 'LOCKED') && (
+              <GradeChangeRequestForm key={`${sheet.id}-${sheet.version}`} sheetId={sheet.id} />
+            )}
           <form className="stack-form" onSubmit={handleSubmit}>
             <fieldset className="student-fieldset" disabled={!editable || saving}>
               {rubric.criteria.map((criterion) => (

@@ -58,7 +58,7 @@ function creationError(error: unknown) {
 
 export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProps) {
   const { showError, showSuccess } = useToast()
-  const [role, setRole] = useState<'STUDENT' | 'LECTURER'>('STUDENT')
+  const [role, setRole] = useState<'STUDENT' | 'LECTURER' | 'ADMIN'>('STUDENT')
   const [form, setForm] = useState(emptyForm)
   const [departments, setDepartments] = useState<DepartmentResponse[]>([])
   const [loading, setLoading] = useState(true)
@@ -121,7 +121,7 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
 
     const departmentId = Number(form.departmentId)
     const selectedDepartment = departments.find((department) => department.id === departmentId)
-    if (!selectedDepartment) {
+    if (role !== 'ADMIN' && !selectedDepartment) {
       fail('Vui lòng chọn bộ môn cho tài khoản.')
       return
     }
@@ -133,27 +133,29 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
       phone: form.phone.trim() || undefined,
     }
     const payload: CreateUserRequest =
-      role === 'STUDENT'
-        ? {
-            ...common,
-            roles: ['STUDENT'],
-            student: {
-              departmentId,
-              studentCode: form.studentCode.trim(),
-              className: form.className.trim(),
-              cohort: form.cohort.trim(),
-            },
-          }
-        : {
-            ...common,
-            roles: ['LECTURER'],
-            lecturer: {
-              departmentId,
-              lecturerCode: form.lecturerCode.trim(),
-              academicDegree: form.academicDegree.trim() || undefined,
-              specialization: selectedDepartment.name,
-            },
-          }
+      role === 'ADMIN'
+        ? { ...common, roles: ['ADMIN'] }
+        : role === 'STUDENT'
+          ? {
+              ...common,
+              roles: ['STUDENT'],
+              student: {
+                departmentId,
+                studentCode: form.studentCode.trim(),
+                className: form.className.trim(),
+                cohort: form.cohort.trim(),
+              },
+            }
+          : {
+              ...common,
+              roles: ['LECTURER'],
+              lecturer: {
+                departmentId,
+                lecturerCode: form.lecturerCode.trim(),
+                academicDegree: form.academicDegree.trim() || undefined,
+                specialization: selectedDepartment!.name,
+              },
+            }
 
     setSubmitting(true)
     try {
@@ -170,13 +172,23 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
 
   return (
     <form className="create-account-form" onSubmit={submit}>
-      {loading && (
+      {role !== 'ADMIN' && (
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={submitting}
+          onClick={() => setRole('ADMIN')}
+        >
+          Tạo tài khoản quản trị viên
+        </button>
+      )}
+      {loading && role !== 'ADMIN' && (
         <div className="content-state" role="status">
           <span className="spinner" />
           <p>Đang tải danh sách bộ môn...</p>
         </div>
       )}
-      {loadError && (
+      {loadError && role !== 'ADMIN' && (
         <div className="create-account-form__notice" role="alert">
           <p>Không thể tải danh sách bộ môn.</p>
           <button
@@ -192,10 +204,10 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
           </button>
         </div>
       )}
-      {!loading && !loadError && departments.length === 0 && (
+      {role !== 'ADMIN' && !loading && !loadError && departments.length === 0 && (
         <div className="create-account-form__notice" role="status">
           <p>Cần có ít nhất một bộ môn trước khi tạo tài khoản.</p>
-          <Link className="btn btn-secondary" to="/academic-management" onClick={onCancel}>
+          <Link className="btn btn-secondary" to="/academic-catalog" onClick={onCancel}>
             Quản lý học thuật
           </Link>
         </div>
@@ -203,7 +215,9 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
 
       <fieldset
         className="create-account-form__fields"
-        disabled={submitting || loading || loadError || departments.length === 0}
+        disabled={
+          submitting || (role !== 'ADMIN' && (loading || loadError || departments.length === 0))
+        }
       >
         <h2 className="section-title">Thông tin tài khoản</h2>
         <div className="create-account-form__grid">
@@ -219,12 +233,13 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
               value={role}
               required
               onChange={(event) => {
-                setRole(event.target.value as 'STUDENT' | 'LECTURER')
+                setRole(event.target.value as 'STUDENT' | 'LECTURER' | 'ADMIN')
                 setErrorMessage('')
               }}
             >
               <option value="STUDENT">Sinh viên</option>
               <option value="LECTURER">Giảng viên</option>
+              <option value="ADMIN">Quản trị viên</option>
             </AnimatedSelect>
           </div>
           <div className="form-group">
@@ -320,122 +335,127 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
           </div>
         </div>
 
-        <h2 className="section-title">Hồ sơ {role === 'STUDENT' ? 'sinh viên' : 'giảng viên'}</h2>
-        <div className="create-account-form__grid">
-          <div className="form-group">
-            <label className="form-label" htmlFor="create-department">
-              Bộ môn{' '}
-              <span className="text-red" aria-hidden="true">
-                *
-              </span>
-            </label>
-            <AnimatedSelect
-              id="create-department"
-              value={form.departmentId}
-              onChange={(event) => updateField('departmentId', event.target.value)}
-              required
-            >
-              <option value="">Chọn bộ môn</option>
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name.trim().toLocaleLowerCase('vi') === 'công nghệ phần mềm'
-                    ? 'Công Nghệ Phần Mềm'
-                    : department.name}
-                </option>
-              ))}
-            </AnimatedSelect>
-          </div>
-          {role === 'STUDENT' ? (
-            <>
+        {role !== 'ADMIN' && (
+          <>
+            <h2 className="section-title">
+              Hồ sơ {role === 'STUDENT' ? 'sinh viên' : 'giảng viên'}
+            </h2>
+            <div className="create-account-form__grid">
               <div className="form-group">
-                <label className="form-label" htmlFor="create-student-code">
-                  Mã sinh viên{' '}
+                <label className="form-label" htmlFor="create-department">
+                  Bộ môn{' '}
                   <span className="text-red" aria-hidden="true">
                     *
                   </span>
-                </label>
-                <input
-                  id="create-student-code"
-                  className="form-input"
-                  value={form.studentCode}
-                  onChange={(event) => updateField('studentCode', event.target.value)}
-                  maxLength={20}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="create-class">
-                  Lớp{' '}
-                  <span className="text-red" aria-hidden="true">
-                    *
-                  </span>
-                </label>
-                <input
-                  id="create-class"
-                  className="form-input"
-                  value={form.className}
-                  onChange={(event) => updateField('className', event.target.value)}
-                  maxLength={50}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="create-cohort">
-                  Khóa{' '}
-                  <span className="text-red" aria-hidden="true">
-                    *
-                  </span>
-                </label>
-                <input
-                  id="create-cohort"
-                  className="form-input"
-                  placeholder="Ví dụ: 2026"
-                  value={form.cohort}
-                  onChange={(event) => updateField('cohort', event.target.value)}
-                  maxLength={20}
-                  required
-                />
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="form-group">
-                <label className="form-label" htmlFor="create-lecturer-code">
-                  Mã giảng viên{' '}
-                  <span className="text-red" aria-hidden="true">
-                    *
-                  </span>
-                </label>
-                <input
-                  id="create-lecturer-code"
-                  className="form-input"
-                  value={form.lecturerCode}
-                  onChange={(event) => updateField('lecturerCode', event.target.value)}
-                  maxLength={20}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="create-degree">
-                  Học vị
                 </label>
                 <AnimatedSelect
-                  id="create-degree"
-                  value={form.academicDegree}
-                  onChange={(event) => updateField('academicDegree', event.target.value)}
+                  id="create-department"
+                  value={form.departmentId}
+                  onChange={(event) => updateField('departmentId', event.target.value)}
+                  required
                 >
-                  <option value="">Chọn học vị</option>
-                  {academicDegrees.map((degree) => (
-                    <option key={degree} value={degree}>
-                      {degree}
+                  <option value="">Chọn bộ môn</option>
+                  {departments.map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name.trim().toLocaleLowerCase('vi') === 'công nghệ phần mềm'
+                        ? 'Công Nghệ Phần Mềm'
+                        : department.name}
                     </option>
                   ))}
                 </AnimatedSelect>
               </div>
-            </>
-          )}
-        </div>
-
+              {role === 'STUDENT' ? (
+                <>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="create-student-code">
+                      Mã sinh viên{' '}
+                      <span className="text-red" aria-hidden="true">
+                        *
+                      </span>
+                    </label>
+                    <input
+                      id="create-student-code"
+                      className="form-input"
+                      value={form.studentCode}
+                      onChange={(event) => updateField('studentCode', event.target.value)}
+                      maxLength={20}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="create-class">
+                      Lớp{' '}
+                      <span className="text-red" aria-hidden="true">
+                        *
+                      </span>
+                    </label>
+                    <input
+                      id="create-class"
+                      className="form-input"
+                      value={form.className}
+                      onChange={(event) => updateField('className', event.target.value)}
+                      maxLength={50}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="create-cohort">
+                      Khóa{' '}
+                      <span className="text-red" aria-hidden="true">
+                        *
+                      </span>
+                    </label>
+                    <input
+                      id="create-cohort"
+                      className="form-input"
+                      placeholder="Ví dụ: 2026"
+                      value={form.cohort}
+                      onChange={(event) => updateField('cohort', event.target.value)}
+                      maxLength={20}
+                      required
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="create-lecturer-code">
+                      Mã giảng viên{' '}
+                      <span className="text-red" aria-hidden="true">
+                        *
+                      </span>
+                    </label>
+                    <input
+                      id="create-lecturer-code"
+                      className="form-input"
+                      value={form.lecturerCode}
+                      onChange={(event) => updateField('lecturerCode', event.target.value)}
+                      maxLength={20}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="create-degree">
+                      Học vị
+                    </label>
+                    <AnimatedSelect
+                      id="create-degree"
+                      value={form.academicDegree}
+                      onChange={(event) => updateField('academicDegree', event.target.value)}
+                    >
+                      <option value="">Chọn học vị</option>
+                      {academicDegrees.map((degree) => (
+                        <option key={degree} value={degree}>
+                          {degree}
+                        </option>
+                      ))}
+                    </AnimatedSelect>
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
         {errorMessage && (
           <p className="create-account-form__error" role="alert">
             {errorMessage}

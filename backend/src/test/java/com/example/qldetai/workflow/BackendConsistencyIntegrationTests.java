@@ -757,11 +757,14 @@ class BackendConsistencyIntegrationTests {
         assertThat(defenses.listDefenses(period.getId(), null, 0, 20).totalElements()).isEqualTo(1);
     }
 
-    @Test
-    void existingGraduationSchedulePreventsChangingThePeriodDate() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {2, 17})
+    void existingGraduationSchedulePreventsChangingThePeriodDate(int utcHour) {
         Long project = assignedProject();
         Long committee = fullCommittee(lecturerA, lecturerB, lecturerD);
-        LocalDateTime starts = now().plusDays(5);
+        // Keep the whole session on one Vietnamese calendar day, regardless of the
+        // time the test runs. UTC 17:30 also exercises the following Vietnamese date.
+        LocalDateTime starts = now().plusDays(5).toLocalDate().atTime(utcHour, 30);
         tx.executeWithoutResult(
                 status -> {
                     var current = periods.findById(period.getId()).orElseThrow();
