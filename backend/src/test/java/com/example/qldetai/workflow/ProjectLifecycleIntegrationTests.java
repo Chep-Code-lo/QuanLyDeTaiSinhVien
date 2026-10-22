@@ -766,6 +766,86 @@ class ProjectLifecycleIntegrationTests {
                 .andExpect(status().isConflict());
     }
 
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(
+            value = AssessmentComponentType.class,
+            names = {"REVIEW", "OTHER"})
+    void assigningAnEvaluatorCreatesAPrivateUnreadNotification(
+            AssessmentComponentType type, @Autowired MockMvc mvc) throws Exception {
+        var project = createAssignedProject("assignment-notice", leaderStudent, secondStudent);
+        var catalog = createLockedCatalog("assignment-notice", "Thành phần chấm", type);
+        LocalDateTime deadline = nowUtc().plusDays(1).withHour(20).withMinute(30);
+        Long evaluationId =
+                evaluationService.assign(
+                        new CreateEvaluationRequest(
+                                project.id(),
+                                catalog.rubric().id(),
+                                lecturerThree.getId(),
+                                null,
+                                deadline),
+                        admin.getId());
+
+        assertEvaluatorNotification(project, catalog, lecturerThree, deadline);
+        mvc.perform(
+                        get("/api/v1/notifications")
+                                .with(user(UserPrincipal.from(lecturerThree.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].title").value("Phân công chấm điểm"))
+                .andExpect(jsonPath("$.data.content[0].targetPath").value("/score-sheets"));
+        mvc.perform(
+                        get("/api/v1/notifications/unread-count")
+                                .with(user(UserPrincipal.from(lecturerThree.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.unreadCount").value(1));
+        mvc.perform(
+                        get("/api/v1/notifications")
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").isEmpty());
+        assertThatThrownBy(
+                        () ->
+                                evaluationService.assign(
+                                        new CreateEvaluationRequest(
+                                                project.id(),
+                                                catalog.rubric().id(),
+                                                lecturerThree.getId(),
+                                                null,
+                                                deadline),
+                                        admin.getId()))
+                .isInstanceOf(com.example.qldetai.exception.ConflictException.class);
+        assertThat(notifications.list(lecturerThree.getUser().getId(), 0, 100).content())
+                .hasSize(1);
+        assertThat(evaluationRepository.findById(evaluationId)).isPresent();
+    }
+
+    private void assertEvaluatorNotification(
+            ProjectAssignmentResponse project,
+            LockedCatalog catalog,
+            Lecturer lecturer,
+            LocalDateTime deadline) {
+        var localDeadline =
+                deadline.atOffset(java.time.ZoneOffset.UTC)
+                        .atZoneSameInstant(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+        assertThat(notifications.list(lecturer.getUser().getId(), 0, 100).content())
+                .filteredOn(item -> item.title().equals("Phân công chấm điểm"))
+                .singleElement()
+                .satisfies(
+                        item -> {
+                            assertThat(item.content())
+                                    .contains(
+                                            project.topicCode(),
+                                            project.topicTitle(),
+                                            catalog.component().name(),
+                                            catalog.rubric().name(),
+                                            localDeadline.format(
+                                                    java.time.format.DateTimeFormatter.ofPattern(
+                                                            "dd/MM/yyyy HH:mm")),
+                                            "Asia/Ho_Chi_Minh");
+                            assertThat(item.targetPath()).isEqualTo("/score-sheets");
+                            assertThat(item.readAt()).isNull();
+                        });
+    }
+
     @Test
     void committeeEvaluationAppearsInAssignmentAndDefenseReads() {
         ProjectAssignmentResponse assignment =
@@ -835,6 +915,11 @@ class ProjectLifecycleIntegrationTests {
                                 defenseId,
                                 nowUtc().plusDays(7)),
                         admin.getId());
+        assertEvaluatorNotification(
+                assignment,
+                catalog,
+                lecturerThree,
+                evaluationRepository.findById(evaluationId).orElseThrow().getDeadlineAt());
 
         PageResponse<EvaluationCommitteeResponse> committees =
                 evaluationCommitteeService.listCommittees(period.getId(), 0, 10);
