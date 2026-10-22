@@ -69,26 +69,26 @@ public class AnnouncementController {
             @AuthenticationPrincipal UserPrincipal principal) {
         AnnouncementResponse created = announcementService.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/announcements/" + created.id()))
-                .body(ApiResponse.success("Announcement created as draft.", created));
+                .body(ApiResponse.success("Đã tạo thông báo nháp.", created));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or @announcementAuthorization.canManage(#id, authentication)")
     public ApiResponse<AnnouncementResponse> update(
             @PathVariable Long id, @Valid @RequestBody UpdateAnnouncementRequest request) {
-        return ApiResponse.success("Announcement updated.", announcementService.update(id, request));
+        return ApiResponse.success("Đã cập nhật thông báo.", announcementService.update(id, request));
     }
 
     @PatchMapping("/{id}/publish")
     @PreAuthorize("hasRole('ADMIN') or @announcementAuthorization.canManage(#id, authentication)")
     public ApiResponse<AnnouncementResponse> publish(@PathVariable Long id) {
-        return ApiResponse.success("Announcement published.", announcementService.publish(id));
+        return ApiResponse.success("Đã công bố thông báo.", announcementService.publish(id));
     }
 
     @PatchMapping("/{id}/archive")
     @PreAuthorize("hasRole('ADMIN') or @announcementAuthorization.canManage(#id, authentication)")
     public ApiResponse<AnnouncementResponse> archive(@PathVariable Long id) {
-        return ApiResponse.success("Announcement archived.", announcementService.archive(id));
+        return ApiResponse.success("Đã lưu trữ thông báo.", announcementService.archive(id));
     }
 
     @DeleteMapping("/{id}")

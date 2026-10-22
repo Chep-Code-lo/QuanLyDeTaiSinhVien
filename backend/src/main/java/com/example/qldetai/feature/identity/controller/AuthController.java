@@ -44,7 +44,7 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest,
             HttpServletResponse response) {
-        return ApiResponse.success("Login successful.", authService.login(request, httpRequest, response));
+        return ApiResponse.success("Đăng nhập thành công.", authService.login(request, httpRequest, response));
     }
 
     @GetMapping("/me")
@@ -58,7 +58,7 @@ public class AuthController {
             @Valid @RequestBody ChangePasswordRequest request,
             HttpServletRequest httpRequest, HttpServletResponse response) {
         authService.changePassword(principal.id(), request, httpRequest, response);
-        return ApiResponse.success("Password changed successfully.", null);
+        return ApiResponse.success("Đổi mật khẩu thành công.", null);
     }
 
     @PostMapping("/logout")
@@ -68,6 +68,6 @@ public class AuthController {
             Authentication authentication) {
         new SecurityContextLogoutHandler().logout(request, response, authentication);
         SecurityContextHolder.clearContext();
-        return ApiResponse.success("Logout successful.", null);
+        return ApiResponse.success("Đăng xuất thành công.", null);
     }
 }

@@ -13,6 +13,19 @@ import org.springframework.data.repository.query.Param;
 
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id = :id")
+    Optional<User> findByIdForUpdate(@Param("id") Long id);
+
+    @Query("select u.id from User u where lower(u.email) = :identifier")
+    Optional<Long> findLoginIdByEmail(@Param("identifier") String identifier);
+
+    @Query("select s.user.id from Student s where lower(s.studentCode) = :identifier")
+    Optional<Long> findLoginIdByStudentCode(@Param("identifier") String identifier);
+
+    @Query("select l.user.id from Lecturer l where lower(l.lecturerCode) = :identifier")
+    Optional<Long> findLoginIdByLecturerCode(@Param("identifier") String identifier);
+
     @EntityGraph(attributePaths = {"userRoles", "userRoles.role"})
     Optional<User> findByEmailIgnoreCase(String email);
 

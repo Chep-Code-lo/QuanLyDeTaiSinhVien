@@ -49,7 +49,7 @@ public class AssessmentComponentController {
             @AuthenticationPrincipal UserPrincipal principal) {
         AssessmentComponentResponse created = service.createComponent(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/assessment-components/" + created.id()))
-                .body(ApiResponse.success("Assessment component created.", created));
+                .body(ApiResponse.success("Đã tạo thành phần đánh giá.", created));
     }
 
     @PatchMapping("/assessment-components/{id}/lock")
@@ -59,6 +59,6 @@ public class AssessmentComponentController {
     public ApiResponse<AssessmentComponentResponse> lockComponent(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Assessment component locked.", service.lockComponent(id, principal.id()));
+                "Đã khóa thành phần đánh giá.", service.lockComponent(id, principal.id()));
     }
 }

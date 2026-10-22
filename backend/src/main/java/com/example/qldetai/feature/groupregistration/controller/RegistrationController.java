@@ -74,7 +74,7 @@ public class RegistrationController {
             @AuthenticationPrincipal UserPrincipal principal) {
         TopicRegistrationResponse created = registrationService.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/topic-registrations/" + created.id()))
-                .body(ApiResponse.success("Topic registration submitted.", created));
+                .body(ApiResponse.success("Đã gửi đăng ký đề tài.", created));
     }
 
     @PatchMapping("/{id}/review")
@@ -86,7 +86,7 @@ public class RegistrationController {
             @Valid @RequestBody ReviewTopicRegistrationRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Topic registration reviewed.",
+                "Đã xử lý đăng ký đề tài.",
                 registrationService.review(id, request, principal.id()));
     }
 
@@ -97,7 +97,7 @@ public class RegistrationController {
             @Valid @RequestBody WithdrawTopicRegistrationRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Topic registration withdrawn.",
+                "Đã rút đăng ký đề tài.",
                 registrationService.withdraw(id, request, principal.id()));
     }
 }

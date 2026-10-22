@@ -65,7 +65,7 @@ public class GradeChangeController {
             @AuthenticationPrincipal UserPrincipal principal) {
         Long q = service.requestChange(id, request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/grade-change-requests/" + q))
-                .body(ApiResponse.success("Grade change requested.", q));
+                .body(ApiResponse.success("Đã gửi yêu cầu đổi điểm.", q));
     }
 
     @PatchMapping("/grade-change-requests/{id}/review")
@@ -77,6 +77,6 @@ public class GradeChangeController {
             @Valid @RequestBody ReviewGradeChangeRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         service.reviewChange(id, request, principal.id());
-        return ApiResponse.success("Grade change request reviewed.", null);
+        return ApiResponse.success("Đã xử lý yêu cầu đổi điểm.", null);
     }
 }

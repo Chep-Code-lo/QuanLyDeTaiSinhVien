@@ -56,19 +56,19 @@ public class UserAdminController {
     public ResponseEntity<ApiResponse<UserResponse>> create(@Valid @RequestBody CreateUserRequest request) {
         UserResponse created = userAdminService.create(request);
         return ResponseEntity.created(URI.create("/api/v1/admin/users/" + created.id()))
-                .body(ApiResponse.success("User account created.", created));
+                .body(ApiResponse.success("Đã tạo tài khoản người dùng.", created));
     }
 
     @PutMapping("/{id}")
     public ApiResponse<UserResponse> update(
             @PathVariable Long id, @Valid @RequestBody UpdateUserRequest request) {
-        return ApiResponse.success("User account updated.", userAdminService.update(id, request));
+        return ApiResponse.success("Đã cập nhật tài khoản người dùng.", userAdminService.update(id, request));
     }
 
     @PatchMapping("/{id}/status")
     public ApiResponse<UserResponse> updateStatus(
             @PathVariable Long id, @Valid @RequestBody UpdateUserStatusRequest request) {
-        return ApiResponse.success("User status updated.", userAdminService.updateStatus(id, request));
+        return ApiResponse.success("Đã cập nhật trạng thái người dùng.", userAdminService.updateStatus(id, request));
     }
 
     @DeleteMapping("/{id}")
@@ -80,6 +80,6 @@ public class UserAdminController {
     @PutMapping("/{id}/roles")
     public ApiResponse<UserResponse> updateRoles(
             @PathVariable Long id, @Valid @RequestBody UpdateUserRolesRequest request) {
-        return ApiResponse.success("User roles updated.", userAdminService.updateRoles(id, request));
+        return ApiResponse.success("Đã cập nhật vai trò người dùng.", userAdminService.updateRoles(id, request));
     }
 }

@@ -56,24 +56,24 @@ public class GroupInvitationController {
             @AuthenticationPrincipal UserPrincipal principal) {
         GroupInvitationResponse created = groupInvitationService.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/group-invitations/" + created.id()))
-                .body(ApiResponse.success("Group invitation created.", created));
+                .body(ApiResponse.success("Đã gửi lời mời tham gia nhóm.", created));
     }
 
     @PatchMapping("/{id}/accept")
     public ApiResponse<GroupInvitationResponse> accept(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Group invitation processed.", groupInvitationService.accept(id, principal.id()));
+        return ApiResponse.success("Đã xử lý lời mời tham gia nhóm.", groupInvitationService.accept(id, principal.id()));
     }
 
     @PatchMapping("/{id}/reject")
     public ApiResponse<GroupInvitationResponse> reject(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Group invitation processed.", groupInvitationService.reject(id, principal.id()));
+        return ApiResponse.success("Đã xử lý lời mời tham gia nhóm.", groupInvitationService.reject(id, principal.id()));
     }
 
     @PatchMapping("/{id}/cancel")
     public ApiResponse<GroupInvitationResponse> cancel(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Group invitation cancelled.", groupInvitationService.cancel(id, principal.id()));
+        return ApiResponse.success("Đã hủy lời mời tham gia nhóm.", groupInvitationService.cancel(id, principal.id()));
     }
 }

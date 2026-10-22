@@ -62,7 +62,7 @@ public class GroupController {
             @AuthenticationPrincipal UserPrincipal principal) {
         StudentGroupResponse created = groupService.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/groups/" + created.id()))
-                .body(ApiResponse.success("Student group created.", created));
+                .body(ApiResponse.success("Đã tạo nhóm sinh viên.", created));
     }
 
     @DeleteMapping("/{id}/members/{studentId}")
@@ -71,6 +71,6 @@ public class GroupController {
             @PathVariable Long id,
             @PathVariable Long studentId,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Group member removed.", groupService.removeMember(id, studentId, principal.id()));
+        return ApiResponse.success("Đã xóa thành viên khỏi nhóm.", groupService.removeMember(id, studentId, principal.id()));
     }
 }

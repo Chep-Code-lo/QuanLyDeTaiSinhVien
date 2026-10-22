@@ -56,14 +56,14 @@ public class RegistrationPeriodController {
             @AuthenticationPrincipal UserPrincipal principal) {
         RegistrationPeriodResponse created = registrationPeriodService.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/registration-periods/" + created.id()))
-                .body(ApiResponse.success("Registration period created as draft.", created));
+                .body(ApiResponse.success("Đã tạo đợt đăng ký nháp.", created));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManagePeriod(#id, authentication)")
     public ApiResponse<RegistrationPeriodResponse> update(
             @PathVariable Long id, @Valid @RequestBody UpdateRegistrationPeriodRequest request) {
-        return ApiResponse.success("Registration period updated.", registrationPeriodService.update(id, request));
+        return ApiResponse.success("Đã cập nhật đợt đăng ký.", registrationPeriodService.update(id, request));
     }
 
     @PatchMapping("/{id}/status")
@@ -73,6 +73,6 @@ public class RegistrationPeriodController {
             @Valid @RequestBody ChangePeriodStatusRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Registration period status updated.", registrationPeriodService.changeStatus(id, request, principal.id()));
+                "Đã cập nhật trạng thái đợt đăng ký.", registrationPeriodService.changeStatus(id, request, principal.id()));
     }
 }

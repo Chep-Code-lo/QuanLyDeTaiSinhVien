@@ -34,14 +34,14 @@ public class ProgressController {
             @AuthenticationPrincipal UserPrincipal principal) {
         MilestoneResponse r = service.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/milestones/" + r.id()))
-                .body(ApiResponse.success("Milestone created.", r));
+                .body(ApiResponse.success("Đã tạo mốc tiến độ.", r));
     }
 
     @PutMapping("/milestones/{id}")
     @PreAuthorize("hasRole('ADMIN') or @progressAuthorization.canManageMilestone(#id, authentication)")
     public ApiResponse<MilestoneResponse> update(
             @PathVariable Long id, @Valid @RequestBody UpdateMilestoneRequest request) {
-        return ApiResponse.success("Milestone updated.", service.update(id, request));
+        return ApiResponse.success("Đã cập nhật mốc tiến độ.", service.update(id, request));
     }
 
     @GetMapping("/project-assignments/{assignmentId}/milestones")
@@ -55,7 +55,7 @@ public class ProgressController {
             "hasRole('ADMIN') or @projectAuthorization.canManageAssignment(#assignmentId, authentication)")
     public ApiResponse<MilestoneReminderResponse> sendReminder(@PathVariable Long assignmentId) {
         return ApiResponse.success(
-                "Deadline reminder sent.", milestoneReminderService.send(assignmentId));
+                "Đã gửi nhắc hạn.", milestoneReminderService.send(assignmentId));
     }
 
     @PostMapping("/milestones/{id}/submissions")
@@ -66,7 +66,7 @@ public class ProgressController {
             @AuthenticationPrincipal UserPrincipal principal) {
         SubmissionResponse r = service.submit(id, request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/report-submissions/" + r.id()))
-                .body(ApiResponse.success("Report submitted.", r));
+                .body(ApiResponse.success("Đã nộp báo cáo.", r));
     }
 
     @PostMapping("/report-submissions/{id}/feedback")
@@ -77,6 +77,6 @@ public class ProgressController {
             @Valid @RequestBody FeedbackRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Feedback saved.", service.feedback(id, request, principal.id()));
+                "Đã lưu nhận xét.", service.feedback(id, request, principal.id()));
     }
 }

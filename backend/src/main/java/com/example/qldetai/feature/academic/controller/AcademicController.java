@@ -43,14 +43,14 @@ public class AcademicController {
             @Valid @RequestBody CreateFacultyRequest request) {
         FacultyResponse created = academicCatalogService.createFaculty(request);
         return ResponseEntity.created(URI.create("/api/v1/faculties/" + created.id()))
-                .body(ApiResponse.success("Faculty created.", created));
+                .body(ApiResponse.success("Đã tạo khoa.", created));
     }
 
     @PatchMapping("/faculties/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<FacultyResponse> updateFaculty(
             @PathVariable Long id, @Valid @RequestBody UpdateCatalogRequest request) {
-        return ApiResponse.success("Faculty updated.", academicCatalogService.updateFaculty(id, request));
+        return ApiResponse.success("Đã cập nhật khoa.", academicCatalogService.updateFaculty(id, request));
     }
 
     @GetMapping("/departments")
@@ -64,14 +64,14 @@ public class AcademicController {
             @Valid @RequestBody CreateDepartmentRequest request) {
         DepartmentResponse created = academicCatalogService.createDepartment(request);
         return ResponseEntity.created(URI.create("/api/v1/departments/" + created.id()))
-                .body(ApiResponse.success("Department created.", created));
+                .body(ApiResponse.success("Đã tạo bộ môn.", created));
     }
 
     @PatchMapping("/departments/{id}")
     @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageDepartment(#id, authentication)")
     public ApiResponse<DepartmentResponse> updateDepartment(
             @PathVariable Long id, @Valid @RequestBody UpdateCatalogRequest request) {
-        return ApiResponse.success("Department updated.", academicCatalogService.updateDepartment(id, request));
+        return ApiResponse.success("Đã cập nhật bộ môn.", academicCatalogService.updateDepartment(id, request));
     }
 
     @GetMapping("/semesters")
@@ -85,6 +85,6 @@ public class AcademicController {
             @Valid @RequestBody CreateSemesterRequest request) {
         SemesterResponse created = academicCatalogService.createSemester(request);
         return ResponseEntity.created(URI.create("/api/v1/semesters/" + created.id()))
-                .body(ApiResponse.success("Semester created.", created));
+                .body(ApiResponse.success("Đã tạo học kỳ.", created));
     }
 }

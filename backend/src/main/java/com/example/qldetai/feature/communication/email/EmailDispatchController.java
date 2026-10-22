@@ -45,6 +45,6 @@ public class EmailDispatchController {
             @PathVariable EmailNotificationEventType eventType,
             @Valid @RequestBody SendEmailRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Email was queued for the selected recipients.", service.send(principal.id(), eventType, request));
+        return ApiResponse.success("Đã xếp hàng gửi email đến người nhận đã chọn.", service.send(principal.id(), eventType, request));
     }
 }
