@@ -1128,7 +1128,7 @@ export function EvaluatorAssignmentPage() {
                 disabled={page === 0 || listLoading || submitting}
                 onClick={() => setPage(page - 1)}
               >
-                Trang trước
+                Trước
               </button>
               <button
                 type="button"
@@ -1136,7 +1136,7 @@ export function EvaluatorAssignmentPage() {
                 disabled={page >= totalPages - 1 || listLoading || submitting}
                 onClick={() => setPage(page + 1)}
               >
-                Trang sau
+                Sau
               </button>
             </div>
           </div>

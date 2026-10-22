@@ -1,3 +1,4 @@
+import { NotificationDetailDialog } from '../src/features/notifications/components/NotificationDetailDialog'
 import { beforeAll, beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
@@ -93,7 +94,7 @@ it('loads exactly one server page, resets page on search and page size changes',
   expect(mocks.list).toHaveBeenLastCalledWith({ page: 0, size: 10, search: '' })
   expect(mocks.personal).not.toHaveBeenCalled()
   const nav = screen.getByRole('navigation', { name: 'Phân trang thông báo chung' })
-  fireEvent.click(within(nav).getByRole('button', { name: 'Trang sau' }))
+  fireEvent.click(within(nav).getByRole('button', { name: 'Sau' }))
   await waitFor(() =>
     expect(mocks.list).toHaveBeenLastCalledWith({ page: 1, size: 10, search: '' }),
   )
@@ -152,7 +153,7 @@ it('resets management pagination on faculty and status changes', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Mở quản lý' }))
   await screen.findByText('Thông báo 3')
   const nav = screen.getByRole('navigation', { name: 'Phân trang quản lý thông báo khoa' })
-  fireEvent.click(within(nav).getByRole('button', { name: 'Trang sau' }))
+  fireEvent.click(within(nav).getByRole('button', { name: 'Sau' }))
   await waitFor(() =>
     expect(mocks.managed).toHaveBeenLastCalledWith(
       expect.objectContaining({ facultyId: 1, page: 1 }),
@@ -180,4 +181,15 @@ it('shows errors with retry and a searchable empty state', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }))
   await screen.findByText('Không tìm thấy thông báo phù hợp.')
   expect(screen.getByRole('searchbox', { name: 'Tìm kiếm thông báo chung' })).toBeTruthy()
+})
+
+it('thông báo cũ hiển thị giờ Việt Nam thay cho mã múi giờ kỹ thuật', () => {
+  const content = 'Bắt đầu: 26/10/2026 10:00. Kết thúc: 26/10/2026 11:00 (Asia/Ho_Chi_Minh).'
+  const item = { title: 'Lịch bảo vệ đề tài', content, sentAt: '2026-10-23T01:00:00Z' }
+  render(<NotificationDetailDialog item={item} onClose={vi.fn()} />)
+  expect(
+    screen.getByText('Bắt đầu: 26/10/2026 10:00. Kết thúc: 26/10/2026 11:00 (giờ Việt Nam).'),
+  ).toBeTruthy()
+  expect(screen.queryByText(/Asia\/Ho_Chi_Minh/)).toBeNull()
+  expect(item.content).toBe(content)
 })

@@ -964,7 +964,7 @@ export function EmailSettingsPage() {
                           setRecipientPage((page) => page - 1)
                         }}
                       >
-                        Trang trước
+                        Trước
                       </button>
                       <span>
                         Trang {recipientPage + 1} / {recipientPages}
@@ -978,7 +978,7 @@ export function EmailSettingsPage() {
                           setRecipientPage((page) => page + 1)
                         }}
                       >
-                        Trang sau
+                        Sau
                       </button>
                     </div>
                   )}

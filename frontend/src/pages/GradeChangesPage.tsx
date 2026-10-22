@@ -42,10 +42,6 @@ export function GradeChangesPage() {
     <>
       <PageHeader title="Yêu cầu đổi điểm" />
       <section className="page-card">
-        <p>
-          Giảng viên gửi yêu cầu từ phiếu chấm đã nộp. Người quản lý đúng phạm vi xét duyệt trước
-          khi giảng viên sửa và nộp lại.
-        </p>
         <label>
           Trạng thái yêu cầu
           <select

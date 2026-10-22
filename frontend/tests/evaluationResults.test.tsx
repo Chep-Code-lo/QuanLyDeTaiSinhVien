@@ -112,7 +112,7 @@ it('người quản lý chỉ công bố sau xác nhận và kết quả chuyể
   await userEvent.click(
     within(screen.getByRole('dialog')).getByRole('button', { name: 'Xác nhận' }),
   )
-  await screen.findByText('Phiên bản 1 · Đã công bố')
+  await screen.findByText('Kết quả lần 1 · Đã công bố')
   expect(mocks.publish).toHaveBeenCalledExactlyOnceWith(7)
   expect(screen.queryByRole('button', { name: 'Công bố kết quả' })).toBeNull()
 })
@@ -153,7 +153,7 @@ it('bỏ qua phản hồi đề tài cũ đến muộn và phân trang ở serve
   await screen.findByText(/Chưa có kết quả được chốt/)
   await act(async () => resolve(page([finalized])))
   expect(screen.queryByText('8.50/10')).toBeNull()
-  await userEvent.click(screen.getByRole('button', { name: 'Trang sau' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Sau' }))
   await waitFor(() => expect(mocks.projects).toHaveBeenLastCalledWith(undefined, 1, 10))
 })
 it('lỗi tải có thể thử lại và không cho phép thao tác khi chưa xác nhận quyền', async () => {
@@ -166,4 +166,38 @@ it('lỗi tải có thể thử lại và không cho phép thao tác khi chưa x
   expect(screen.queryByRole('button', { name: 'Chốt kết quả' })).toBeNull()
   await userEvent.click(screen.getByRole('button', { name: 'Thử lại' }))
   await screen.findByRole('button', { name: 'Chốt kết quả' })
+})
+
+it('hiển thị nhãn điểm bằng tiếng Việt, ẩn phiên bản kỹ thuật và phân trang một trang', async () => {
+  mocks.results.mockResolvedValue(
+    page([
+      {
+        ...finalized,
+        inputs: [
+          ...finalized.inputs,
+          { id: 2, sheetId: 12, componentCode: 'DEFENSE', sheetVersion: 0, scoreSnapshot: 8 },
+          { id: 3, sheetId: 13, componentCode: 'CUSTOM', sheetVersion: 2, scoreSnapshot: 9 },
+        ],
+      },
+    ]),
+  )
+  render(<EvaluationResultsPage />)
+  await userEvent.click(await screen.findByRole('button', { name: 'Xem điểm DT01' }))
+  await screen.findByRole('heading', { name: 'Kết quả lần 1 · Đã chốt, chờ công bố' })
+  expect(screen.getByText('Phản biện')).toBeTruthy()
+  expect(screen.getByText('Bảo vệ trước hội đồng')).toBeTruthy()
+  expect(screen.getByText('CUSTOM')).toBeTruthy()
+  expect(screen.getByText('Phiếu số 12')).toBeTruthy()
+  expect(screen.queryByText(/phiên bản 0/)).toBeNull()
+  expect(screen.queryByRole('navigation', { name: 'Phân trang kết quả' })).toBeNull()
+})
+it('chỉ hiện phân trang kết quả khi có nhiều trang và lấy đúng trang từ backend', async () => {
+  mocks.results.mockResolvedValue(page([finalized], 2))
+  render(<EvaluationResultsPage />)
+  await userEvent.click(await screen.findByRole('button', { name: 'Xem điểm DT01' }))
+  const pager = await screen.findByRole('navigation', { name: 'Phân trang kết quả' })
+  await userEvent.click(within(pager).getByRole('button', { name: 'Sau' }))
+  await waitFor(() =>
+    expect(mocks.results).toHaveBeenLastCalledWith({ assignmentId: 1, page: 1, size: 10 }),
+  )
 })

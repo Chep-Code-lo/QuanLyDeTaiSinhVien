@@ -440,7 +440,7 @@ export const AcademicManagementPage: React.FC = () => {
                 disabled={loadingPeriods || periodPage === 0}
                 onClick={() => setPeriodPage((value) => value - 1)}
               >
-                Trang trước
+                Trước
               </button>
               <button
                 type="button"
@@ -448,7 +448,7 @@ export const AcademicManagementPage: React.FC = () => {
                 disabled={loadingPeriods || periodPage + 1 >= totalPeriodPages}
                 onClick={() => setPeriodPage((value) => value + 1)}
               >
-                Trang sau
+                Sau
               </button>
             </div>
           </nav>

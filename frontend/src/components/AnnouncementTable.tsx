@@ -163,7 +163,7 @@ export function CommunicationPagination({
         disabled={loading || page === 0}
         onClick={() => onPage(page - 1)}
       >
-        Trang trước
+        Trước
       </button>
       <button
         type="button"
@@ -171,7 +171,7 @@ export function CommunicationPagination({
         disabled={loading || page + 1 >= totalPages}
         onClick={() => onPage(page + 1)}
       >
-        Trang sau
+        Sau
       </button>
     </nav>
   )

@@ -22,7 +22,6 @@ export function ProjectAssignmentsPage() {
     <>
       <PageHeader title="Theo dõi đề tài được giao" />
       <section className="page-card">
-        <p>Đề tài được giao tự động sau khi đăng ký nhóm được duyệt.</p>
         <RemoteState
           loading={loading}
           error={error}

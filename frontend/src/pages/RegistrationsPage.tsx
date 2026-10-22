@@ -379,7 +379,7 @@ export function RegistrationsPage() {
                 disabled={loading || reviewPage === 0}
                 onClick={() => setReviewPage((value) => value - 1)}
               >
-                Trang trước
+                Trước
               </button>
               <button
                 type="button"
@@ -387,7 +387,7 @@ export function RegistrationsPage() {
                 disabled={loading || reviewPage + 1 >= totalReviewPages}
                 onClick={() => setReviewPage((value) => value + 1)}
               >
-                Trang sau
+                Sau
               </button>
             </div>
           </nav>

@@ -263,7 +263,7 @@ export function UserManagementPage() {
                 disabled={page === 0 || loading}
                 onClick={() => setPage((currentPage) => currentPage - 1)}
               >
-                Trang trước
+                Trước
               </button>
               <button
                 type="button"
@@ -271,7 +271,7 @@ export function UserManagementPage() {
                 disabled={page >= totalPages - 1 || loading}
                 onClick={() => setPage((currentPage) => currentPage + 1)}
               >
-                Trang sau
+                Sau
               </button>
             </div>
           </div>

@@ -45,7 +45,7 @@ it('chỉ tải một trang dù có nhiều đợt, rồi yêu cầu đúng tran
   render(<AcademicManagementPage />)
   await screen.findByText('Đợt đầu')
   expect(mocks.periods).toHaveBeenCalledExactlyOnceWith(undefined, 0, 10)
-  fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Sau' }))
   await screen.findByText('Đợt tiếp')
   expect(mocks.periods).toHaveBeenLastCalledWith(undefined, 1, 10)
   expect(mocks.periods).toHaveBeenCalledTimes(2)

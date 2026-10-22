@@ -12,10 +12,7 @@ export function GradeChangeRequestForm({ sheetId }: { sheetId: number }) {
   return (
     <section className="page-card">
       <h3>Yêu cầu điều chỉnh điểm</h3>
-      <p>
-        Phiếu chỉ được mở lại sau khi yêu cầu được duyệt. Phiếu đã dùng để chốt kết quả không thể mở
-        lại.
-      </p>
+
       {sent ? (
         <p role="status">Đã gửi yêu cầu. Theo dõi tại mục Yêu cầu đổi điểm.</p>
       ) : (

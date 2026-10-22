@@ -10,6 +10,13 @@ import type { PageResponse } from '../types/api'
 import type { ProjectAssignmentResponse, ResultDetailResponse, ResultStatus } from '../types/domain'
 import { formatDateTime } from '../utils/dateTime'
 
+const componentLabels: Record<string, string> = {
+  REVIEW: 'Phản biện',
+  DEFENSE: 'Bảo vệ trước hội đồng',
+  COMMITTEE: 'Hội đồng bảo vệ',
+  OTHER: 'Đánh giá khác',
+}
+
 const statusLabels: Record<ResultStatus, string> = {
   FINALIZED: 'Đã chốt, chờ công bố',
   PUBLISHED: 'Đã công bố',
@@ -49,10 +56,6 @@ export function EvaluationResultsPage() {
     <>
       <PageHeader title="Tổng hợp & Công bố điểm" />
       <section className="page-card">
-        <p>
-          Chủ tịch hội đồng chốt kết quả sau khi đủ phiếu điểm. Admin hoặc người quản lý đúng phạm
-          vi công bố kết quả cho sinh viên.
-        </p>
         <RemoteState
           loading={!current}
           error={current?.error ?? ''}
@@ -94,28 +97,30 @@ export function EvaluationResultsPage() {
                 </tbody>
               </table>
             </div>
-            <nav aria-label="Phân trang đề tài">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={page === 0}
-                onClick={() => go(page - 1)}
-              >
-                Trang trước
-              </button>
-              <span>
-                {' '}
-                Trang {page + 1}/{Math.max(1, current.data.totalPages)}{' '}
-              </span>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={page + 1 >= current.data.totalPages}
-                onClick={() => go(page + 1)}
-              >
-                Trang sau
-              </button>
-            </nav>
+            {current.data.totalPages > 1 && (
+              <nav className="table-pagination result-pagination" aria-label="Phân trang đề tài">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={page === 0}
+                  onClick={() => go(page - 1)}
+                >
+                  Trước
+                </button>
+                <span>
+                  {' '}
+                  Trang {page + 1}/{Math.max(1, current.data.totalPages)}{' '}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={page + 1 >= current.data.totalPages}
+                  onClick={() => go(page + 1)}
+                >
+                  Sau
+                </button>
+              </nav>
+            )}
           </>
         )}
       </section>
@@ -195,10 +200,7 @@ function ProjectResults({ project }: { project: ProjectAssignmentResponse }) {
       <h2>
         {project.topicCode} · {project.groupName}
       </h2>
-      <p>
-        Điểm được hệ thống tính bằng trung bình các điểm thành phần. Mỗi thành phần lấy trung bình
-        điểm của các giảng viên được phân công.
-      </p>
+
       <RemoteState
         loading={!current}
         error={current?.error ?? ''}
@@ -233,35 +235,33 @@ function ProjectResults({ project }: { project: ProjectAssignmentResponse }) {
           {current.data.content.map((result) => (
             <article key={result.id} className="page-card">
               <h3>
-                Phiên bản {result.versionNo} · {statusLabels[result.status]}
+                Kết quả lần {result.versionNo} · {statusLabels[result.status]}
               </h3>
               <p>
-                Điểm tổng hợp: <strong>{Number(result.finalScore).toFixed(2)}/10</strong>
+                Điểm tổng kết: <strong>{Number(result.finalScore).toFixed(2)}/10</strong>
               </p>
               <p>
-                Chốt bởi {result.finalizedByName} · {formatDateTime(result.finalizedAt)}
+                Người chốt điểm: {result.finalizedByName} · {formatDateTime(result.finalizedAt)}
               </p>
               {result.publishedAt && (
                 <p>
-                  Công bố bởi {result.publishedByName} · {formatDateTime(result.publishedAt)}
+                  Người công bố: {result.publishedByName} · {formatDateTime(result.publishedAt)}
                 </p>
               )}
               <div className="table-container">
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Thành phần</th>
+                      <th>Nội dung đánh giá</th>
                       <th>Phiếu chấm</th>
-                      <th>Điểm phiếu</th>
+                      <th>Điểm đánh giá</th>
                     </tr>
                   </thead>
                   <tbody>
                     {result.inputs.map((input) => (
                       <tr key={input.id}>
-                        <td>{input.componentCode}</td>
-                        <td>
-                          #{input.sheetId} · phiên bản {input.sheetVersion}
-                        </td>
+                        <td>{componentLabels[input.componentCode] ?? input.componentCode}</td>
+                        <td>Phiếu số {input.sheetId}</td>
                         <td>{Number(input.scoreSnapshot).toFixed(2)}</td>
                       </tr>
                     ))}
@@ -286,28 +286,30 @@ function ProjectResults({ project }: { project: ProjectAssignmentResponse }) {
               )}
             </article>
           ))}
-          <nav aria-label="Phân trang phiên bản kết quả">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={busy || page === 0}
-              onClick={() => setPage((value) => value - 1)}
-            >
-              Phiên bản trước
-            </button>
-            <span>
-              {' '}
-              Trang {page + 1}/{Math.max(1, current.data.totalPages)}{' '}
-            </span>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={busy || page + 1 >= current.data.totalPages}
-              onClick={() => setPage((value) => value + 1)}
-            >
-              Phiên bản sau
-            </button>
-          </nav>
+          {current.data.totalPages > 1 && (
+            <nav className="table-pagination result-pagination" aria-label="Phân trang kết quả">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={busy || page === 0}
+                onClick={() => setPage((value) => value - 1)}
+              >
+                Trước
+              </button>
+              <span>
+                {' '}
+                Trang {page + 1}/{Math.max(1, current.data.totalPages)}{' '}
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={busy || page + 1 >= current.data.totalPages}
+                onClick={() => setPage((value) => value + 1)}
+              >
+                Sau
+              </button>
+            </nav>
+          )}
         </>
       )}
       <ConfirmModal

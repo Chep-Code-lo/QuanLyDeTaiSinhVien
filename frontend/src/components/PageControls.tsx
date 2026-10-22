@@ -12,7 +12,7 @@ export function PageControls({
   label: string
 }) {
   return (
-    <nav className="table-pagination" aria-label={label}>
+    <nav className="table-pagination result-pagination" aria-label={label}>
       <span>
         Trang {page + 1}/{Math.max(1, totalPages)}
       </span>
@@ -23,7 +23,7 @@ export function PageControls({
           disabled={loading || page === 0}
           onClick={() => onPage(page - 1)}
         >
-          Trang trước
+          Trước
         </button>
         <button
           type="button"
@@ -31,7 +31,7 @@ export function PageControls({
           disabled={loading || page + 1 >= totalPages}
           onClick={() => onPage(page + 1)}
         >
-          Trang sau
+          Sau
         </button>
       </div>
     </nav>
