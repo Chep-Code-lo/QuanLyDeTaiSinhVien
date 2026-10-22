@@ -147,7 +147,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception exception) {
-        log.error("Unhandled request failure", exception);
+        log.error(
+                "Unhandled request failure type={} requestId={}",
+                exception.getClass().getName(),
+                org.slf4j.MDC.get("requestId"));
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.failure("Hệ thống gặp lỗi. Vui lòng thử lại sau."));
     }
