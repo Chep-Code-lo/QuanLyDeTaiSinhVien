@@ -59,14 +59,20 @@ jobs:
       - name: Backend clean verify
         working-directory: backend
         run: bash ./mvnw --batch-mode clean verify
-      - name: Concurrent HTTP and evaluation tests on MySQL
+      - name: Notification, mapping and concurrent tests on MySQL
         working-directory: backend
         run: >-
           bash ./mvnw --batch-mode test
-          '-Dtest=AuthSessionIntegrationTests,EvaluationConcurrencyIntegrationTests'
+          '-Dtest=AuthSessionIntegrationTests,EvaluationConcurrencyIntegrationTests,CommunicationPaginationIntegrationTests,MappingQueryIntegrationTests,BackendConsistencyIntegrationTests#studentProjectMappingDoesNotQueryEachProjectAssociation'
           '-Drace.test.mysql.url=jdbc:mysql://127.0.0.1:3306/ql_de_tai_sinh_vien?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC'
           -Drace.test.mysql.user=root
           "-Drace.test.mysql.password=$MYSQL_PWD"
+          '-Dreview.mysql.url=jdbc:mysql://127.0.0.1:3306/ql_de_tai_sinh_vien?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC'
+          -Dreview.mysql.user=root
+          "-Dreview.mysql.password=$MYSQL_PWD"
+          '-Daudit.mysql.url=jdbc:mysql://127.0.0.1:3306/ql_de_tai_sinh_vien?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC'
+          -Daudit.mysql.user=root
+          "-Daudit.mysql.password=$MYSQL_PWD"
 
   frontend:
     runs-on: ubuntu-latest
