@@ -62,7 +62,8 @@ public class CurrentUserRefreshFilter extends OncePerRequestFilter {
             response.setStatus(401);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             objectMapper.writeValue(
-                    response.getOutputStream(), ApiResponse.failure("The account is not active."));
+                    response.getOutputStream(),
+                    ApiResponse.failure("Tài khoản đã bị khóa hoặc ngừng hoạt động."));
             return;
         }
 

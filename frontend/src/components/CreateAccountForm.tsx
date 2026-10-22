@@ -42,6 +42,7 @@ function creationError(error: unknown) {
     case 'Department was not found.':
       return 'Bộ môn không còn tồn tại. Vui lòng tải lại trang.'
     case 'Request validation failed.':
+    case 'Thông tin chưa hợp lệ. Vui lòng kiểm tra lại các trường đã nhập.':
       return (
         (isAxiosError(error) && error.response?.data?.data?.password) ||
         'Thông tin chưa hợp lệ. Vui lòng kiểm tra lại các trường đã nhập.'

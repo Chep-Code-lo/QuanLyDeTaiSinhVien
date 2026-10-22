@@ -56,7 +56,10 @@ public class GlobalExceptionHandler {
                                         error.getField(), error.getDefaultMessage()));
 
         return ResponseEntity.badRequest()
-                .body(ApiResponse.failure("Request validation failed.", fieldErrors));
+                .body(
+                        ApiResponse.failure(
+                                "Thông tin chưa hợp lệ. Vui lòng kiểm tra lại các trường đã nhập.",
+                                fieldErrors));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -72,7 +75,10 @@ public class GlobalExceptionHandler {
                                         violation.getMessage()));
 
         return ResponseEntity.badRequest()
-                .body(ApiResponse.failure("Request validation failed.", violations));
+                .body(
+                        ApiResponse.failure(
+                                "Thông tin chưa hợp lệ. Vui lòng kiểm tra lại các trường đã nhập.",
+                                violations));
     }
 
     @ExceptionHandler({
@@ -84,7 +90,7 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception exception) {
         return ResponseEntity.badRequest()
-                .body(ApiResponse.failure("The request payload is invalid."));
+                .body(ApiResponse.failure("Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại."));
     }
 
     @ExceptionHandler(BusinessRuleException.class)
@@ -110,7 +116,7 @@ public class GlobalExceptionHandler {
         String message =
                 exception instanceof ConflictException
                         ? exception.getMessage()
-                        : "The requested change conflicts with existing data.";
+                        : "Thay đổi bị trùng hoặc xung đột với dữ liệu hiện có.";
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.failure(message));
     }
 
@@ -124,25 +130,28 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(
                         ApiResponse.failure(
-                                "The data was changed by another request. Reload and try again."));
+                                "Dữ liệu đã được thay đổi bởi yêu cầu khác. Vui lòng tải lại và thử lại."));
     }
 
     @ExceptionHandler({BadCredentialsException.class, AuthenticationException.class})
     public ResponseEntity<ApiResponse<Void>> handleAuthentication(Exception exception) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.failure("Email or password is incorrect."));
+                .body(ApiResponse.failure("Email hoặc mật khẩu không chính xác."));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException exception) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.failure("You do not have permission to perform this action."));
+                .body(ApiResponse.failure("Bạn không có quyền thực hiện thao tác này."));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception exception) {
-        log.error("Unhandled request failure", exception);
+        log.error(
+                "Unhandled request failure type={} requestId={}",
+                exception.getClass().getName(),
+                org.slf4j.MDC.get("requestId"));
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.failure("An unexpected server error occurred."));
+                .body(ApiResponse.failure("Hệ thống gặp lỗi. Vui lòng thử lại sau."));
     }
 }

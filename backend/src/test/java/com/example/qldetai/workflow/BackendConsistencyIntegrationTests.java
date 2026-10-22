@@ -131,8 +131,12 @@ class BackendConsistencyIntegrationTests {
             }
             properties.add("spring.datasource.url", () -> url);
             properties.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-            properties.add("spring.datasource.username", () -> "root");
-            properties.add("spring.datasource.password", () -> "audit-only-local");
+            properties.add(
+                    "spring.datasource.username",
+                    () -> System.getProperty("audit.mysql.user", "root"));
+            properties.add(
+                    "spring.datasource.password",
+                    () -> System.getProperty("audit.mysql.password", "audit-only-local"));
             // Use the authoritative SQL bootstrap, including generated columns and triggers.
             properties.add("spring.jpa.hibernate.ddl-auto", () -> "none");
             properties.add("spring.sql.init.mode", () -> "never");
@@ -1222,6 +1226,49 @@ class BackendConsistencyIntegrationTests {
                         stored.status() == GradeChangeStatus.APPROVED
                                 ? ScoreSheetStatus.DRAFT
                                 : ScoreSheetStatus.SUBMITTED);
+    }
+
+    @Test
+    void studentProjectMappingDoesNotQueryEachProjectAssociation() {
+        for (int index = 0; index < 3; index++) {
+            if (index > 0) {
+                period =
+                        tx.execute(
+                                status -> {
+                                    RegistrationPeriod other = new RegistrationPeriod();
+                                    other.setFaculty(period.getFaculty());
+                                    other.setSemester(period.getSemester());
+                                    other.setName("Mapping period " + unique());
+                                    other.setCreatedBy(admin);
+                                    other.setProjectType(ProjectType.COURSE);
+                                    other.setStatus(RegistrationPeriodStatus.ACTIVE);
+                                    other.setProposalStartAt(period.getProposalStartAt());
+                                    other.setProposalEndAt(period.getProposalEndAt());
+                                    other.setRegistrationStartAt(period.getRegistrationStartAt());
+                                    other.setRegistrationEndAt(period.getRegistrationEndAt());
+                                    other.setMinGroupMembers(2);
+                                    other.setMaxGroupMembers(3);
+                                    return periods.save(other);
+                                });
+            }
+            assignedProject();
+        }
+        tx.executeWithoutResult(
+                status -> {
+                    entityManager.clear();
+                    var statistics =
+                            entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+                    statistics.clear();
+                    assertThat(projects.listForStudent(leaderA.getUser().getId()))
+                            .hasSize(3)
+                            .allSatisfy(
+                                    item -> {
+                                        assertThat(item.groupName()).isNotBlank();
+                                        assertThat(item.topicTitle()).isNotBlank();
+                                        assertThat(item.assignedByName()).isNotBlank();
+                                    });
+                    assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+                });
     }
 
     @Test

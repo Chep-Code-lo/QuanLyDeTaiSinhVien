@@ -38,6 +38,7 @@ public interface ProjectAssignmentRepository extends JpaRepository<ProjectAssign
     @Query("select assignment from ProjectAssignment assignment where assignment.id = :id")
     Optional<ProjectAssignment> findByIdForUpdate(@Param("id") Long id);
 
+    @EntityGraph(attributePaths = {"period", "group", "topic", "assignedBy"})
     @Query(
             """
             select assignment from ProjectAssignment assignment

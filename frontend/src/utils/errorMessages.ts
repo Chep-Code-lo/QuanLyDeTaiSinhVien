@@ -1,4 +1,14 @@
 const messages: Record<string, string> = {
+  'The data was changed by another request. Reload and try again.':
+    'Dữ liệu đã được thay đổi bởi yêu cầu khác. Vui lòng tải lại và thử lại.',
+  'Student code is already in use.': 'Mã sinh viên này đã được sử dụng.',
+  'Lecturer code is already in use.': 'Mã giảng viên này đã được sử dụng.',
+  'Department was not found.': 'Bộ môn không còn tồn tại. Vui lòng tải lại trang.',
+  'User account was not found.': 'Tài khoản này không còn tồn tại.',
+  'You cannot delete the account currently in use.': 'Bạn không thể xóa tài khoản đang đăng nhập.',
+  'At least one active administrator account is required.':
+    'Hệ thống phải luôn có ít nhất một quản trị viên đang hoạt động.',
+
   'The current password is incorrect.': 'Mật khẩu hiện tại không chính xác.',
   'The new password must differ from the current password.':
     'Mật khẩu mới phải khác mật khẩu hiện tại.',

@@ -18,16 +18,25 @@ type AnnouncementTableProps = {
   label: string
   items: AnnouncementTableItem[]
   onOpen: (id: number) => void
+  search: string
+  onSearch: (search: string) => void
+  loading: boolean
+  error: string
+  onRetry: () => void
 }
 
-export function AnnouncementTable({ label, items, onOpen }: AnnouncementTableProps) {
-  const [search, setSearch] = useState('')
+export function AnnouncementTable({
+  label,
+  items,
+  onOpen,
+  search,
+  onSearch,
+  loading,
+  error,
+  onRetry,
+}: AnnouncementTableProps) {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const selected = items.find((item) => item.id === selectedId)
-  const query = search.trim().toLocaleLowerCase('vi')
-  const visibleItems = items.filter((item) =>
-    `${item.title} ${item.senderName}`.toLocaleLowerCase('vi').includes(query),
-  )
 
   return (
     <div className="announcement-inbox">
@@ -35,8 +44,9 @@ export function AnnouncementTable({ label, items, onOpen }: AnnouncementTablePro
         <Search size={17} aria-hidden="true" />
         <input
           type="search"
+          maxLength={250}
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => onSearch(event.target.value)}
           placeholder="Tìm kiếm thông báo"
           aria-label={`Tìm kiếm ${label.toLocaleLowerCase('vi')}`}
         />
@@ -51,14 +61,29 @@ export function AnnouncementTable({ label, items, onOpen }: AnnouncementTablePro
             </tr>
           </thead>
           <tbody>
-            {visibleItems.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={3} role="status">
+                  Đang tải thông báo...
+                </td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan={3}>
+                  <p role="alert">{error}</p>
+                  <button type="button" onClick={onRetry}>
+                    Thử lại
+                  </button>
+                </td>
+              </tr>
+            ) : items.length === 0 ? (
               <tr>
                 <td colSpan={3} className="announcement-table__empty">
                   Không tìm thấy thông báo phù hợp.
                 </td>
               </tr>
             ) : (
-              visibleItems.map((item) => {
+              items.map((item) => {
                 return (
                   <tr
                     key={item.id}
@@ -90,5 +115,64 @@ export function AnnouncementTable({ label, items, onOpen }: AnnouncementTablePro
       </div>
       {selected && <NotificationDetailDialog item={selected} onClose={() => setSelectedId(null)} />}
     </div>
+  )
+}
+
+export function CommunicationPagination({
+  label,
+  page,
+  size,
+  totalPages,
+  totalElements,
+  loading,
+  onPage,
+  onSize,
+}: {
+  label: string
+  page: number
+  size: number
+  totalPages: number
+  totalElements: number
+  loading: boolean
+  onPage: (page: number) => void
+  onSize: (size: number) => void
+}) {
+  return (
+    <nav className="table-pagination" aria-label={`Phân trang ${label.toLocaleLowerCase('vi')}`}>
+      <label>
+        Số thông báo mỗi trang
+        <select
+          className="form-select"
+          aria-label={`Số thông báo mỗi trang - ${label}`}
+          value={size}
+          onChange={(event) => onSize(Number(event.target.value))}
+        >
+          {[10, 20, 50].map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
+      </label>
+      <span>
+        Trang {page + 1}/{Math.max(totalPages, 1)} · {totalElements} thông báo
+      </span>
+      <button
+        type="button"
+        className="btn btn-secondary btn-sm"
+        disabled={loading || page === 0}
+        onClick={() => onPage(page - 1)}
+      >
+        Trang trước
+      </button>
+      <button
+        type="button"
+        className="btn btn-secondary btn-sm"
+        disabled={loading || page + 1 >= totalPages}
+        onClick={() => onPage(page + 1)}
+      >
+        Trang sau
+      </button>
+    </nav>
   )
 }

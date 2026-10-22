@@ -12,6 +12,7 @@ import com.example.qldetai.feature.communication.dto.CommunicationDtos.Announcem
 import com.example.qldetai.feature.communication.dto.CommunicationDtos.CreateAnnouncementRequest;
 import com.example.qldetai.feature.communication.dto.CommunicationDtos.UpdateAnnouncementRequest;
 import com.example.qldetai.feature.communication.repository.AnnouncementRepository;
+import com.example.qldetai.feature.communication.repository.CommunicationSearch;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.progress.domain.StoredFile;
@@ -22,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,31 +43,62 @@ public class AnnouncementService {
     /** Public feed: unpublished or archived content is intentionally never returned here. */
     @Transactional(readOnly = true)
     public PageResponse<AnnouncementResponse> listPublished(Long facultyId, int page, int size) {
-        PageRequest pageable =
-                PageRequest.of(
-                        page,
-                        size,
-                        Sort.by("publishedAt").descending().and(Sort.by("createdAt").descending()));
-        Page<Announcement> announcements =
-                facultyId == null
-                        ? announcementRepository.findByStatus(
-                                AnnouncementStatus.PUBLISHED, pageable)
-                        : announcementRepository.findByFacultyIdAndStatus(
-                                facultyId, AnnouncementStatus.PUBLISHED, pageable);
-        return PageResponse.from(announcements.map(this::toResponse));
+        return listPublished(facultyId, "", page, size);
     }
 
-    /** Management feed for one faculty. Authorization is enforced at the controller boundary. */
+    @Transactional(readOnly = true)
+    public PageResponse<AnnouncementResponse> listPublished(
+            Long facultyId, String search, int page, int size) {
+        Specification<Announcement> scope =
+                (root, query, cb) -> cb.equal(root.get("status"), AnnouncementStatus.PUBLISHED);
+        if (facultyId != null)
+            scope =
+                    scope.and(
+                            (root, query, cb) ->
+                                    cb.equal(root.get("faculty").get("id"), facultyId));
+        return PageResponse.from(
+                announcementRepository
+                        .findAll(
+                                scope.and(
+                                        CommunicationSearch.text(
+                                                search, "title", "content", "createdBy.fullName")),
+                                PageRequest.of(
+                                        page,
+                                        size,
+                                        Sort.by("publishedAt")
+                                                .descending()
+                                                .and(Sort.by("createdAt").descending())
+                                                .and(Sort.by("id").descending())))
+                        .map(this::toResponse));
+    }
+
+    /** Authorization for the requested faculty remains at the controller boundary. */
     @Transactional(readOnly = true)
     public PageResponse<AnnouncementResponse> listForManagement(
             Long facultyId, AnnouncementStatus status, int page, int size) {
-        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Announcement> announcements =
-                status == null
-                        ? announcementRepository.findByFacultyId(facultyId, pageable)
-                        : announcementRepository.findByFacultyIdAndStatus(
-                                facultyId, status, pageable);
-        return PageResponse.from(announcements.map(this::toResponse));
+        return listForManagement(facultyId, status, "", page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<AnnouncementResponse> listForManagement(
+            Long facultyId, AnnouncementStatus status, String search, int page, int size) {
+        Specification<Announcement> scope =
+                (root, query, cb) -> cb.equal(root.get("faculty").get("id"), facultyId);
+        if (status != null)
+            scope = scope.and((root, query, cb) -> cb.equal(root.get("status"), status));
+        return PageResponse.from(
+                announcementRepository
+                        .findAll(
+                                scope.and(
+                                        CommunicationSearch.text(
+                                                search, "title", "content", "createdBy.fullName")),
+                                PageRequest.of(
+                                        page,
+                                        size,
+                                        Sort.by("createdAt")
+                                                .descending()
+                                                .and(Sort.by("id").descending())))
+                        .map(this::toResponse));
     }
 
     @Transactional(readOnly = true)
@@ -83,14 +116,14 @@ public class AnnouncementService {
                         .orElseThrow(
                                 () ->
                                         new ResourceNotFoundException(
-                                                "Active faculty was not found."));
+                                                "Không tìm thấy khoa đang hoạt động."));
         User creator =
                 userRepository
                         .findById(actorId)
                         .orElseThrow(
                                 () ->
                                         new ResourceNotFoundException(
-                                                "Creating user was not found."));
+                                                "Không tìm thấy tài khoản tạo thông báo."));
 
         Announcement announcement = new Announcement();
         announcement.setFaculty(faculty);
@@ -108,7 +141,7 @@ public class AnnouncementService {
     public AnnouncementResponse update(Long id, UpdateAnnouncementRequest request) {
         Announcement announcement = requireAnnouncement(id);
         if (announcement.getStatus() != AnnouncementStatus.DRAFT) {
-            throw new BusinessRuleException("Only a draft announcement can be edited.");
+            throw new BusinessRuleException("Chỉ có thể sửa thông báo ở trạng thái nháp.");
         }
         apply(announcement, request.title(), request.content(), request.attachmentFileId());
         return toResponse(announcement);
@@ -122,7 +155,7 @@ public class AnnouncementService {
     public AnnouncementResponse publish(Long id) {
         Announcement announcement = requireAnnouncement(id);
         if (announcement.getStatus() != AnnouncementStatus.DRAFT) {
-            throw new BusinessRuleException("Only a draft announcement can be published.");
+            throw new BusinessRuleException("Chỉ có thể công bố thông báo ở trạng thái nháp.");
         }
         announcement.setStatus(AnnouncementStatus.PUBLISHED);
         announcement.setPublishedAt(LocalDateTime.now(clock));
@@ -137,7 +170,7 @@ public class AnnouncementService {
     public AnnouncementResponse archive(Long id) {
         Announcement announcement = requireAnnouncement(id);
         if (announcement.getStatus() != AnnouncementStatus.PUBLISHED) {
-            throw new BusinessRuleException("Only a published announcement can be archived.");
+            throw new BusinessRuleException("Chỉ có thể lưu trữ thông báo đã công bố.");
         }
         announcement.setStatus(AnnouncementStatus.ARCHIVED);
         return toResponse(announcement);
@@ -151,8 +184,7 @@ public class AnnouncementService {
     public void delete(Long id) {
         Announcement announcement = requireAnnouncement(id);
         if (announcement.getStatus() == AnnouncementStatus.PUBLISHED) {
-            throw new BusinessRuleException(
-                    "Archive a published announcement instead of deleting it.");
+            throw new BusinessRuleException("Hãy lưu trữ thông báo đã công bố thay vì xóa.");
         }
         announcementRepository.delete(announcement);
     }
@@ -168,13 +200,13 @@ public class AnnouncementService {
     private StoredFile requireAttachment(Long id) {
         return storedFileRepository
                 .findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Attachment file was not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tệp đính kèm."));
     }
 
     private Announcement requireAnnouncement(Long id) {
         return announcementRepository
                 .findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Announcement was not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông báo."));
     }
 
     private AnnouncementResponse toResponse(Announcement announcement) {

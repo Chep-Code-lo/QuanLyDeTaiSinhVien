@@ -91,7 +91,11 @@ public class BusinessAuditAspect {
                     requestId,
                     durationMs);
         } catch (RuntimeException exception) {
-            log.error("Unable to persist business audit log for {}.", audit.action(), exception);
+            log.error(
+                    "Unable to persist business audit log for {}. type={} requestId={}",
+                    audit.action(),
+                    exception.getClass().getName(),
+                    requestId);
         }
     }
 

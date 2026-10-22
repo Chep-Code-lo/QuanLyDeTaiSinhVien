@@ -73,7 +73,12 @@ vi.mock('../src/api/evaluation', () => ({
   },
 }))
 vi.mock('../src/api/notifications', () => ({
-  notificationApi: { list: mocks.notifications, unreadCount: mocks.unread, markRead: mocks.read },
+  notificationApi: {
+    list: mocks.notifications,
+    forAnnouncements: async () => [],
+    unreadCount: mocks.unread,
+    markRead: mocks.read,
+  },
 }))
 vi.mock('../src/api/announcements', () => ({ announcementApi: { list: mocks.announcements } }))
 
