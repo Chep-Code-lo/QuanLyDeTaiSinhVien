@@ -83,7 +83,7 @@ class StoredFileIntegrationTests {
     @Test
     void uploadStoresMetadataAndAllowsFileLookup() throws Exception {
         MockHttpSession session = login("admin@test.local", "TestPassword123!");
-        byte[] fileBytes = "hello backend".getBytes(StandardCharsets.UTF_8);
+        byte[] fileBytes = "%PDF-1.7\nhello backend\n%%EOF".getBytes(StandardCharsets.UTF_8);
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "C:\\fakepath\\report-final.pdf",
@@ -126,6 +126,8 @@ class StoredFileIntegrationTests {
         mockMvc.perform(get("/api/v1/files/{id}/preview", storedFileId).session(session))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("inline")))
+                .andExpect(header().string("Content-Security-Policy", "sandbox; default-src 'none'"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF))
                 .andExpect(content().bytes(fileBytes));
     }

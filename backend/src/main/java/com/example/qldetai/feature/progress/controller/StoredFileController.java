@@ -67,13 +67,15 @@ public class StoredFileController {
                 : ContentDisposition.inline()
                         .filename(file.originalName(), StandardCharsets.UTF_8)
                         .build();
-        return ResponseEntity.ok()
+        var response = ResponseEntity.ok()
                 .contentType(contentType(file.mimeType()))
                 .contentLength(file.sizeBytes())
                 .header(
                         HttpHeaders.CONTENT_DISPOSITION,
                         contentDisposition.toString())
-                .body(new FileSystemResource(file.path()));
+                .header("X-Content-Type-Options", "nosniff");
+        if (!attachment) response.header("Content-Security-Policy", "sandbox; default-src 'none'");
+        return response.body(new FileSystemResource(file.path()));
     }
 
     private MediaType contentType(String mimeType) {
