@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { Sidebar } from '../src/components/Sidebar'
@@ -44,7 +44,7 @@ vi.mock('../src/context/AuthContext', () => ({
     hasRole: (role: string) => mocks.user.roles.includes(role),
     hasAnyRole: (roles: string[]) => roles.some((role) => mocks.user.roles.includes(role)),
     hasAppointment: () => false,
-    canAccessAcademicManagement: () => true,
+    canAccessAcademicManagement: () => mocks.user.roles.includes('ADMIN'),
     logout: mocks.logout,
   }),
 }))
@@ -144,6 +144,7 @@ beforeAll(() => {
 })
 
 beforeEach(() => {
+  mocks.user.roles = ['LECTURER', 'ADMIN']
   mocks.logout.mockReset()
   mocks.logout.mockResolvedValue(undefined)
   mocks.topics.mockResolvedValue(page([]))
@@ -196,6 +197,67 @@ describe('Hồi quy frontend', () => {
     expect(container.querySelectorAll('.sidebar__icon svg').length).toBeGreaterThan(10)
     expect(screen.getByRole('button', { name: 'Quản lý tài khoản' }).hasAttribute('href')).toBe(
       false,
+    )
+  })
+
+  it('nhóm menu theo quy trình và giữ mỗi chức năng ở đúng một nhóm', () => {
+    mount(<Sidebar onNavigate={vi.fn()} />)
+    const groups = screen.getAllByRole('group')
+    expect(groups.map((group) => group.querySelector('.sidebar__label')?.textContent)).toEqual([
+      'Menu chính',
+      'Cá nhân',
+      'Đề tài & tiến độ',
+      'Đánh giá & kết quả',
+      'Quản trị',
+    ])
+    expect(
+      within(screen.getByRole('group', { name: 'Đề tài & tiến độ' }))
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual([
+      'Đề tài & Dự án',
+      'Đề xuất & Xét duyệt',
+      'Nhóm đề tài',
+      'Đăng ký đề tài',
+      'Đề tài được giao',
+      'Tiến độ & Mốc báo cáo',
+    ])
+    expect(
+      within(screen.getByRole('group', { name: 'Đánh giá & kết quả' }))
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual([
+      'Tiêu chuẩn đánh giá',
+      'Phân công giảng viên',
+      'Chấm điểm đề tài',
+      'Tổng hợp & Công bố điểm',
+      'Yêu cầu đổi điểm',
+    ])
+    const buttons = screen.getAllByRole('button')
+    expect(new Set(buttons.map((button) => button.textContent)).size).toBe(buttons.length)
+  })
+
+  it('menu sinh viên ẩn nhóm quản trị và vẫn điều hướng, đánh dấu trang hiện tại', async () => {
+    mocks.user.roles = ['STUDENT']
+    const onNavigate = vi.fn()
+    mount(
+      <>
+        <Sidebar onNavigate={onNavigate} />
+        <CurrentPath />
+      </>,
+      '/results',
+    )
+    expect(screen.queryByRole('group', { name: 'Quản trị' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Chấm điểm đề tài' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Yêu cầu đổi điểm' })).toBeNull()
+    expect(
+      screen.getByRole('button', { name: 'Lịch bảo vệ & Kết quả' }).getAttribute('aria-current'),
+    ).toBe('page')
+    await userEvent.click(screen.getByRole('button', { name: 'Thông báo' }))
+    expect(screen.getByTestId('current-path').textContent).toBe('/announcements')
+    expect(onNavigate).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: 'Thông báo' }).getAttribute('aria-current')).toBe(
+      'page',
     )
   })
 

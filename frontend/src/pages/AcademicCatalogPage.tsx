@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { academicApi } from '../api/academic'
 import { errorMessage } from '../api/student'
 import { PageHeader } from '../components/PageHeader'
@@ -47,7 +47,7 @@ export function AcademicCatalogPage() {
       />
       {data && (
         <>
-          <section className="page-card">
+          <section className="page-card academic-catalog-section">
             <h2>Khoa</h2>
             {admin && (
               <button
@@ -91,7 +91,7 @@ export function AcademicCatalogPage() {
               </table>
             </div>
           </section>
-          <section className="page-card">
+          <section className="page-card academic-catalog-section">
             <h2>Bộ môn</h2>
             {managedFaculties.some((item) => item.active !== false) && (
               <button
@@ -137,7 +137,7 @@ export function AcademicCatalogPage() {
               </table>
             </div>
           </section>
-          <section className="page-card">
+          <section className="page-card academic-catalog-section">
             <h2>Học kỳ</h2>
             {admin && (
               <button
@@ -213,9 +213,46 @@ function CatalogEditor({
   const [endsOn, setEndsOn] = useState('')
   const [busy, setBusy] = useState(false)
   const sending = useRef(false)
+  const dialog = useRef<HTMLDialogElement>(null)
+  const titleId = useId()
+  const catalogName = { faculty: 'khoa', department: 'bộ môn', semester: 'học kỳ' }[kind]
+  useEffect(() => {
+    const element = dialog.current
+    const trigger = document.activeElement as HTMLElement | null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    element?.showModal()
+    element?.querySelector<HTMLInputElement>('input:not([disabled])')?.focus()
+    return () => {
+      element?.close()
+      document.body.style.overflow = previousOverflow
+      if (trigger?.isConnected) trigger.focus()
+    }
+  }, [])
   return (
-    <section className="page-card">
-      <h2>{item ? 'Chỉnh sửa danh mục' : 'Thêm danh mục'}</h2>
+    <dialog
+      ref={dialog}
+      className="catalog-editor-dialog"
+      aria-labelledby={titleId}
+      onCancel={(event) => {
+        event.preventDefault()
+        if (!sending.current) onClose()
+      }}
+    >
+      <div className="catalog-editor-dialog__heading">
+        <h2 id={titleId}>
+          {item ? `Chỉnh sửa ${catalogName} ${item.code}` : `Thêm ${catalogName}`}
+        </h2>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={busy}
+          onClick={onClose}
+          aria-label="Đóng biểu mẫu danh mục"
+        >
+          Đóng
+        </button>
+      </div>
       <form
         className="stack-form"
         onSubmit={async (event) => {
@@ -371,6 +408,6 @@ function CatalogEditor({
           </div>
         </fieldset>
       </form>
-    </section>
+    </dialog>
   )
 }

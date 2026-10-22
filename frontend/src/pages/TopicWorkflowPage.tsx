@@ -40,9 +40,9 @@ export function TopicWorkflowPage() {
               Đề xuất đề tài
             </button>
           )}
-          <label className="topic-workflow-toolbar__filter">
-            Trạng thái đề xuất
+          <div className="topic-workflow-toolbar__filter">
             <select
+              aria-label="Trạng thái đề xuất"
               className="form-select"
               value={status}
               onChange={(event) => {
@@ -66,7 +66,7 @@ export function TopicWorkflowPage() {
                 </option>
               ))}
             </select>
-          </label>
+          </div>
         </div>
         <RemoteState loading={loading} error={error} retry={refresh} />
         {data && (

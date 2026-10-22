@@ -1,6 +1,6 @@
 import { useEffect, useRef, type UIEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { navigationItems } from '../config/navigation'
+import { navigationGroups, navigationItems } from '../config/navigation'
 import { useAuth } from '../context/AuthContext'
 
 type SidebarProps = { onNavigate: () => void }
@@ -66,29 +66,44 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           alt="Logo Trường Đại học Công nghệ Kỹ thuật Thành phố Hồ Chí Minh"
         />
       </Link>
-      <p className="sidebar__label">Menu chính</p>
       <nav className="sidebar__nav" aria-label="Điều hướng chính" onScroll={handleNavScroll}>
-        {filteredItems.map((item) => {
-          const Icon = item.icon
-          const isActive =
-            pathname === item.to || (item.to !== '/' && pathname.startsWith(`${item.to}/`))
-
+        {navigationGroups.map((group) => {
+          const items = filteredItems.filter((item) => item.group === group.id)
+          if (!items.length) return null
           return (
-            <button
-              key={item.to}
-              type="button"
-              className={`sidebar__link${isActive ? ' sidebar__link--active' : ''}`}
-              aria-current={isActive ? 'page' : undefined}
-              onClick={() => {
-                navigate(item.to)
-                onNavigate()
-              }}
+            <div
+              key={group.id}
+              className="sidebar__group"
+              role="group"
+              aria-labelledby={`nav-group-${group.id}`}
             >
-              <span className="sidebar__icon" aria-hidden="true">
-                <Icon size={18} strokeWidth={1.8} />
-              </span>
-              <span className="sidebar__text">{item.label}</span>
-            </button>
+              <p id={`nav-group-${group.id}`} className="sidebar__label">
+                {group.label}
+              </p>
+              {items.map((item) => {
+                const Icon = item.icon
+                const isActive =
+                  pathname === item.to || (item.to !== '/' && pathname.startsWith(`${item.to}/`))
+
+                return (
+                  <button
+                    key={item.to}
+                    type="button"
+                    className={`sidebar__link${isActive ? ' sidebar__link--active' : ''}`}
+                    aria-current={isActive ? 'page' : undefined}
+                    onClick={() => {
+                      navigate(item.to)
+                      onNavigate()
+                    }}
+                  >
+                    <span className="sidebar__icon" aria-hidden="true">
+                      <Icon size={18} strokeWidth={1.8} />
+                    </span>
+                    <span className="sidebar__text">{item.label}</span>
+                  </button>
+                )
+              })}
+            </div>
           )
         })}
       </nav>

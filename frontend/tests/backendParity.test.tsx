@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -153,6 +153,14 @@ const lecturer = (): CurrentUser => ({
   roles: ['LECTURER'],
   lecturer: { id: 1, lecturerCode: 'GV01', departmentId: 2 },
   activeAppointments: [],
+})
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute('open', '')
+  }
+  HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute('open')
+  }
 })
 beforeEach(() => {
   for (const value of Object.values(mocks))
@@ -318,35 +326,72 @@ it.each([true, false])(
     })
   },
 )
-it('nhật ký lọc/phân trang trên server, bỏ qua phản hồi cũ', async () => {
-  let resolve!: (data: unknown) => void
-  mocks.audit.mockImplementation(({ entityType }: { entityType?: string }) =>
-    entityType === 'TOPIC'
-      ? new Promise((done) => {
-          resolve = done
-        })
-      : Promise.resolve(page([], 2)),
-  )
+it('nhật ký bỏ bộ lọc loại đối tượng, phân trang trên server và làm mới trang hiện tại', async () => {
+  mocks.audit.mockResolvedValue(page([], 2))
   render(<AuditLogsPage />)
   await screen.findByText('Không có nhật ký phù hợp.')
+  expect(screen.queryByLabelText('Loại đối tượng')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Lọc nhật ký' })).toBeNull()
+  expect(mocks.audit).toHaveBeenLastCalledWith({ page: 0, size: 20 })
   await userEvent.click(screen.getByRole('button', { name: 'Sau' }))
-  await waitFor(() =>
-    expect(mocks.audit).toHaveBeenLastCalledWith({ page: 1, size: 20, entityType: undefined }),
+  await waitFor(() => expect(mocks.audit).toHaveBeenLastCalledWith({ page: 1, size: 20 }))
+  const callsBeforeRefresh = mocks.audit.mock.calls.length
+  await userEvent.click(screen.getByRole('button', { name: 'Làm mới nhật ký' }))
+  await waitFor(() => expect(mocks.audit).toHaveBeenCalledTimes(callsBeforeRefresh + 1))
+  expect(mocks.audit).toHaveBeenLastCalledWith({ page: 1, size: 20 })
+})
+it('quản lý đề tài mở hộp thoại và trả focus về nút khi đóng', async () => {
+  render(<ProjectAssignmentsPage />)
+  const trigger = await screen.findByRole('button', { name: 'Quản lý DT01' })
+  await userEvent.click(trigger)
+  const dialog = screen.getByRole('dialog', { name: 'Quản lý đề tài' })
+  expect(dialog.hasAttribute('open')).toBe(true)
+  expect(document.body.style.overflow).toBe('hidden')
+  await within(dialog).findByRole('heading', { name: 'DT01 · Nhóm A' })
+  fireEvent(dialog, new Event('cancel', { cancelable: true }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(document.activeElement).toBe(trigger)
+  expect(document.body.style.overflow).toBe('')
+  expect(mocks.status).not.toHaveBeenCalled()
+})
+it('hủy xác nhận vẫn giữ hộp thoại quản lý đề tài', async () => {
+  render(<ProjectAssignmentsPage />)
+  await userEvent.click(await screen.findByRole('button', { name: 'Quản lý DT01' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Hủy giao đề tài' }))
+  const dialog = screen.getByRole('dialog', { name: 'Xác nhận trạng thái đề tài' })
+  fireEvent(dialog, new Event('cancel', { cancelable: true }))
+  expect(screen.getByRole('dialog', { name: 'Quản lý đề tài' }).hasAttribute('open')).toBe(true)
+  expect(mocks.status).not.toHaveBeenCalled()
+  await userEvent.click(screen.getByRole('button', { name: 'Đóng hộp thoại quản lý đề tài' }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+})
+it('không đóng hoặc gửi trùng khi cập nhật trạng thái, lỗi vẫn giữ hộp thoại', async () => {
+  let reject!: (error: Error) => void
+  mocks.status.mockImplementation(
+    () =>
+      new Promise((_, fail) => {
+        reject = fail
+      }),
   )
-  fireEvent.change(screen.getByLabelText('Loại đối tượng'), { target: { value: 'TOPIC' } })
-  await userEvent.click(screen.getByRole('button', { name: 'Lọc nhật ký' }))
-  fireEvent.change(screen.getByLabelText('Loại đối tượng'), { target: { value: 'USER' } })
-  await userEvent.click(screen.getByRole('button', { name: 'Lọc nhật ký' }))
-  await screen.findByText('Không có nhật ký phù hợp.')
-  await act(async () =>
-    resolve(
-      page([
-        { id: 1, action: 'CŨ', entityType: 'TOPIC', outcome: 'SUCCESS', createdAt: '2026-01-01' },
-      ]),
-    ),
-  )
-  expect(screen.queryByText('CŨ')).toBeNull()
-  expect(mocks.audit).toHaveBeenLastCalledWith({ page: 0, size: 20, entityType: 'USER' })
+  render(<ProjectAssignmentsPage />)
+  await userEvent.click(await screen.findByRole('button', { name: 'Quản lý DT01' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Đánh dấu hoàn thành' }))
+  await confirm()
+  const dialog = screen.getByRole('dialog', { name: 'Xác nhận trạng thái đề tài' })
+  expect(
+    (
+      within(dialog).getByRole('button', {
+        name: 'Đóng hộp thoại quản lý đề tài',
+      }) as HTMLButtonElement
+    ).disabled,
+  ).toBe(true)
+  fireEvent(dialog, new Event('cancel', { cancelable: true }))
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Đang xử lý...' }))
+  expect(mocks.status).toHaveBeenCalledTimes(1)
+  await act(async () => reject(new Error('Không thể cập nhật.')))
+  expect(screen.getByRole('dialog', { name: 'Quản lý đề tài' }).hasAttribute('open')).toBe(true)
+  await screen.findByRole('button', { name: 'Đánh dấu hoàn thành' })
+  expect(mocks.error).toHaveBeenCalled()
 })
 it('cập nhật trạng thái đề tài dùng version và chỉ gửi sau xác nhận', async () => {
   render(<ProjectAssignmentsPage />)
@@ -603,4 +648,57 @@ it('lọc yêu cầu đổi điểm theo mã phiếu được gửi về backend
       sheetId: 5,
     }),
   )
+})
+
+it.each([
+  ['Thêm khoa', 'Thêm khoa', 'Mã danh mục'],
+  ['Sửa khoa CNTT', 'Chỉnh sửa khoa CNTT', 'Tên danh mục'],
+  ['Thêm bộ môn', 'Thêm bộ môn', 'Mã danh mục'],
+  ['Sửa bộ môn PM', 'Chỉnh sửa bộ môn PM', 'Tên danh mục'],
+  ['Thêm học kỳ', 'Thêm học kỳ', 'Năm học'],
+])(
+  'nút %s mở ngay hộp thoại, đặt focus vào biểu mẫu và trả focus khi hủy',
+  async (buttonName, title, field) => {
+    render(<AcademicCatalogPage />)
+    const button = await screen.findByRole('button', { name: buttonName })
+    await userEvent.click(button)
+    const dialog = screen.getByRole('dialog', { name: title })
+    expect(dialog.hasAttribute('open')).toBe(true)
+    expect(document.activeElement).toBe(within(dialog).getByLabelText(field))
+    expect(document.body.style.overflow).toBe('hidden')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Hủy danh mục' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(document.activeElement).toBe(button)
+    expect(document.body.style.overflow).not.toBe('hidden')
+  },
+)
+it('Escape đóng biểu mẫu mà không gửi dữ liệu', async () => {
+  render(<AcademicCatalogPage />)
+  await userEvent.click(await screen.findByRole('button', { name: 'Thêm khoa' }))
+  fireEvent(screen.getByRole('dialog'), new Event('cancel', { bubbles: false, cancelable: true }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(mocks.createFaculty).not.toHaveBeenCalled()
+})
+it('đang lưu không được đóng hộp thoại; lưu thất bại giữ dữ liệu để sửa', async () => {
+  let reject!: (reason: unknown) => void
+  mocks.createFaculty.mockImplementation(
+    () =>
+      new Promise((_, fail) => {
+        reject = fail
+      }),
+  )
+  render(<AcademicCatalogPage />)
+  await userEvent.click(await screen.findByRole('button', { name: 'Thêm khoa' }))
+  fireEvent.change(screen.getByLabelText('Mã danh mục'), { target: { value: 'NEW' } })
+  fireEvent.change(screen.getByLabelText('Tên danh mục'), { target: { value: 'Khoa mới' } })
+  await userEvent.click(screen.getByRole('button', { name: 'Lưu danh mục' }))
+  fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
+  expect(screen.getByRole('dialog')).toBeTruthy()
+  expect(
+    (screen.getByRole('button', { name: 'Đóng biểu mẫu danh mục' }) as HTMLButtonElement).disabled,
+  ).toBe(true)
+  await act(async () => reject({ response: { data: { message: 'Mã khoa đã tồn tại.' } } }))
+  expect((screen.getByLabelText('Tên danh mục') as HTMLInputElement).value).toBe('Khoa mới')
+  expect(screen.getByRole('dialog')).toBeTruthy()
+  expect(mocks.error).toHaveBeenCalledWith('Mã khoa đã tồn tại.')
 })
