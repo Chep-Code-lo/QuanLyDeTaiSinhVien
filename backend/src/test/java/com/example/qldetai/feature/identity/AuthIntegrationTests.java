@@ -4,15 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.qldetai.feature.academic.domain.Department;
-import com.example.qldetai.feature.academic.repository.DepartmentRepository;
 import com.example.qldetai.feature.academic.domain.Faculty;
+import com.example.qldetai.feature.academic.repository.DepartmentRepository;
 import com.example.qldetai.feature.academic.repository.FacultyRepository;
 import com.example.qldetai.feature.identity.domain.AcademicAppointment;
 import com.example.qldetai.feature.identity.domain.Lecturer;
@@ -27,9 +27,7 @@ import com.example.qldetai.feature.identity.repository.LecturerRepository;
 import com.example.qldetai.feature.identity.repository.RoleRepository;
 import com.example.qldetai.feature.identity.repository.StudentRepository;
 import com.example.qldetai.feature.identity.repository.UserRepository;
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.util.Set;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -42,7 +40,15 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest(properties = {"server.forward-headers-strategy=none", "app.security.trusted-proxies=127.0.0.1"})
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.Set;
+
+@SpringBootTest(
+        properties = {
+            "server.forward-headers-strategy=none",
+            "app.security.trusted-proxies=127.0.0.1"
+        })
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @AutoConfigureMockMvc(print = org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint.NONE)
 @Transactional
@@ -57,9 +63,13 @@ class AuthIntegrationTests {
         loginAttempt(email.toUpperCase(), "TestPassword123!", "203.0.113.10")
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút."));
+                .andExpect(
+                        jsonPath("$.message")
+                                .value(
+                                        "Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút."));
         loginAttempt(email, "TestPassword123!", "203.0.113.11").andExpect(status().isOk());
-        loginAttempt("another-" + email, "incorrect", "203.0.113.10").andExpect(status().isUnauthorized());
+        loginAttempt("another-" + email, "incorrect", "203.0.113.10")
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -76,11 +86,20 @@ class AuthIntegrationTests {
 
     @Test
     void oversizedLoginPasswordReturnsClearVietnamese400() throws Exception {
-        for (String password : new String[] {"A1!" + "a".repeat(70), "A1!" + "ề".repeat(24),
-                "A1!" + "😀".repeat(18), "A1!" + "a".repeat(97)}) {
+        for (String password :
+                new String[] {
+                    "A1!" + "a".repeat(70),
+                    "A1!" + "ề".repeat(24),
+                    "A1!" + "😀".repeat(18),
+                    "A1!" + "a".repeat(97)
+                }) {
             loginAttempt("admin@test.local", password, "203.0.113.80")
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(com.example.qldetai.feature.identity.validation.PasswordByteLength.MESSAGE));
+                    .andExpect(
+                            jsonPath("$.message")
+                                    .value(
+                                            com.example.qldetai.feature.identity.validation
+                                                    .PasswordByteLength.MESSAGE));
         }
     }
 
@@ -88,8 +107,11 @@ class AuthIntegrationTests {
     void legacyPbkdf2UserCanStillLogin() throws Exception {
         String email = createUserWithRole("legacy-pbkdf2", RoleCode.ADMIN);
         User user = userRepository.findByEmailIgnoreCase(email).orElseThrow();
-        user.setPasswordHash("{pbkdf2}" + org.springframework.security.crypto.password.Pbkdf2PasswordEncoder
-                .defaultsForSpringSecurity_v5_8().encode("TestPassword123!"));
+        user.setPasswordHash(
+                "{pbkdf2}"
+                        + org.springframework.security.crypto.password.Pbkdf2PasswordEncoder
+                                .defaultsForSpringSecurity_v5_8()
+                                .encode("TestPassword123!"));
         userRepository.saveAndFlush(user);
         loginAttempt(email, "TestPassword123!", "203.0.113.81").andExpect(status().isOk());
     }
@@ -97,26 +119,46 @@ class AuthIntegrationTests {
     @Test
     void longLegacyPbkdf2PasswordsAuthenticateWithoutChangingStoredCredentials() throws Exception {
         int index = 0;
-        for (String password : new String[] {"A1!" + "a".repeat(97), "Đ1!" + "ề".repeat(30),
-                "A1!" + "😀".repeat(20)}) {
+        for (String password :
+                new String[] {
+                    "A1!" + "a".repeat(97), "Đ1!" + "ề".repeat(30), "A1!" + "😀".repeat(20)
+                }) {
             String email = createUserWithRole("long-legacy-" + index++, RoleCode.ADMIN);
             User legacy = userRepository.findByEmailIgnoreCase(email).orElseThrow();
-            String hash = "{pbkdf2}" + org.springframework.security.crypto.password.Pbkdf2PasswordEncoder
-                    .defaultsForSpringSecurity_v5_8().encode(password);
+            String hash =
+                    "{pbkdf2}"
+                            + org.springframework.security.crypto.password.Pbkdf2PasswordEncoder
+                                    .defaultsForSpringSecurity_v5_8()
+                                    .encode(password);
             legacy.setPasswordHash(hash);
             userRepository.saveAndFlush(legacy);
             loginAttempt(email, password, "203.0.113.82").andExpect(status().isOk());
-            loginAttempt(email, password + "wrong", "203.0.113.82").andExpect(status().isUnauthorized());
-            assertThat(userRepository.findByEmailIgnoreCase(email).orElseThrow().getPasswordHash().equals(hash)).isTrue();
+            loginAttempt(email, password + "wrong", "203.0.113.82")
+                    .andExpect(status().isUnauthorized());
+            assertThat(
+                            userRepository
+                                    .findByEmailIgnoreCase(email)
+                                    .orElseThrow()
+                                    .getPasswordHash()
+                                    .equals(hash))
+                    .isTrue();
         }
     }
 
-    private org.springframework.test.web.servlet.ResultActions loginAttempt(String email, String password, String ip) throws Exception {
-        return mockMvc.perform(post("/api/v1/auth/login")
-                .with(csrf())
-                .with(request -> { request.setRemoteAddr(ip); return request; })
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"username\":\"%s\",\"password\":\"%s\"}".formatted(email, password)));
+    private org.springframework.test.web.servlet.ResultActions loginAttempt(
+            String email, String password, String ip) throws Exception {
+        return mockMvc.perform(
+                post("/api/v1/auth/login")
+                        .with(csrf())
+                        .with(
+                                request -> {
+                                    request.setRemoteAddr(ip);
+                                    return request;
+                                })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                "{\"username\":\"%s\",\"password\":\"%s\"}"
+                                        .formatted(email, password)));
     }
 
     private final MockMvc mockMvc;
@@ -173,19 +215,22 @@ class AuthIntegrationTests {
 
     @Test
     void loginCreatesSessionAndAllowsAdminAccess() throws Exception {
-        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
-                        .with(csrf())
-                        .header("X-Forwarded-For", "203.0.113.42, 10.0.0.1")
-                        .header("X-Real-IP", "172.18.0.1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        MvcResult login =
+                mockMvc.perform(
+                                post("/api/v1/auth/login")
+                                        .with(csrf())
+                                        .header("X-Forwarded-For", "203.0.113.42, 10.0.0.1")
+                                        .header("X-Real-IP", "172.18.0.1")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                """
                                 {"username":"admin@test.local","password":"TestPassword123!"}
                                 """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.user.username").value("admin@test.local"))
-                .andExpect(jsonPath("$.data.user.roles[0]").value("ADMIN"))
-                .andReturn();
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.success").value(true))
+                        .andExpect(jsonPath("$.data.user.username").value("admin@test.local"))
+                        .andExpect(jsonPath("$.data.user.roles[0]").value("ADMIN"))
+                        .andReturn();
 
         MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
         mockMvc.perform(get("/api/v1/auth/me").session(session))
@@ -198,32 +243,48 @@ class AuthIntegrationTests {
 
     @Test
     void loginRecordsForwardedIpv6InsteadOfDockerPeerAddress() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/login")
-                        .with(csrf())
-                        .header("X-Forwarded-For", "2001:db8::42, 10.0.0.1")
-                        .header("X-Real-IP", "172.18.0.1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        mockMvc.perform(
+                        post("/api/v1/auth/login")
+                                .with(csrf())
+                                .header("X-Forwarded-For", "2001:db8::42, 10.0.0.1")
+                                .header("X-Real-IP", "172.18.0.1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
                                 {"username":"admin@test.local","password":"TestPassword123!"}
                                 """))
                 .andExpect(status().isOk());
-        assertThat(userRepository.findByEmailIgnoreCase("admin@test.local").orElseThrow()
-                .getLastLoginIp()).isEqualTo("2001:db8::42");
+        assertThat(
+                        userRepository
+                                .findByEmailIgnoreCase("admin@test.local")
+                                .orElseThrow()
+                                .getLastLoginIp())
+                .isEqualTo("2001:db8::42");
     }
 
     @Test
     void directLoginRecordsRemoteAddressInsteadOfUnprocessedRealIpHeader() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/login")
-                        .with(csrf())
-                        .with(request -> { request.setRemoteAddr("192.168.1.42"); return request; })
-                        .header("X-Real-IP", "203.0.113.99")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        mockMvc.perform(
+                        post("/api/v1/auth/login")
+                                .with(csrf())
+                                .with(
+                                        request -> {
+                                            request.setRemoteAddr("192.168.1.42");
+                                            return request;
+                                        })
+                                .header("X-Real-IP", "203.0.113.99")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
                                 {"username":"admin@test.local","password":"TestPassword123!"}
                                 """))
                 .andExpect(status().isOk());
-        assertThat(userRepository.findByEmailIgnoreCase("admin@test.local").orElseThrow()
-                .getLastLoginIp()).isEqualTo("192.168.1.42");
+        assertThat(
+                        userRepository
+                                .findByEmailIgnoreCase("admin@test.local")
+                                .orElseThrow()
+                                .getLastLoginIp())
+                .isEqualTo("192.168.1.42");
     }
 
     @Test
@@ -235,8 +296,12 @@ class AuthIntegrationTests {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.totalTopics").value(0))
                 .andExpect(jsonPath("$.data.unreadNotifications").value(0));
-        mockMvc.perform(post("/api/v1/evaluation-assignments/batch").session(session).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"assignments\":[null]}"))
+        mockMvc.perform(
+                        post("/api/v1/evaluation-assignments/batch")
+                                .session(session)
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"assignments\":[null]}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -245,39 +310,58 @@ class AuthIntegrationTests {
         String studentEmail = createUserWithRole("student-directory", RoleCode.STUDENT);
         MockHttpSession session = login(studentEmail, "TestPassword123!");
 
-        mockMvc.perform(get("/api/v1/groups").session(session))
-                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/groups").session(session)).andExpect(status().isForbidden());
         mockMvc.perform(get("/api/v1/evaluation-committees").session(session))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/v1/defense-sessions/eligibility").param("assignmentId", "1").param("committeeId", "1").session(session))
+        mockMvc.perform(
+                        get("/api/v1/defense-sessions/eligibility")
+                                .param("assignmentId", "1")
+                                .param("committeeId", "1")
+                                .session(session))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/v1/evaluation-assignments/batch").session(session).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content("""
+        mockMvc.perform(
+                        post("/api/v1/evaluation-assignments/batch")
+                                .session(session)
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
                             {"assignments":[{"assignmentId":1,"rubricId":1,"lecturerId":1,"deadlineAt":"2099-01-01T00:00:00"}]}
                             """))
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    void lastActiveAdministratorCannotBeLockedOrLoseAdminRoleThroughOtherEndpoints() throws Exception {
+    void lastActiveAdministratorCannotBeLockedOrLoseAdminRoleThroughOtherEndpoints()
+            throws Exception {
         User admin = userRepository.findByEmailIgnoreCase("admin@test.local").orElseThrow();
         assertThat(userRepository.findActiveAdministrators()).hasSize(1);
         MockHttpSession session = login("admin@test.local", "TestPassword123!");
-        mockMvc.perform(patch("/api/v1/admin/users/{id}/status", admin.getId()).session(session).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"LOCKED\"}"))
+        mockMvc.perform(
+                        patch("/api/v1/admin/users/{id}/status", admin.getId())
+                                .session(session)
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"status\":\"LOCKED\"}"))
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(put("/api/v1/admin/users/{id}/roles", admin.getId()).session(session).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"roles\":[\"LECTURER\"]}"))
+        mockMvc.perform(
+                        put("/api/v1/admin/users/{id}/roles", admin.getId())
+                                .session(session)
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"roles\":[\"LECTURER\"]}"))
                 .andExpect(status().isBadRequest());
         assertThat(userRepository.findActiveAdministrators()).hasSize(1);
-        assertThat(userRepository.findById(admin.getId()).orElseThrow().getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(userRepository.findById(admin.getId()).orElseThrow().getStatus())
+                .isEqualTo(UserStatus.ACTIVE);
     }
 
     @Test
     void currentUserIncludesActiveAppointmentsForLecturer() throws Exception {
         Faculty faculty = createFaculty("CNTT");
         Department department = createDepartment(faculty, "CNPM");
-        Lecturer lecturer = createLecturer("lecturer-me", "GVME", "Giang Vien Co Nhiem Vu", department);
+        Lecturer lecturer =
+                createLecturer("lecturer-me", "GVME", "Giang Vien Co Nhiem Vu", department);
         createAppointment(lecturer, faculty, department, PositionCode.DEPARTMENT_HEAD);
 
         MockHttpSession session = login("lecturer-me@test.local", "TestPassword123!");
@@ -285,11 +369,18 @@ class AuthIntegrationTests {
         mockMvc.perform(get("/api/v1/auth/me").session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.fullName").value("Giang Vien Co Nhiem Vu"))
-                .andExpect(jsonPath("$.data.lecturer.lecturerCode").value(lecturer.getLecturerCode()))
-                .andExpect(jsonPath("$.data.activeAppointments[0].lecturerId").value(lecturer.getId()))
-                .andExpect(jsonPath("$.data.activeAppointments[0].facultyId").value(faculty.getId()))
-                .andExpect(jsonPath("$.data.activeAppointments[0].departmentId").value(department.getId()))
-                .andExpect(jsonPath("$.data.activeAppointments[0].positionCode").value("DEPARTMENT_HEAD"));
+                .andExpect(
+                        jsonPath("$.data.lecturer.lecturerCode").value(lecturer.getLecturerCode()))
+                .andExpect(
+                        jsonPath("$.data.activeAppointments[0].lecturerId").value(lecturer.getId()))
+                .andExpect(
+                        jsonPath("$.data.activeAppointments[0].facultyId").value(faculty.getId()))
+                .andExpect(
+                        jsonPath("$.data.activeAppointments[0].departmentId")
+                                .value(department.getId()))
+                .andExpect(
+                        jsonPath("$.data.activeAppointments[0].positionCode")
+                                .value("DEPARTMENT_HEAD"));
     }
 
     @Test
@@ -298,45 +389,62 @@ class AuthIntegrationTests {
         Department targetDepartment = createDepartment(faculty, "HTTT");
         Department otherDepartment = createDepartment(faculty, "KHMT");
 
-        Lecturer matched = createLecturer("directory-match", "GVSEARCH", "Nguyen Van Search", targetDepartment);
+        Lecturer matched =
+                createLecturer(
+                        "directory-match", "GVSEARCH", "Nguyen Van Search", targetDepartment);
         createLecturer("directory-other", "GVOTHER", "Tran Thi Search", otherDepartment);
-        Lecturer locked = createLecturer("directory-locked", "GVLOCK", "Le Search Locked", targetDepartment);
+        Lecturer locked =
+                createLecturer("directory-locked", "GVLOCK", "Le Search Locked", targetDepartment);
         locked.getUser().setStatus(UserStatus.LOCKED);
         userRepository.saveAndFlush(locked.getUser());
 
         MockHttpSession session = login("admin@test.local", "TestPassword123!");
 
-        mockMvc.perform(get("/api/v1/lecturers")
-                        .session(session)
-                        .param("search", "search")
-                        .param("departmentId", targetDepartment.getId().toString()))
+        mockMvc.perform(
+                        get("/api/v1/lecturers")
+                                .session(session)
+                                .param("search", "search")
+                                .param("departmentId", targetDepartment.getId().toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.content[0].id").value(matched.getId()))
-                .andExpect(jsonPath("$.data.content[0].lecturerCode").value(matched.getLecturerCode()))
+                .andExpect(
+                        jsonPath("$.data.content[0].lecturerCode").value(matched.getLecturerCode()))
                 .andExpect(jsonPath("$.data.content[0].fullName").value("Nguyen Van Search"))
                 .andExpect(jsonPath("$.data.content[0].facultyId").value(faculty.getId()))
-                .andExpect(jsonPath("$.data.content[0].departmentId").value(targetDepartment.getId()));
+                .andExpect(
+                        jsonPath("$.data.content[0].departmentId").value(targetDepartment.getId()));
 
-        mockMvc.perform(get("/api/v1/lecturers").session(session)
-                        .param("lecturerId", matched.getId().toString()).param("size", "1"))
+        mockMvc.perform(
+                        get("/api/v1/lecturers")
+                                .session(session)
+                                .param("lecturerId", matched.getId().toString())
+                                .param("size", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.content[0].id").value(matched.getId()));
-        mockMvc.perform(get("/api/v1/lecturers").session(session)
-                        .param("lecturerId", matched.getId().toString())
-                        .param("departmentId", otherDepartment.getId().toString()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
-        mockMvc.perform(get("/api/v1/lecturers").session(session)
-                        .param("lecturerId", locked.getId().toString()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        mockMvc.perform(
+                        get("/api/v1/lecturers")
+                                .session(session)
+                                .param("lecturerId", matched.getId().toString())
+                                .param("departmentId", otherDepartment.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+        mockMvc.perform(
+                        get("/api/v1/lecturers")
+                                .session(session)
+                                .param("lecturerId", locked.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
     }
 
     @Test
     void stateChangingRequestWithoutCsrfIsRejected() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        mockMvc.perform(
+                        post("/api/v1/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
                                 {"username":"admin@test.local","password":"TestPassword123!"}
                                 """))
                 .andExpect(status().isForbidden());
@@ -351,14 +459,17 @@ class AuthIntegrationTests {
 
     @Test
     void revokedAdminRoleTakesEffectForExistingSession() throws Exception {
-        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        MvcResult login =
+                mockMvc.perform(
+                                post("/api/v1/auth/login")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                """
                                 {"username":"admin@test.local","password":"TestPassword123!"}
                                 """))
-                .andExpect(status().isOk())
-                .andReturn();
+                        .andExpect(status().isOk())
+                        .andReturn();
         MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
 
         User user = userRepository.findByEmailIgnoreCase("admin@test.local").orElseThrow();
@@ -376,9 +487,10 @@ class AuthIntegrationTests {
         User target = userRepository.findByEmailIgnoreCase(targetEmail).orElseThrow();
         MockHttpSession session = login("admin@test.local", "TestPassword123!");
 
-        mockMvc.perform(delete("/api/v1/admin/users/{id}", target.getId())
-                        .with(csrf())
-                        .session(session))
+        mockMvc.perform(
+                        delete("/api/v1/admin/users/{id}", target.getId())
+                                .with(csrf())
+                                .session(session))
                 .andExpect(status().isNoContent());
 
         assertThat(userRepository.findById(target.getId()).orElseThrow().getStatus())
@@ -397,11 +509,13 @@ class AuthIntegrationTests {
         User target = student.getUser();
         MockHttpSession session = login("admin@test.local", "TestPassword123!");
 
-        mockMvc.perform(put("/api/v1/admin/users/{id}", target.getId())
-                        .with(csrf())
-                        .session(session)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        mockMvc.perform(
+                        put("/api/v1/admin/users/{id}", target.getId())
+                                .with(csrf())
+                                .session(session)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
                                 {
                                   "version": %d,
                                   "email": "sinhvien.capnhat@test.local",
@@ -415,7 +529,10 @@ class AuthIntegrationTests {
                                   },
                                   "lecturer": null
                                 }
-                                """.formatted(target.getVersion(), newDepartment.getId())))
+                                """
+                                                .formatted(
+                                                        target.getVersion(),
+                                                        newDepartment.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.email").value("sinhvien.capnhat@test.local"))
                 .andExpect(jsonPath("$.data.fullName").value("Sinh Vien Da Cap Nhat"))
@@ -435,9 +552,10 @@ class AuthIntegrationTests {
         User admin = userRepository.findByEmailIgnoreCase("admin@test.local").orElseThrow();
         MockHttpSession session = login("admin@test.local", "TestPassword123!");
 
-        mockMvc.perform(delete("/api/v1/admin/users/{id}", admin.getId())
-                        .with(csrf())
-                        .session(session))
+        mockMvc.perform(
+                        delete("/api/v1/admin/users/{id}", admin.getId())
+                                .with(csrf())
+                                .session(session))
                 .andExpect(status().isBadRequest());
 
         assertThat(userRepository.findById(admin.getId()).orElseThrow().getStatus())
@@ -445,14 +563,18 @@ class AuthIntegrationTests {
     }
 
     private MockHttpSession login(String username, String password) throws Exception {
-        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        MvcResult login =
+                mockMvc.perform(
+                                post("/api/v1/auth/login")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                """
                                 {"username":"%s","password":"%s"}
-                                """.formatted(username, password)))
-                .andExpect(status().isOk())
-                .andReturn();
+                                """
+                                                        .formatted(username, password)))
+                        .andExpect(status().isOk())
+                        .andReturn();
         return (MockHttpSession) login.getRequest().getSession(false);
     }
 
@@ -488,7 +610,8 @@ class AuthIntegrationTests {
         return departmentRepository.saveAndFlush(department);
     }
 
-    private Lecturer createLecturer(String emailPrefix, String lecturerCodePrefix, String fullName, Department department) {
+    private Lecturer createLecturer(
+            String emailPrefix, String lecturerCodePrefix, String fullName, Department department) {
         Role lecturerRole = roleRepository.findByCode(RoleCode.LECTURER).orElseThrow();
         LocalDateTime now = LocalDateTime.now(clock);
 
@@ -511,7 +634,8 @@ class AuthIntegrationTests {
         return lecturerRepository.saveAndFlush(lecturer);
     }
 
-    private Student createStudent(String emailPrefix, String studentCodePrefix, String fullName, Department department) {
+    private Student createStudent(
+            String emailPrefix, String studentCodePrefix, String fullName, Department department) {
         Role studentRole = roleRepository.findByCode(RoleCode.STUDENT).orElseThrow();
         LocalDateTime now = LocalDateTime.now(clock);
 
@@ -534,7 +658,8 @@ class AuthIntegrationTests {
         return studentRepository.saveAndFlush(student);
     }
 
-    private void createAppointment(Lecturer lecturer, Faculty faculty, Department department, PositionCode positionCode) {
+    private void createAppointment(
+            Lecturer lecturer, Faculty faculty, Department department, PositionCode positionCode) {
         AcademicAppointment appointment = new AcademicAppointment();
         appointment.setLecturer(lecturer);
         appointment.setFaculty(faculty);
@@ -542,7 +667,8 @@ class AuthIntegrationTests {
         appointment.setPositionCode(positionCode);
         appointment.setStartsAt(LocalDateTime.now(clock).minusDays(1));
         appointment.setEndsAt(LocalDateTime.now(clock).plusDays(1));
-        appointment.setAssignedBy(userRepository.findByEmailIgnoreCase("admin@test.local").orElseThrow());
+        appointment.setAssignedBy(
+                userRepository.findByEmailIgnoreCase("admin@test.local").orElseThrow());
         academicAppointmentRepository.saveAndFlush(appointment);
     }
 

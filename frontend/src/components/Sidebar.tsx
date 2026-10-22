@@ -52,7 +52,12 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
   return (
     <aside className="sidebar app-sidebar">
-      <Link className="sidebar__brand" to="/dashboard" aria-label="Về trang tổng quan" onClick={onNavigate}>
+      <Link
+        className="sidebar__brand"
+        to="/dashboard"
+        aria-label="Về trang tổng quan"
+        onClick={onNavigate}
+      >
         <img
           className="sidebar__brand-image"
           src="/HCM-UTE_Logo.png"
@@ -65,7 +70,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       <nav className="sidebar__nav" aria-label="Điều hướng chính" onScroll={handleNavScroll}>
         {filteredItems.map((item) => {
           const Icon = item.icon
-          const isActive = pathname === item.to || (item.to !== '/' && pathname.startsWith(`${item.to}/`))
+          const isActive =
+            pathname === item.to || (item.to !== '/' && pathname.startsWith(`${item.to}/`))
 
           return (
             <button
@@ -73,7 +79,10 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               type="button"
               className={`sidebar__link${isActive ? ' sidebar__link--active' : ''}`}
               aria-current={isActive ? 'page' : undefined}
-              onClick={() => { navigate(item.to); onNavigate() }}
+              onClick={() => {
+                navigate(item.to)
+                onNavigate()
+              }}
             >
               <span className="sidebar__icon" aria-hidden="true">
                 <Icon size={18} strokeWidth={1.8} />

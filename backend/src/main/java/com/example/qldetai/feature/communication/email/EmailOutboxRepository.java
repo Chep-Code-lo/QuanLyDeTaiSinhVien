@@ -1,17 +1,19 @@
 package com.example.qldetai.feature.communication.email;
 
+import jakarta.persistence.LockModeType;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import jakarta.persistence.LockModeType;
 
 public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, Long> {
 
@@ -21,7 +23,9 @@ public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, Long> 
      * production database is MySQL 8.4, and the test database runs in MySQL mode.
      */
     @Modifying(flushAutomatically = true)
-    @Query(value = """
+    @Query(
+            value =
+                    """
             insert into email_outbox (
                 event_type, event_key, recipient_user_id, recipient_email, recipient_name,
                 sender_name, from_email, reply_to_email, subject, body, status,
@@ -37,7 +41,8 @@ public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, Long> 
                 :relatedMilestoneId, :resolvedScopeType, :resolvedScopeId,
                 :createdById, :createdAt
             ) on duplicate key update id = id
-            """, nativeQuery = true)
+            """,
+            nativeQuery = true)
     int insertIfAbsent(
             @Param("eventType") String eventType,
             @Param("eventKey") String eventKey,
@@ -71,7 +76,8 @@ public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, Long> 
     java.util.Optional<EmailOutbox> findByIdAndStatus(Long id, EmailOutboxStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
+    @Query(
+            """
             select o from EmailOutbox o
             where o.status = com.example.qldetai.feature.communication.email.EmailOutboxStatus.PENDING
               and o.nextAttemptAt <= :now
@@ -79,15 +85,15 @@ public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, Long> 
             """)
     List<EmailOutbox> lockReadyForDelivery(@Param("now") LocalDateTime now, Pageable pageable);
 
-    @Query("""
+    @Query(
+            """
             select o.id from EmailOutbox o
             where o.status = com.example.qldetai.feature.communication.email.EmailOutboxStatus.SENDING
               and o.claimedAt < :claimedBefore
             order by o.id
             """)
     List<Long> findStaleClaimIds(
-            @Param("claimedBefore") LocalDateTime claimedBefore,
-            Pageable pageable);
+            @Param("claimedBefore") LocalDateTime claimedBefore, Pageable pageable);
 
     Page<EmailOutbox> findByFacultyIdIn(Collection<Long> facultyIds, Pageable pageable);
 
@@ -96,7 +102,8 @@ public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, Long> 
      * have no business faculty id. Its resolved setting scope is still faculty data
      * and must remain visible to the dean who owns that scope.
      */
-    @Query("""
+    @Query(
+            """
             select o from EmailOutbox o
             where o.facultyId in :facultyIds
                or (o.resolvedScopeType = com.example.qldetai.feature.communication.email.NotificationScopeType.FACULTY
@@ -104,9 +111,13 @@ public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, Long> 
                or (o.resolvedScopeType = com.example.qldetai.feature.communication.email.NotificationScopeType.LECTURER
                    and o.resolvedScopeId = :userId)
             """)
-    Page<EmailOutbox> findAccessibleToDean(@Param("facultyIds") Collection<Long> facultyIds, @Param("userId") Long userId, Pageable pageable);
+    Page<EmailOutbox> findAccessibleToDean(
+            @Param("facultyIds") Collection<Long> facultyIds,
+            @Param("userId") Long userId,
+            Pageable pageable);
 
-    @Query("""
+    @Query(
+            """
             select o from EmailOutbox o
             where (o.resolvedScopeType = com.example.qldetai.feature.communication.email.NotificationScopeType.LECTURER
                    and o.resolvedScopeId = :userId)

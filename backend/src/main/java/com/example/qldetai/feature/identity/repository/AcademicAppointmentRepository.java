@@ -2,15 +2,18 @@ package com.example.qldetai.feature.identity.repository;
 
 import com.example.qldetai.feature.identity.domain.AcademicAppointment;
 import com.example.qldetai.feature.identity.domain.PositionCode;
-import java.time.LocalDateTime;
-import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 public interface AcademicAppointmentRepository extends JpaRepository<AcademicAppointment, Long> {
 
-    @Query("""
+    @Query(
+            """
             select a from AcademicAppointment a
             join fetch a.lecturer l
             join fetch l.user
@@ -21,7 +24,8 @@ public interface AcademicAppointmentRepository extends JpaRepository<AcademicApp
             """)
     List<AcademicAppointment> findForAdministration(@Param("lecturerId") Long lecturerId);
 
-    @Query("""
+    @Query(
+            """
             select count(a) > 0 from AcademicAppointment a
             where a.lecturer.user.id = :userId
               and a.positionCode = :position
@@ -35,7 +39,8 @@ public interface AcademicAppointmentRepository extends JpaRepository<AcademicApp
             @Param("facultyId") Long facultyId,
             @Param("now") LocalDateTime now);
 
-    @Query("""
+    @Query(
+            """
             select count(a) > 0 from AcademicAppointment a
             where a.lecturer.user.id = :userId
               and a.positionCode = :position
@@ -49,16 +54,19 @@ public interface AcademicAppointmentRepository extends JpaRepository<AcademicApp
             @Param("departmentId") Long departmentId,
             @Param("now") LocalDateTime now);
 
-    @Query("""
+    @Query(
+            """
             select distinct a.faculty.id from AcademicAppointment a
             where a.lecturer.user.id = :userId
               and a.positionCode = com.example.qldetai.feature.identity.domain.PositionCode.DEAN
               and a.startsAt <= :now
               and (a.endsAt is null or a.endsAt > :now)
             """)
-    List<Long> findActiveDeanFacultyIds(@Param("userId") Long userId, @Param("now") LocalDateTime now);
+    List<Long> findActiveDeanFacultyIds(
+            @Param("userId") Long userId, @Param("now") LocalDateTime now);
 
-    @Query("""
+    @Query(
+            """
             select a from AcademicAppointment a
             join fetch a.lecturer l
             join fetch l.user
@@ -69,5 +77,6 @@ public interface AcademicAppointmentRepository extends JpaRepository<AcademicApp
               and (a.endsAt is null or a.endsAt > :now)
             order by a.startsAt desc
             """)
-    List<AcademicAppointment> findActiveByUserId(@Param("userId") Long userId, @Param("now") LocalDateTime now);
+    List<AcademicAppointment> findActiveByUserId(
+            @Param("userId") Long userId, @Param("now") LocalDateTime now);
 }

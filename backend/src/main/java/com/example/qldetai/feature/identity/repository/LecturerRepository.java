@@ -24,7 +24,8 @@ public interface LecturerRepository extends JpaRepository<Lecturer, Long> {
     @EntityGraph(attributePaths = {"user", "department"})
     List<Lecturer> findByUserIdIn(Collection<Long> userIds);
 
-    @Query("""
+    @Query(
+            """
             select l from Lecturer l
             join fetch l.user
             where l.department.faculty.id = :facultyId

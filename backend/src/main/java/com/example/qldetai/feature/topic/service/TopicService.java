@@ -1,7 +1,7 @@
 package com.example.qldetai.feature.topic.service;
 
-import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ConflictException;
 import com.example.qldetai.exception.ResourceNotFoundException;
@@ -10,8 +10,8 @@ import com.example.qldetai.feature.academic.domain.RegistrationPeriod;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriodStatus;
 import com.example.qldetai.feature.academic.repository.DepartmentRepository;
 import com.example.qldetai.feature.academic.repository.RegistrationPeriodRepository;
-import com.example.qldetai.feature.communication.service.NotificationService;
 import com.example.qldetai.feature.communication.email.EmailNotificationEventService;
+import com.example.qldetai.feature.communication.service.NotificationService;
 import com.example.qldetai.feature.groupregistration.domain.StudentGroup;
 import com.example.qldetai.feature.groupregistration.repository.GroupMemberRepository;
 import com.example.qldetai.feature.groupregistration.repository.StudentGroupRepository;
@@ -42,21 +42,25 @@ import com.example.qldetai.feature.topic.dto.TopicDtos.WithdrawTopicRequest;
 import com.example.qldetai.feature.topic.repository.TopicRepository;
 import com.example.qldetai.feature.topic.repository.TopicReviewRepository;
 import com.example.qldetai.feature.topic.repository.TopicSupervisorRepository;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -80,7 +84,6 @@ public class TopicService {
     private final Clock clock;
     private final EntityManager entityManager;
 
-
     @Transactional(readOnly = true)
     public PageResponse<TopicResponse> list(
             Long periodId, TopicStatus status, int page, int size, Long actorId) {
@@ -90,42 +93,90 @@ public class TopicService {
     @Transactional(readOnly = true)
     public PageResponse<TopicResponse> list(
             Long periodId, TopicStatus status, String search, int page, int size, Long actorId) {
-        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending().and(Sort.by("id").descending()));
+        PageRequest pageable =
+                PageRequest.of(
+                        page,
+                        size,
+                        Sort.by("createdAt").descending().and(Sort.by("id").descending()));
         User actor = requireUser(actorId);
         boolean staff = isAcademicStaff(actor);
         if (!staff && !hasRole(actor, RoleCode.STUDENT)) {
-            throw new AccessDeniedException("A student, lecturer, or administrator account is required.");
+            throw new AccessDeniedException(
+                    "A student, lecturer, or administrator account is required.");
         }
-        org.springframework.data.jpa.domain.Specification<Topic> specification = (root, query, cb) -> {
-            var conditions = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
-            if (periodId != null) conditions.add(cb.equal(root.get("period").get("id"), periodId));
-            if (status != null) conditions.add(cb.equal(root.get("status"), status));
-            if (!staff) {
-                var membership = query.subquery(Long.class);
-                var member = membership.from(com.example.qldetai.feature.groupregistration.domain.GroupMember.class);
-                membership.select(member.get("id")).where(
-                        cb.equal(member.get("group"), root.get("reservedGroup")),
-                        cb.equal(member.get("student").get("user").get("id"), actorId),
-                        cb.isNull(member.get("leftAt")));
-                conditions.add(cb.or(cb.equal(root.get("proposedBy").get("id"), actorId),
-                        cb.and(cb.equal(root.get("status"), TopicStatus.PUBLISHED),
-                                cb.or(cb.equal(root.get("visibilityType"), VisibilityType.OPEN), cb.exists(membership)))));
-            }
-            if (search != null && !search.isBlank()) {
-                String pattern = "%" + search.trim().toLowerCase(java.util.Locale.ROOT)
-                        .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
-                var supervisorQuery = query.subquery(Long.class);
-                var supervisor = supervisorQuery.from(com.example.qldetai.feature.topic.domain.TopicSupervisor.class);
-                supervisorQuery.select(supervisor.get("id")).where(cb.equal(supervisor.get("topic"), root),
-                        cb.like(cb.lower(supervisor.get("lecturer").get("user").get("fullName")), pattern, '\\'));
-                conditions.add(cb.or(cb.like(cb.lower(root.get("code")), pattern, '\\'),
-                        cb.like(cb.lower(root.get("title")), pattern, '\\'),
-                        cb.like(cb.lower(root.get("department").get("name")), pattern, '\\'),
-                        cb.exists(supervisorQuery)));
-            }
-            return cb.and(conditions.toArray(jakarta.persistence.criteria.Predicate[]::new));
-        };
-        return toResponses(topicRepository.findAll(specification, pageable), staff ? null : actorId);
+        org.springframework.data.jpa.domain.Specification<Topic> specification =
+                (root, query, cb) -> {
+                    var conditions =
+                            new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+                    if (periodId != null)
+                        conditions.add(cb.equal(root.get("period").get("id"), periodId));
+                    if (status != null) conditions.add(cb.equal(root.get("status"), status));
+                    if (!staff) {
+                        var membership = query.subquery(Long.class);
+                        var member =
+                                membership.from(
+                                        com.example.qldetai.feature.groupregistration.domain
+                                                .GroupMember.class);
+                        membership
+                                .select(member.get("id"))
+                                .where(
+                                        cb.equal(member.get("group"), root.get("reservedGroup")),
+                                        cb.equal(
+                                                member.get("student").get("user").get("id"),
+                                                actorId),
+                                        cb.isNull(member.get("leftAt")));
+                        conditions.add(
+                                cb.or(
+                                        cb.equal(root.get("proposedBy").get("id"), actorId),
+                                        cb.and(
+                                                cb.equal(root.get("status"), TopicStatus.PUBLISHED),
+                                                cb.or(
+                                                        cb.equal(
+                                                                root.get("visibilityType"),
+                                                                VisibilityType.OPEN),
+                                                        cb.exists(membership)))));
+                    }
+                    if (search != null && !search.isBlank()) {
+                        String pattern =
+                                "%"
+                                        + search.trim()
+                                                .toLowerCase(java.util.Locale.ROOT)
+                                                .replace("\\", "\\\\")
+                                                .replace("%", "\\%")
+                                                .replace("_", "\\_")
+                                        + "%";
+                        var supervisorQuery = query.subquery(Long.class);
+                        var supervisor =
+                                supervisorQuery.from(
+                                        com.example.qldetai.feature.topic.domain.TopicSupervisor
+                                                .class);
+                        supervisorQuery
+                                .select(supervisor.get("id"))
+                                .where(
+                                        cb.equal(supervisor.get("topic"), root),
+                                        cb.like(
+                                                cb.lower(
+                                                        supervisor
+                                                                .get("lecturer")
+                                                                .get("user")
+                                                                .get("fullName")),
+                                                pattern,
+                                                '\\'));
+                        conditions.add(
+                                cb.or(
+                                        cb.like(cb.lower(root.get("code")), pattern, '\\'),
+                                        cb.like(cb.lower(root.get("title")), pattern, '\\'),
+                                        cb.like(
+                                                cb.lower(root.get("department").get("name")),
+                                                pattern,
+                                                '\\'),
+                                        cb.exists(supervisorQuery)));
+                    }
+                    return cb.and(
+                            conditions.toArray(jakarta.persistence.criteria.Predicate[]::new));
+                };
+        return toResponses(
+                topicRepository.findAll(specification, pageable), staff ? null : actorId);
     }
 
     @Transactional(readOnly = true)
@@ -164,10 +215,12 @@ public class TopicService {
         ProposalSource source = determineProposalSource(actor);
         Department department = resolveDepartment(actor);
         if (!hasRole(actor, RoleCode.ADMIN) && !isProposalWindowOpen(period, now)) {
-            throw new BusinessRuleException("Topics can only be proposed during the proposal window.");
+            throw new BusinessRuleException(
+                    "Topics can only be proposed during the proposal window.");
         }
         if (!department.getFaculty().getId().equals(period.getFaculty().getId())) {
-            throw new BusinessRuleException("Topic proposer must belong to the same faculty as the registration period.");
+            throw new BusinessRuleException(
+                    "Topic proposer must belong to the same faculty as the registration period.");
         }
         String code = normalizeCode(request.code());
         if (topicRepository.existsByPeriodIdAndCodeIgnoreCase(period.getId(), code)) {
@@ -187,7 +240,8 @@ public class TopicService {
                 request.expectedOutcomes(),
                 request.prerequisites(),
                 request.visibilityType(),
-                resolveReservedGroup(period, request.visibilityType(), request.reservedGroupId(), actor));
+                resolveReservedGroup(
+                        period, request.visibilityType(), request.reservedGroupId(), actor));
         topic.setProposedBy(actor);
         topic.setProposalSource(source);
         topic.setStatus(TopicStatus.PENDING);
@@ -196,17 +250,20 @@ public class TopicService {
 
     @Transactional
     @BusinessAudit(action = "TOPIC_CREATE_FOR_REGISTRATION", entityType = "TOPIC")
-    public TopicResponse createForRegistration(CreateRegistrationTopicRequest request, Long actorId) {
+    public TopicResponse createForRegistration(
+            CreateRegistrationTopicRequest request, Long actorId) {
         User actor = requireUser(actorId);
         RegistrationPeriod period = requirePeriod(request.periodId());
         LocalDateTime now = LocalDateTime.now(clock);
         if (!isProposalWindowOpen(period, now)) {
-            throw new BusinessRuleException("Topics can only be proposed during the proposal window.");
+            throw new BusinessRuleException(
+                    "Topics can only be proposed during the proposal window.");
         }
 
         Department department = requireActiveDepartment(request.departmentId());
         if (!department.getFaculty().getId().equals(period.getFaculty().getId())) {
-            throw new BusinessRuleException("Department must belong to the same faculty as the registration period.");
+            throw new BusinessRuleException(
+                    "Department must belong to the same faculty as the registration period.");
         }
 
         String code = normalizeCode(request.code());
@@ -215,7 +272,8 @@ public class TopicService {
         }
         if (request.secondaryLecturerId() != null
                 && request.secondaryLecturerId().equals(request.primaryLecturerId())) {
-            throw new BusinessRuleException("Primary and secondary supervisors must be different lecturers.");
+            throw new BusinessRuleException(
+                    "Primary and secondary supervisors must be different lecturers.");
         }
 
         Topic topic = new Topic();
@@ -238,9 +296,10 @@ public class TopicService {
         topic = topicRepository.saveAndFlush(topic);
 
         Lecturer primary = requireLecturer(request.primaryLecturerId(), topic);
-        Lecturer secondary = request.secondaryLecturerId() == null
-                ? null
-                : requireLecturer(request.secondaryLecturerId(), topic);
+        Lecturer secondary =
+                request.secondaryLecturerId() == null
+                        ? null
+                        : requireLecturer(request.secondaryLecturerId(), topic);
         topicSupervisorRepository.save(createSupervisor(topic, primary, actor, 1, now));
         if (secondary != null) {
             topicSupervisorRepository.save(createSupervisor(topic, secondary, actor, 2, now));
@@ -267,28 +326,39 @@ public class TopicService {
                 request.expectedOutcomes(),
                 request.prerequisites(),
                 request.visibilityType(),
-                resolveReservedGroup(topic.getPeriod(), request.visibilityType(), request.reservedGroupId(), actor));
+                resolveReservedGroup(
+                        topic.getPeriod(),
+                        request.visibilityType(),
+                        request.reservedGroupId(),
+                        actor));
         return toResponse(topic);
     }
 
     @Transactional
     @BusinessAudit(action = "TOPIC_SUPERVISORS_ASSIGN", entityType = "TOPIC", entityIdArgument = 0)
-    public TopicResponse assignSupervisors(Long id, AssignSupervisorsRequest request, Long actorId) {
-        Topic topic = topicRepository.findByIdForUpdate(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Topic was not found."));
+    public TopicResponse assignSupervisors(
+            Long id, AssignSupervisorsRequest request, Long actorId) {
+        Topic topic =
+                topicRepository
+                        .findByIdForUpdate(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Topic was not found."));
         User actor = requireUser(actorId);
         verifyVersion(topic, request.version());
         ensureModerator(actor);
-        if (topic.getStatus() != TopicStatus.APPROVED && topic.getStatus() != TopicStatus.PUBLISHED) {
-            throw new BusinessRuleException("Supervisors can only be assigned after the topic is approved.");
+        if (topic.getStatus() != TopicStatus.APPROVED
+                && topic.getStatus() != TopicStatus.PUBLISHED) {
+            throw new BusinessRuleException(
+                    "Supervisors can only be assigned after the topic is approved.");
         }
 
         Lecturer primary = requireLecturer(request.primaryLecturerId(), topic);
-        Lecturer secondary = request.secondaryLecturerId() == null
-                ? null
-                : requireLecturer(request.secondaryLecturerId(), topic);
+        Lecturer secondary =
+                request.secondaryLecturerId() == null
+                        ? null
+                        : requireLecturer(request.secondaryLecturerId(), topic);
         if (secondary != null && secondary.getId().equals(primary.getId())) {
-            throw new BusinessRuleException("Primary and secondary supervisors must be different lecturers.");
+            throw new BusinessRuleException(
+                    "Primary and secondary supervisors must be different lecturers.");
         }
 
         // Supervisor rows are part of the topic revision even if topic fields are unchanged.
@@ -310,8 +380,10 @@ public class TopicService {
         User actor = requireUser(actorId);
         verifyVersion(topic, request.version());
         ensureModerator(actor);
-        if (topic.getStatus() == TopicStatus.PUBLISHED || topic.getStatus() == TopicStatus.WITHDRAWN) {
-            throw new BusinessRuleException("Published or withdrawn topics can no longer be reviewed.");
+        if (topic.getStatus() == TopicStatus.PUBLISHED
+                || topic.getStatus() == TopicStatus.WITHDRAWN) {
+            throw new BusinessRuleException(
+                    "Published or withdrawn topics can no longer be reviewed.");
         }
 
         TopicReview review = new TopicReview();
@@ -322,17 +394,22 @@ public class TopicService {
         review.setReviewedAt(LocalDateTime.now(clock));
         topicReviewRepository.save(review);
 
-        topic.setStatus(switch (request.decision()) {
-            case APPROVED -> TopicStatus.APPROVED;
-            case REVISION_REQUIRED -> TopicStatus.REVISION_REQUIRED;
-            case REJECTED -> TopicStatus.REJECTED;
-        });
+        topic.setStatus(
+                switch (request.decision()) {
+                    case APPROVED -> TopicStatus.APPROVED;
+                    case REVISION_REQUIRED -> TopicStatus.REVISION_REQUIRED;
+                    case REJECTED -> TopicStatus.REJECTED;
+                });
 
         notificationService.publish(
                 topic.getProposedBy().getId(),
                 "topic-review-" + topic.getId() + "-" + review.getId(),
                 "Đề tài đã được phản hồi",
-                "Đề tài " + topic.getCode() + " vừa được cập nhật trạng thái " + topic.getStatus() + ".",
+                "Đề tài "
+                        + topic.getCode()
+                        + " vừa được cập nhật trạng thái "
+                        + topic.getStatus()
+                        + ".",
                 "/topics/" + topic.getId());
 
         if (review.getDecision() == TopicReviewDecision.APPROVED
@@ -353,9 +430,11 @@ public class TopicService {
         if (topic.getStatus() != TopicStatus.APPROVED) {
             throw new BusinessRuleException("Only approved topics can be published.");
         }
-        List<TopicSupervisor> supervisors = topicSupervisorRepository.findByTopicIdOrderBySlotNoAsc(topic.getId());
+        List<TopicSupervisor> supervisors =
+                topicSupervisorRepository.findByTopicIdOrderBySlotNoAsc(topic.getId());
         if (supervisors.stream().noneMatch(supervisor -> supervisor.getSlotNo() == 1)) {
-            throw new BusinessRuleException("Assign a primary supervisor before publishing the topic.");
+            throw new BusinessRuleException(
+                    "Assign a primary supervisor before publishing the topic.");
         }
 
         LocalDateTime now = LocalDateTime.now(clock);
@@ -376,8 +455,10 @@ public class TopicService {
         Topic topic = requireTopic(id);
         User actor = requireUser(actorId);
         verifyVersion(topic, request.version());
-        if (!hasRole(actor, RoleCode.ADMIN) && !topic.getProposedBy().getId().equals(actor.getId())) {
-            throw new AccessDeniedException("Only the proposer or an administrator can withdraw this topic.");
+        if (!hasRole(actor, RoleCode.ADMIN)
+                && !topic.getProposedBy().getId().equals(actor.getId())) {
+            throw new AccessDeniedException(
+                    "Only the proposer or an administrator can withdraw this topic.");
         }
         if (topic.getStatus() == TopicStatus.PUBLISHED) {
             throw new BusinessRuleException("Published topics cannot be withdrawn.");
@@ -417,15 +498,19 @@ public class TopicService {
         if (studentRepository.findByUserId(actor.getId()).isPresent()) {
             return ProposalSource.STUDENT;
         }
-        throw new AccessDeniedException("A student or lecturer profile is required to propose a topic.");
+        throw new AccessDeniedException(
+                "A student or lecturer profile is required to propose a topic.");
     }
 
     private Department resolveDepartment(User actor) {
-        return lecturerRepository.findByUserId(actor.getId())
+        return lecturerRepository
+                .findByUserId(actor.getId())
                 .map(Lecturer::getDepartment)
                 .or(() -> studentRepository.findByUserId(actor.getId()).map(Student::getDepartment))
-                .orElseThrow(() ->
-                        new AccessDeniedException("A student or lecturer profile is required to propose a topic."));
+                .orElseThrow(
+                        () ->
+                                new AccessDeniedException(
+                                        "A student or lecturer profile is required to propose a topic."));
     }
 
     private StudentGroup resolveReservedGroup(
@@ -442,25 +527,29 @@ public class TopicService {
         if (reservedGroupId == null) {
             throw new BusinessRuleException("Reserved topics must specify a target group.");
         }
-        StudentGroup group = studentGroupRepository.findById(reservedGroupId)
-                .orElseThrow(() -> new ResourceNotFoundException("Reserved group was not found."));
+        StudentGroup group =
+                studentGroupRepository
+                        .findById(reservedGroupId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Reserved group was not found."));
         if (!group.getPeriod().getId().equals(period.getId())) {
-            throw new BusinessRuleException("Reserved group must belong to the same registration period.");
+            throw new BusinessRuleException(
+                    "Reserved group must belong to the same registration period.");
         }
         if (hasRole(actor, RoleCode.STUDENT)
                 && !isAcademicStaff(actor)
-                && !groupMemberRepository.existsByGroupIdAndStudentUserIdAndLeftAtIsNull(group.getId(), actor.getId())) {
-            throw new AccessDeniedException("Students can reserve a topic only for their own group.");
+                && !groupMemberRepository.existsByGroupIdAndStudentUserIdAndLeftAtIsNull(
+                        group.getId(), actor.getId())) {
+            throw new AccessDeniedException(
+                    "Students can reserve a topic only for their own group.");
         }
         return group;
     }
 
     private TopicSupervisor createSupervisor(
-            Topic topic,
-            Lecturer lecturer,
-            User actor,
-            int slotNo,
-            LocalDateTime assignedAt) {
+            Topic topic, Lecturer lecturer, User actor, int slotNo, LocalDateTime assignedAt) {
         TopicSupervisor supervisor = new TopicSupervisor();
         supervisor.setTopic(topic);
         supervisor.setLecturer(lecturer);
@@ -471,62 +560,82 @@ public class TopicService {
     }
 
     private Lecturer requireLecturer(Long lecturerId, Topic topic) {
-        Lecturer lecturer = lecturerRepository.findById(lecturerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Lecturer was not found."));
+        Lecturer lecturer =
+                lecturerRepository
+                        .findById(lecturerId)
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException("Lecturer was not found."));
         if (!lecturer.getDepartment().getFaculty().getId().equals(topic.getFaculty().getId())) {
-            throw new BusinessRuleException("Supervisor must belong to the same faculty as the topic.");
+            throw new BusinessRuleException(
+                    "Supervisor must belong to the same faculty as the topic.");
         }
         return lecturer;
     }
 
     private RegistrationPeriod requirePeriod(Long id) {
-        RegistrationPeriod period = registrationPeriodRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Registration period was not found."));
+        RegistrationPeriod period =
+                registrationPeriodRepository
+                        .findById(id)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Registration period was not found."));
         if (period.getStatus() != RegistrationPeriodStatus.ACTIVE) {
-            throw new BusinessRuleException("Topics can only be managed in an active registration period.");
+            throw new BusinessRuleException(
+                    "Topics can only be managed in an active registration period.");
         }
         return period;
     }
 
     private Department requireActiveDepartment(Long id) {
-        return departmentRepository.findById(id)
+        return departmentRepository
+                .findById(id)
                 .filter(Department::isActive)
-                .orElseThrow(() -> new ResourceNotFoundException("Active department was not found."));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Active department was not found."));
     }
 
     private Topic requireTopic(Long id) {
-        return topicRepository.findById(id)
+        return topicRepository
+                .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Topic was not found."));
     }
 
     private User requireUser(Long id) {
-        return userRepository.findWithRolesById(id)
+        return userRepository
+                .findWithRolesById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User account was not found."));
     }
 
     private void verifyVersion(Topic topic, int requestedVersion) {
         if (topic.getVersion() != requestedVersion) {
-            throw new ConflictException("The topic was changed by another user. Reload and try again.");
+            throw new ConflictException(
+                    "The topic was changed by another user. Reload and try again.");
         }
     }
 
     private void ensureTopicEditor(Topic topic, User actor) {
-        if (!hasRole(actor, RoleCode.ADMIN) && !topic.getProposedBy().getId().equals(actor.getId())) {
-            throw new AccessDeniedException("Only the topic proposer or an administrator can edit this topic.");
+        if (!hasRole(actor, RoleCode.ADMIN)
+                && !topic.getProposedBy().getId().equals(actor.getId())) {
+            throw new AccessDeniedException(
+                    "Only the topic proposer or an administrator can edit this topic.");
         }
         if (!EDITABLE_STATUSES.contains(topic.getStatus())) {
-            throw new BusinessRuleException("Only draft, pending, or revision-required topics can be edited.");
+            throw new BusinessRuleException(
+                    "Only draft, pending, or revision-required topics can be edited.");
         }
     }
 
     private void ensureModerator(User actor) {
         if (!hasRole(actor, RoleCode.ADMIN) && !hasRole(actor, RoleCode.LECTURER)) {
-            throw new AccessDeniedException("Only lecturers or administrators can moderate topics.");
+            throw new AccessDeniedException(
+                    "Only lecturers or administrators can moderate topics.");
         }
     }
 
     private boolean isProposalWindowOpen(RegistrationPeriod period, LocalDateTime now) {
-        return !now.isBefore(period.getProposalStartAt()) && !now.isAfter(period.getProposalEndAt());
+        return !now.isBefore(period.getProposalStartAt())
+                && !now.isAfter(period.getProposalEndAt());
     }
 
     private boolean hasRole(User user, RoleCode role) {
@@ -564,8 +673,14 @@ public class TopicService {
     }
 
     private TopicResponse toResponse(Topic topic, boolean includeLatestReview) {
-        return toResponse(topic, topicSupervisorRepository.findByTopicIdOrderBySlotNoAsc(topic.getId()),
-                includeLatestReview ? topicReviewRepository.findFirstByTopicIdOrderByReviewedAtDesc(topic.getId()).orElse(null) : null);
+        return toResponse(
+                topic,
+                topicSupervisorRepository.findByTopicIdOrderBySlotNoAsc(topic.getId()),
+                includeLatestReview
+                        ? topicReviewRepository
+                                .findFirstByTopicIdOrderByReviewedAtDesc(topic.getId())
+                                .orElse(null)
+                        : null);
     }
 
     private PageResponse<TopicResponse> toResponses(Page<Topic> found, Long studentUserId) {
@@ -573,28 +688,54 @@ public class TopicService {
             return PageResponse.from(found.map(this::toResponse));
         }
         List<Long> topicIds = found.getContent().stream().map(Topic::getId).toList();
-        Map<Long, List<TopicSupervisor>> supervisorsByTopic = topicSupervisorRepository
-                .findByTopicIdInOrderBySlotNoAsc(topicIds).stream()
-                .collect(java.util.stream.Collectors.groupingBy(supervisor -> supervisor.getTopic().getId()));
-        List<Long> reviewableIds = found.getContent().stream()
-                .filter(topic -> studentUserId == null || topic.getProposedBy().getId().equals(studentUserId))
-                .map(Topic::getId).toList();
-        Map<Long, TopicReview> latestReviews = reviewableIds.isEmpty() ? Map.of() : topicReviewRepository
-                .findLatestByTopicIds(reviewableIds).stream()
-                .collect(java.util.stream.Collectors.toMap(review -> review.getTopic().getId(), review -> review));
-        return PageResponse.from(found.map(topic -> toResponse(topic,
-                supervisorsByTopic.getOrDefault(topic.getId(), List.of()), latestReviews.get(topic.getId()))));
+        Map<Long, List<TopicSupervisor>> supervisorsByTopic =
+                topicSupervisorRepository.findByTopicIdInOrderBySlotNoAsc(topicIds).stream()
+                        .collect(
+                                java.util.stream.Collectors.groupingBy(
+                                        supervisor -> supervisor.getTopic().getId()));
+        List<Long> reviewableIds =
+                found.getContent().stream()
+                        .filter(
+                                topic ->
+                                        studentUserId == null
+                                                || topic.getProposedBy()
+                                                        .getId()
+                                                        .equals(studentUserId))
+                        .map(Topic::getId)
+                        .toList();
+        Map<Long, TopicReview> latestReviews =
+                reviewableIds.isEmpty()
+                        ? Map.of()
+                        : topicReviewRepository.findLatestByTopicIds(reviewableIds).stream()
+                                .collect(
+                                        java.util.stream.Collectors.toMap(
+                                                review -> review.getTopic().getId(),
+                                                review -> review));
+        return PageResponse.from(
+                found.map(
+                        topic ->
+                                toResponse(
+                                        topic,
+                                        supervisorsByTopic.getOrDefault(topic.getId(), List.of()),
+                                        latestReviews.get(topic.getId()))));
     }
 
-    private TopicResponse toResponse(Topic topic, List<TopicSupervisor> foundSupervisors, TopicReview review) {
-        List<TopicSupervisorResponse> supervisors = foundSupervisors.stream()
-                .map(supervisor -> new TopicSupervisorResponse(
-                        supervisor.getLecturer().getId(),
-                        supervisor.getLecturer().getLecturerCode(),
-                        supervisor.getLecturer().getUser().getFullName(),
-                        supervisor.getSlotNo()))
-                .toList();
-        TopicReviewResponse latestReview = review == null ? null : new TopicReviewResponse(
+    private TopicResponse toResponse(
+            Topic topic, List<TopicSupervisor> foundSupervisors, TopicReview review) {
+        List<TopicSupervisorResponse> supervisors =
+                foundSupervisors.stream()
+                        .map(
+                                supervisor ->
+                                        new TopicSupervisorResponse(
+                                                supervisor.getLecturer().getId(),
+                                                supervisor.getLecturer().getLecturerCode(),
+                                                supervisor.getLecturer().getUser().getFullName(),
+                                                supervisor.getSlotNo()))
+                        .toList();
+        TopicReviewResponse latestReview =
+                review == null
+                        ? null
+                        : new TopicReviewResponse(
                                 review.getId(),
                                 review.getDecision(),
                                 review.getComment(),

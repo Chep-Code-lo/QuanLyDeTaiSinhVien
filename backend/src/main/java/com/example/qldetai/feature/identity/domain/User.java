@@ -1,6 +1,7 @@
 package com.example.qldetai.feature.identity.domain;
 
 import com.example.qldetai.common.persistence.AuditedEntity;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -12,12 +13,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
-import java.time.LocalDateTime;
-import java.util.LinkedHashSet;
-import java.util.Set;
+
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "users")
@@ -62,8 +65,16 @@ public class User extends AuditedEntity {
     public void replaceRoles(Set<Role> roles, LocalDateTime assignedAt) {
         // Keep existing links: Hibernate inserts new links before deleting orphans,
         // so recreating unchanged roles can violate UNIQUE(user_id, role_id).
-        userRoles.removeIf(link -> roles.stream().noneMatch(role -> role.getCode() == link.getRole().getCode()));
-        roles.stream().filter(role -> userRoles.stream().noneMatch(link -> link.getRole().getCode() == role.getCode()))
+        userRoles.removeIf(
+                link ->
+                        roles.stream()
+                                .noneMatch(role -> role.getCode() == link.getRole().getCode()));
+        roles.stream()
+                .filter(
+                        role ->
+                                userRoles.stream()
+                                        .noneMatch(
+                                                link -> link.getRole().getCode() == role.getCode()))
                 .forEach(role -> userRoles.add(new UserRole(this, role, assignedAt)));
     }
 }

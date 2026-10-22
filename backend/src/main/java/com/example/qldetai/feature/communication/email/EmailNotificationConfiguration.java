@@ -5,5 +5,4 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @EnableConfigurationProperties(EmailNotificationProperties.class)
-public class EmailNotificationConfiguration {
-}
+public class EmailNotificationConfiguration {}

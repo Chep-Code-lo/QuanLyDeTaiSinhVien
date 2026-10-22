@@ -14,6 +14,8 @@ import com.example.qldetai.feature.evaluation.repository.GradeChangeRequestRepos
 import com.example.qldetai.feature.evaluation.repository.ResultInputRepository;
 import com.example.qldetai.feature.evaluation.repository.ScoreSheetRepository;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -24,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -37,13 +38,11 @@ public class GradeChangeService {
     private final EvaluationActorAccess actorAccess;
     private final GradeChangeAccess access;
 
-
     @Transactional(readOnly = true)
     public PageResponse<GradeChangeRequestResponse> listChanges(
             GradeChangeStatus status, Long sheetId, int page, int size, Long actorId) {
         actorAccess.manager(actorId);
-        Specification<GradeChangeRequest> specification =
-                access.readableBy(actorId);
+        Specification<GradeChangeRequest> specification = access.readableBy(actorId);
         if (status != null) {
             specification =
                     specification.and(
@@ -70,9 +69,15 @@ public class GradeChangeService {
     @Transactional(readOnly = true)
     public GradeChangeRequestResponse getChange(Long id, Long actorId) {
         actorAccess.manager(actorId);
-        GradeChangeRequest change = changes.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Grade change request was not found."));
-        if (!changes.exists(access.readableBy(actorId).and((root, query, cb) -> cb.equal(root.get("id"), id)))) {
+        GradeChangeRequest change =
+                changes.findById(id)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Grade change request was not found."));
+        if (!changes.exists(
+                access.readableBy(actorId)
+                        .and((root, query, cb) -> cb.equal(root.get("id"), id)))) {
             throw new AccessDeniedException("You cannot view this grade change request.");
         }
         return gradeChange(change);
@@ -112,7 +117,9 @@ public class GradeChangeService {
                                 () ->
                                         new ResourceNotFoundException(
                                                 "Grade change request was not found."));
-        if (!changes.exists(access.manageableBy(actorId).and((root, query, cb) -> cb.equal(root.get("id"), id)))) {
+        if (!changes.exists(
+                access.manageableBy(actorId)
+                        .and((root, query, cb) -> cb.equal(root.get("id"), id)))) {
             throw new AccessDeniedException("You cannot review this grade change request.");
         }
         if (changeRequest.getStatus() != GradeChangeStatus.PENDING) {
@@ -144,7 +151,7 @@ public class GradeChangeService {
         if (sheet.getId() != null && resultInputs.existsBySheetId(sheet.getId())) {
             throw new BusinessRuleException(
                     "Cannot reopen or edit a score sheet captured by a result version; finalized"
-                        + " and published evidence is immutable.");
+                            + " and published evidence is immutable.");
         }
     }
 

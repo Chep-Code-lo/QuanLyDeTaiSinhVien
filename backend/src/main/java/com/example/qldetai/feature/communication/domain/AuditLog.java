@@ -2,6 +2,7 @@ package com.example.qldetai.feature.communication.domain;
 
 import com.example.qldetai.common.persistence.CreatedAtEntity;
 import com.example.qldetai.feature.identity.domain.User;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -56,5 +58,4 @@ public class AuditLog extends CreatedAtEntity {
 
     @Column(name = "duration_ms")
     private Long durationMs;
-
 }

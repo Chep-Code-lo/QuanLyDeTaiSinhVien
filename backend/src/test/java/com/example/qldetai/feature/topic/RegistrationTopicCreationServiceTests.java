@@ -17,8 +17,8 @@ import com.example.qldetai.feature.academic.repository.DepartmentRepository;
 import com.example.qldetai.feature.academic.repository.FacultyRepository;
 import com.example.qldetai.feature.academic.repository.RegistrationPeriodRepository;
 import com.example.qldetai.feature.academic.repository.SemesterRepository;
-import com.example.qldetai.feature.identity.domain.Lecturer;
 import com.example.qldetai.feature.identity.domain.AcademicAppointment;
+import com.example.qldetai.feature.identity.domain.Lecturer;
 import com.example.qldetai.feature.identity.domain.PositionCode;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.domain.UserStatus;
@@ -30,9 +30,7 @@ import com.example.qldetai.feature.topic.dto.TopicDtos.CreateRegistrationTopicRe
 import com.example.qldetai.feature.topic.dto.TopicDtos.TopicResponse;
 import com.example.qldetai.feature.topic.service.TopicService;
 import com.example.qldetai.security.UserPrincipal;
-import java.time.Clock;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -40,6 +38,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -133,17 +135,20 @@ class RegistrationTopicCreationServiceTests {
 
     @Test
     void createsAndPublishesTopicForSelectedDepartmentWithTwoSupervisors() {
-        TopicResponse created = topicService.createForRegistration(new CreateRegistrationTopicRequest(
-                period.getId(),
-                department.getId(),
-                "TOPIC-" + Long.toUnsignedString(System.nanoTime(), 36),
-                "Đề tài kiểm thử",
-                "Mô tả rõ ràng",
-                "Mục tiêu kiểm thử",
-                "Kết quả kiểm thử",
-                null,
-                primaryLecturer.getId(),
-                secondaryLecturer.getId()), manager.getId());
+        TopicResponse created =
+                topicService.createForRegistration(
+                        new CreateRegistrationTopicRequest(
+                                period.getId(),
+                                department.getId(),
+                                "TOPIC-" + Long.toUnsignedString(System.nanoTime(), 36),
+                                "Đề tài kiểm thử",
+                                "Mô tả rõ ràng",
+                                "Mục tiêu kiểm thử",
+                                "Kết quả kiểm thử",
+                                null,
+                                primaryLecturer.getId(),
+                                secondaryLecturer.getId()),
+                        manager.getId());
 
         assertThat(created.departmentId()).isEqualTo(department.getId());
         assertThat(created.status()).isEqualTo(TopicStatus.PUBLISHED);
@@ -165,19 +170,22 @@ class RegistrationTopicCreationServiceTests {
         appointment.setAssignedBy(manager);
         academicAppointmentRepository.saveAndFlush(appointment);
 
-        String request = registrationTopicRequest("API-" + Long.toUnsignedString(System.nanoTime(), 36));
-        mockMvc.perform(post("/api/v1/topics/for-registration")
-                        .with(user(UserPrincipal.from(manager)))
-                        .with(csrf())
-                        .contentType("application/json")
-                        .content(request))
+        String request =
+                registrationTopicRequest("API-" + Long.toUnsignedString(System.nanoTime(), 36));
+        mockMvc.perform(
+                        post("/api/v1/topics/for-registration")
+                                .with(user(UserPrincipal.from(manager)))
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content(request))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(post("/api/v1/topics/for-registration")
-                        .with(user(UserPrincipal.from(primaryLecturer.getUser())))
-                        .with(csrf())
-                        .contentType("application/json")
-                        .content(request))
+        mockMvc.perform(
+                        post("/api/v1/topics/for-registration")
+                                .with(user(UserPrincipal.from(primaryLecturer.getUser())))
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content(request))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.status").value("PUBLISHED"))
                 .andExpect(jsonPath("$.data.departmentId").value(department.getId()))

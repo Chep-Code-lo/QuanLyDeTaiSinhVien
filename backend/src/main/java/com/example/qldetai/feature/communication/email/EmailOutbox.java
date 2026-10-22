@@ -2,6 +2,7 @@ package com.example.qldetai.feature.communication.email;
 
 import com.example.qldetai.common.persistence.CreatedAtEntity;
 import com.example.qldetai.feature.identity.domain.User;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -14,17 +15,20 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.LocalDateTime;
+
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(
         name = "email_outbox",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uq_email_outbox_01",
-                columnNames = {"event_key", "recipient_user_id"}))
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uq_email_outbox_01",
+                        columnNames = {"event_key", "recipient_user_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -116,5 +120,4 @@ public class EmailOutbox extends CreatedAtEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     private User createdBy;
-
 }

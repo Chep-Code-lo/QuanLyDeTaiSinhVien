@@ -8,11 +8,13 @@ import com.example.qldetai.feature.academic.dto.AcademicDtos.RegistrationPeriodR
 import com.example.qldetai.feature.academic.dto.AcademicDtos.UpdateRegistrationPeriodRequest;
 import com.example.qldetai.feature.academic.service.RegistrationPeriodService;
 import com.example.qldetai.security.UserPrincipal;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import java.net.URI;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,6 +29,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URI;
+
 @RestController
 @Validated
 @RequestMapping("/api/v1/registration-periods")
@@ -34,7 +38,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class RegistrationPeriodController {
 
     private final RegistrationPeriodService registrationPeriodService;
-
 
     @GetMapping
     public ApiResponse<PageResponse<RegistrationPeriodResponse>> list(
@@ -50,11 +53,13 @@ public class RegistrationPeriodController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManageFaculty(#request.facultyId, authentication)")
+    @PreAuthorize(
+            "hasRole('ADMIN') or @academicAuthorization.canManageFaculty(#request.facultyId, authentication)")
     public ResponseEntity<ApiResponse<RegistrationPeriodResponse>> create(
             @Valid @RequestBody CreateRegistrationPeriodRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        RegistrationPeriodResponse created = registrationPeriodService.create(request, principal.id());
+        RegistrationPeriodResponse created =
+                registrationPeriodService.create(request, principal.id());
         return ResponseEntity.created(URI.create("/api/v1/registration-periods/" + created.id()))
                 .body(ApiResponse.success("Đã tạo đợt đăng ký nháp.", created));
     }
@@ -63,7 +68,8 @@ public class RegistrationPeriodController {
     @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManagePeriod(#id, authentication)")
     public ApiResponse<RegistrationPeriodResponse> update(
             @PathVariable Long id, @Valid @RequestBody UpdateRegistrationPeriodRequest request) {
-        return ApiResponse.success("Đã cập nhật đợt đăng ký.", registrationPeriodService.update(id, request));
+        return ApiResponse.success(
+                "Đã cập nhật đợt đăng ký.", registrationPeriodService.update(id, request));
     }
 
     @PatchMapping("/{id}/status")
@@ -73,6 +79,7 @@ public class RegistrationPeriodController {
             @Valid @RequestBody ChangePeriodStatusRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Đã cập nhật trạng thái đợt đăng ký.", registrationPeriodService.changeStatus(id, request, principal.id()));
+                "Đã cập nhật trạng thái đợt đăng ký.",
+                registrationPeriodService.changeStatus(id, request, principal.id()));
     }
 }

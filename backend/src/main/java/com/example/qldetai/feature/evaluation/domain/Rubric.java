@@ -1,6 +1,7 @@
 package com.example.qldetai.feature.evaluation.domain;
 
 import com.example.qldetai.common.persistence.CreatedAtEntity;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -11,13 +12,18 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "rubrics", uniqueConstraints =
-        @UniqueConstraint(name = "uq_rubrics_01", columnNames = {"component_id", "version_no"}))
+@Table(
+        name = "rubrics",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uq_rubrics_01",
+                        columnNames = {"component_id", "version_no"}))
 @Getter
 @Setter
 @NoArgsConstructor

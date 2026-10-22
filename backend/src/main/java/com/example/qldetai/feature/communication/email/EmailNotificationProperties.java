@@ -1,8 +1,9 @@
 package com.example.qldetai.feature.communication.email;
 
-import java.time.ZoneId;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
+
+import java.time.ZoneId;
 
 @Validated
 @ConfigurationProperties(prefix = "app.email")

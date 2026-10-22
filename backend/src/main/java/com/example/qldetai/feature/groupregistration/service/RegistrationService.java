@@ -1,13 +1,13 @@
 package com.example.qldetai.feature.groupregistration.service;
 
-import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ConflictException;
 import com.example.qldetai.exception.ResourceNotFoundException;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriodStatus;
-import com.example.qldetai.feature.communication.service.NotificationService;
 import com.example.qldetai.feature.communication.email.EmailNotificationEventService;
+import com.example.qldetai.feature.communication.service.NotificationService;
 import com.example.qldetai.feature.groupregistration.domain.GroupMember;
 import com.example.qldetai.feature.groupregistration.domain.GroupMemberRole;
 import com.example.qldetai.feature.groupregistration.domain.GroupStatus;
@@ -32,16 +32,19 @@ import com.example.qldetai.feature.topic.domain.Topic;
 import com.example.qldetai.feature.topic.domain.TopicStatus;
 import com.example.qldetai.feature.topic.domain.VisibilityType;
 import com.example.qldetai.feature.topic.repository.TopicRepository;
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.util.List;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -59,13 +62,14 @@ public class RegistrationService {
     private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
 
-
     @Transactional(readOnly = true)
-    public PageResponse<TopicRegistrationResponse> list(Long periodId, RegistrationStatus status, int page, int size) {
+    public PageResponse<TopicRegistrationResponse> list(
+            Long periodId, RegistrationStatus status, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("registeredAt").descending());
         Page<TopicRegistration> registrations;
         if (periodId != null && status != null) {
-            registrations = topicRegistrationRepository.findByPeriodIdAndStatus(periodId, status, pageable);
+            registrations =
+                    topicRegistrationRepository.findByPeriodIdAndStatus(periodId, status, pageable);
         } else if (periodId != null) {
             registrations = topicRegistrationRepository.findByPeriodId(periodId, pageable);
         } else if (status != null) {
@@ -80,9 +84,10 @@ public class RegistrationService {
     public PageResponse<TopicRegistrationResponse> listForStudent(
             Long userId, Long periodId, RegistrationStatus status, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("registeredAt").descending());
-        return PageResponse.from(topicRegistrationRepository
-                .findByCurrentStudentUserId(userId, periodId, status, pageable)
-                .map(this::toResponse));
+        return PageResponse.from(
+                topicRegistrationRepository
+                        .findByCurrentStudentUserId(userId, periodId, status, pageable)
+                        .map(this::toResponse));
     }
 
     @Transactional(readOnly = true)
@@ -95,8 +100,10 @@ public class RegistrationService {
     public TopicRegistrationResponse create(CreateTopicRegistrationRequest request, Long actorId) {
         Student actor = requireStudent(actorId);
         StudentGroup group = requireGroupForUpdate(request.groupId());
-        Topic topic = topicRepository.findByIdForUpdate(request.topicId())
-                .orElseThrow(() -> new ResourceNotFoundException("Topic was not found."));
+        Topic topic =
+                topicRepository
+                        .findByIdForUpdate(request.topicId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Topic was not found."));
         ensureLeader(group.getId(), actor.getId());
         ensureGroupReady(group);
         if (projectAssignmentRepository.findByGroupIdForUpdate(group.getId()).isPresent()) {
@@ -105,18 +112,24 @@ public class RegistrationService {
         if (projectAssignmentRepository.findByTopicIdForUpdate(topic.getId()).isPresent()) {
             throw new ConflictException("This topic already has a project assignment.");
         }
-        if (!topicRegistrationRepository.findByGroupIdAndStatusInForUpdate(
-                group.getId(), List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED)).isEmpty()) {
-            throw new ConflictException("This group already has a pending or approved topic registration.");
+        if (!topicRegistrationRepository
+                .findByGroupIdAndStatusInForUpdate(
+                        group.getId(),
+                        List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED))
+                .isEmpty()) {
+            throw new ConflictException(
+                    "This group already has a pending or approved topic registration.");
         }
         if (!topic.getPeriod().getId().equals(group.getPeriod().getId())) {
-            throw new BusinessRuleException("Topic and student group must belong to the same registration period.");
+            throw new BusinessRuleException(
+                    "Topic and student group must belong to the same registration period.");
         }
         if (topic.getStatus() != TopicStatus.PUBLISHED) {
             throw new BusinessRuleException("Only published topics can be registered.");
         }
         if (topic.getVisibilityType() == VisibilityType.RESERVED
-                && (topic.getReservedGroup() == null || !topic.getReservedGroup().getId().equals(group.getId()))) {
+                && (topic.getReservedGroup() == null
+                        || !topic.getReservedGroup().getId().equals(group.getId()))) {
             throw new BusinessRuleException("This topic is reserved for another student group.");
         }
 
@@ -132,16 +145,22 @@ public class RegistrationService {
     }
 
     @Transactional
-    @BusinessAudit(action = "TOPIC_REGISTRATION_REVIEW", entityType = "TOPIC_REGISTRATION", entityIdArgument = 0)
-    public TopicRegistrationResponse review(Long id, ReviewTopicRegistrationRequest request, Long actorId) {
+    @BusinessAudit(
+            action = "TOPIC_REGISTRATION_REVIEW",
+            entityType = "TOPIC_REGISTRATION",
+            entityIdArgument = 0)
+    public TopicRegistrationResponse review(
+            Long id, ReviewTopicRegistrationRequest request, Long actorId) {
         TopicRegistration registration = requireRegistrationForUpdate(id);
         User actor = requireReviewer(actorId);
         verifyVersion(registration, request.version());
         if (registration.getStatus() != RegistrationStatus.PENDING) {
             throw new BusinessRuleException("Only pending registrations can be reviewed.");
         }
-        if (request.status() != RegistrationStatus.APPROVED && request.status() != RegistrationStatus.REJECTED) {
-            throw new BusinessRuleException("Registration review must end with APPROVED or REJECTED.");
+        if (request.status() != RegistrationStatus.APPROVED
+                && request.status() != RegistrationStatus.REJECTED) {
+            throw new BusinessRuleException(
+                    "Registration review must end with APPROVED or REJECTED.");
         }
         if (request.status() == RegistrationStatus.REJECTED
                 && (request.decisionReason() == null || request.decisionReason().isBlank())) {
@@ -157,15 +176,21 @@ public class RegistrationService {
             // decision is rolled back as well, preserving the one-step approval invariant.
             projectAssignmentService.createForApprovedRegistration(registration, actor);
         } else {
-            notifyGroup(registration, "Đăng ký đề tài đã bị từ chối.\nLý do: " + registration.getDecisionReason());
+            notifyGroup(
+                    registration,
+                    "Đăng ký đề tài đã bị từ chối.\nLý do: " + registration.getDecisionReason());
         }
         emailNotificationEventService.topicRegistrationDecision(registration, actor);
         return toResponse(registration);
     }
 
     @Transactional
-    @BusinessAudit(action = "TOPIC_REGISTRATION_WITHDRAW", entityType = "TOPIC_REGISTRATION", entityIdArgument = 0)
-    public TopicRegistrationResponse withdraw(Long id, WithdrawTopicRegistrationRequest request, Long actorId) {
+    @BusinessAudit(
+            action = "TOPIC_REGISTRATION_WITHDRAW",
+            entityType = "TOPIC_REGISTRATION",
+            entityIdArgument = 0)
+    public TopicRegistrationResponse withdraw(
+            Long id, WithdrawTopicRegistrationRequest request, Long actorId) {
         TopicRegistration registration = requireRegistrationForUpdate(id);
         Student actor = requireStudent(actorId);
         verifyVersion(registration, request.version());
@@ -180,65 +205,89 @@ public class RegistrationService {
 
     private void ensureGroupReady(StudentGroup group) {
         if (group.getPeriod().getStatus() != RegistrationPeriodStatus.ACTIVE) {
-            throw new BusinessRuleException("Topics can only be registered in an active registration period.");
+            throw new BusinessRuleException(
+                    "Topics can only be registered in an active registration period.");
         }
         if (group.getStatus() != GroupStatus.ACTIVE) {
             throw new BusinessRuleException("Only active student groups can register a topic.");
         }
         LocalDateTime now = LocalDateTime.now(clock);
-        if (now.isBefore(group.getPeriod().getRegistrationStartAt()) || now.isAfter(group.getPeriod().getRegistrationEndAt())) {
-            throw new BusinessRuleException("Topics can only be registered during the registration window.");
+        if (now.isBefore(group.getPeriod().getRegistrationStartAt())
+                || now.isAfter(group.getPeriod().getRegistrationEndAt())) {
+            throw new BusinessRuleException(
+                    "Topics can only be registered during the registration window.");
         }
     }
 
     private void ensureLeader(Long groupId, Long studentId) {
-        GroupMember membership = groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(groupId, studentId)
-                .orElseThrow(() -> new AccessDeniedException("Only active group members can manage topic registration."));
+        GroupMember membership =
+                groupMemberRepository
+                        .findByGroupIdAndStudentIdAndLeftAtIsNull(groupId, studentId)
+                        .orElseThrow(
+                                () ->
+                                        new AccessDeniedException(
+                                                "Only active group members can manage topic registration."));
         if (membership.getMemberRole() != GroupMemberRole.LEADER) {
             throw new AccessDeniedException("Only the group leader can manage topic registration.");
         }
     }
 
     private Student requireStudent(Long actorId) {
-        User actor = userRepository.findWithRolesById(actorId)
-                .orElseThrow(() -> new ResourceNotFoundException("User account was not found."));
-        if (actor.getUserRoles().stream().noneMatch(userRole -> userRole.getRole().getCode() == RoleCode.STUDENT)) {
+        User actor =
+                userRepository
+                        .findWithRolesById(actorId)
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException("User account was not found."));
+        if (actor.getUserRoles().stream()
+                .noneMatch(userRole -> userRole.getRole().getCode() == RoleCode.STUDENT)) {
             throw new AccessDeniedException("A student account is required for this action.");
         }
-        return studentRepository.findByUserId(actorId)
+        return studentRepository
+                .findByUserId(actorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student profile was not found."));
     }
 
     private User requireReviewer(Long actorId) {
-        User actor = userRepository.findWithRolesById(actorId)
-                .orElseThrow(() -> new ResourceNotFoundException("User account was not found."));
-        boolean allowed = actor.getUserRoles().stream()
-                .map(userRole -> userRole.getRole().getCode())
-                .anyMatch(role -> role == RoleCode.ADMIN || role == RoleCode.LECTURER);
+        User actor =
+                userRepository
+                        .findWithRolesById(actorId)
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException("User account was not found."));
+        boolean allowed =
+                actor.getUserRoles().stream()
+                        .map(userRole -> userRole.getRole().getCode())
+                        .anyMatch(role -> role == RoleCode.ADMIN || role == RoleCode.LECTURER);
         if (!allowed) {
-            throw new AccessDeniedException("Only lecturers or administrators can review topic registrations.");
+            throw new AccessDeniedException(
+                    "Only lecturers or administrators can review topic registrations.");
         }
         return actor;
     }
 
     private TopicRegistration requireRegistrationForUpdate(Long id) {
-        return topicRegistrationRepository.findByIdForUpdate(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Topic registration was not found."));
+        return topicRegistrationRepository
+                .findByIdForUpdate(id)
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Topic registration was not found."));
     }
 
     private StudentGroup requireGroupForUpdate(Long id) {
-        return studentGroupRepository.findByIdForUpdate(id)
+        return studentGroupRepository
+                .findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Student group was not found."));
     }
 
     private TopicRegistration requireRegistration(Long id) {
-        return topicRegistrationRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Topic registration was not found."));
+        return topicRegistrationRepository
+                .findById(id)
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Topic registration was not found."));
     }
 
     private void verifyVersion(TopicRegistration registration, int requestedVersion) {
         if (registration.getVersion() != requestedVersion) {
-            throw new ConflictException("The topic registration was changed by another user. Reload and try again.");
+            throw new ConflictException(
+                    "The topic registration was changed by another user. Reload and try again.");
         }
     }
 
@@ -247,13 +296,21 @@ public class RegistrationService {
     }
 
     private void notifyGroup(TopicRegistration registration, String message) {
-        groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(registration.getGroup().getId())
-                .forEach(member -> notificationService.publish(
-                        member.getStudent().getUser().getId(),
-                        "topic-registration-" + registration.getId() + "-" + registration.getStatus() + "-" + member.getStudent().getId(),
-                        "Kết quả đăng ký đề tài",
-                        message,
-                        "/topic-registrations/" + registration.getId()));
+        groupMemberRepository
+                .findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(registration.getGroup().getId())
+                .forEach(
+                        member ->
+                                notificationService.publish(
+                                        member.getStudent().getUser().getId(),
+                                        "topic-registration-"
+                                                + registration.getId()
+                                                + "-"
+                                                + registration.getStatus()
+                                                + "-"
+                                                + member.getStudent().getId(),
+                                        "Kết quả đăng ký đề tài",
+                                        message,
+                                        "/topic-registrations/" + registration.getId()));
     }
 
     private TopicRegistrationResponse toResponse(TopicRegistration registration) {
@@ -272,7 +329,9 @@ public class RegistrationService {
                 registration.getStatus(),
                 registration.getRegisteredAt(),
                 registration.getReviewedBy() == null ? null : registration.getReviewedBy().getId(),
-                registration.getReviewedBy() == null ? null : registration.getReviewedBy().getFullName(),
+                registration.getReviewedBy() == null
+                        ? null
+                        : registration.getReviewedBy().getFullName(),
                 registration.getReviewedAt(),
                 registration.getDecisionReason(),
                 registration.getVersion());

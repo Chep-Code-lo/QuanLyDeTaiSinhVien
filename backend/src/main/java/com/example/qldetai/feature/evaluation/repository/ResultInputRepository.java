@@ -1,10 +1,12 @@
 package com.example.qldetai.feature.evaluation.repository;
 
 import com.example.qldetai.feature.evaluation.domain.ResultInput;
-import java.util.List;
-import java.util.Collection;
+
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Collection;
+import java.util.List;
 
 public interface ResultInputRepository extends JpaRepository<ResultInput, Long> {
 

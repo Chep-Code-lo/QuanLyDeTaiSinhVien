@@ -3,10 +3,12 @@ package com.example.qldetai.common.audit;
 import com.example.qldetai.config.RequestIdFilter;
 import com.example.qldetai.feature.communication.domain.AuditOutcome;
 import com.example.qldetai.security.UserPrincipal;
+
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.UUID;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -19,6 +21,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.util.UUID;
 
 @Aspect
 @Component
@@ -39,18 +43,21 @@ public class BusinessAuditAspect {
             Object result = joinPoint.proceed();
             long durationMs = elapsedMillis(startedAt);
             if (TransactionSynchronizationManager.isActualTransactionActive()) {
-                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                    @Override
-                    public void afterCompletion(int status) {
-                        safeWrite(
-                                actorId,
-                                audit,
-                                entityId,
-                                status == STATUS_COMMITTED ? AuditOutcome.SUCCESS : AuditOutcome.FAILURE,
-                                requestId,
-                                durationMs);
-                    }
-                });
+                TransactionSynchronizationManager.registerSynchronization(
+                        new TransactionSynchronization() {
+                            @Override
+                            public void afterCompletion(int status) {
+                                safeWrite(
+                                        actorId,
+                                        audit,
+                                        entityId,
+                                        status == STATUS_COMMITTED
+                                                ? AuditOutcome.SUCCESS
+                                                : AuditOutcome.FAILURE,
+                                        requestId,
+                                        durationMs);
+                            }
+                        });
             } else {
                 safeWrite(actorId, audit, entityId, AuditOutcome.SUCCESS, requestId, durationMs);
             }
@@ -75,7 +82,14 @@ public class BusinessAuditAspect {
             String requestId,
             long durationMs) {
         try {
-            writer.write(actorId, audit.action(), audit.entityType(), entityId, outcome, requestId, durationMs);
+            writer.write(
+                    actorId,
+                    audit.action(),
+                    audit.entityType(),
+                    entityId,
+                    outcome,
+                    requestId,
+                    durationMs);
         } catch (RuntimeException exception) {
             log.error("Unable to persist business audit log for {}.", audit.action(), exception);
         }
@@ -83,13 +97,15 @@ public class BusinessAuditAspect {
 
     private Long currentActorId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication != null && authentication.getPrincipal() instanceof UserPrincipal principal
+        return authentication != null
+                        && authentication.getPrincipal() instanceof UserPrincipal principal
                 ? principal.id()
                 : null;
     }
 
     private String currentRequestId() {
-        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
+        if (RequestContextHolder.getRequestAttributes()
+                instanceof ServletRequestAttributes attributes) {
             HttpServletRequest request = attributes.getRequest();
             Object value = request.getAttribute(RequestIdFilter.ATTRIBUTE_NAME);
             if (value instanceof String requestId) {

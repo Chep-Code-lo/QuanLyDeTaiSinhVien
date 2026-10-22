@@ -9,11 +9,13 @@ import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserStatusReq
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UserResponse;
 import com.example.qldetai.feature.identity.service.UserAdminService;
 import com.example.qldetai.security.UserPrincipal;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import java.net.URI;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,6 +31,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URI;
+
 @Validated
 @RestController
 @RequestMapping("/api/v1/admin/users")
@@ -37,7 +41,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserAdminController {
 
     private final UserAdminService userAdminService;
-
 
     @GetMapping
     public ApiResponse<PageResponse<UserResponse>> list(
@@ -53,7 +56,8 @@ public class UserAdminController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<UserResponse>> create(@Valid @RequestBody CreateUserRequest request) {
+    public ResponseEntity<ApiResponse<UserResponse>> create(
+            @Valid @RequestBody CreateUserRequest request) {
         UserResponse created = userAdminService.create(request);
         return ResponseEntity.created(URI.create("/api/v1/admin/users/" + created.id()))
                 .body(ApiResponse.success("Đã tạo tài khoản người dùng.", created));
@@ -62,17 +66,20 @@ public class UserAdminController {
     @PutMapping("/{id}")
     public ApiResponse<UserResponse> update(
             @PathVariable Long id, @Valid @RequestBody UpdateUserRequest request) {
-        return ApiResponse.success("Đã cập nhật tài khoản người dùng.", userAdminService.update(id, request));
+        return ApiResponse.success(
+                "Đã cập nhật tài khoản người dùng.", userAdminService.update(id, request));
     }
 
     @PatchMapping("/{id}/status")
     public ApiResponse<UserResponse> updateStatus(
             @PathVariable Long id, @Valid @RequestBody UpdateUserStatusRequest request) {
-        return ApiResponse.success("Đã cập nhật trạng thái người dùng.", userAdminService.updateStatus(id, request));
+        return ApiResponse.success(
+                "Đã cập nhật trạng thái người dùng.", userAdminService.updateStatus(id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
         userAdminService.delete(id, principal.id());
         return ResponseEntity.noContent().build();
     }
@@ -80,6 +87,7 @@ public class UserAdminController {
     @PutMapping("/{id}/roles")
     public ApiResponse<UserResponse> updateRoles(
             @PathVariable Long id, @Valid @RequestBody UpdateUserRolesRequest request) {
-        return ApiResponse.success("Đã cập nhật vai trò người dùng.", userAdminService.updateRoles(id, request));
+        return ApiResponse.success(
+                "Đã cập nhật vai trò người dùng.", userAdminService.updateRoles(id, request));
     }
 }

@@ -14,15 +14,18 @@ import com.example.qldetai.feature.project.domain.AssignmentStatus;
 import com.example.qldetai.feature.project.repository.ProjectAssignmentRepository;
 import com.example.qldetai.feature.topic.domain.TopicStatus;
 import com.example.qldetai.feature.topic.repository.TopicRepository;
+
+import lombok.RequiredArgsConstructor;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -35,12 +38,12 @@ public class DashboardService {
     private final NotificationRepository notificationRepository;
     private final Clock clock;
 
-
     @Transactional(readOnly = true)
     public DashboardSummaryResponse summary(Long userId) {
         LocalDateTime now = LocalDateTime.now(clock);
-        List<RegistrationPeriod> activePeriods = registrationPeriodRepository
-                .findByStatusOrderByRegistrationEndAtAsc(RegistrationPeriodStatus.ACTIVE);
+        List<RegistrationPeriod> activePeriods =
+                registrationPeriodRepository.findByStatusOrderByRegistrationEndAtAsc(
+                        RegistrationPeriodStatus.ACTIVE);
 
         return new DashboardSummaryResponse(
                 topicRepository.count(),
@@ -56,15 +59,20 @@ public class DashboardService {
                         .orElse(null),
                 currentSemester(LocalDate.now(clock)),
                 topicRepository.countByProjectType().stream()
-                        .map(count -> new TopicTypeCountResponse(count.getProjectType(), count.getCount()))
+                        .map(
+                                count ->
+                                        new TopicTypeCountResponse(
+                                                count.getProjectType(), count.getCount()))
                         .toList(),
                 topicRepository.findTop5ByStatusOrderByUpdatedAtDesc(TopicStatus.PUBLISHED).stream()
-                        .map(topic -> new RecentTopicResponse(
-                                topic.getId(),
-                                topic.getCode(),
-                                topic.getTitle(),
-                                topic.getDepartment().getName(),
-                                topic.getStatus().name()))
+                        .map(
+                                topic ->
+                                        new RecentTopicResponse(
+                                                topic.getId(),
+                                                topic.getCode(),
+                                                topic.getTitle(),
+                                                topic.getDepartment().getName(),
+                                                topic.getStatus().name()))
                         .toList(),
                 upcomingDeadlines(activePeriods, now),
                 now);
@@ -72,24 +80,43 @@ public class DashboardService {
 
     private CurrentSemesterResponse currentSemester(LocalDate today) {
         return semesterRepository
-                .findFirstByStartsOnLessThanEqualAndEndsOnGreaterThanEqualOrderByStartsOnDesc(today, today)
-                .or(() -> semesterRepository.findFirstByStartsOnLessThanEqualOrderByStartsOnDesc(today))
-                .map(semester -> new CurrentSemesterResponse(semester.getSemesterNo(), semester.getAcademicYear()))
+                .findFirstByStartsOnLessThanEqualAndEndsOnGreaterThanEqualOrderByStartsOnDesc(
+                        today, today)
+                .or(
+                        () ->
+                                semesterRepository
+                                        .findFirstByStartsOnLessThanEqualOrderByStartsOnDesc(today))
+                .map(
+                        semester ->
+                                new CurrentSemesterResponse(
+                                        semester.getSemesterNo(), semester.getAcademicYear()))
                 .orElse(null);
     }
 
     private List<UpcomingDeadlineResponse> upcomingDeadlines(
-            List<RegistrationPeriod> periods,
-            LocalDateTime now) {
+            List<RegistrationPeriod> periods, LocalDateTime now) {
         return periods.stream()
-                .flatMap(period -> Stream.of(
-                        deadline(period, "Kết thúc đăng ký giảng viên", period.getProposalEndAt()),
-                        deadline(period, "Kết thúc đăng ký sinh viên", period.getRegistrationEndAt()),
-                        deadline(period, "Hạn GVPB nộp điểm", period.getReviewDeadlineAt()),
-                        deadline(
-                                period,
-                                "Báo cáo hội đồng",
-                                period.getDefenseDate() == null ? null : period.getDefenseDate().atStartOfDay())))
+                .flatMap(
+                        period ->
+                                Stream.of(
+                                        deadline(
+                                                period,
+                                                "Kết thúc đăng ký giảng viên",
+                                                period.getProposalEndAt()),
+                                        deadline(
+                                                period,
+                                                "Kết thúc đăng ký sinh viên",
+                                                period.getRegistrationEndAt()),
+                                        deadline(
+                                                period,
+                                                "Hạn GVPB nộp điểm",
+                                                period.getReviewDeadlineAt()),
+                                        deadline(
+                                                period,
+                                                "Báo cáo hội đồng",
+                                                period.getDefenseDate() == null
+                                                        ? null
+                                                        : period.getDefenseDate().atStartOfDay())))
                 .flatMap(java.util.Optional::stream)
                 .filter(deadline -> deadline.dueAt().isAfter(now))
                 .sorted(Comparator.comparing(UpcomingDeadlineResponse::dueAt))
@@ -98,12 +125,11 @@ public class DashboardService {
     }
 
     private java.util.Optional<UpcomingDeadlineResponse> deadline(
-            RegistrationPeriod period,
-            String title,
-            LocalDateTime dueAt) {
+            RegistrationPeriod period, String title, LocalDateTime dueAt) {
         if (dueAt == null) {
             return java.util.Optional.empty();
         }
-        return java.util.Optional.of(new UpcomingDeadlineResponse(period.getId(), period.getName(), title, dueAt));
+        return java.util.Optional.of(
+                new UpcomingDeadlineResponse(period.getId(), period.getName(), title, dueAt));
     }
 }

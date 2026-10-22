@@ -8,6 +8,14 @@ import com.example.qldetai.feature.progress.domain.StoredFile;
 import com.example.qldetai.feature.progress.domain.StoredFileStatus;
 import com.example.qldetai.feature.progress.dto.ProgressDtos.StoredFileResponse;
 import com.example.qldetai.feature.progress.repository.StoredFileRepository;
+
+import lombok.RequiredArgsConstructor;
+
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -25,25 +33,31 @@ import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
 public class StoredFileService {
 
-    private static final Map<String, String> ALLOWED_TYPES = Map.ofEntries(
-            Map.entry("pdf", "application/pdf"), Map.entry("doc", "application/msword"),
-            Map.entry("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-            Map.entry("ppt", "application/vnd.ms-powerpoint"),
-            Map.entry("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
-            Map.entry("xls", "application/vnd.ms-excel"),
-            Map.entry("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-            Map.entry("zip", "application/zip"), Map.entry("png", "image/png"),
-            Map.entry("jpg", "image/jpeg"), Map.entry("jpeg", "image/jpeg"), Map.entry("txt", "text/plain"));
+    private static final Map<String, String> ALLOWED_TYPES =
+            Map.ofEntries(
+                    Map.entry("pdf", "application/pdf"),
+                    Map.entry("doc", "application/msword"),
+                    Map.entry(
+                            "docx",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+                    Map.entry("ppt", "application/vnd.ms-powerpoint"),
+                    Map.entry(
+                            "pptx",
+                            "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+                    Map.entry("xls", "application/vnd.ms-excel"),
+                    Map.entry(
+                            "xlsx",
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                    Map.entry("zip", "application/zip"),
+                    Map.entry("png", "image/png"),
+                    Map.entry("jpg", "image/jpeg"),
+                    Map.entry("jpeg", "image/jpeg"),
+                    Map.entry("txt", "text/plain"));
 
     private final StoredFileRepository storedFileRepository;
     private final UserRepository userRepository;
@@ -67,10 +81,11 @@ public class StoredFileService {
             long sizeBytes;
             try (InputStream inputStream = file.getInputStream();
                     DigestInputStream digestStream = new DigestInputStream(inputStream, digest);
-                    OutputStream outputStream = Files.newOutputStream(
-                            targetPath,
-                            StandardOpenOption.CREATE_NEW,
-                            StandardOpenOption.WRITE)) {
+                    OutputStream outputStream =
+                            Files.newOutputStream(
+                                    targetPath,
+                                    StandardOpenOption.CREATE_NEW,
+                                    StandardOpenOption.WRITE)) {
                 sizeBytes = digestStream.transferTo(outputStream);
             }
 
@@ -79,8 +94,13 @@ public class StoredFileService {
                 throw new BusinessRuleException("Please choose a non-empty file to upload.");
             }
 
-            User uploadedBy = userRepository.findById(actorId)
-                    .orElseThrow(() -> new ResourceNotFoundException("User account was not found."));
+            User uploadedBy =
+                    userRepository
+                            .findById(actorId)
+                            .orElseThrow(
+                                    () ->
+                                            new ResourceNotFoundException(
+                                                    "User account was not found."));
 
             StoredFile storedFile = new StoredFile();
             storedFile.setStorageKey(storageKey);
@@ -123,7 +143,8 @@ public class StoredFileService {
     public DownloadedFile preview(Long id) {
         DownloadedFile file = download(id);
         if (!isPreviewable(file.mimeType())) {
-            throw new BusinessRuleException("This file type cannot be previewed. Please download it instead.");
+            throw new BusinessRuleException(
+                    "This file type cannot be previewed. Please download it instead.");
         }
         return file;
     }
@@ -161,9 +182,13 @@ public class StoredFileService {
     }
 
     private String normalizeOriginalName(String originalFilename) {
-        String candidate = originalFilename == null
-                ? "upload.bin"
-                : originalFilename.replace('\\', '/').substring(originalFilename.replace('\\', '/').lastIndexOf('/') + 1).trim();
+        String candidate =
+                originalFilename == null
+                        ? "upload.bin"
+                        : originalFilename
+                                .replace('\\', '/')
+                                .substring(originalFilename.replace('\\', '/').lastIndexOf('/') + 1)
+                                .trim();
         if (candidate.isBlank()) {
             return "upload.bin";
         }
@@ -175,16 +200,23 @@ public class StoredFileService {
         String extension = dot > 0 ? originalName.substring(dot + 1).toLowerCase(Locale.ROOT) : "";
         String expected = ALLOWED_TYPES.get(extension);
         if (expected == null) {
-            throw new BusinessRuleException("Định dạng tệp không được phép. Chỉ nhận PDF, Office, ZIP, PNG, JPG, JPEG và TXT.");
+            throw new BusinessRuleException(
+                    "Định dạng tệp không được phép. Chỉ nhận PDF, Office, ZIP, PNG, JPG, JPEG và TXT.");
         }
         String supplied = file.getContentType();
         if (supplied != null && !supplied.isBlank()) {
             try {
                 MediaType type = MediaType.parseMediaType(supplied);
-                String mime = type.getType().toLowerCase(Locale.ROOT) + "/" + type.getSubtype().toLowerCase(Locale.ROOT);
-                if (!expected.equals(mime) && !MediaType.APPLICATION_OCTET_STREAM_VALUE.equals(mime)
-                        && !("zip".equals(extension) && "application/x-zip-compressed".equals(mime))) {
-                    throw new BusinessRuleException("Loại nội dung tệp không khớp với định dạng được phép.");
+                String mime =
+                        type.getType().toLowerCase(Locale.ROOT)
+                                + "/"
+                                + type.getSubtype().toLowerCase(Locale.ROOT);
+                if (!expected.equals(mime)
+                        && !MediaType.APPLICATION_OCTET_STREAM_VALUE.equals(mime)
+                        && !("zip".equals(extension)
+                                && "application/x-zip-compressed".equals(mime))) {
+                    throw new BusinessRuleException(
+                            "Loại nội dung tệp không khớp với định dạng được phép.");
                 }
             } catch (IllegalArgumentException exception) {
                 throw new BusinessRuleException("Loại nội dung tệp không hợp lệ.");
@@ -192,17 +224,22 @@ public class StoredFileService {
         }
         try (InputStream input = file.getInputStream()) {
             byte[] header = input.readNBytes(8);
-            boolean valid = switch (extension) {
-                case "pdf" -> startsWith(header, 0x25, 0x50, 0x44, 0x46, 0x2d);
-                case "png" -> startsWith(header, 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
-                case "jpg", "jpeg" -> startsWith(header, 0xff, 0xd8, 0xff);
-                case "doc", "ppt", "xls" -> startsWith(header, 0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1);
-                case "docx", "pptx", "xlsx", "zip" -> startsWith(header, 0x50, 0x4b, 0x03, 0x04)
-                        || startsWith(header, 0x50, 0x4b, 0x05, 0x06);
-                case "txt" -> isText(input, header);
-                default -> false;
-            };
-            if (!valid) throw new BusinessRuleException("Nội dung tệp không khớp với định dạng đã chọn.");
+            boolean valid =
+                    switch (extension) {
+                        case "pdf" -> startsWith(header, 0x25, 0x50, 0x44, 0x46, 0x2d);
+                        case "png" ->
+                                startsWith(header, 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+                        case "jpg", "jpeg" -> startsWith(header, 0xff, 0xd8, 0xff);
+                        case "doc", "ppt", "xls" ->
+                                startsWith(header, 0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1);
+                        case "docx", "pptx", "xlsx", "zip" ->
+                                startsWith(header, 0x50, 0x4b, 0x03, 0x04)
+                                        || startsWith(header, 0x50, 0x4b, 0x05, 0x06);
+                        case "txt" -> isText(input, header);
+                        default -> false;
+                    };
+            if (!valid)
+                throw new BusinessRuleException("Nội dung tệp không khớp với định dạng đã chọn.");
             return expected;
         } catch (IOException exception) {
             throw new IllegalStateException("The file could not be read.", exception);
@@ -251,6 +288,5 @@ public class StoredFileService {
         }
     }
 
-    public record DownloadedFile(Path path, String originalName, String mimeType, long sizeBytes) {
-    }
+    public record DownloadedFile(Path path, String originalName, String mimeType, long sizeBytes) {}
 }

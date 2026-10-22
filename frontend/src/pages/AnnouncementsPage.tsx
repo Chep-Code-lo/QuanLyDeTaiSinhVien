@@ -30,8 +30,14 @@ export function AnnouncementsPage() {
   const [faculties, setFaculties] = useState<FacultyResponse[]>([])
   const [managed, setManaged] = useState<AnnouncementResponse[]>([])
   const [activeTab, setActiveTab] = useState<'general' | 'personal'>('general')
-  const [loading, setLoading] = useRequestLoading(JSON.stringify([user?.id, activeTab]), activeTab === 'general')
-  const [personalLoading, setPersonalLoading] = useRequestLoading(JSON.stringify([user?.id, activeTab]), activeTab === 'personal')
+  const [loading, setLoading] = useRequestLoading(
+    JSON.stringify([user?.id, activeTab]),
+    activeTab === 'general',
+  )
+  const [personalLoading, setPersonalLoading] = useRequestLoading(
+    JSON.stringify([user?.id, activeTab]),
+    activeTab === 'personal',
+  )
   const [managing, setManaging] = useState(false)
   const [editing, setEditing] = useState<AnnouncementResponse>()
   const [pendingArchive, setPendingArchive] = useState<AnnouncementResponse>()
@@ -41,8 +47,10 @@ export function AnnouncementsPage() {
   const [attachmentFileId, setAttachmentFileId] = useState('')
   useEffect(() => {
     const updateReadState = (event: Event) => {
-      const updated = (event as CustomEvent<{ notification?: NotificationResponse }>).detail?.notification
-      if (updated) setNotifications(items => items.map(item => item.id === updated.id ? updated : item))
+      const updated = (event as CustomEvent<{ notification?: NotificationResponse }>).detail
+        ?.notification
+      if (updated)
+        setNotifications((items) => items.map((item) => (item.id === updated.id ? updated : item)))
     }
     window.addEventListener('notifications-updated', updateReadState)
     return () => window.removeEventListener('notifications-updated', updateReadState)
@@ -62,36 +70,55 @@ export function AnnouncementsPage() {
   const facultyId = allowedFacultyIds[0]
   const canLoadFaculties = hasRole('ADMIN') || hasAppointment('DEAN')
 
-  const loadPublic = useCallback((isCurrent: () => boolean = () => true) => Promise.all([
-        allPages(page => announcementApi.list({ page, size: 100 })),
-        allPages(page => notificationApi.list(page, 100)),
-      ]).then(([official, personal]) => {
-      if (!isCurrent()) return
-      setAnnouncements(official)
-      setNotifications(personal)
-    }).catch(error => {
-      if (isCurrent()) showError(messageOf(error))
-    }).finally(() => {
-      if (isCurrent()) setLoading(false)
-    }), [showError, setLoading])
+  const loadPublic = useCallback(
+    (isCurrent: () => boolean = () => true) =>
+      Promise.all([
+        allPages((page) => announcementApi.list({ page, size: 100 })),
+        allPages((page) => notificationApi.list(page, 100)),
+      ])
+        .then(([official, personal]) => {
+          if (!isCurrent()) return
+          setAnnouncements(official)
+          setNotifications(personal)
+        })
+        .catch((error) => {
+          if (isCurrent()) showError(messageOf(error))
+        })
+        .finally(() => {
+          if (isCurrent()) setLoading(false)
+        }),
+    [showError, setLoading],
+  )
 
-  const loadPersonal = useCallback((isCurrent: () => boolean) => allPages(page => notificationApi.list(page, 100))
-    .then(personal => {
-      if (!isCurrent()) return
-      setNotifications(personal)
-    }).catch(error => {
-      if (isCurrent()) showError(messageOf(error))
-    }).finally(() => {
-      if (isCurrent()) setPersonalLoading(false)
-    }), [showError, setPersonalLoading])
+  const loadPersonal = useCallback(
+    (isCurrent: () => boolean) =>
+      allPages((page) => notificationApi.list(page, 100))
+        .then((personal) => {
+          if (!isCurrent()) return
+          setNotifications(personal)
+        })
+        .catch((error) => {
+          if (isCurrent()) showError(messageOf(error))
+        })
+        .finally(() => {
+          if (isCurrent()) setPersonalLoading(false)
+        }),
+    [showError, setPersonalLoading],
+  )
 
-  const loadManaged = useCallback((id = facultyId) => {
-    if (!id || !canManage) return
-    return allPages(page => announcementApi.listForManagement({ facultyId: id, page, size: 100 }))
-      .then(setManaged).catch(error => {
-      showError(messageOf(error))
-    })
-  }, [facultyId, canManage, showError])
+  const loadManaged = useCallback(
+    (id = facultyId) => {
+      if (!id || !canManage) return
+      return allPages((page) =>
+        announcementApi.listForManagement({ facultyId: id, page, size: 100 }),
+      )
+        .then(setManaged)
+        .catch((error) => {
+          showError(messageOf(error))
+        })
+    },
+    [facultyId, canManage, showError],
+  )
 
   useEffect(() => {
     let active = true
@@ -121,7 +148,9 @@ export function AnnouncementsPage() {
       setNotifications((items) =>
         items.map((candidate) => (candidate.id === item.id ? updated : candidate)),
       )
-      window.dispatchEvent(new CustomEvent('notifications-updated', { detail: { notification: updated } }))
+      window.dispatchEvent(
+        new CustomEvent('notifications-updated', { detail: { notification: updated } }),
+      )
     } catch (error) {
       showError(messageOf(error))
     }
@@ -191,7 +220,7 @@ export function AnnouncementsPage() {
     setArchiving(true)
     try {
       const updated = await announcementApi.archive(pendingArchive.id)
-      setManaged((items) => items.map((item) => item.id === updated.id ? updated : item))
+      setManaged((items) => items.map((item) => (item.id === updated.id ? updated : item)))
       if (editing?.id === pendingArchive.id) resetEditor()
       setPendingArchive(undefined)
       showSuccess('Đã lưu trữ thông báo.')
@@ -250,7 +279,11 @@ export function AnnouncementsPage() {
               <div>
                 <h2>Quản lý thông báo khoa</h2>
               </div>
-              <button className="btn btn-secondary" aria-expanded={managing} onClick={() => setManaging((value) => !value)}>
+              <button
+                className="btn btn-secondary"
+                aria-expanded={managing}
+                onClick={() => setManaging((value) => !value)}
+              >
                 {managing ? 'Ẩn quản lý' : 'Mở quản lý'}
               </button>
             </div>
@@ -295,7 +328,10 @@ export function AnnouncementsPage() {
                 </form>
                 <div className="stack-list">
                   {managed.map((announcement) => (
-                    <article key={announcement.id} className="notification-item announcement-management-item">
+                    <article
+                      key={announcement.id}
+                      className="notification-item announcement-management-item"
+                    >
                       <div className="announcement-management-copy">
                         <h2>{announcement.title}</h2>
                         <p>{announcement.content}</p>
@@ -305,7 +341,11 @@ export function AnnouncementsPage() {
                         <StatusBadge status={announcement.status} />
                         {announcement.status === 'DRAFT' && (
                           <>
-                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => edit(announcement)}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => edit(announcement)}
+                            >
                               Sửa
                             </button>
                             <button
@@ -357,19 +397,26 @@ export function AnnouncementsPage() {
                 attachmentPath: announcement.attachmentPath,
                 attachmentName: announcement.attachmentName,
                 unread: notifications.some(
-                  (item) => item.targetPath === '/announcements' &&
-                    item.title === announcement.title && item.content === announcement.content && !item.readAt,
+                  (item) =>
+                    item.targetPath === '/announcements' &&
+                    item.title === announcement.title &&
+                    item.content === announcement.content &&
+                    !item.readAt,
                 ),
               }))}
               onOpen={(id) => {
                 const announcement = announcements.find((item) => item.id === id)
                 if (!announcement) return
-                notifications.filter(
-                  (item) => item.targetPath === '/announcements' &&
-                    item.title === announcement.title && item.content === announcement.content,
-                ).forEach((item) => {
-                  void markRead(item)
-                })
+                notifications
+                  .filter(
+                    (item) =>
+                      item.targetPath === '/announcements' &&
+                      item.title === announcement.title &&
+                      item.content === announcement.content,
+                  )
+                  .forEach((item) => {
+                    void markRead(item)
+                  })
               }}
             />
           )}
@@ -400,12 +447,13 @@ export function AnnouncementsPage() {
               id: item.id,
               title: item.title,
               content: item.content,
-              senderName: item.targetPath === '/announcements'
-                ? announcements.find(
-                    (announcement) => announcement.title === item.title &&
-                      announcement.content === item.content,
-                  )?.createdByName ?? 'Hệ thống'
-                : 'Hệ thống',
+              senderName:
+                item.targetPath === '/announcements'
+                  ? (announcements.find(
+                      (announcement) =>
+                        announcement.title === item.title && announcement.content === item.content,
+                    )?.createdByName ?? 'Hệ thống')
+                  : 'Hệ thống',
               sentAt: item.createdAt,
               unread: !item.readAt,
             }))}

@@ -6,12 +6,13 @@ import com.example.qldetai.feature.groupregistration.dto.GroupRegistrationDtos.C
 import com.example.qldetai.feature.groupregistration.dto.GroupRegistrationDtos.GroupInvitationResponse;
 import com.example.qldetai.feature.groupregistration.service.GroupInvitationService;
 import com.example.qldetai.security.UserPrincipal;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import java.net.URI;
-import java.util.List;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,6 +26,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URI;
+import java.util.List;
+
 @Validated
 @RestController
 @RequestMapping("/api/v1/group-invitations")
@@ -34,11 +38,12 @@ public class GroupInvitationController {
 
     private final GroupInvitationService groupInvitationService;
 
-
     @GetMapping("/mine")
     public ApiResponse<PageResponse<GroupInvitationResponse>> mine(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestParam(required = false) com.example.qldetai.feature.groupregistration.domain.GroupInvitationStatus status,
+            @RequestParam(required = false)
+                    com.example.qldetai.feature.groupregistration.domain.GroupInvitationStatus
+                            status,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return ApiResponse.success(groupInvitationService.mine(principal.id(), status, page, size));
@@ -62,18 +67,23 @@ public class GroupInvitationController {
     @PatchMapping("/{id}/accept")
     public ApiResponse<GroupInvitationResponse> accept(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Đã xử lý lời mời tham gia nhóm.", groupInvitationService.accept(id, principal.id()));
+        return ApiResponse.success(
+                "Đã xử lý lời mời tham gia nhóm.",
+                groupInvitationService.accept(id, principal.id()));
     }
 
     @PatchMapping("/{id}/reject")
     public ApiResponse<GroupInvitationResponse> reject(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Đã xử lý lời mời tham gia nhóm.", groupInvitationService.reject(id, principal.id()));
+        return ApiResponse.success(
+                "Đã xử lý lời mời tham gia nhóm.",
+                groupInvitationService.reject(id, principal.id()));
     }
 
     @PatchMapping("/{id}/cancel")
     public ApiResponse<GroupInvitationResponse> cancel(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Đã hủy lời mời tham gia nhóm.", groupInvitationService.cancel(id, principal.id()));
+        return ApiResponse.success(
+                "Đã hủy lời mời tham gia nhóm.", groupInvitationService.cancel(id, principal.id()));
     }
 }

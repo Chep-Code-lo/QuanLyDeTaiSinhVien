@@ -5,59 +5,50 @@ import com.example.qldetai.feature.evaluation.domain.CommitteeStatus;
 import com.example.qldetai.feature.evaluation.domain.DefenseStatus;
 import com.example.qldetai.feature.evaluation.domain.GradeChangeStatus;
 import com.example.qldetai.feature.evaluation.domain.ResultStatus;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
 public final class EvaluationAdminDtos {
 
-    private EvaluationAdminDtos() {
-    }
+    private EvaluationAdminDtos() {}
 
-    public record CreateCommitteeRequest(@NotNull Long periodId, @NotBlank String name) {
-    }
+    public record CreateCommitteeRequest(@NotNull Long periodId, @NotBlank String name) {}
 
     public record CommitteeMemberInput(
-            @NotNull Long lecturerId,
-            @NotBlank @Size(max = 100) String roleName) {
-    }
+            @NotNull Long lecturerId, @NotBlank @Size(max = 100) String roleName) {}
 
     public record SaveCommitteeRequest(
             @NotNull Long periodId,
             @NotBlank @Size(max = 200) String name,
             @NotNull Long rubricId,
             @NotNull @Size(min = 1, max = 5) List<@NotNull @Valid CommitteeMemberInput> members,
-            Integer version) {
-    }
+            Integer version) {}
 
     public record AddCommitteeMemberRequest(
-            @NotNull Long lecturerId,
-            @Min(1) @Max(5) int slotNo,
-            @NotNull CommitteeRole role) {
-    }
+            @NotNull Long lecturerId, @Min(1) @Max(5) int slotNo, @NotNull CommitteeRole role) {}
 
     public record CreateDefenseRequest(
             @NotNull Long assignmentId,
             @NotNull Long committeeId,
             @NotBlank @Size(max = 200) String location,
             @NotNull LocalDateTime startsAt,
-            @NotNull LocalDateTime endsAt) {
-    }
+            @NotNull LocalDateTime endsAt) {}
 
-    public record DefenseEligibilityResponse(boolean eligible, String reason) {
-    }
+    public record DefenseEligibilityResponse(boolean eligible, String reason) {}
 
-    public record ReviewGradeChangeRequest(@NotNull Boolean approved, @Size(max = 5000) String comment) {
-    }
+    public record ReviewGradeChangeRequest(
+            @NotNull Boolean approved, @Size(max = 5000) String comment) {}
 
-    public record CreateGradeChangeRequest(@NotBlank @Size(max = 5000) String reason) {
-    }
+    public record CreateGradeChangeRequest(@NotBlank @Size(max = 5000) String reason) {}
 
     public record CommitteeMemberResponse(
             Long id,
@@ -66,8 +57,7 @@ public final class EvaluationAdminDtos {
             String lecturerName,
             int slotNo,
             CommitteeRole role,
-            String roleName) {
-    }
+            String roleName) {}
 
     public record EvaluationCommitteeResponse(
             Long id,
@@ -82,8 +72,7 @@ public final class EvaluationAdminDtos {
             LocalDateTime createdAt,
             int version,
             List<CommitteeMemberResponse> members,
-            Long rubricId) {
-    }
+            Long rubricId) {}
 
     public record DefenseSessionResponse(
             Long id,
@@ -101,16 +90,14 @@ public final class EvaluationAdminDtos {
             LocalDateTime startsAt,
             LocalDateTime endsAt,
             DefenseStatus status,
-            int version) {
-    }
+            int version) {}
 
     public record ResultResponse(
             Long id,
             Long assignmentId,
             int versionNo,
             BigDecimal finalScore,
-            ResultStatus status) {
-    }
+            ResultStatus status) {}
 
     public record ResultInputResponse(
             Long id,
@@ -119,14 +106,10 @@ public final class EvaluationAdminDtos {
             String componentCode,
             int sheetVersion,
             BigDecimal scoreSnapshot,
-            String rubricSnapshot) {
-    }
+            String rubricSnapshot) {}
 
     public record ResultMemberResponse(
-            Long studentId,
-            String studentCodeSnapshot,
-            String fullNameSnapshot) {
-    }
+            Long studentId, String studentCodeSnapshot, String fullNameSnapshot) {}
 
     public record ResultDetailResponse(
             Long id,
@@ -148,8 +131,7 @@ public final class EvaluationAdminDtos {
             String publishedByName,
             LocalDateTime publishedAt,
             List<ResultInputResponse> inputs,
-            List<ResultMemberResponse> members) {
-    }
+            List<ResultMemberResponse> members) {}
 
     public record GradeChangeRequestResponse(
             Long id,
@@ -165,6 +147,5 @@ public final class EvaluationAdminDtos {
             String reviewComment,
             LocalDateTime createdAt,
             LocalDateTime reviewedAt,
-            LocalDateTime appliedAt) {
-    }
+            LocalDateTime appliedAt) {}
 }

@@ -13,6 +13,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,7 +29,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
@@ -36,7 +37,6 @@ import lombok.RequiredArgsConstructor;
 public class GradeChangeController {
 
     private final GradeChangeService service;
-
 
     @GetMapping("/grade-change-requests")
     @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")

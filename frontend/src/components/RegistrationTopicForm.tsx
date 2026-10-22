@@ -97,8 +97,9 @@ export function RegistrationTopicForm({
   const periodDepartments = allowedDepartments.filter(
     (department) => department.facultyId === selectedPeriod?.facultyId,
   )
-  const selectedDepartment =
-    periodDepartments.find((department) => String(department.id) === departmentId)
+  const selectedDepartment = periodDepartments.find(
+    (department) => String(department.id) === departmentId,
+  )
   const facultyId = selectedPeriod?.facultyId
   const proposalStart = serverTimestamp(selectedPeriod?.proposalStartAt)
   const proposalEnd = serverTimestamp(selectedPeriod?.proposalEndAt)

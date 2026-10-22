@@ -23,9 +23,10 @@ import com.example.qldetai.feature.academic.repository.DepartmentRepository;
 import com.example.qldetai.feature.academic.repository.FacultyRepository;
 import com.example.qldetai.feature.academic.repository.RegistrationPeriodRepository;
 import com.example.qldetai.feature.academic.repository.SemesterRepository;
+import com.example.qldetai.feature.communication.email.*;
 import com.example.qldetai.feature.evaluation.domain.AssessmentComponentType;
-import com.example.qldetai.feature.evaluation.domain.EvaluationStatus;
 import com.example.qldetai.feature.evaluation.domain.CommitteeRole;
+import com.example.qldetai.feature.evaluation.domain.EvaluationStatus;
 import com.example.qldetai.feature.evaluation.domain.GradeChangeStatus;
 import com.example.qldetai.feature.evaluation.domain.ScoreSheetStatus;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.AddCommitteeMemberRequest;
@@ -111,6 +112,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -122,9 +125,6 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import com.example.qldetai.feature.communication.email.*;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -136,8 +136,10 @@ class ProjectLifecycleIntegrationTests {
     static void isolatedResultEmailMysql(DynamicPropertyRegistry properties) {
         String url = System.getProperty("result.email.mysql.url");
         if (url != null) {
-            if (!url.startsWith("jdbc:mysql://127.0.0.1:") || !url.contains("/ql_de_tai_sinh_vien?")) {
-                throw new IllegalArgumentException("Result email tests require a disposable local database.");
+            if (!url.startsWith("jdbc:mysql://127.0.0.1:")
+                    || !url.contains("/ql_de_tai_sinh_vien?")) {
+                throw new IllegalArgumentException(
+                        "Result email tests require a disposable local database.");
             }
             properties.add("spring.datasource.url", () -> url);
             properties.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
@@ -148,14 +150,22 @@ class ProjectLifecycleIntegrationTests {
         }
     }
 
-    @Autowired private com.example.qldetai.feature.evaluation.repository.EvaluationAssignmentRepository evaluationRepository;
-    @Autowired private com.example.qldetai.feature.evaluation.repository.ResultVersionRepository resultRepository;
+    @Autowired
+    private com.example.qldetai.feature.evaluation.repository.EvaluationAssignmentRepository
+            evaluationRepository;
+
+    @Autowired
+    private com.example.qldetai.feature.evaluation.repository.ResultVersionRepository
+            resultRepository;
+
     @Autowired private AcademicAppointmentRepository appointments;
     @Autowired private EmailNotificationSettingsService emailSettings;
     @Autowired private EmailOutboxRepository emailOutbox;
     @Autowired private EmailNotificationEventService emailEvents;
     @Autowired private EmailEventContextFactory emailContexts;
-    @Autowired private com.example.qldetai.feature.communication.service.NotificationService notifications;
+
+    @Autowired
+    private com.example.qldetai.feature.communication.service.NotificationService notifications;
 
     @ParameterizedTest
     @CsvSource({
@@ -172,38 +182,69 @@ class ProjectLifecycleIntegrationTests {
         "RESEARCH,2027-05-02T01:00:00,2027-05-02T02:00:00,201"
     })
     void defenseDateIsEnforcedOnlyForGraduationUsingVietnamCalendarDates(
-            ProjectType type, LocalDateTime start, LocalDateTime end, int expectedStatus,
-            @Autowired MockMvc mvc) throws Exception {
+            ProjectType type,
+            LocalDateTime start,
+            LocalDateTime end,
+            int expectedStatus,
+            @Autowired MockMvc mvc)
+            throws Exception {
         var project = createAssignedProject("defense-date", leaderStudent, secondStudent);
-        Long committeeId = evaluationCommitteeService.createCommittee(
-                new CreateCommitteeRequest(period.getId(), "Date validation"), admin.getId());
-        evaluationCommitteeService.addMember(committeeId,
-                new AddCommitteeMemberRequest(lecturerThree.getId(), 1, CommitteeRole.CHAIR), admin.getId());
-        evaluationCommitteeService.addMember(committeeId,
-                new AddCommitteeMemberRequest(lecturerFour.getId(), 2, CommitteeRole.SECRETARY), admin.getId());
-        evaluationCommitteeService.addMember(committeeId,
-                new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER), admin.getId());
+        Long committeeId =
+                evaluationCommitteeService.createCommittee(
+                        new CreateCommitteeRequest(period.getId(), "Date validation"),
+                        admin.getId());
+        evaluationCommitteeService.addMember(
+                committeeId,
+                new AddCommitteeMemberRequest(lecturerThree.getId(), 1, CommitteeRole.CHAIR),
+                admin.getId());
+        evaluationCommitteeService.addMember(
+                committeeId,
+                new AddCommitteeMemberRequest(lecturerFour.getId(), 2, CommitteeRole.SECRETARY),
+                admin.getId());
+        evaluationCommitteeService.addMember(
+                committeeId,
+                new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER),
+                admin.getId());
         period.setProjectType(type);
         period.setDefenseDate(LocalDate.of(2027, 5, 1));
-        var result = mvc.perform(post("/api/v1/defense-sessions")
-                .with(user(UserPrincipal.from(admin))).with(csrf())
-                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                .content("""
+        var result =
+                mvc.perform(
+                                post("/api/v1/defense-sessions")
+                                        .with(user(UserPrincipal.from(admin)))
+                                        .with(csrf())
+                                        .contentType(
+                                                org.springframework.http.MediaType.APPLICATION_JSON)
+                                        .content(
+                                                """
                         {"assignmentId":%d,"committeeId":%d,"location":"A101","startsAt":"%sZ","endsAt":"%sZ"}
-                        """.formatted(project.id(), committeeId, start, end)))
-                .andExpect(status().is(expectedStatus));
+                        """
+                                                        .formatted(
+                                                                project.id(),
+                                                                committeeId,
+                                                                start,
+                                                                end)))
+                        .andExpect(status().is(expectedStatus));
         if (expectedStatus == 400) {
-            result.andExpect(jsonPath("$.message").value(
-                    "Phiên bảo vệ phải diễn ra vào ngày 01/05/2027 theo cấu hình đợt KLTN."));
-            assertThat(defenseSessionService.listDefensesForStudent(leaderStudent.getUser().getId())).isEmpty();
+            result.andExpect(
+                    jsonPath("$.message")
+                            .value(
+                                    "Phiên bảo vệ phải diễn ra vào ngày 01/05/2027 theo cấu hình đợt KLTN."));
+            assertThat(
+                            defenseSessionService.listDefensesForStudent(
+                                    leaderStudent.getUser().getId()))
+                    .isEmpty();
             assertThat(notifications.list(leaderStudent.getUser().getId(), 0, 100).content())
                     .noneMatch(item -> item.title().equals("Lịch bảo vệ đề tài"));
         } else {
-            assertThat(defenseSessionService.listDefensesForStudent(leaderStudent.getUser().getId()))
-                    .singleElement().satisfies(item -> {
-                        assertThat(item.startsAt()).isEqualTo(start);
-                        assertThat(item.endsAt()).isEqualTo(end);
-                    });
+            assertThat(
+                            defenseSessionService.listDefensesForStudent(
+                                    leaderStudent.getUser().getId()))
+                    .singleElement()
+                    .satisfies(
+                            item -> {
+                                assertThat(item.startsAt()).isEqualTo(start);
+                                assertThat(item.endsAt()).isEqualTo(end);
+                            });
         }
     }
 
@@ -211,21 +252,31 @@ class ProjectLifecycleIntegrationTests {
     void rejectionNotifiesEveryCurrentMemberWithTheEnteredReason() {
         var topic = createPublishedTopic("rejected-reason");
         var group = createActiveGroup("Rejected group", leaderStudent, secondStudent);
-        var registration = registrationService.create(
-                new CreateTopicRegistrationRequest(group.id(), topic.id(), null),
-                leaderStudent.getUser().getId());
+        var registration =
+                registrationService.create(
+                        new CreateTopicRegistrationRequest(group.id(), topic.id(), null),
+                        leaderStudent.getUser().getId());
         String reason = "Đề tài chưa phù hợp với định hướng của nhóm.";
-        var rejected = registrationService.review(registration.id(),
-                new ReviewTopicRegistrationRequest(registration.version(), RegistrationStatus.REJECTED, "  " + reason + "  "),
-                admin.getId());
+        var rejected =
+                registrationService.review(
+                        registration.id(),
+                        new ReviewTopicRegistrationRequest(
+                                registration.version(),
+                                RegistrationStatus.REJECTED,
+                                "  " + reason + "  "),
+                        admin.getId());
         assertThat(rejected.decisionReason()).isEqualTo(reason);
         for (var student : List.of(leaderStudent, secondStudent)) {
             var received = notifications.list(student.getUser().getId(), 0, 100).content();
-            assertThat(received).filteredOn(item -> item.title().equals("Kết quả đăng ký đề tài"))
-                    .singleElement().satisfies(item -> {
-                        assertThat(item.content()).contains("đã bị từ chối", "Lý do: " + reason);
-                        assertThat(item.readAt()).isNull();
-                    });
+            assertThat(received)
+                    .filteredOn(item -> item.title().equals("Kết quả đăng ký đề tài"))
+                    .singleElement()
+                    .satisfies(
+                            item -> {
+                                assertThat(item.content())
+                                        .contains("đã bị từ chối", "Lý do: " + reason);
+                                assertThat(item.readAt()).isNull();
+                            });
         }
         assertThat(notifications.list(thirdStudent.getUser().getId(), 0, 100).content()).isEmpty();
     }
@@ -238,17 +289,28 @@ class ProjectLifecycleIntegrationTests {
         submitFullScore(project.id(), catalog, lecturerThree, null);
         var finalized = evaluationResultService.finalizeResult(project.id(), admin.getId());
         assertThat(emailOutbox.count()).isZero();
-        assertThatThrownBy(() -> emailContexts.resultPublished(resultRepository.findById(finalized.id()).orElseThrow()))
+        assertThatThrownBy(
+                        () ->
+                                emailContexts.resultPublished(
+                                        resultRepository.findById(finalized.id()).orElseThrow()))
                 .isInstanceOf(BusinessRuleException.class);
         evaluationResultService.publish(finalized.id(), admin.getId());
-        assertThat(emailOutbox.findAll()).hasSize(2).allSatisfy(message -> {
-            assertThat(message.getEventType()).isEqualTo(EmailNotificationEventType.RESULT_PUBLISHED);
-            assertThat(message.getEventKey()).isEqualTo("result-published:" + finalized.id());
-            assertThat(message.getBody()).contains("10.00/10", "/results", message.getRecipientName());
-            assertThat(message.getStatus()).isEqualTo(EmailOutboxStatus.PENDING);
-        });
-        assertThat(emailOutbox.findAll()).extracting(EmailOutbox::getRecipientEmail)
-                .containsExactlyInAnyOrder(leaderStudent.getUser().getEmail(), secondStudent.getUser().getEmail());
+        assertThat(emailOutbox.findAll())
+                .hasSize(2)
+                .allSatisfy(
+                        message -> {
+                            assertThat(message.getEventType())
+                                    .isEqualTo(EmailNotificationEventType.RESULT_PUBLISHED);
+                            assertThat(message.getEventKey())
+                                    .isEqualTo("result-published:" + finalized.id());
+                            assertThat(message.getBody())
+                                    .contains("10.00/10", "/results", message.getRecipientName());
+                            assertThat(message.getStatus()).isEqualTo(EmailOutboxStatus.PENDING);
+                        });
+        assertThat(emailOutbox.findAll())
+                .extracting(EmailOutbox::getRecipientEmail)
+                .containsExactlyInAnyOrder(
+                        leaderStudent.getUser().getEmail(), secondStudent.getUser().getEmail());
         emailEvents.resultPublished(resultRepository.findById(finalized.id()).orElseThrow());
         assertThat(emailOutbox.count()).isEqualTo(2);
         assertThatThrownBy(() -> evaluationResultService.publish(finalized.id(), admin.getId()))
@@ -260,10 +322,12 @@ class ProjectLifecycleIntegrationTests {
     void disabledResultEmailDoesNotPreventPublicationOrQueueMessages() {
         configureResultEmail(false);
         var project = createAssignedProject("disabled-email", leaderStudent, secondStudent);
-        var catalog = createLockedCatalog("disabled-email", "Scored", AssessmentComponentType.OTHER);
+        var catalog =
+                createLockedCatalog("disabled-email", "Scored", AssessmentComponentType.OTHER);
         submitFullScore(project.id(), catalog, lecturerThree, null);
         var finalized = evaluationResultService.finalizeResult(project.id(), admin.getId());
-        assertThat(evaluationResultService.publish(finalized.id(), admin.getId()).status().name()).isEqualTo("PUBLISHED");
+        assertThat(evaluationResultService.publish(finalized.id(), admin.getId()).status().name())
+                .isEqualTo("PUBLISHED");
         assertThat(emailOutbox.count()).isZero();
     }
 
@@ -271,24 +335,43 @@ class ProjectLifecycleIntegrationTests {
     void resultEmailUsesSnapshotMembersEvenIfCurrentMembershipChanges() {
         configureResultEmail(true);
         var project = createAssignedProject("snapshot-email", leaderStudent, secondStudent);
-        var catalog = createLockedCatalog("snapshot-email", "Scored", AssessmentComponentType.OTHER);
+        var catalog =
+                createLockedCatalog("snapshot-email", "Scored", AssessmentComponentType.OTHER);
         submitFullScore(project.id(), catalog, lecturerThree, null);
         var finalized = evaluationResultService.finalizeResult(project.id(), admin.getId());
         var projectEntity = projectAssignmentRepository.findById(project.id()).orElseThrow();
-        groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(projectEntity.getGroup().getId())
+        groupMemberRepository
+                .findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(projectEntity.getGroup().getId())
                 .forEach(member -> member.setLeftAt(nowUtc()));
         groupMemberRepository.flush();
         evaluationResultService.publish(finalized.id(), admin.getId());
-        assertThat(emailOutbox.findAll()).extracting(EmailOutbox::getRecipientEmail)
-                .containsExactlyInAnyOrder(leaderStudent.getUser().getEmail(), secondStudent.getUser().getEmail());
+        assertThat(emailOutbox.findAll())
+                .extracting(EmailOutbox::getRecipientEmail)
+                .containsExactlyInAnyOrder(
+                        leaderStudent.getUser().getEmail(), secondStudent.getUser().getEmail());
     }
 
     private void configureResultEmail(boolean enabled) {
-        var defaults = emailSettings.get(admin.getId(), EmailNotificationEventType.RESULT_PUBLISHED, NotificationScopeType.SYSTEM, 0L);
-        emailSettings.update(admin.getId(), EmailNotificationEventType.RESULT_PUBLISHED,
-                new EmailNotificationDtos.UpdateNotificationSettingRequest(NotificationScopeType.SYSTEM, 0L, enabled,
-                        defaults.senderName(), defaults.fromEmail(), null, defaults.subjectTemplate(), defaults.bodyTemplate(),
-                        defaults.recipientGroups(), null));
+        var defaults =
+                emailSettings.get(
+                        admin.getId(),
+                        EmailNotificationEventType.RESULT_PUBLISHED,
+                        NotificationScopeType.SYSTEM,
+                        0L);
+        emailSettings.update(
+                admin.getId(),
+                EmailNotificationEventType.RESULT_PUBLISHED,
+                new EmailNotificationDtos.UpdateNotificationSettingRequest(
+                        NotificationScopeType.SYSTEM,
+                        0L,
+                        enabled,
+                        defaults.senderName(),
+                        defaults.fromEmail(),
+                        null,
+                        defaults.subjectTemplate(),
+                        defaults.bodyTemplate(),
+                        defaults.recipientGroups(),
+                        null));
     }
 
     private final TopicService topicService;
@@ -585,25 +668,29 @@ class ProjectLifecycleIntegrationTests {
     @Test
     void committeeConfigurationCanBeSavedOverHttp(@Autowired MockMvc mvc) throws Exception {
         LockedCatalog catalog =
-                createLockedCatalog("committee-config", "Chấm hội đồng", AssessmentComponentType.COMMITTEE);
-        String body = """
+                createLockedCatalog(
+                        "committee-config", "Chấm hội đồng", AssessmentComponentType.COMMITTEE);
+        String body =
+                """
                 {"periodId":%d,"name":"Hội đồng 1","rubricId":%d,"members":[
                   {"lecturerId":%d,"roleName":"Chủ tịch"},
                   {"lecturerId":%d,"roleName":"Thư ký"},
                   {"lecturerId":%d,"roleName":"Ủy viên chuyên môn"}
                 ]}
-                """.formatted(
-                period.getId(),
-                catalog.rubric().id(),
-                lecturerThree.getId(),
-                lecturerFour.getId(),
-                lecturerFive.getId());
+                """
+                        .formatted(
+                                period.getId(),
+                                catalog.rubric().id(),
+                                lecturerThree.getId(),
+                                lecturerFour.getId(),
+                                lecturerFive.getId());
 
-        mvc.perform(post("/api/v1/evaluation-committees/configuration")
-                        .with(user(UserPrincipal.from(admin)))
-                        .with(csrf())
-                        .contentType("application/json")
-                        .content(body))
+        mvc.perform(
+                        post("/api/v1/evaluation-committees/configuration")
+                                .with(user(UserPrincipal.from(admin)))
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.name").value("Hội đồng 1"))
                 .andExpect(jsonPath("$.data.rubricId").value(catalog.rubric().id()))
@@ -613,61 +700,69 @@ class ProjectLifecycleIntegrationTests {
                 evaluationCommitteeService.listCommittees(period.getId(), 0, 10).content();
         assertThat(savedCommittees)
                 .singleElement()
-                .satisfies(committee -> {
-                    assertThat(committee.rubricId()).isEqualTo(catalog.rubric().id());
-                    assertThat(committee.members()).hasSize(3);
-                });
+                .satisfies(
+                        committee -> {
+                            assertThat(committee.rubricId()).isEqualTo(catalog.rubric().id());
+                            assertThat(committee.members()).hasSize(3);
+                        });
         EvaluationCommitteeResponse created = savedCommittees.get(0);
-        String updatedBody = """
+        String updatedBody =
+                """
                 {"periodId":%d,"name":"Hội đồng đã cập nhật","rubricId":%d,"version":%d,"members":[
                   {"lecturerId":%d,"roleName":"Chủ tịch"},
                   {"lecturerId":%d,"roleName":"Thư ký"},
                   {"lecturerId":%d,"roleName":"Ủy viên chuyên môn"}
                 ]}
-                """.formatted(
-                period.getId(),
-                catalog.rubric().id(),
-                created.version(),
-                lecturerThree.getId(),
-                lecturerFour.getId(),
-                lecturerFive.getId());
+                """
+                        .formatted(
+                                period.getId(),
+                                catalog.rubric().id(),
+                                created.version(),
+                                lecturerThree.getId(),
+                                lecturerFour.getId(),
+                                lecturerFive.getId());
 
-        mvc.perform(put("/api/v1/evaluation-committees/{id}/configuration", created.id())
-                        .with(user(UserPrincipal.from(admin)))
-                        .with(csrf())
-                        .contentType("application/json")
-                        .content(updatedBody))
+        mvc.perform(
+                        put("/api/v1/evaluation-committees/{id}/configuration", created.id())
+                                .with(user(UserPrincipal.from(admin)))
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content(updatedBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.name").value("Hội đồng đã cập nhật"))
                 .andExpect(jsonPath("$.data.version").value(created.version() + 1));
 
-        String rosterOnlyUpdateBody = """
+        String rosterOnlyUpdateBody =
+                """
                 {"periodId":%d,"name":"Hội đồng đã cập nhật","rubricId":%d,"version":%d,"members":[
                   {"lecturerId":%d,"roleName":"Chủ tịch"},
                   {"lecturerId":%d,"roleName":"Thư ký"},
                   {"lecturerId":%d,"roleName":"Ủy viên phản biện"}
                 ]}
-                """.formatted(
-                period.getId(),
-                catalog.rubric().id(),
-                created.version() + 1,
-                lecturerThree.getId(),
-                lecturerFour.getId(),
-                lecturerFive.getId());
-        mvc.perform(put("/api/v1/evaluation-committees/{id}/configuration", created.id())
-                        .with(user(UserPrincipal.from(admin)))
-                        .with(csrf())
-                        .contentType("application/json")
-                        .content(rosterOnlyUpdateBody))
+                """
+                        .formatted(
+                                period.getId(),
+                                catalog.rubric().id(),
+                                created.version() + 1,
+                                lecturerThree.getId(),
+                                lecturerFour.getId(),
+                                lecturerFive.getId());
+        mvc.perform(
+                        put("/api/v1/evaluation-committees/{id}/configuration", created.id())
+                                .with(user(UserPrincipal.from(admin)))
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content(rosterOnlyUpdateBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.version").value(created.version() + 2))
                 .andExpect(jsonPath("$.data.members[2].roleName").value("Ủy viên phản biện"));
 
-        mvc.perform(put("/api/v1/evaluation-committees/{id}/configuration", created.id())
-                        .with(user(UserPrincipal.from(admin)))
-                        .with(csrf())
-                        .contentType("application/json")
-                        .content(updatedBody))
+        mvc.perform(
+                        put("/api/v1/evaluation-committees/{id}/configuration", created.id())
+                                .with(user(UserPrincipal.from(admin)))
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content(updatedBody))
                 .andExpect(status().isConflict());
     }
 
@@ -708,14 +803,26 @@ class ProjectLifecycleIntegrationTests {
         for (var student : List.of(leaderStudent, secondStudent)) {
             assertThat(notifications.list(student.getUser().getId(), 0, 100).content())
                     .filteredOn(item -> item.title().equals("Lịch bảo vệ đề tài"))
-                    .singleElement().satisfies(item -> {
-                        assertThat(item.content()).contains(assignment.topicCode(), assignment.topicTitle(), "Phòng A101");
-                        var localStart = startsAt.atOffset(java.time.ZoneOffset.UTC)
-                                .atZoneSameInstant(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
-                        assertThat(item.content()).contains(localStart.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
-                        assertThat(item.targetPath()).isEqualTo("/results");
-                        assertThat(item.readAt()).isNull();
-                    });
+                    .singleElement()
+                    .satisfies(
+                            item -> {
+                                assertThat(item.content())
+                                        .contains(
+                                                assignment.topicCode(),
+                                                assignment.topicTitle(),
+                                                "Phòng A101");
+                                var localStart =
+                                        startsAt.atOffset(java.time.ZoneOffset.UTC)
+                                                .atZoneSameInstant(
+                                                        java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+                                assertThat(item.content())
+                                        .contains(
+                                                localStart.format(
+                                                        java.time.format.DateTimeFormatter
+                                                                .ofPattern("dd/MM/yyyy HH:mm")));
+                                assertThat(item.targetPath()).isEqualTo("/results");
+                                assertThat(item.readAt()).isNull();
+                            });
         }
         assertThat(notifications.list(thirdStudent.getUser().getId(), 0, 100).content()).isEmpty();
 
@@ -1023,8 +1130,7 @@ class ProjectLifecycleIntegrationTests {
                 createAssignedProject("AUTH", leaderStudent, secondStudent);
         var project = projectAssignmentRepository.findById(assigned.id()).orElseThrow();
         var catalog =
-                createLockedCatalog(
-                        "AUTH", "Authorization rubric", AssessmentComponentType.REVIEW);
+                createLockedCatalog("AUTH", "Authorization rubric", AssessmentComponentType.REVIEW);
         AcademicAppointment appointment = new AcademicAppointment();
         appointment.setLecturer(lecturerOne);
         appointment.setFaculty(faculty);
@@ -1123,8 +1229,7 @@ class ProjectLifecycleIntegrationTests {
             } else if ("rubrics".equals(resource)) {
                 request.param("componentId", "0");
             }
-            mvc.perform(request.with(user(principal)))
-                    .andExpect(status().isOk());
+            mvc.perform(request.with(user(principal))).andExpect(status().isOk());
         }
     }
 
@@ -1162,34 +1267,82 @@ class ProjectLifecycleIntegrationTests {
     void scoringRejectsExpiredDeadlinesAndCancelledEvaluations() {
         var project = createAssignedProject("deadline", leaderStudent, secondStudent);
         var catalog = createLockedCatalog("deadline", "Deadline", AssessmentComponentType.OTHER);
-        Long evaluationId = evaluationService.assign(new CreateEvaluationRequest(project.id(),
-                catalog.rubric().id(), lecturerThree.getId(), null, nowUtc().plusDays(1)), admin.getId());
+        Long evaluationId =
+                evaluationService.assign(
+                        new CreateEvaluationRequest(
+                                project.id(),
+                                catalog.rubric().id(),
+                                lecturerThree.getId(),
+                                null,
+                                nowUtc().plusDays(1)),
+                        admin.getId());
         var evaluation = evaluationRepository.findById(evaluationId).orElseThrow();
         evaluation.setDeadlineAt(nowUtc().minusSeconds(1));
-        var request = new SaveSheetRequest(0, "Test", scoreRequests(catalog.rubric(),
-                new BigDecimal("6"), new BigDecimal("4")), true);
-        assertThatThrownBy(() -> evaluationService.saveSheet(evaluationId, request, lecturerThree.getUser().getId()))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("deadline");
+        var request =
+                new SaveSheetRequest(
+                        0,
+                        "Test",
+                        scoreRequests(catalog.rubric(), new BigDecimal("6"), new BigDecimal("4")),
+                        true);
+        assertThatThrownBy(
+                        () ->
+                                evaluationService.saveSheet(
+                                        evaluationId, request, lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("deadline");
         evaluation.setDeadlineAt(nowUtc().plusDays(1));
-        evaluation.setStatus(com.example.qldetai.feature.evaluation.domain.EvaluationStatus.CANCELLED);
-        assertThatThrownBy(() -> evaluationService.saveSheet(evaluationId, request, lecturerThree.getUser().getId()))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("active evaluation");
+        evaluation.setStatus(
+                com.example.qldetai.feature.evaluation.domain.EvaluationStatus.CANCELLED);
+        assertThatThrownBy(
+                        () ->
+                                evaluationService.saveSheet(
+                                        evaluationId, request, lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("active evaluation");
     }
 
     @Test
     void reviewScoringHonorsPeriodDeadlineAndRejectsAssignmentsBeyondIt() {
         var project = createAssignedProject("review-deadline", leaderStudent, secondStudent);
-        var catalog = createLockedCatalog("review-deadline", "Review", AssessmentComponentType.REVIEW);
-        assertThatThrownBy(() -> evaluationService.assign(new CreateEvaluationRequest(project.id(),
-                catalog.rubric().id(), lecturerThree.getId(), null, period.getReviewDeadlineAt().plusDays(1)), admin.getId()))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("cannot exceed");
-        Long id = evaluationService.assign(new CreateEvaluationRequest(project.id(), catalog.rubric().id(),
-                lecturerThree.getId(), null, nowUtc().plusDays(1)), admin.getId());
+        var catalog =
+                createLockedCatalog("review-deadline", "Review", AssessmentComponentType.REVIEW);
+        assertThatThrownBy(
+                        () ->
+                                evaluationService.assign(
+                                        new CreateEvaluationRequest(
+                                                project.id(),
+                                                catalog.rubric().id(),
+                                                lecturerThree.getId(),
+                                                null,
+                                                period.getReviewDeadlineAt().plusDays(1)),
+                                        admin.getId()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("cannot exceed");
+        Long id =
+                evaluationService.assign(
+                        new CreateEvaluationRequest(
+                                project.id(),
+                                catalog.rubric().id(),
+                                lecturerThree.getId(),
+                                null,
+                                nowUtc().plusDays(1)),
+                        admin.getId());
         period.setReviewDeadlineAt(nowUtc().minusSeconds(1));
-        assertThatThrownBy(() -> evaluationService.saveSheet(id, new SaveSheetRequest(0, "Late",
-                scoreRequests(catalog.rubric(), new BigDecimal("6"), new BigDecimal("4")), true),
-                lecturerThree.getUser().getId()))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("review deadline");
+        assertThatThrownBy(
+                        () ->
+                                evaluationService.saveSheet(
+                                        id,
+                                        new SaveSheetRequest(
+                                                0,
+                                                "Late",
+                                                scoreRequests(
+                                                        catalog.rubric(),
+                                                        new BigDecimal("6"),
+                                                        new BigDecimal("4")),
+                                                true),
+                                        lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("review deadline");
     }
 
     @Test
@@ -1198,16 +1351,32 @@ class ProjectLifecycleIntegrationTests {
         studentGroupRepository.findById(group.id()).orElseThrow().setStatus(GroupStatus.LOCKED);
         var otherPeriod = createActivePeriod();
 
-        assertThat(groupService.create(new CreateGroupRequest(otherPeriod.getId(), "Other"),
-                leaderStudent.getUser().getId()).id()).isPositive();
-        var otherGroup = groupService.create(new CreateGroupRequest(otherPeriod.getId(), "Other"),
-                thirdStudent.getUser().getId());
-        assertThat(groupService.addMember(otherGroup.id(),
-                new AddGroupMemberRequest(secondStudent.getStudentCode()), thirdStudent.getUser().getId()).id())
+        assertThat(
+                        groupService
+                                .create(
+                                        new CreateGroupRequest(otherPeriod.getId(), "Other"),
+                                        leaderStudent.getUser().getId())
+                                .id())
+                .isPositive();
+        var otherGroup =
+                groupService.create(
+                        new CreateGroupRequest(otherPeriod.getId(), "Other"),
+                        thirdStudent.getUser().getId());
+        assertThat(
+                        groupService
+                                .addMember(
+                                        otherGroup.id(),
+                                        new AddGroupMemberRequest(secondStudent.getStudentCode()),
+                                        thirdStudent.getUser().getId())
+                                .id())
                 .isEqualTo(otherGroup.id());
 
-        assertThatThrownBy(() -> groupService.create(new CreateGroupRequest(otherPeriod.getId(), "Duplicate"),
-                leaderStudent.getUser().getId())).isInstanceOf(BusinessRuleException.class)
+        assertThatThrownBy(
+                        () ->
+                                groupService.create(
+                                        new CreateGroupRequest(otherPeriod.getId(), "Duplicate"),
+                                        leaderStudent.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("active group");
     }
 
@@ -1215,15 +1384,27 @@ class ProjectLifecycleIntegrationTests {
     void closedOrCancelledPeriodRejectsTopicRegistrationEvenInsideDateWindow() {
         var topic = createPublishedTopic("closed-period");
         var group = createActiveGroup("Group", leaderStudent, secondStudent);
-        for (var state : List.of(RegistrationPeriodStatus.CLOSED, RegistrationPeriodStatus.CANCELLED)) {
+        for (var state :
+                List.of(RegistrationPeriodStatus.CLOSED, RegistrationPeriodStatus.CANCELLED)) {
             period.setStatus(state);
-            assertThatThrownBy(() -> registrationService.create(
-                    new CreateTopicRegistrationRequest(group.id(), topic.id(), "Test"), leaderStudent.getUser().getId()))
-                    .isInstanceOf(BusinessRuleException.class).hasMessageContaining("active registration period");
+            assertThatThrownBy(
+                            () ->
+                                    registrationService.create(
+                                            new CreateTopicRegistrationRequest(
+                                                    group.id(), topic.id(), "Test"),
+                                            leaderStudent.getUser().getId()))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("active registration period");
         }
         period.setStatus(RegistrationPeriodStatus.ACTIVE);
-        assertThat(registrationService.create(new CreateTopicRegistrationRequest(group.id(), topic.id(), "Test"),
-                leaderStudent.getUser().getId()).status()).isEqualTo(RegistrationStatus.PENDING);
+        assertThat(
+                        registrationService
+                                .create(
+                                        new CreateTopicRegistrationRequest(
+                                                group.id(), topic.id(), "Test"),
+                                        leaderStudent.getUser().getId())
+                                .status())
+                .isEqualTo(RegistrationStatus.PENDING);
     }
 
     @Test
@@ -1232,32 +1413,54 @@ class ProjectLifecycleIntegrationTests {
         var scored = createLockedCatalog("scored", "Scored", AssessmentComponentType.OTHER);
         createLockedCatalog("missing", "Missing", AssessmentComponentType.REVIEW);
         submitFullScore(project.id(), scored, lecturerThree, null);
-        assertThatThrownBy(() -> evaluationResultService.finalizeResult(project.id(), admin.getId()))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("evaluator assignment is missing");
+        assertThatThrownBy(
+                        () -> evaluationResultService.finalizeResult(project.id(), admin.getId()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("evaluator assignment is missing");
         assertThat(resultRepository.countByAssignmentId(project.id())).isZero();
     }
 
     @Test
-    void onlyTheCorrespondingChairCanFinalizeACommitteeResultThroughHttp(@Autowired MockMvc mvc) throws Exception {
+    void onlyTheCorrespondingChairCanFinalizeACommitteeResultThroughHttp(@Autowired MockMvc mvc)
+            throws Exception {
         var project = createAssignedProject("chair-only", leaderStudent, secondStudent);
-        var catalog = createLockedCatalog("committee", "Committee", AssessmentComponentType.COMMITTEE);
-        Long committeeId = evaluationCommitteeService.createCommittee(
-                new CreateCommitteeRequest(period.getId(), "Council"), admin.getId());
-        evaluationCommitteeService.addMember(committeeId,
-                new AddCommitteeMemberRequest(lecturerThree.getId(), 1, CommitteeRole.CHAIR), admin.getId());
-        evaluationCommitteeService.addMember(committeeId,
-                new AddCommitteeMemberRequest(lecturerFour.getId(), 2, CommitteeRole.SECRETARY), admin.getId());
-        evaluationCommitteeService.addMember(committeeId,
-                new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER), admin.getId());
-        Long defenseId = defenseSessionService.schedule(new CreateDefenseRequest(project.id(), committeeId,
-                "A101", nowUtc().plusDays(2), nowUtc().plusDays(2).plusHours(1)), admin.getId());
+        var catalog =
+                createLockedCatalog("committee", "Committee", AssessmentComponentType.COMMITTEE);
+        Long committeeId =
+                evaluationCommitteeService.createCommittee(
+                        new CreateCommitteeRequest(period.getId(), "Council"), admin.getId());
+        evaluationCommitteeService.addMember(
+                committeeId,
+                new AddCommitteeMemberRequest(lecturerThree.getId(), 1, CommitteeRole.CHAIR),
+                admin.getId());
+        evaluationCommitteeService.addMember(
+                committeeId,
+                new AddCommitteeMemberRequest(lecturerFour.getId(), 2, CommitteeRole.SECRETARY),
+                admin.getId());
+        evaluationCommitteeService.addMember(
+                committeeId,
+                new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER),
+                admin.getId());
+        Long defenseId =
+                defenseSessionService.schedule(
+                        new CreateDefenseRequest(
+                                project.id(),
+                                committeeId,
+                                "A101",
+                                nowUtc().plusDays(2),
+                                nowUtc().plusDays(2).plusHours(1)),
+                        admin.getId());
         submitFullScore(project.id(), catalog, lecturerThree, defenseId);
         submitFullScore(project.id(), catalog, lecturerFour, defenseId);
         submitFullScore(project.id(), catalog, lecturerFive, defenseId);
-        Long otherCommittee = evaluationCommitteeService.createCommittee(
-                new CreateCommitteeRequest(period.getId(), "Unrelated council"), admin.getId());
-        evaluationCommitteeService.addMember(otherCommittee,
-                new AddCommitteeMemberRequest(lecturerOne.getId(), 1, CommitteeRole.CHAIR), admin.getId());
+        Long otherCommittee =
+                evaluationCommitteeService.createCommittee(
+                        new CreateCommitteeRequest(period.getId(), "Unrelated council"),
+                        admin.getId());
+        evaluationCommitteeService.addMember(
+                otherCommittee,
+                new AddCommitteeMemberRequest(lecturerOne.getId(), 1, CommitteeRole.CHAIR),
+                admin.getId());
         String url = "/api/v1/project-assignments/" + project.id() + "/results/finalize";
         for (User denied : List.of(admin, lecturerFour.getUser(), lecturerOne.getUser())) {
             mvc.perform(post(url).with(user(UserPrincipal.from(denied))).with(csrf()))
@@ -1269,23 +1472,41 @@ class ProjectLifecycleIntegrationTests {
     }
 
     @Test
-    void resultListsAndDetailsAreScopedAndStudentsOnlyReadPublishedSnapshots(@Autowired MockMvc mvc) throws Exception {
+    void resultListsAndDetailsAreScopedAndStudentsOnlyReadPublishedSnapshots(@Autowired MockMvc mvc)
+            throws Exception {
         var project = createAssignedProject("scoped-results", leaderStudent, secondStudent);
         var catalog = createLockedCatalog("scoped", "Scored", AssessmentComponentType.OTHER);
         submitFullScore(project.id(), catalog, lecturerThree, null);
         var finalized = evaluationResultService.finalizeResult(project.id(), admin.getId());
-        assertThat(evaluationResultService.listResults(null, null, null, 0, 1,
-                lecturerFour.getUser().getId()).totalElements()).isZero();
-        assertThat(evaluationResultService.listResults(null, null, null, 0, 1,
-                lecturerThree.getUser().getId()).totalElements()).isEqualTo(1);
-        mvc.perform(get("/api/v1/results/" + finalized.id())
-                .with(user(UserPrincipal.from(lecturerFour.getUser())))).andExpect(status().isForbidden());
-        mvc.perform(get("/api/v1/results/" + finalized.id())
-                .with(user(UserPrincipal.from(leaderStudent.getUser())))).andExpect(status().isForbidden());
-        assertThat(evaluationResultService.getResult(finalized.id(), lecturerThree.getUser().getId()).id())
+        assertThat(
+                        evaluationResultService
+                                .listResults(null, null, null, 0, 1, lecturerFour.getUser().getId())
+                                .totalElements())
+                .isZero();
+        assertThat(
+                        evaluationResultService
+                                .listResults(
+                                        null, null, null, 0, 1, lecturerThree.getUser().getId())
+                                .totalElements())
+                .isEqualTo(1);
+        mvc.perform(
+                        get("/api/v1/results/" + finalized.id())
+                                .with(user(UserPrincipal.from(lecturerFour.getUser()))))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/v1/results/" + finalized.id())
+                                .with(user(UserPrincipal.from(leaderStudent.getUser()))))
+                .andExpect(status().isForbidden());
+        assertThat(
+                        evaluationResultService
+                                .getResult(finalized.id(), lecturerThree.getUser().getId())
+                                .id())
                 .isEqualTo(finalized.id());
-        assertThat(evaluationResultService.listResults(null, null, null, 0, 10,
-                lecturerOne.getUser().getId()).totalElements()).isZero();
+        assertThat(
+                        evaluationResultService
+                                .listResults(null, null, null, 0, 10, lecturerOne.getUser().getId())
+                                .totalElements())
+                .isZero();
 
         AcademicAppointment dean = new AcademicAppointment();
         dean.setLecturer(lecturerFour);
@@ -1294,174 +1515,188 @@ class ProjectLifecycleIntegrationTests {
         dean.setStartsAt(nowUtc().minusDays(1));
         dean.setAssignedBy(admin);
         appointments.saveAndFlush(dean);
-        assertThat(evaluationResultService.listResults(null, null, null, 0, 10,
-                lecturerFour.getUser().getId()).totalElements()).isZero();
+        assertThat(
+                        evaluationResultService
+                                .listResults(
+                                        null, null, null, 0, 10, lecturerFour.getUser().getId())
+                                .totalElements())
+                .isZero();
         dean.setFaculty(faculty);
-        assertThat(evaluationResultService.listResults(null, null, null, 0, 10,
-                lecturerFour.getUser().getId()).totalElements()).isEqualTo(1);
+        assertThat(
+                        evaluationResultService
+                                .listResults(
+                                        null, null, null, 0, 10, lecturerFour.getUser().getId())
+                                .totalElements())
+                .isEqualTo(1);
         dean.setEndsAt(nowUtc().minusSeconds(1));
-        assertThat(evaluationResultService.listResults(null, null, null, 0, 10,
-                lecturerFour.getUser().getId()).totalElements()).isZero();
+        assertThat(
+                        evaluationResultService
+                                .listResults(
+                                        null, null, null, 0, 10, lecturerFour.getUser().getId())
+                                .totalElements())
+                .isZero();
 
         evaluationResultService.publish(finalized.id(), admin.getId());
-        assertThat(evaluationResultService.getResult(finalized.id(), leaderStudent.getUser().getId()).id())
+        assertThat(
+                        evaluationResultService
+                                .getResult(finalized.id(), leaderStudent.getUser().getId())
+                                .id())
                 .isEqualTo(finalized.id());
-        mvc.perform(get("/api/v1/student/results")
-                        .with(user(UserPrincipal.from(leaderStudent.getUser()))))
+        mvc.perform(
+                        get("/api/v1/student/results")
+                                .with(user(UserPrincipal.from(leaderStudent.getUser()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].id").value(finalized.id()))
                 .andExpect(jsonPath("$.data[0].status").value("PUBLISHED"));
-        mvc.perform(get("/api/v1/student/results")
-                        .with(user(UserPrincipal.from(thirdStudent.getUser()))))
+        mvc.perform(
+                        get("/api/v1/student/results")
+                                .with(user(UserPrincipal.from(thirdStudent.getUser()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isEmpty());
-        assertThatThrownBy(() -> evaluationResultService.getResult(finalized.id(), thirdStudent.getUser().getId()))
+        assertThatThrownBy(
+                        () ->
+                                evaluationResultService.getResult(
+                                        finalized.id(), thirdStudent.getUser().getId()))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-        assertThat(evaluationResultService.listResults(null, null, null, 0, 10,
-                lecturerOne.getUser().getId()).totalElements()).isEqualTo(1);
+        assertThat(
+                        evaluationResultService
+                                .listResults(null, null, null, 0, 10, lecturerOne.getUser().getId())
+                                .totalElements())
+                .isEqualTo(1);
     }
 
     @Test
     void studentsOnlyListRegistrationsForTheirOwnGroups(@Autowired MockMvc mvc) throws Exception {
-        var project = createAssignedProject("student-registration-scope", leaderStudent, secondStudent);
+        var project =
+                createAssignedProject("student-registration-scope", leaderStudent, secondStudent);
 
-        mvc.perform(get("/api/v1/topic-registrations/mine")
-                        .with(user(UserPrincipal.from(leaderStudent.getUser()))))
+        mvc.perform(
+                        get("/api/v1/topic-registrations/mine")
+                                .with(user(UserPrincipal.from(leaderStudent.getUser()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].groupId").value(project.groupId()));
-        mvc.perform(get("/api/v1/topic-registrations/mine")
-                        .with(user(UserPrincipal.from(thirdStudent.getUser()))))
+        mvc.perform(
+                        get("/api/v1/topic-registrations/mine")
+                                .with(user(UserPrincipal.from(thirdStudent.getUser()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content").isEmpty());
-        mvc.perform(get("/api/v1/topic-registrations")
-                        .with(user(UserPrincipal.from(leaderStudent.getUser()))))
+        mvc.perform(
+                        get("/api/v1/topic-registrations")
+                                .with(user(UserPrincipal.from(leaderStudent.getUser()))))
                 .andExpect(status().isForbidden());
-        mvc.perform(get("/api/v1/topic-registrations/{id}", project.registrationId())
-                        .with(user(UserPrincipal.from(leaderStudent.getUser()))))
+        mvc.perform(
+                        get("/api/v1/topic-registrations/{id}", project.registrationId())
+                                .with(user(UserPrincipal.from(leaderStudent.getUser()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.groupId").value(project.groupId()));
-        mvc.perform(get("/api/v1/topic-registrations/{id}", project.registrationId())
-                        .with(user(UserPrincipal.from(thirdStudent.getUser()))))
+        mvc.perform(
+                        get("/api/v1/topic-registrations/{id}", project.registrationId())
+                                .with(user(UserPrincipal.from(thirdStudent.getUser()))))
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    void auditReproducesGradeChangeListDisclosureToUnrelatedLecturer(@Autowired MockMvc mvc) throws Exception {
-        var project = createAssignedProject("grade-change-disclosure", leaderStudent, secondStudent);
+    void auditReproducesGradeChangeListDisclosureToUnrelatedLecturer(@Autowired MockMvc mvc)
+            throws Exception {
+        var project =
+                createAssignedProject("grade-change-disclosure", leaderStudent, secondStudent);
         var catalog = createLockedCatalog("disclosure", "Review", AssessmentComponentType.OTHER);
-        Long evaluationId = evaluationService.assign(new CreateEvaluationRequest(project.id(), catalog.rubric().id(),
-                lecturerThree.getId(), null, nowUtc().plusDays(1)), admin.getId());
-        var sheet = evaluationService.saveSheet(evaluationId, new SaveSheetRequest(0, "Complete",
-                scoreRequests(catalog.rubric(), new BigDecimal("6"), new BigDecimal("4")), true), lecturerThree.getUser().getId());
-        Long change = gradeChangeService.requestChange(sheet.id(), new CreateGradeChangeRequest("Private correction reason"),
-                lecturerThree.getUser().getId());
-        mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+        Long evaluationId =
+                evaluationService.assign(
+                        new CreateEvaluationRequest(
+                                project.id(),
+                                catalog.rubric().id(),
+                                lecturerThree.getId(),
+                                null,
+                                nowUtc().plusDays(1)),
+                        admin.getId());
+        var sheet =
+                evaluationService.saveSheet(
+                        evaluationId,
+                        new SaveSheetRequest(
+                                0,
+                                "Complete",
+                                scoreRequests(
+                                        catalog.rubric(), new BigDecimal("6"), new BigDecimal("4")),
+                                true),
+                        lecturerThree.getUser().getId());
+        Long change =
+                gradeChangeService.requestChange(
+                        sheet.id(),
+                        new CreateGradeChangeRequest("Private correction reason"),
+                        lecturerThree.getUser().getId());
+        mvc.perform(
+                        get("/api/v1/grade-change-requests")
+                                .param("sheetId", sheet.id().toString())
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content").isEmpty())
                 .andExpect(jsonPath("$.data.totalElements").value(0));
-        mvc.perform(get("/api/v1/grade-change-requests")
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.content").isEmpty());
-        mvc.perform(get("/api/v1/grade-change-requests/{id}", change)
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+        mvc.perform(
+                        get("/api/v1/grade-change-requests")
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").isEmpty());
+        mvc.perform(
+                        get("/api/v1/grade-change-requests/{id}", change)
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
                 .andExpect(status().isForbidden());
         for (User reader : List.of(admin, lecturerThree.getUser(), lecturerOne.getUser())) {
-            mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
-                            .with(user(UserPrincipal.from(reader))))
+            mvc.perform(
+                            get("/api/v1/grade-change-requests")
+                                    .param("sheetId", sheet.id().toString())
+                                    .with(user(UserPrincipal.from(reader))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.content[0].id").value(change))
-                    .andExpect(jsonPath("$.data.content[0].reason").value("Private correction reason"));
-            mvc.perform(get("/api/v1/grade-change-requests/{id}", change).with(user(UserPrincipal.from(reader))))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value(change));
+                    .andExpect(
+                            jsonPath("$.data.content[0].reason")
+                                    .value("Private correction reason"));
+            mvc.perform(
+                            get("/api/v1/grade-change-requests/{id}", change)
+                                    .with(user(UserPrincipal.from(reader))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.id").value(change));
         }
         for (boolean approved : List.of(true, false)) {
-            mvc.perform(patch("/api/v1/grade-change-requests/{id}/review", change)
-                            .with(user(UserPrincipal.from(lecturerFive.getUser()))).with(csrf())
-                            .contentType("application/json").content("{\"approved\":" + approved + ",\"comment\":\"unrelated\"}"))
+            mvc.perform(
+                            patch("/api/v1/grade-change-requests/{id}/review", change)
+                                    .with(user(UserPrincipal.from(lecturerFive.getUser())))
+                                    .with(csrf())
+                                    .contentType("application/json")
+                                    .content(
+                                            "{\"approved\":"
+                                                    + approved
+                                                    + ",\"comment\":\"unrelated\"}"))
                     .andExpect(status().isForbidden());
-            assertThatThrownBy(() -> gradeChangeService.reviewChange(change,
-                    new ReviewGradeChangeRequest(approved, "unrelated"), lecturerFive.getUser().getId()))
+            assertThatThrownBy(
+                            () ->
+                                    gradeChangeService.reviewChange(
+                                            change,
+                                            new ReviewGradeChangeRequest(approved, "unrelated"),
+                                            lecturerFive.getUser().getId()))
                     .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         }
-        evaluationService.assign(new CreateEvaluationRequest(project.id(), catalog.rubric().id(),
-                lecturerFour.getId(), null, nowUtc().plusDays(1)), admin.getId());
-        mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
-                        .with(user(UserPrincipal.from(lecturerFour.getUser()))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.content[0].id").value(change));
-        mvc.perform(patch("/api/v1/grade-change-requests/{id}/review", change)
-                        .with(user(UserPrincipal.from(lecturerThree.getUser()))).with(csrf())
-                        .contentType("application/json").content("{\"approved\":true,\"comment\":\"self review\"}"))
+        evaluationService.assign(
+                new CreateEvaluationRequest(
+                        project.id(),
+                        catalog.rubric().id(),
+                        lecturerFour.getId(),
+                        null,
+                        nowUtc().plusDays(1)),
+                admin.getId());
+        mvc.perform(
+                        get("/api/v1/grade-change-requests")
+                                .param("sheetId", sheet.id().toString())
+                                .with(user(UserPrincipal.from(lecturerFour.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].id").value(change));
+        mvc.perform(
+                        patch("/api/v1/grade-change-requests/{id}/review", change)
+                                .with(user(UserPrincipal.from(lecturerThree.getUser())))
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content("{\"approved\":true,\"comment\":\"self review\"}"))
                 .andExpect(status().isForbidden());
-        AcademicAppointment appointment = new AcademicAppointment();
-        appointment.setLecturer(lecturerFive); appointment.setFaculty(createFaculty("OUT"));
-        appointment.setPositionCode(PositionCode.DEAN);
-        appointment.setStartsAt(nowUtc().minusDays(1)); appointment.setAssignedBy(admin);
-        appointments.saveAndFlush(appointment);
-        mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.content").isEmpty());
-        appointment.setFaculty(faculty); appointments.saveAndFlush(appointment);
-        mvc.perform(get("/api/v1/grade-change-requests/{id}", change)
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
-                .andExpect(status().isOk());
-        appointment.setPositionCode(PositionCode.DEPARTMENT_HEAD);
-        appointment.setDepartment(createDepartment(faculty, "OTH"));
-        appointments.saveAndFlush(appointment);
-        mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.content").isEmpty());
-        appointment.setDepartment(department);
-        appointment.setStartsAt(nowUtc().minusDays(1)); appointment.setAssignedBy(admin);
-        appointments.saveAndFlush(appointment);
-        mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.content[0].id").value(change));
-        appointment.setEndsAt(nowUtc().minusSeconds(1)); appointments.saveAndFlush(appointment);
-        mvc.perform(get("/api/v1/grade-change-requests").param("sheetId", sheet.id().toString())
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.content").isEmpty());
-        appointment.setEndsAt(null); appointments.saveAndFlush(appointment);
-        mvc.perform(patch("/api/v1/grade-change-requests/{id}/review", change)
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))).with(csrf())
-                        .contentType("application/json").content("{\"approved\":false,\"comment\":\"scoped rejection\"}"))
-                .andExpect(status().isOk());
-        Long nextChange = gradeChangeService.requestChange(sheet.id(), new CreateGradeChangeRequest("Second correction"),
-                lecturerThree.getUser().getId());
-        mvc.perform(patch("/api/v1/grade-change-requests/{id}/review", nextChange)
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))).with(csrf())
-                        .contentType("application/json").content("{\"approved\":true,\"comment\":\"scoped approval\"}"))
-                .andExpect(status().isOk());
-        evaluationRepository.findById(evaluationId).orElseThrow().setStatus(EvaluationStatus.CANCELLED);
-        evaluationRepository.flush();
-        mvc.perform(get("/api/v1/grade-change-requests/{id}", change)
-                        .with(user(UserPrincipal.from(lecturerThree.getUser()))))
-                .andExpect(status().isOk());
-        mvc.perform(get("/api/v1/evaluation-assignments/{id}/score-sheet", evaluationId)
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
-                .andExpect(status().isForbidden());
-        mvc.perform(get("/api/v1/evaluation-assignments/{id}/score-sheet", evaluationId)
-                        .with(user(UserPrincipal.from(thirdStudent.getUser()))))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void draftEvaluationCatalogsAreVisibleOnlyWithinManagementScope(@Autowired MockMvc mvc) throws Exception {
-        var component = evaluationService.createComponent(new CreateAssessmentComponentRequest(period.getId(),
-                unique("draft-private"), "Private draft", AssessmentComponentType.OTHER), admin.getId());
-        var rubric = evaluationService.createRubric(new CreateRubricRequest(component.id(), "Private draft rubric",
-                List.of(new CriterionRequest("Private", "Draft details", BigDecimal.TEN, 1))), admin.getId());
-        for (User outsider : List.of(lecturerFive.getUser(), thirdStudent.getUser())) {
-            mvc.perform(get("/api/v1/assessment-components").param("periodId", period.getId().toString())
-                            .with(user(UserPrincipal.from(outsider))))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
-            mvc.perform(get("/api/v1/rubrics").param("componentId", component.id().toString())
-                            .with(user(UserPrincipal.from(outsider))))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
-        }
-        mvc.perform(get("/api/v1/rubrics").param("componentId", component.id().toString())
-                        .with(user(UserPrincipal.from(admin))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].id").value(rubric.id()));
         AcademicAppointment appointment = new AcademicAppointment();
         appointment.setLecturer(lecturerFive);
         appointment.setFaculty(createFaculty("OUT"));
@@ -1469,42 +1704,200 @@ class ProjectLifecycleIntegrationTests {
         appointment.setStartsAt(nowUtc().minusDays(1));
         appointment.setAssignedBy(admin);
         appointments.saveAndFlush(appointment);
-        mvc.perform(get("/api/v1/rubrics").param("componentId", component.id().toString())
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
+        mvc.perform(
+                        get("/api/v1/grade-change-requests")
+                                .param("sheetId", sheet.id().toString())
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").isEmpty());
+        appointment.setFaculty(faculty);
+        appointments.saveAndFlush(appointment);
+        mvc.perform(
+                        get("/api/v1/grade-change-requests/{id}", change)
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk());
+        appointment.setPositionCode(PositionCode.DEPARTMENT_HEAD);
+        appointment.setDepartment(createDepartment(faculty, "OTH"));
+        appointments.saveAndFlush(appointment);
+        mvc.perform(
+                        get("/api/v1/grade-change-requests")
+                                .param("sheetId", sheet.id().toString())
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").isEmpty());
+        appointment.setDepartment(department);
+        appointment.setStartsAt(nowUtc().minusDays(1));
+        appointment.setAssignedBy(admin);
+        appointments.saveAndFlush(appointment);
+        mvc.perform(
+                        get("/api/v1/grade-change-requests")
+                                .param("sheetId", sheet.id().toString())
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].id").value(change));
+        appointment.setEndsAt(nowUtc().minusSeconds(1));
+        appointments.saveAndFlush(appointment);
+        mvc.perform(
+                        get("/api/v1/grade-change-requests")
+                                .param("sheetId", sheet.id().toString())
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").isEmpty());
+        appointment.setEndsAt(null);
+        appointments.saveAndFlush(appointment);
+        mvc.perform(
+                        patch("/api/v1/grade-change-requests/{id}/review", change)
+                                .with(user(UserPrincipal.from(lecturerFive.getUser())))
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content("{\"approved\":false,\"comment\":\"scoped rejection\"}"))
+                .andExpect(status().isOk());
+        Long nextChange =
+                gradeChangeService.requestChange(
+                        sheet.id(),
+                        new CreateGradeChangeRequest("Second correction"),
+                        lecturerThree.getUser().getId());
+        mvc.perform(
+                        patch("/api/v1/grade-change-requests/{id}/review", nextChange)
+                                .with(user(UserPrincipal.from(lecturerFive.getUser())))
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content("{\"approved\":true,\"comment\":\"scoped approval\"}"))
+                .andExpect(status().isOk());
+        evaluationRepository
+                .findById(evaluationId)
+                .orElseThrow()
+                .setStatus(EvaluationStatus.CANCELLED);
+        evaluationRepository.flush();
+        mvc.perform(
+                        get("/api/v1/grade-change-requests/{id}", change)
+                                .with(user(UserPrincipal.from(lecturerThree.getUser()))))
+                .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/v1/evaluation-assignments/{id}/score-sheet", evaluationId)
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/v1/evaluation-assignments/{id}/score-sheet", evaluationId)
+                                .with(user(UserPrincipal.from(thirdStudent.getUser()))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void draftEvaluationCatalogsAreVisibleOnlyWithinManagementScope(@Autowired MockMvc mvc)
+            throws Exception {
+        var component =
+                evaluationService.createComponent(
+                        new CreateAssessmentComponentRequest(
+                                period.getId(),
+                                unique("draft-private"),
+                                "Private draft",
+                                AssessmentComponentType.OTHER),
+                        admin.getId());
+        var rubric =
+                evaluationService.createRubric(
+                        new CreateRubricRequest(
+                                component.id(),
+                                "Private draft rubric",
+                                List.of(
+                                        new CriterionRequest(
+                                                "Private", "Draft details", BigDecimal.TEN, 1))),
+                        admin.getId());
+        for (User outsider : List.of(lecturerFive.getUser(), thirdStudent.getUser())) {
+            mvc.perform(
+                            get("/api/v1/assessment-components")
+                                    .param("periodId", period.getId().toString())
+                                    .with(user(UserPrincipal.from(outsider))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data").isEmpty());
+            mvc.perform(
+                            get("/api/v1/rubrics")
+                                    .param("componentId", component.id().toString())
+                                    .with(user(UserPrincipal.from(outsider))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data").isEmpty());
+        }
+        mvc.perform(
+                        get("/api/v1/rubrics")
+                                .param("componentId", component.id().toString())
+                                .with(user(UserPrincipal.from(admin))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(rubric.id()));
+        AcademicAppointment appointment = new AcademicAppointment();
+        appointment.setLecturer(lecturerFive);
+        appointment.setFaculty(createFaculty("OUT"));
+        appointment.setPositionCode(PositionCode.DEAN);
+        appointment.setStartsAt(nowUtc().minusDays(1));
+        appointment.setAssignedBy(admin);
+        appointments.saveAndFlush(appointment);
+        mvc.perform(
+                        get("/api/v1/rubrics")
+                                .param("componentId", component.id().toString())
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
         appointment.setFaculty(faculty);
         appointment.setPositionCode(PositionCode.DEPARTMENT_HEAD);
         appointment.setDepartment(department);
         appointments.saveAndFlush(appointment);
-        mvc.perform(get("/api/v1/rubrics").param("componentId", component.id().toString())
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
+        mvc.perform(
+                        get("/api/v1/rubrics")
+                                .param("componentId", component.id().toString())
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
         appointment.setPositionCode(PositionCode.DEAN);
         appointment.setDepartment(null);
         appointments.saveAndFlush(appointment);
-        mvc.perform(get("/api/v1/assessment-components").param("periodId", period.getId().toString())
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].id").value(component.id()));
-        mvc.perform(get("/api/v1/rubrics").param("componentId", component.id().toString())
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].id").value(rubric.id()));
+        mvc.perform(
+                        get("/api/v1/assessment-components")
+                                .param("periodId", period.getId().toString())
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(component.id()));
+        mvc.perform(
+                        get("/api/v1/rubrics")
+                                .param("componentId", component.id().toString())
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(rubric.id()));
         appointment.setEndsAt(nowUtc().minusSeconds(1));
         appointments.saveAndFlush(appointment);
-        mvc.perform(get("/api/v1/rubrics").param("componentId", component.id().toString())
-                        .with(user(UserPrincipal.from(lecturerFive.getUser()))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
+        mvc.perform(
+                        get("/api/v1/rubrics")
+                                .param("componentId", component.id().toString())
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
         evaluationService.lockRubric(rubric.id(), admin.getId());
         evaluationService.lockComponent(component.id(), admin.getId());
-        mvc.perform(get("/api/v1/rubrics").param("componentId", component.id().toString())
-                        .with(user(UserPrincipal.from(thirdStudent.getUser()))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].id").value(rubric.id()));
+        mvc.perform(
+                        get("/api/v1/rubrics")
+                                .param("componentId", component.id().toString())
+                                .with(user(UserPrincipal.from(thirdStudent.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(rubric.id()));
     }
 
-    private void submitFullScore(Long assignmentId, LockedCatalog catalog, Lecturer lecturer, Long defenseId) {
-        Long id = evaluationService.assign(new CreateEvaluationRequest(assignmentId, catalog.rubric().id(),
-                lecturer.getId(), defenseId, nowUtc().plusDays(1)), admin.getId());
-        evaluationService.saveSheet(id, new SaveSheetRequest(0, "Complete",
-                scoreRequests(catalog.rubric(), new BigDecimal("6"), new BigDecimal("4")), true), lecturer.getUser().getId());
+    private void submitFullScore(
+            Long assignmentId, LockedCatalog catalog, Lecturer lecturer, Long defenseId) {
+        Long id =
+                evaluationService.assign(
+                        new CreateEvaluationRequest(
+                                assignmentId,
+                                catalog.rubric().id(),
+                                lecturer.getId(),
+                                defenseId,
+                                nowUtc().plusDays(1)),
+                        admin.getId());
+        evaluationService.saveSheet(
+                id,
+                new SaveSheetRequest(
+                        0,
+                        "Complete",
+                        scoreRequests(catalog.rubric(), new BigDecimal("6"), new BigDecimal("4")),
+                        true),
+                lecturer.getUser().getId());
     }
 
     private StudentGroupResponse createActiveGroup(String name, Student leader, Student member) {
@@ -1521,7 +1914,8 @@ class ProjectLifecycleIntegrationTests {
             String topicCode, Student leader, Student member) {
         TopicResponse topic = createPublishedTopic(topicCode);
         if (System.getProperty("result.email.mysql.url") != null) {
-            // Advance the fixture from proposal to registration without overlapping SQL time windows.
+            // Advance the fixture from proposal to registration without overlapping SQL time
+            // windows.
             period.setProposalEndAt(nowUtc().minusDays(1));
             period.setRegistrationStartAt(nowUtc().minusHours(1));
             period.setRegistrationEndAt(nowUtc().plusDays(2));
@@ -1544,16 +1938,11 @@ class ProjectLifecycleIntegrationTests {
     }
 
     private LockedCatalog createLockedCatalog(
-            String code,
-            String name,
-            AssessmentComponentType componentType) {
+            String code, String name, AssessmentComponentType componentType) {
         AssessmentComponentResponse component =
                 evaluationService.createComponent(
                         new CreateAssessmentComponentRequest(
-                                period.getId(),
-                                unique(code),
-                                name,
-                                componentType),
+                                period.getId(), unique(code), name, componentType),
                         admin.getId());
         RubricResponse draftRubric =
                 evaluationService.createRubric(

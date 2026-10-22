@@ -1,4 +1,18 @@
-import { Bell, BookOpen, Building2, CalendarCheck, ClipboardCheck, Flag, Home, ListChecks, Mail, ShieldCheck, UserRound, UsersRound, type LucideIcon } from 'lucide-react'
+import {
+  Bell,
+  BookOpen,
+  Building2,
+  CalendarCheck,
+  ClipboardCheck,
+  Flag,
+  Home,
+  ListChecks,
+  Mail,
+  ShieldCheck,
+  UserRound,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react'
 import type { PositionCode, RoleCode } from '../types/domain'
 
 export type NavigationItem = {
@@ -17,8 +31,18 @@ export const navigationItems: NavigationItem[] = [
   { icon: UsersRound, label: 'Nhóm đề tài', to: '/groups' },
   { icon: ClipboardCheck, label: 'Đăng ký đề tài', to: '/registrations' },
   { icon: ListChecks, label: 'Tiến độ & Mốc báo cáo', to: '/progress' },
-  { icon: ClipboardCheck, label: 'Tiêu chuẩn đánh giá', to: '/evaluations', roles: ['LECTURER', 'ADMIN'] },
-  { icon: Flag, label: 'Phân công giảng viên', to: '/evaluator-assignment', roles: ['LECTURER', 'ADMIN'] },
+  {
+    icon: ClipboardCheck,
+    label: 'Tiêu chuẩn đánh giá',
+    to: '/evaluations',
+    roles: ['LECTURER', 'ADMIN'],
+  },
+  {
+    icon: Flag,
+    label: 'Phân công giảng viên',
+    to: '/evaluator-assignment',
+    roles: ['LECTURER', 'ADMIN'],
+  },
   { icon: ClipboardCheck, label: 'Chấm điểm đề tài', to: '/score-sheets', roles: ['LECTURER'] },
   {
     icon: Building2,

@@ -631,7 +631,13 @@ export interface TopicRegistrationResponse {
 }
 
 export type TopicStatus =
-  'DRAFT' | 'PENDING' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'WITHDRAWN' | string
+  | 'DRAFT'
+  | 'PENDING'
+  | 'APPROVED'
+  | 'PUBLISHED'
+  | 'REJECTED'
+  | 'WITHDRAWN'
+  | string
 export interface TopicSupervisorResponse {
   lecturerId: number
   lecturerCode: string

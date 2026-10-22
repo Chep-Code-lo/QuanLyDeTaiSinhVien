@@ -1,22 +1,15 @@
 package com.example.qldetai.feature.evaluation.service;
 
-import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ResourceNotFoundException;
-import com.example.qldetai.feature.communication.service.NotificationService;
 import com.example.qldetai.feature.communication.email.EmailNotificationEventService;
+import com.example.qldetai.feature.communication.service.NotificationService;
 import com.example.qldetai.feature.evaluation.domain.AssessmentComponent;
 import com.example.qldetai.feature.evaluation.domain.AssessmentComponentType;
 import com.example.qldetai.feature.evaluation.domain.CommitteeRole;
 import com.example.qldetai.feature.evaluation.domain.DefenseStatus;
-import com.example.qldetai.feature.evaluation.repository.AssessmentComponentRepository;
-import com.example.qldetai.feature.evaluation.repository.CommitteeMemberRepository;
-import com.example.qldetai.feature.evaluation.repository.DefenseSessionRepository;
-import com.example.qldetai.feature.project.service.ProjectAuthorization;
-import com.example.qldetai.feature.identity.domain.RoleCode;
-import com.example.qldetai.security.UserPrincipal;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import com.example.qldetai.feature.evaluation.domain.EvaluationAssignment;
 import com.example.qldetai.feature.evaluation.domain.EvaluationStatus;
 import com.example.qldetai.feature.evaluation.domain.ResultInput;
@@ -30,6 +23,9 @@ import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultDeta
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultInputResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultMemberResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultResponse;
+import com.example.qldetai.feature.evaluation.repository.AssessmentComponentRepository;
+import com.example.qldetai.feature.evaluation.repository.CommitteeMemberRepository;
+import com.example.qldetai.feature.evaluation.repository.DefenseSessionRepository;
 import com.example.qldetai.feature.evaluation.repository.EvaluationAssignmentRepository;
 import com.example.qldetai.feature.evaluation.repository.ResultInputRepository;
 import com.example.qldetai.feature.evaluation.repository.ResultMemberRepository;
@@ -38,15 +34,21 @@ import com.example.qldetai.feature.evaluation.repository.RubricCriterionReposito
 import com.example.qldetai.feature.evaluation.repository.ScoreDetailRepository;
 import com.example.qldetai.feature.evaluation.repository.ScoreSheetRepository;
 import com.example.qldetai.feature.groupregistration.repository.GroupMemberRepository;
+import com.example.qldetai.feature.identity.domain.RoleCode;
 import com.example.qldetai.feature.identity.domain.Student;
 import com.example.qldetai.feature.identity.repository.StudentRepository;
 import com.example.qldetai.feature.project.domain.ProjectAssignment;
 import com.example.qldetai.feature.project.repository.ProjectAssignmentRepository;
+import com.example.qldetai.feature.project.service.ProjectAuthorization;
+import com.example.qldetai.security.UserPrincipal;
+
+import lombok.RequiredArgsConstructor;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,7 +64,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -88,7 +89,6 @@ public class EvaluationResultService {
     private final CommitteeMemberRepository committeeMembers;
     private final ProjectAuthorization projectAuthorization;
     private final ResultAccess resultAccess;
-
 
     @Transactional(readOnly = true)
     public PageResponse<ResultDetailResponse> listResults(
@@ -119,23 +119,37 @@ public class EvaluationResultService {
                     specification.and(
                             (root, query, builder) -> builder.equal(root.get("status"), status));
         }
-        var found = results.findAll(
-                                specification,
-                                PageRequest.of(
-                                        page,
-                                        size,
-                                        Sort.by("finalizedAt")
-                                                .descending()
-                                                .and(Sort.by("id").descending())));
+        var found =
+                results.findAll(
+                        specification,
+                        PageRequest.of(
+                                page,
+                                size,
+                                Sort.by("finalizedAt")
+                                        .descending()
+                                        .and(Sort.by("id").descending())));
         List<Long> ids = found.getContent().stream().map(ResultVersion::getId).toList();
-        Map<Long, List<ResultInput>> inputsByResult = ids.isEmpty() ? Map.of() : resultInputs
-                .findByResultIdInOrderByIdAsc(ids).stream()
-                .collect(java.util.stream.Collectors.groupingBy(input -> input.getResult().getId()));
-        Map<Long, List<ResultMember>> membersByResult = ids.isEmpty() ? Map.of() : resultMembers
-                .findByResultIdInOrderByIdAsc(ids).stream()
-                .collect(java.util.stream.Collectors.groupingBy(member -> member.getResult().getId()));
-        return PageResponse.from(found.map(result -> resultDetail(result,
-                inputsByResult.getOrDefault(result.getId(), List.of()), membersByResult.getOrDefault(result.getId(), List.of()))));
+        Map<Long, List<ResultInput>> inputsByResult =
+                ids.isEmpty()
+                        ? Map.of()
+                        : resultInputs.findByResultIdInOrderByIdAsc(ids).stream()
+                                .collect(
+                                        java.util.stream.Collectors.groupingBy(
+                                                input -> input.getResult().getId()));
+        Map<Long, List<ResultMember>> membersByResult =
+                ids.isEmpty()
+                        ? Map.of()
+                        : resultMembers.findByResultIdInOrderByIdAsc(ids).stream()
+                                .collect(
+                                        java.util.stream.Collectors.groupingBy(
+                                                member -> member.getResult().getId()));
+        return PageResponse.from(
+                found.map(
+                        result ->
+                                resultDetail(
+                                        result,
+                                        inputsByResult.getOrDefault(result.getId(), List.of()),
+                                        membersByResult.getOrDefault(result.getId(), List.of()))));
     }
 
     @Transactional(readOnly = true)
@@ -144,8 +158,10 @@ public class EvaluationResultService {
                 results.findById(resultId)
                         .orElseThrow(() -> new ResourceNotFoundException("Result was not found."));
         if (actorAccess.isManager(actorId)) {
-            if (!results.exists(resultAccess.readableBy(actorId).and(
-                    (root, query, cb) -> cb.equal(root.get("id"), resultId)))) {
+            if (!results.exists(
+                    resultAccess
+                            .readableBy(actorId)
+                            .and((root, query, cb) -> cb.equal(root.get("id"), resultId)))) {
                 throw new AccessDeniedException("You cannot view this result.");
             }
         } else {
@@ -175,13 +191,19 @@ public class EvaluationResultService {
     @BusinessAudit(action = "RESULT_FINALIZE", entityType = "RESULT_VERSION", entityIdArgument = 0)
     public ResultResponse finalizeResult(Long assignmentId, Long actorId) {
         actorAccess.manager(actorId);
-        ProjectAssignment assignment = assignments.findByIdForUpdate(assignmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Project assignment was not found."));
+        ProjectAssignment assignment =
+                assignments
+                        .findByIdForUpdate(assignmentId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Project assignment was not found."));
         List<AssessmentComponent> requiredComponents =
                 components.findByPeriodIdOrderByCodeAsc(assignment.getPeriod().getId());
         requireFinalizer(assignment, requiredComponents, actorId);
         List<ResultVersion> currentResults = results.findByAssignmentIdForUpdate(assignmentId);
-        if (currentResults.stream().anyMatch(result -> result.getStatus() == ResultStatus.FINALIZED)) {
+        if (currentResults.stream()
+                .anyMatch(result -> result.getStatus() == ResultStatus.FINALIZED)) {
             throw new BusinessRuleException(
                     "A finalized result is already awaiting publication or supersession.");
         }
@@ -200,13 +222,16 @@ public class EvaluationResultService {
         Map<Long, ScoreSheet> sourceSheets = new LinkedHashMap<>();
         List<BigDecimal> componentAverages = new java.util.ArrayList<>();
         if (requiredComponents.isEmpty()) {
-            throw new BusinessRuleException("Configure the required assessment components before finalization.");
+            throw new BusinessRuleException(
+                    "Configure the required assessment components before finalization.");
         }
         for (AssessmentComponent component : requiredComponents) {
             if (!"LOCKED".equals(component.getStatus())) {
-                throw new BusinessRuleException("All required assessment components must be locked before finalization.");
+                throw new BusinessRuleException(
+                        "All required assessment components must be locked before finalization.");
             }
-            List<EvaluationAssignment> componentEvaluations = byComponent.getOrDefault(component.getId(), List.of());
+            List<EvaluationAssignment> componentEvaluations =
+                    byComponent.getOrDefault(component.getId(), List.of());
             if (componentEvaluations.isEmpty()) {
                 throw new BusinessRuleException(
                         "Cannot finalize while a required evaluator assignment is missing.");
@@ -222,7 +247,7 @@ public class EvaluationResultService {
                                         () ->
                                                 new BusinessRuleException(
                                                         "Cannot finalize while a required score"
-                                                            + " sheet is missing."));
+                                                                + " sheet is missing."));
                 if (sheet.getStatus() != ScoreSheetStatus.SUBMITTED
                         && sheet.getStatus() != ScoreSheetStatus.LOCKED) {
                     throw new BusinessRuleException(
@@ -251,8 +276,13 @@ public class EvaluationResultService {
 
         ResultVersion resultVersion = new ResultVersion();
         resultVersion.setAssignment(assignment);
-        resultVersion.setVersionNo(Math.addExact(currentResults.stream()
-                .mapToInt(ResultVersion::getVersionNo).max().orElse(0), 1));
+        resultVersion.setVersionNo(
+                Math.addExact(
+                        currentResults.stream()
+                                .mapToInt(ResultVersion::getVersionNo)
+                                .max()
+                                .orElse(0),
+                        1));
         resultVersion.setFinalScore(finalScore);
         resultVersion.setFinalizedBy(actorAccess.user(actorId));
         resultVersion.setFinalizedAt(LocalDateTime.now(clock));
@@ -273,42 +303,60 @@ public class EvaluationResultService {
         return result(resultVersion);
     }
 
-    private void requireFinalizer(ProjectAssignment assignment, List<AssessmentComponent> required, Long actorId) {
+    private void requireFinalizer(
+            ProjectAssignment assignment, List<AssessmentComponent> required, Long actorId) {
         var defense = defenses.findByAssignmentId(assignment.getId());
-        boolean needsChair = defense.isPresent() || required.stream()
-                .anyMatch(component -> component.getComponentType() == AssessmentComponentType.COMMITTEE);
+        boolean needsChair =
+                defense.isPresent()
+                        || required.stream()
+                                .anyMatch(
+                                        component ->
+                                                component.getComponentType()
+                                                        == AssessmentComponentType.COMMITTEE);
         if (needsChair) {
-            if (defense.isEmpty() || defense.get().getStatus() == DefenseStatus.CANCELLED
+            if (defense.isEmpty()
+                    || defense.get().getStatus() == DefenseStatus.CANCELLED
                     || !committeeMembers.existsByCommitteeIdAndLecturerUserIdAndCommitteeRole(
                             defense.get().getCommittee().getId(), actorId, CommitteeRole.CHAIR)) {
-                throw new AccessDeniedException("Only the chair of this project's defense committee can finalize its result.");
+                throw new AccessDeniedException(
+                        "Only the chair of this project's defense committee can finalize its result.");
             }
             return;
         }
         // Projects without a committee retain the existing scoped academic management workflow.
         var principal = UserPrincipal.from(actorAccess.user(actorId));
-        var authentication = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+        var authentication =
+                new UsernamePasswordAuthenticationToken(
+                        principal, null, principal.getAuthorities());
         if (!principal.roles().contains(RoleCode.ADMIN)
                 && !projectAuthorization.canManageAssignment(assignment.getId(), authentication)) {
-            throw new AccessDeniedException("Only this project's academic manager can finalize a result without a committee.");
+            throw new AccessDeniedException(
+                    "Only this project's academic manager can finalize a result without a committee.");
         }
     }
 
     private void requireCompleteCommitteeRoster(
             ProjectAssignment assignment, List<EvaluationAssignment> componentEvaluations) {
-        var defense = defenses.findByAssignmentId(assignment.getId())
-                .filter(item -> item.getStatus() != DefenseStatus.CANCELLED)
-                .orElseThrow(
-                        () -> new BusinessRuleException(
-                                "Cannot finalize without an active defense session."));
-        Set<Long> memberIds = committeeMembers.findByCommitteeId(defense.getCommittee().getId()).stream()
-                .map(member -> member.getLecturer().getId())
-                .collect(java.util.stream.Collectors.toSet());
-        Set<Long> evaluatorIds = componentEvaluations.stream()
-                .filter(evaluation -> evaluation.getDefense() != null
-                        && defense.getId().equals(evaluation.getDefense().getId()))
-                .map(evaluation -> evaluation.getLecturer().getId())
-                .collect(java.util.stream.Collectors.toSet());
+        var defense =
+                defenses.findByAssignmentId(assignment.getId())
+                        .filter(item -> item.getStatus() != DefenseStatus.CANCELLED)
+                        .orElseThrow(
+                                () ->
+                                        new BusinessRuleException(
+                                                "Cannot finalize without an active defense session."));
+        Set<Long> memberIds =
+                committeeMembers.findByCommitteeId(defense.getCommittee().getId()).stream()
+                        .map(member -> member.getLecturer().getId())
+                        .collect(java.util.stream.Collectors.toSet());
+        Set<Long> evaluatorIds =
+                componentEvaluations.stream()
+                        .filter(
+                                evaluation ->
+                                        evaluation.getDefense() != null
+                                                && defense.getId()
+                                                        .equals(evaluation.getDefense().getId()))
+                        .map(evaluation -> evaluation.getLecturer().getId())
+                        .collect(java.util.stream.Collectors.toSet());
         if (memberIds.isEmpty()
                 || evaluatorIds.size() != componentEvaluations.size()
                 || !evaluatorIds.equals(memberIds)) {
@@ -474,11 +522,14 @@ public class EvaluationResultService {
     }
 
     private ResultDetailResponse resultDetail(ResultVersion resultVersion) {
-        return resultDetail(resultVersion, resultInputs.findByResultIdOrderByIdAsc(resultVersion.getId()),
+        return resultDetail(
+                resultVersion,
+                resultInputs.findByResultIdOrderByIdAsc(resultVersion.getId()),
                 resultMembers.findByResultIdOrderByIdAsc(resultVersion.getId()));
     }
 
-    private ResultDetailResponse resultDetail(ResultVersion resultVersion, List<ResultInput> inputs, List<ResultMember> members) {
+    private ResultDetailResponse resultDetail(
+            ResultVersion resultVersion, List<ResultInput> inputs, List<ResultMember> members) {
         ProjectAssignment assignment = resultVersion.getAssignment();
         return new ResultDetailResponse(
                 resultVersion.getId(),

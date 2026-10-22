@@ -1,7 +1,7 @@
 package com.example.qldetai.feature.groupregistration.service;
 
-import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ResourceNotFoundException;
 import com.example.qldetai.feature.academic.domain.RegistrationPeriod;
@@ -26,15 +26,18 @@ import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.StudentRepository;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.project.repository.ProjectAssignmentRepository;
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.util.List;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Invitation-only membership workflow.  Acceptance and creation of the membership row happen in
@@ -54,19 +57,28 @@ public class GroupInvitationService {
     private final NotificationService notificationService;
     private final Clock clock;
 
-
     @Transactional
     public PageResponse<GroupInvitationResponse> mine(Long actorId, int page, int size) {
         return mine(actorId, null, page, size);
     }
 
     @Transactional
-    public PageResponse<GroupInvitationResponse> mine(Long actorId, GroupInvitationStatus status, int page, int size) {
+    public PageResponse<GroupInvitationResponse> mine(
+            Long actorId, GroupInvitationStatus status, int page, int size) {
         expireStale();
         Student student = requireStudent(actorId);
-        var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending().and(Sort.by("id").descending()));
-        var found = status == null ? groupInvitationRepository.findByInvitedStudentIdOrderByCreatedAtDesc(student.getId(), pageable)
-                : groupInvitationRepository.findByInvitedStudentIdAndStatusOrderByCreatedAtDesc(student.getId(), status, pageable);
+        var pageable =
+                PageRequest.of(
+                        page,
+                        size,
+                        Sort.by("createdAt").descending().and(Sort.by("id").descending()));
+        var found =
+                status == null
+                        ? groupInvitationRepository.findByInvitedStudentIdOrderByCreatedAtDesc(
+                                student.getId(), pageable)
+                        : groupInvitationRepository
+                                .findByInvitedStudentIdAndStatusOrderByCreatedAtDesc(
+                                        student.getId(), status, pageable);
         return PageResponse.from(found.map(this::toResponse));
     }
 
@@ -90,8 +102,10 @@ public class GroupInvitationService {
         RegistrationPeriod period = requireOpenRegistrationWindow(group);
         ensureGroupMutable(group);
 
-        Student invitedStudent = studentRepository.findByStudentCodeIgnoreCase(request.studentCode().trim())
-                .orElseThrow(() -> new ResourceNotFoundException("Student was not found."));
+        Student invitedStudent =
+                studentRepository
+                        .findByStudentCodeIgnoreCase(request.studentCode().trim())
+                        .orElseThrow(() -> new ResourceNotFoundException("Student was not found."));
         ensureEligibleInvitee(group, invitedStudent);
 
         LocalDateTime now = LocalDateTime.now(clock);
@@ -99,16 +113,18 @@ public class GroupInvitationService {
             throw new BusinessRuleException("Invitation expiry must be in the future.");
         }
         LocalDateTime policyExpiry = now.plusHours(period.getInvitationExpiryHours());
-        LocalDateTime latestExpiry = policyExpiry.isBefore(period.getRegistrationEndAt())
-                ? policyExpiry
-                : period.getRegistrationEndAt();
+        LocalDateTime latestExpiry =
+                policyExpiry.isBefore(period.getRegistrationEndAt())
+                        ? policyExpiry
+                        : period.getRegistrationEndAt();
         if (request.expiresAt().isAfter(latestExpiry)) {
             throw new BusinessRuleException(
                     "Invitation expiry must be within the configured invitation lifetime and registration window.");
         }
         if (groupInvitationRepository.existsByGroupIdAndInvitedStudentIdAndStatus(
                 group.getId(), invitedStudent.getId(), GroupInvitationStatus.PENDING)) {
-            throw new BusinessRuleException("This student already has a pending invitation to the group.");
+            throw new BusinessRuleException(
+                    "This student already has a pending invitation to the group.");
         }
 
         GroupInvitation invitation = new GroupInvitation();
@@ -129,7 +145,10 @@ public class GroupInvitationService {
     }
 
     @Transactional
-    @BusinessAudit(action = "GROUP_INVITATION_ACCEPT", entityType = "GROUP_INVITATION", entityIdArgument = 0)
+    @BusinessAudit(
+            action = "GROUP_INVITATION_ACCEPT",
+            entityType = "GROUP_INVITATION",
+            entityIdArgument = 0)
     public GroupInvitationResponse accept(Long invitationId, Long actorId) {
         expireStale();
         Student actor = requireStudent(actorId);
@@ -147,9 +166,11 @@ public class GroupInvitationService {
         ensureGroupMutable(group);
         ensureEligibleInvitee(group, actor);
 
-        List<GroupMember> activeMembers = groupMemberRepository.findActiveByGroupIdForUpdate(group.getId());
+        List<GroupMember> activeMembers =
+                groupMemberRepository.findActiveByGroupIdForUpdate(group.getId());
         if (activeMembers.size() >= period.getMaxGroupMembers()) {
-            throw new BusinessRuleException("The group has reached its configured maximum number of members.");
+            throw new BusinessRuleException(
+                    "The group has reached its configured maximum number of members.");
         }
 
         GroupMember member = new GroupMember();
@@ -174,7 +195,10 @@ public class GroupInvitationService {
     }
 
     @Transactional
-    @BusinessAudit(action = "GROUP_INVITATION_REJECT", entityType = "GROUP_INVITATION", entityIdArgument = 0)
+    @BusinessAudit(
+            action = "GROUP_INVITATION_REJECT",
+            entityType = "GROUP_INVITATION",
+            entityIdArgument = 0)
     public GroupInvitationResponse reject(Long invitationId, Long actorId) {
         expireStale();
         Student actor = requireStudent(actorId);
@@ -192,13 +216,19 @@ public class GroupInvitationService {
                 invitation.getInvitedBy().getUser().getId(),
                 "group-invitation-rejected-" + invitation.getId(),
                 "Lời mời đã bị từ chối",
-                actor.getUser().getFullName() + " đã từ chối lời mời vào nhóm " + invitation.getGroup().getName() + ".",
+                actor.getUser().getFullName()
+                        + " đã từ chối lời mời vào nhóm "
+                        + invitation.getGroup().getName()
+                        + ".",
                 "/groups");
         return toResponse(invitation);
     }
 
     @Transactional
-    @BusinessAudit(action = "GROUP_INVITATION_CANCEL", entityType = "GROUP_INVITATION", entityIdArgument = 0)
+    @BusinessAudit(
+            action = "GROUP_INVITATION_CANCEL",
+            entityType = "GROUP_INVITATION",
+            entityIdArgument = 0)
     public GroupInvitationResponse cancel(Long invitationId, Long actorId) {
         expireStale();
         Student actor = requireStudent(actorId);
@@ -245,86 +275,119 @@ public class GroupInvitationService {
     }
 
     private StudentGroup requireGroupForUpdate(Long groupId) {
-        return studentGroupRepository.findByIdForUpdate(groupId)
+        return studentGroupRepository
+                .findByIdForUpdate(groupId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student group was not found."));
     }
 
     private GroupInvitation requireInvitationForUpdate(Long invitationId) {
-        return groupInvitationRepository.findByIdForUpdate(invitationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Group invitation was not found."));
+        return groupInvitationRepository
+                .findByIdForUpdate(invitationId)
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Group invitation was not found."));
     }
 
     private RegistrationPeriod requireOpenRegistrationWindow(StudentGroup group) {
         RegistrationPeriod period = group.getPeriod();
         if (period.getStatus() != RegistrationPeriodStatus.ACTIVE) {
-            throw new BusinessRuleException("Group invitations are only available in an active registration period.");
+            throw new BusinessRuleException(
+                    "Group invitations are only available in an active registration period.");
         }
         LocalDateTime now = LocalDateTime.now(clock);
-        if (now.isBefore(period.getRegistrationStartAt()) || now.isAfter(period.getRegistrationEndAt())) {
-            throw new BusinessRuleException("Group invitations are only available during the registration window.");
+        if (now.isBefore(period.getRegistrationStartAt())
+                || now.isAfter(period.getRegistrationEndAt())) {
+            throw new BusinessRuleException(
+                    "Group invitations are only available during the registration window.");
         }
         return period;
     }
 
     private void ensureGroupMutable(StudentGroup group) {
         if (group.getStatus() == GroupStatus.LOCKED || group.getStatus() == GroupStatus.CLOSED) {
-            throw new BusinessRuleException("This group is locked and can no longer change members.");
+            throw new BusinessRuleException(
+                    "This group is locked and can no longer change members.");
         }
         if (projectAssignmentRepository.existsByGroupId(group.getId())) {
-            throw new BusinessRuleException("This group already has a project assignment and can no longer change members.");
+            throw new BusinessRuleException(
+                    "This group already has a project assignment and can no longer change members.");
         }
-        if (!topicRegistrationRepository.findByGroupIdAndStatusInForUpdate(
-                group.getId(), List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED)).isEmpty()) {
-            throw new BusinessRuleException("Group members cannot change after a topic registration is pending or approved.");
+        if (!topicRegistrationRepository
+                .findByGroupIdAndStatusInForUpdate(
+                        group.getId(),
+                        List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED))
+                .isEmpty()) {
+            throw new BusinessRuleException(
+                    "Group members cannot change after a topic registration is pending or approved.");
         }
     }
 
     private void ensureEligibleInvitee(StudentGroup group, Student student) {
         RegistrationPeriod period = group.getPeriod();
         if (!student.getDepartment().getFaculty().getId().equals(period.getFaculty().getId())) {
-            throw new BusinessRuleException("All group members must belong to the same faculty as the registration period.");
+            throw new BusinessRuleException(
+                    "All group members must belong to the same faculty as the registration period.");
         }
         studentRepository.findByIdForUpdate(student.getId()).orElseThrow();
-        if (!groupMemberRepository.findConflictingMemberships(period.getId(), student.getId()).isEmpty()) {
+        if (!groupMemberRepository
+                .findConflictingMemberships(period.getId(), student.getId())
+                .isEmpty()) {
             throw new BusinessRuleException("Student already belongs to an active group.");
         }
-        if (groupMemberRepository.findActiveByGroupIdForUpdate(group.getId()).size() >= period.getMaxGroupMembers()) {
-            throw new BusinessRuleException("The group has reached its configured maximum number of members.");
+        if (groupMemberRepository.findActiveByGroupIdForUpdate(group.getId()).size()
+                >= period.getMaxGroupMembers()) {
+            throw new BusinessRuleException(
+                    "The group has reached its configured maximum number of members.");
         }
     }
 
     private void requireLeader(Long groupId, Long studentId) {
-        GroupMember membership = groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(groupId, studentId)
-                .orElseThrow(() -> new AccessDeniedException("Only active group members can manage this group."));
+        GroupMember membership =
+                groupMemberRepository
+                        .findByGroupIdAndStudentIdAndLeftAtIsNull(groupId, studentId)
+                        .orElseThrow(
+                                () ->
+                                        new AccessDeniedException(
+                                                "Only active group members can manage this group."));
         if (membership.getMemberRole() != GroupMemberRole.LEADER) {
             throw new AccessDeniedException("Only the group leader can manage group invitations.");
         }
     }
 
     private Student requireStudent(Long actorId) {
-        User user = userRepository.findWithRolesById(actorId)
-                .orElseThrow(() -> new ResourceNotFoundException("User account was not found."));
-        if (user.getUserRoles().stream().noneMatch(userRole -> userRole.getRole().getCode() == RoleCode.STUDENT)) {
+        User user =
+                userRepository
+                        .findWithRolesById(actorId)
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException("User account was not found."));
+        if (user.getUserRoles().stream()
+                .noneMatch(userRole -> userRole.getRole().getCode() == RoleCode.STUDENT)) {
             throw new AccessDeniedException("A student account is required for this action.");
         }
-        return studentRepository.findByUserId(actorId)
+        return studentRepository
+                .findByUserId(actorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student profile was not found."));
     }
 
     private void refreshGroupStatus(StudentGroup group) {
-        long activeMembers = groupMemberRepository.findActiveByGroupIdForUpdate(group.getId()).size();
-        group.setStatus(activeMembers >= group.getPeriod().getMinGroupMembers() ? GroupStatus.ACTIVE : GroupStatus.FORMING);
+        long activeMembers =
+                groupMemberRepository.findActiveByGroupIdForUpdate(group.getId()).size();
+        group.setStatus(
+                activeMembers >= group.getPeriod().getMinGroupMembers()
+                        ? GroupStatus.ACTIVE
+                        : GroupStatus.FORMING);
     }
 
     private int nextAvailableSlot(List<GroupMember> activeMembers, int maxGroupMembers) {
         for (int slot = 1; slot <= maxGroupMembers; slot++) {
             int candidate = slot;
-            boolean used = activeMembers.stream().anyMatch(member -> member.getSlotNo() == candidate);
+            boolean used =
+                    activeMembers.stream().anyMatch(member -> member.getSlotNo() == candidate);
             if (!used) {
                 return candidate;
             }
         }
-        throw new BusinessRuleException("The group has reached its configured maximum number of members.");
+        throw new BusinessRuleException(
+                "The group has reached its configured maximum number of members.");
     }
 
     private GroupInvitationResponse toResponse(GroupInvitation invitation) {

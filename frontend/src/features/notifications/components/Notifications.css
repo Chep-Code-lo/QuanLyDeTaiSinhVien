@@ -1,36 +1,197 @@
-﻿.notification-menu { position: relative; }
-.portal-shell button.notification-button { padding: 0; border: 0; cursor: pointer; }
-.notification-popover { position: absolute; top: calc(100% + 12px); right: 0; width: 360px; max-width: calc(100vw - 32px); overflow: hidden; border: 1px solid var(--line-border); border-radius: 14px; color: var(--ink-900); background: #fff; box-shadow: 0 16px 48px rgb(15 35 70 / 18%); animation: overlay-popover-in var(--overlay-popover-duration) var(--overlay-motion-easing) both; }
-.notification-popover__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line-border); }
-.notification-popover__heading h2 { margin: 0; color: var(--dark-blue); font-size: 17px; }
-.notification-close { display: grid; place-items: center; flex: 0 0 30px; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 7px; color: var(--ink-500); background: transparent; cursor: pointer; }
-.notification-close:hover { color: var(--dark-blue); background: var(--light-blue); }
-.notification-popover__list { max-height: min(380px, calc(100dvh - 240px)); overflow: auto; overscroll-behavior: contain; }
-.notification-popover__list ul { margin: 0; padding: 6px; list-style: none; }
-.notification-popover__item { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; padding: 13px 12px; border: 0; border-radius: 8px; background: #fff; color: var(--ink-700); font: inherit; text-align: left; line-height: 1.5; cursor: pointer; }
-.notification-popover__item > span { min-width: 0; overflow-wrap: anywhere; }
-.notification-popover__item--unread { color: var(--dark-blue); font-weight: 700; }
-.notification-popover__item i { flex: 0 0 7px; height: 7px; border-radius: 50%; background: var(--accent-red); }
-.notification-popover__item:hover, .notification-popover__item:focus-visible { background: var(--light-blue); }
-.notification-popover__state { margin: 0; padding: 24px 16px; color: var(--ink-500); text-align: center; font-size: 14px; }
-.notification-popover__state p { margin: 0 0 12px; }
-.notification-popover > footer { padding: 12px 16px; border-top: 1px solid var(--line-border); text-align: center; }
-.notification-detail { width: min(640px, calc(100% - 32px)); max-height: calc(100dvh - 48px); padding: 0; overflow: auto; border: 1px solid var(--line-border); border-radius: 16px; background: #fff; color: var(--ink-900); font: inherit; box-shadow: 0 24px 70px rgb(15 35 70 / 24%); overscroll-behavior: contain; }
-.notification-detail[open] { animation: overlay-panel-in var(--overlay-panel-duration) var(--overlay-motion-easing) both; }
-.notification-detail::backdrop { background: rgb(15 30 55 / 50%); backdrop-filter: blur(3px); animation: overlay-backdrop-in var(--overlay-backdrop-duration) ease both; }
-.notification-detail__inner { padding: 24px; }
-.notification-detail__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--line-border); }
-.notification-detail__heading > div { min-width: 0; }
-.notification-detail__heading h2 { margin: 0; color: var(--dark-blue); font-size: 21px; line-height: 1.4; overflow-wrap: anywhere; }
-.notification-detail__heading p { margin: 8px 0 0; color: var(--ink-500); font-size: 13px; }
-.notification-detail__content { padding: 22px 0; color: var(--ink-700); font-size: 15px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
-.notification-detail__attachment { display: inline-block; margin-bottom: 20px; }
-.notification-detail__footer { display: flex; justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--line-border); }
+﻿.notification-menu {
+  position: relative;
+}
+.portal-shell button.notification-button {
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+.notification-popover {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  overflow: hidden;
+  border: 1px solid var(--line-border);
+  border-radius: 14px;
+  color: var(--ink-900);
+  background: #fff;
+  box-shadow: 0 16px 48px rgb(15 35 70 / 18%);
+  animation: overlay-popover-in var(--overlay-popover-duration) var(--overlay-motion-easing) both;
+}
+.notification-popover__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line-border);
+}
+.notification-popover__heading h2 {
+  margin: 0;
+  color: var(--dark-blue);
+  font-size: 17px;
+}
+.notification-close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ink-500);
+  background: transparent;
+  cursor: pointer;
+}
+.notification-close:hover {
+  color: var(--dark-blue);
+  background: var(--light-blue);
+}
+.notification-popover__list {
+  max-height: min(380px, calc(100dvh - 240px));
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.notification-popover__list ul {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+}
+.notification-popover__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 13px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink-700);
+  font: inherit;
+  text-align: left;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.notification-popover__item > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.notification-popover__item--unread {
+  color: var(--dark-blue);
+  font-weight: 700;
+}
+.notification-popover__item i {
+  flex: 0 0 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-red);
+}
+.notification-popover__item:hover,
+.notification-popover__item:focus-visible {
+  background: var(--light-blue);
+}
+.notification-popover__state {
+  margin: 0;
+  padding: 24px 16px;
+  color: var(--ink-500);
+  text-align: center;
+  font-size: 14px;
+}
+.notification-popover__state p {
+  margin: 0 0 12px;
+}
+.notification-popover > footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--line-border);
+  text-align: center;
+}
+.notification-detail {
+  width: min(640px, calc(100% - 32px));
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--line-border);
+  border-radius: 16px;
+  background: #fff;
+  color: var(--ink-900);
+  font: inherit;
+  box-shadow: 0 24px 70px rgb(15 35 70 / 24%);
+  overscroll-behavior: contain;
+}
+.notification-detail[open] {
+  animation: overlay-panel-in var(--overlay-panel-duration) var(--overlay-motion-easing) both;
+}
+.notification-detail::backdrop {
+  background: rgb(15 30 55 / 50%);
+  backdrop-filter: blur(3px);
+  animation: overlay-backdrop-in var(--overlay-backdrop-duration) ease both;
+}
+.notification-detail__inner {
+  padding: 24px;
+}
+.notification-detail__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line-border);
+}
+.notification-detail__heading > div {
+  min-width: 0;
+}
+.notification-detail__heading h2 {
+  margin: 0;
+  color: var(--dark-blue);
+  font-size: 21px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.notification-detail__heading p {
+  margin: 8px 0 0;
+  color: var(--ink-500);
+  font-size: 13px;
+}
+.notification-detail__content {
+  padding: 22px 0;
+  color: var(--ink-700);
+  font-size: 15px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.notification-detail__attachment {
+  display: inline-block;
+  margin-bottom: 20px;
+}
+.notification-detail__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-border);
+}
 @media (max-width: 600px) {
-  .notification-popover { position: fixed; top: 60px; right: 16px; width: min(360px, calc(100vw - 32px)); }
-  .notification-detail__inner { padding: 20px 16px; }
-  .notification-detail__heading h2 { font-size: 19px; }
+  .notification-popover {
+    position: fixed;
+    top: 60px;
+    right: 16px;
+    width: min(360px, calc(100vw - 32px));
+  }
+  .notification-detail__inner {
+    padding: 20px 16px;
+  }
+  .notification-detail__heading h2 {
+    font-size: 19px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .notification-popover, .notification-detail[open], .notification-detail::backdrop { animation: none; }
+  .notification-popover,
+  .notification-detail[open],
+  .notification-detail::backdrop {
+    animation: none;
+  }
 }

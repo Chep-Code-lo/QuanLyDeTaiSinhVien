@@ -6,12 +6,13 @@ import com.example.qldetai.feature.groupregistration.dto.GroupRegistrationDtos.C
 import com.example.qldetai.feature.groupregistration.dto.GroupRegistrationDtos.StudentGroupResponse;
 import com.example.qldetai.feature.groupregistration.service.GroupService;
 import com.example.qldetai.security.UserPrincipal;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import java.net.URI;
-import java.util.List;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,6 +26,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URI;
+import java.util.List;
+
 @Validated
 @RestController
 @RequestMapping("/api/v1/groups")
@@ -32,7 +36,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class GroupController {
 
     private final GroupService groupService;
-
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
@@ -45,7 +48,8 @@ public class GroupController {
 
     @GetMapping("/mine")
     @PreAuthorize("hasRole('STUDENT')")
-    public ApiResponse<List<StudentGroupResponse>> mine(@AuthenticationPrincipal UserPrincipal principal) {
+    public ApiResponse<List<StudentGroupResponse>> mine(
+            @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(groupService.mine(principal.id()));
     }
 
@@ -71,6 +75,8 @@ public class GroupController {
             @PathVariable Long id,
             @PathVariable Long studentId,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ApiResponse.success("Đã xóa thành viên khỏi nhóm.", groupService.removeMember(id, studentId, principal.id()));
+        return ApiResponse.success(
+                "Đã xóa thành viên khỏi nhóm.",
+                groupService.removeMember(id, studentId, principal.id()));
     }
 }

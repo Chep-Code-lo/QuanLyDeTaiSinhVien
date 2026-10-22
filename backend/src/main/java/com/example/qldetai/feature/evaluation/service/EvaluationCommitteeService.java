@@ -1,7 +1,7 @@
 package com.example.qldetai.feature.evaluation.service;
 
-import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ConflictException;
 import com.example.qldetai.exception.ResourceNotFoundException;
@@ -19,8 +19,10 @@ import com.example.qldetai.feature.evaluation.repository.CommitteeMemberReposito
 import com.example.qldetai.feature.evaluation.repository.EvaluationCommitteeRepository;
 import com.example.qldetai.feature.identity.repository.LecturerRepository;
 
-import org.springframework.data.domain.PageRequest;
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -29,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -42,14 +43,15 @@ public class EvaluationCommitteeService {
     private final LecturerRepository lecturers;
     private final EvaluationActorAccess actorAccess;
 
-
     @Transactional(readOnly = true)
-    public PageResponse<EvaluationCommitteeResponse> listCommittees(Long periodId, int page, int size) {
+    public PageResponse<EvaluationCommitteeResponse> listCommittees(
+            Long periodId, int page, int size) {
         return listCommittees(periodId, page, size, null);
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<EvaluationCommitteeResponse> listCommittees(Long periodId, int page, int size, Long actorId) {
+    public PageResponse<EvaluationCommitteeResponse> listCommittees(
+            Long periodId, int page, int size, Long actorId) {
         Specification<EvaluationCommittee> specification = readScope.committees(actorId);
         if (periodId != null) {
             specification =
@@ -58,20 +60,31 @@ public class EvaluationCommitteeService {
                                     builder.equal(root.join("period").get("id"), periodId));
         }
         Page<EvaluationCommittee> found =
-                committees
-                        .findAll(
-                                specification,
-                                PageRequest.of(
-                                        page,
-                                        size,
-                                        Sort.by("createdAt")
-                                                .descending()
-                                                .and(Sort.by("id").descending())));
-        Map<Long, List<CommitteeMember>> membersByCommittee = found.isEmpty() ? Map.of() : committeeMembers
-                .findByCommitteeIdIn(found.getContent().stream().map(EvaluationCommittee::getId).toList()).stream()
-                .collect(java.util.stream.Collectors.groupingBy(member -> member.getCommittee().getId()));
-        return PageResponse.from(found.map(committee -> committee(committee,
-                membersByCommittee.getOrDefault(committee.getId(), List.of()))));
+                committees.findAll(
+                        specification,
+                        PageRequest.of(
+                                page,
+                                size,
+                                Sort.by("createdAt").descending().and(Sort.by("id").descending())));
+        Map<Long, List<CommitteeMember>> membersByCommittee =
+                found.isEmpty()
+                        ? Map.of()
+                        : committeeMembers
+                                .findByCommitteeIdIn(
+                                        found.getContent().stream()
+                                                .map(EvaluationCommittee::getId)
+                                                .toList())
+                                .stream()
+                                .collect(
+                                        java.util.stream.Collectors.groupingBy(
+                                                member -> member.getCommittee().getId()));
+        return PageResponse.from(
+                found.map(
+                        committee ->
+                                committee(
+                                        committee,
+                                        membersByCommittee.getOrDefault(
+                                                committee.getId(), List.of()))));
     }
 
     @Transactional
@@ -109,7 +122,8 @@ public class EvaluationCommitteeService {
             throw new BusinessRuleException(
                     "Committee member slot exceeds this registration period's configured maximum.");
         }
-        List<CommitteeMember> currentMembers = committeeMembers.findByCommitteeIdForUpdate(committeeId);
+        List<CommitteeMember> currentMembers =
+                committeeMembers.findByCommitteeIdForUpdate(committeeId);
         if (currentMembers.size() >= Math.min(5, maxMembers)) {
             throw new BusinessRuleException(
                     "This committee has reached the configured maximum number of members.");
@@ -142,7 +156,8 @@ public class EvaluationCommitteeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Committee was not found."));
     }
 
-    EvaluationCommitteeResponse committee(EvaluationCommittee committee, List<CommitteeMember> currentMembers) {
+    EvaluationCommitteeResponse committee(
+            EvaluationCommittee committee, List<CommitteeMember> currentMembers) {
         List<CommitteeMemberResponse> members =
                 currentMembers.stream()
                         .sorted(Comparator.comparingInt(CommitteeMember::getSlotNo))

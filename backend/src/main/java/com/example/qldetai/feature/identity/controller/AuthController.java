@@ -7,11 +7,13 @@ import com.example.qldetai.feature.identity.dto.IdentityDtos.LoginRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.LoginResponse;
 import com.example.qldetai.feature.identity.service.AuthService;
 import com.example.qldetai.security.UserPrincipal;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import java.util.Map;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -23,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -30,13 +34,13 @@ public class AuthController {
 
     private final AuthService authService;
 
-
     @GetMapping("/csrf")
     public ApiResponse<Map<String, String>> csrf(CsrfToken token) {
-        return ApiResponse.success(Map.of(
-                "headerName", token.getHeaderName(),
-                "parameterName", token.getParameterName(),
-                "token", token.getToken()));
+        return ApiResponse.success(
+                Map.of(
+                        "headerName", token.getHeaderName(),
+                        "parameterName", token.getParameterName(),
+                        "token", token.getToken()));
     }
 
     @PostMapping("/login")
@@ -44,7 +48,8 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest,
             HttpServletResponse response) {
-        return ApiResponse.success("Đăng nhập thành công.", authService.login(request, httpRequest, response));
+        return ApiResponse.success(
+                "Đăng nhập thành công.", authService.login(request, httpRequest, response));
     }
 
     @GetMapping("/me")
@@ -56,7 +61,8 @@ public class AuthController {
     public ApiResponse<Void> changePassword(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody ChangePasswordRequest request,
-            HttpServletRequest httpRequest, HttpServletResponse response) {
+            HttpServletRequest httpRequest,
+            HttpServletResponse response) {
         authService.changePassword(principal.id(), request, httpRequest, response);
         return ApiResponse.success("Đổi mật khẩu thành công.", null);
     }

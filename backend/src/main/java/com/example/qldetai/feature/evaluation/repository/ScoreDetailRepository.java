@@ -1,8 +1,10 @@
 package com.example.qldetai.feature.evaluation.repository;
 
 import com.example.qldetai.feature.evaluation.domain.ScoreDetail;
-import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
 
 public interface ScoreDetailRepository extends JpaRepository<ScoreDetail, Long> {
 

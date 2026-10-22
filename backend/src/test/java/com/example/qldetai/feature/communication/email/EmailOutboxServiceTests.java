@@ -8,19 +8,22 @@ import static org.mockito.Mockito.when;
 
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.domain.UserStatus;
+
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
+
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.mail.MailSendException;
+import org.springframework.mail.javamail.JavaMailSender;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.Properties;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.mail.MailSendException;
-import org.springframework.mail.javamail.JavaMailSender;
 
 class EmailOutboxServiceTests {
 
@@ -29,31 +32,39 @@ class EmailOutboxServiceTests {
     void smtpFailureUsesMockSenderAndQueuesRetryWithoutThrowing() throws Exception {
         EmailOutboxRepository outboxRepository = mock(EmailOutboxRepository.class);
         EmailDeliveryLogRepository deliveryLogRepository = mock(EmailDeliveryLogRepository.class);
-        com.example.qldetai.feature.identity.repository.UserRepository userRepository = mock(
-                com.example.qldetai.feature.identity.repository.UserRepository.class);
+        com.example.qldetai.feature.identity.repository.UserRepository userRepository =
+                mock(com.example.qldetai.feature.identity.repository.UserRepository.class);
         JavaMailSender sender = mock(JavaMailSender.class);
         ObjectProvider<JavaMailSender> senderProvider = mock(ObjectProvider.class);
         when(senderProvider.getIfAvailable()).thenReturn(sender);
-        when(sender.createMimeMessage()).thenReturn(new MimeMessage(Session.getInstance(new Properties())));
-        org.mockito.Mockito.doThrow(new MailSendException("temporary SMTP outage password=secret-token-for-test")).when(sender).send(any(MimeMessage.class));
+        when(sender.createMimeMessage())
+                .thenReturn(new MimeMessage(Session.getInstance(new Properties())));
+        org.mockito.Mockito.doThrow(
+                        new MailSendException(
+                                "temporary SMTP outage password=secret-token-for-test"))
+                .when(sender)
+                .send(any(MimeMessage.class));
 
         EmailNotificationProperties properties = new EmailNotificationProperties();
         properties.setMaxAttempts(4);
         properties.setRetryBaseDelaySeconds(60);
         Clock fixedClock = Clock.fixed(Instant.parse("2026-10-17T00:00:00Z"), ZoneOffset.UTC);
-        EmailOutboxDeliveryStateService deliveryStateService = new EmailOutboxDeliveryStateService(
-                outboxRepository, deliveryLogRepository, properties, fixedClock);
-        EmailOutboxService service = new EmailOutboxService(
-                outboxRepository,
-                userRepository,
-                new EmailTemplateRenderer(),
-                senderProvider,
-                deliveryStateService,
-                properties,
-                fixedClock);
+        EmailOutboxDeliveryStateService deliveryStateService =
+                new EmailOutboxDeliveryStateService(
+                        outboxRepository, deliveryLogRepository, properties, fixedClock);
+        EmailOutboxService service =
+                new EmailOutboxService(
+                        outboxRepository,
+                        userRepository,
+                        new EmailTemplateRenderer(),
+                        senderProvider,
+                        deliveryStateService,
+                        properties,
+                        fixedClock);
 
         EmailOutbox outbox = sendingOutbox();
-        when(outboxRepository.findByIdAndStatus(12L, EmailOutboxStatus.SENDING)).thenReturn(Optional.of(outbox));
+        when(outboxRepository.findByIdAndStatus(12L, EmailOutboxStatus.SENDING))
+                .thenReturn(Optional.of(outbox));
         when(outboxRepository.findByIdForUpdate(12L)).thenReturn(Optional.of(outbox));
 
         service.deliver(new EmailDeliveryClaim(12L, "claim-token"));

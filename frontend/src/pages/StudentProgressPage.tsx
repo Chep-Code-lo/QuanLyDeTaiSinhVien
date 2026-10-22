@@ -13,7 +13,11 @@ import { parseUtcDateTime } from '../utils/dateTime'
 import { milestoneDayKey } from '../utils/milestoneSchedule'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import type { MilestoneResponse, ProjectAssignmentResponse, StudentGroupResponse } from '../types/domain'
+import type {
+  MilestoneResponse,
+  ProjectAssignmentResponse,
+  StudentGroupResponse,
+} from '../types/domain'
 
 const milestoneLabels: Record<MilestoneResponse['milestoneType'], string> = {
   PROPOSAL: 'Đề cương',
@@ -35,25 +39,33 @@ export function StudentProgressPage() {
   const [file, setFile] = useState<File>()
   const [note, setNote] = useState('')
   const [currentTime, setCurrentTime] = useState(() => Date.now())
-  const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+  const [month, setMonth] = useState(
+    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  )
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
 
-  const load = useCallback(() => Promise.all([
-        studentApi.projectAssignments(),
-        groupApi.mine(),
-      ]).then(async ([projectRows, groupRows]) => {
-      const milestoneRows = (
-        await Promise.all(projectRows.map((project) => milestoneApi.listByAssignment(project.id)))
-      ).flat()
-      setProjects(projectRows)
-      setGroups(groupRows)
-      setMilestones(milestoneRows)
-      setError('')
-    }).catch((loadError) => {
-      setError(errorMessage(loadError))
-    }).finally(() => {
-      setLoading(false)
-    }), [])
+  const load = useCallback(
+    () =>
+      Promise.all([studentApi.projectAssignments(), groupApi.mine()])
+        .then(async ([projectRows, groupRows]) => {
+          const milestoneRows = (
+            await Promise.all(
+              projectRows.map((project) => milestoneApi.listByAssignment(project.id)),
+            )
+          ).flat()
+          setProjects(projectRows)
+          setGroups(groupRows)
+          setMilestones(milestoneRows)
+          setError('')
+        })
+        .catch((loadError) => {
+          setError(errorMessage(loadError))
+        })
+        .finally(() => {
+          setLoading(false)
+        }),
+    [],
+  )
 
   useEffect(() => {
     void load()
@@ -105,10 +117,16 @@ export function StudentProgressPage() {
 
   return (
     <>
-      <PageHeader
-        title="Tiến độ & báo cáo"
+      <PageHeader title="Tiến độ & báo cáo" />
+      <RemoteState
+        loading={loading}
+        error={error}
+        retry={() => {
+          setLoading(true)
+          setError('')
+          void load()
+        }}
       />
-      <RemoteState loading={loading} error={error} retry={() => { setLoading(true); setError(''); void load() }} />
 
       {!loading && !error && (
         <>
@@ -121,7 +139,10 @@ export function StudentProgressPage() {
               id="student-project"
               value={selected}
               disabled={!projects.length}
-              onChange={(event) => { setSelected(event.target.value); setSelectedDay(null) }}
+              onChange={(event) => {
+                setSelected(event.target.value)
+                setSelectedDay(null)
+              }}
             >
               <option value="">
                 {projects.length ? 'Tất cả dự án của tôi' : 'Chưa có dự án được phân công'}
@@ -156,99 +177,115 @@ export function StudentProgressPage() {
             </section>
           )}
 
-          {projects.length > 0 && <div className="milestone-board student-progress-layout">
-          <div className="student-timeline">
-            {visible.map((milestone, index) => {
-              const project = projects.find((item) => item.id === milestone.assignmentId)
-              const isPastDue =
-                new Date(milestone.dueAt).getTime() < currentTime &&
-                milestone.status !== 'ACCEPTED'
+          {projects.length > 0 && (
+            <div className="milestone-board student-progress-layout">
+              <div className="student-timeline">
+                {visible.map((milestone, index) => {
+                  const project = projects.find((item) => item.id === milestone.assignmentId)
+                  const isPastDue =
+                    new Date(milestone.dueAt).getTime() < currentTime &&
+                    milestone.status !== 'ACCEPTED'
 
-              return (
-                <section id={`student-milestone-${milestone.id}`} className={`page-card student-timeline__item${selectedDay === milestoneDayKey(parseUtcDateTime(milestone.dueAt)) ? ' student-timeline__item--selected' : ''}`} key={milestone.id}>
-                  <span className="student-timeline__marker" aria-hidden="true">
-                    {index + 1}
-                  </span>
-                  <div className="content-card__header">
-                    <div>
-                      <span className="student-milestone-type">
-                        {milestoneLabels[milestone.milestoneType]}
-                      </span>
-                      <h2>{milestone.title}</h2>
-                      <small>{project?.topicTitle}</small>
-                    </div>
-                    <StatusBadge status={milestone.status} />
-                  </div>
-                  <p className="student-prose">{milestone.description}</p>
-                  <p>
-                    <strong>Hạn nộp:</strong> {dateText(milestone.dueAt)}
-                    {isPastDue ? ' · Đã qua hạn' : ''}
-                  </p>
-                  {milestone.milestoneType === 'FINAL' && (
-                    <p className="student-notice">
-                      Tệp nộp cuối kỳ cần bao gồm báo cáo hoàn chỉnh và mã nguồn sản phẩm
-                      (có thể đóng gói thành một tệp ZIP).
-                    </p>
-                  )}
-                  {canSubmit(milestone) ? (
-                    <button
-                      className="btn btn-primary"
-                      disabled={uploading}
-                      onClick={() => {
-                        setTarget(milestone)
-                        setFile(undefined)
-                        setNote('')
-                      }}
+                  return (
+                    <section
+                      id={`student-milestone-${milestone.id}`}
+                      className={`page-card student-timeline__item${selectedDay === milestoneDayKey(parseUtcDateTime(milestone.dueAt)) ? ' student-timeline__item--selected' : ''}`}
+                      key={milestone.id}
                     >
-                      <Upload size={16} aria-hidden="true" />
-                      {milestone.submissions.length ? 'Nộp phiên bản mới' : 'Nộp báo cáo'}
-                    </button>
-                  ) : (
-                    <p className="student-notice">
-                      {milestone.status === 'ACCEPTED'
-                        ? 'Mốc đã được chấp nhận, không thể nộp lại.'
-                        : project?.status !== 'IN_PROGRESS'
-                          ? 'Dự án đã đóng, không thể nộp thêm.'
-                          : 'Bạn là thành viên: chỉ trưởng nhóm được nộp báo cáo.'}
-                    </p>
-                  )}
-                  {milestone.submissions.map((submission) => (
-                    <details key={submission.id} className="student-submission">
-                      <summary>
-                        Phiên bản {submission.versionNo} · {dateText(submission.submittedAt)} ·{' '}
-                        {submission.submittedByName}
-                      </summary>
-                      {submission.file && (
-                        <DownloadButton
-                          id={submission.file.id}
-                          name={submission.file.originalName}
-                        />
+                      <span className="student-timeline__marker" aria-hidden="true">
+                        {index + 1}
+                      </span>
+                      <div className="content-card__header">
+                        <div>
+                          <span className="student-milestone-type">
+                            {milestoneLabels[milestone.milestoneType]}
+                          </span>
+                          <h2>{milestone.title}</h2>
+                          <small>{project?.topicTitle}</small>
+                        </div>
+                        <StatusBadge status={milestone.status} />
+                      </div>
+                      <p className="student-prose">{milestone.description}</p>
+                      <p>
+                        <strong>Hạn nộp:</strong> {dateText(milestone.dueAt)}
+                        {isPastDue ? ' · Đã qua hạn' : ''}
+                      </p>
+                      {milestone.milestoneType === 'FINAL' && (
+                        <p className="student-notice">
+                          Tệp nộp cuối kỳ cần bao gồm báo cáo hoàn chỉnh và mã nguồn sản phẩm (có
+                          thể đóng gói thành một tệp ZIP).
+                        </p>
                       )}
-                      <p className="student-prose">{submission.note}</p>
-                      {submission.feedback.length ? (
-                        submission.feedback.map((feedback) => (
-                          <blockquote key={feedback.id}>
-                            <strong>{feedback.lecturerName}</strong> · {dateText(feedback.createdAt)}
-                            <p className="student-prose">{feedback.content}</p>
-                          </blockquote>
-                        ))
+                      {canSubmit(milestone) ? (
+                        <button
+                          className="btn btn-primary"
+                          disabled={uploading}
+                          onClick={() => {
+                            setTarget(milestone)
+                            setFile(undefined)
+                            setNote('')
+                          }}
+                        >
+                          <Upload size={16} aria-hidden="true" />
+                          {milestone.submissions.length ? 'Nộp phiên bản mới' : 'Nộp báo cáo'}
+                        </button>
                       ) : (
-                        <p>Chưa có phản hồi.</p>
+                        <p className="student-notice">
+                          {milestone.status === 'ACCEPTED'
+                            ? 'Mốc đã được chấp nhận, không thể nộp lại.'
+                            : project?.status !== 'IN_PROGRESS'
+                              ? 'Dự án đã đóng, không thể nộp thêm.'
+                              : 'Bạn là thành viên: chỉ trưởng nhóm được nộp báo cáo.'}
+                        </p>
                       )}
-                    </details>
-                  ))}
-                </section>
-              )
-            })}
-          </div>
-          <aside className="milestone-board__sidebar" aria-label="Lịch báo cáo của sinh viên">
-            <MilestoneCalendar milestones={visible} month={month} selectedDay={selectedDay} now={new Date(currentTime)}
-              onMonthChange={setMonth} onSelectDay={(day, due) => {
-                setSelectedDay(day)
-                if (due[0]) document.getElementById(`student-milestone-${due[0].id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-              }} />
-          </aside>
-          </div>}
+                      {milestone.submissions.map((submission) => (
+                        <details key={submission.id} className="student-submission">
+                          <summary>
+                            Phiên bản {submission.versionNo} · {dateText(submission.submittedAt)} ·{' '}
+                            {submission.submittedByName}
+                          </summary>
+                          {submission.file && (
+                            <DownloadButton
+                              id={submission.file.id}
+                              name={submission.file.originalName}
+                            />
+                          )}
+                          <p className="student-prose">{submission.note}</p>
+                          {submission.feedback.length ? (
+                            submission.feedback.map((feedback) => (
+                              <blockquote key={feedback.id}>
+                                <strong>{feedback.lecturerName}</strong> ·{' '}
+                                {dateText(feedback.createdAt)}
+                                <p className="student-prose">{feedback.content}</p>
+                              </blockquote>
+                            ))
+                          ) : (
+                            <p>Chưa có phản hồi.</p>
+                          )}
+                        </details>
+                      ))}
+                    </section>
+                  )
+                })}
+              </div>
+              <aside className="milestone-board__sidebar" aria-label="Lịch báo cáo của sinh viên">
+                <MilestoneCalendar
+                  milestones={visible}
+                  month={month}
+                  selectedDay={selectedDay}
+                  now={new Date(currentTime)}
+                  onMonthChange={setMonth}
+                  onSelectDay={(day, due) => {
+                    setSelectedDay(day)
+                    if (due[0])
+                      document
+                        .getElementById(`student-milestone-${due[0].id}`)
+                        ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                  }}
+                />
+              </aside>
+            </div>
+          )}
         </>
       )}
 

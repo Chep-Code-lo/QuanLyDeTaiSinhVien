@@ -2,16 +2,19 @@ package com.example.qldetai.feature.project.repository;
 
 import com.example.qldetai.feature.project.domain.AssignmentStatus;
 import com.example.qldetai.feature.project.domain.ProjectAssignment;
+
 import jakarta.persistence.LockModeType;
-import java.util.List;
-import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+import java.util.Optional;
 
 public interface ProjectAssignmentRepository extends JpaRepository<ProjectAssignment, Long> {
 
@@ -26,7 +29,8 @@ public interface ProjectAssignmentRepository extends JpaRepository<ProjectAssign
     Page<ProjectAssignment> findByPeriodId(Long periodId, Pageable pageable);
 
     @EntityGraph(attributePaths = {"period", "group", "topic", "assignedBy"})
-    Page<ProjectAssignment> findByPeriodIdAndStatus(Long periodId, AssignmentStatus status, Pageable pageable);
+    Page<ProjectAssignment> findByPeriodIdAndStatus(
+            Long periodId, AssignmentStatus status, Pageable pageable);
 
     long countByStatus(AssignmentStatus status);
 
@@ -34,7 +38,8 @@ public interface ProjectAssignmentRepository extends JpaRepository<ProjectAssign
     @Query("select assignment from ProjectAssignment assignment where assignment.id = :id")
     Optional<ProjectAssignment> findByIdForUpdate(@Param("id") Long id);
 
-    @Query("""
+    @Query(
+            """
             select assignment from ProjectAssignment assignment
             join GroupMember member on member.group.id = assignment.group.id
             where member.student.user.id = :userId and member.leftAt is null
@@ -47,15 +52,18 @@ public interface ProjectAssignmentRepository extends JpaRepository<ProjectAssign
     Optional<ProjectAssignment> findByRegistrationId(Long registrationId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select assignment from ProjectAssignment assignment where assignment.topic.id = :topicId")
+    @Query(
+            "select assignment from ProjectAssignment assignment where assignment.topic.id = :topicId")
     Optional<ProjectAssignment> findByTopicIdForUpdate(Long topicId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select assignment from ProjectAssignment assignment where assignment.group.id = :groupId")
+    @Query(
+            "select assignment from ProjectAssignment assignment where assignment.group.id = :groupId")
     Optional<ProjectAssignment> findByGroupIdForUpdate(Long groupId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select assignment from ProjectAssignment assignment where assignment.registration.id = :registrationId")
+    @Query(
+            "select assignment from ProjectAssignment assignment where assignment.registration.id = :registrationId")
     Optional<ProjectAssignment> findByRegistrationIdForUpdate(Long registrationId);
 
     boolean existsByGroupId(Long groupId);

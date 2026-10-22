@@ -1,12 +1,14 @@
 package com.example.qldetai.feature.topic.repository;
 
 import com.example.qldetai.feature.topic.domain.TopicSupervisor;
-import java.util.List;
-import java.util.Collection;
+
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import java.util.Collection;
+import java.util.List;
 
 public interface TopicSupervisorRepository extends JpaRepository<TopicSupervisor, Long> {
 
@@ -18,9 +20,11 @@ public interface TopicSupervisorRepository extends JpaRepository<TopicSupervisor
 
     void deleteByTopicId(Long topicId);
 
-    @Query("""
+    @Query(
+            """
             select count(ts) > 0 from TopicSupervisor ts
             where ts.topic.id = :topicId and ts.lecturer.user.id = :userId
             """)
-    boolean existsByTopicIdAndLecturerUserId(@Param("topicId") Long topicId, @Param("userId") Long userId);
+    boolean existsByTopicIdAndLecturerUserId(
+            @Param("topicId") Long topicId, @Param("userId") Long userId);
 }

@@ -4,7 +4,9 @@ import com.example.qldetai.feature.communication.domain.AuditLog;
 import com.example.qldetai.feature.communication.domain.AuditOutcome;
 import com.example.qldetai.feature.communication.repository.AuditLogRepository;
 import com.example.qldetai.feature.identity.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;

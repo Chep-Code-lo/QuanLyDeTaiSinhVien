@@ -6,10 +6,11 @@ import com.example.qldetai.feature.identity.dto.IdentityDtos.CreateAppointmentRe
 import com.example.qldetai.feature.identity.dto.IdentityDtos.EndAppointmentRequest;
 import com.example.qldetai.feature.identity.service.AcademicAppointmentService;
 import com.example.qldetai.security.UserPrincipal;
+
 import jakarta.validation.Valid;
-import java.net.URI;
-import java.util.List;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,6 +23,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URI;
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/admin/academic-appointments")
 @PreAuthorize("hasRole('ADMIN')")
@@ -30,9 +34,9 @@ public class AcademicAppointmentController {
 
     private final AcademicAppointmentService academicAppointmentService;
 
-
     @GetMapping
-    public ApiResponse<List<AppointmentResponse>> list(@RequestParam(required = false) Long lecturerId) {
+    public ApiResponse<List<AppointmentResponse>> list(
+            @RequestParam(required = false) Long lecturerId) {
         return ApiResponse.success(academicAppointmentService.list(lecturerId));
     }
 
@@ -41,13 +45,15 @@ public class AcademicAppointmentController {
             @Valid @RequestBody CreateAppointmentRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         AppointmentResponse created = academicAppointmentService.create(request, principal.id());
-        return ResponseEntity.created(URI.create("/api/v1/admin/academic-appointments/" + created.id()))
+        return ResponseEntity.created(
+                        URI.create("/api/v1/admin/academic-appointments/" + created.id()))
                 .body(ApiResponse.success("Đã tạo bổ nhiệm.", created));
     }
 
     @PatchMapping("/{id}/end")
     public ApiResponse<AppointmentResponse> end(
             @PathVariable Long id, @Valid @RequestBody EndAppointmentRequest request) {
-        return ApiResponse.success("Đã kết thúc bổ nhiệm.", academicAppointmentService.end(id, request));
+        return ApiResponse.success(
+                "Đã kết thúc bổ nhiệm.", academicAppointmentService.end(id, request));
     }
 }

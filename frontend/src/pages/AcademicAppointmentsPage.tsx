@@ -239,11 +239,22 @@ export const AcademicAppointmentsPage: React.FC = () => {
 
       {/* Modal Form Create Appointment */}
       {isModalOpen && (
-        <div className="modal-backdrop fade-in" onClick={() => { if (!submitting) setIsModalOpen(false) }}>
+        <div
+          className="modal-backdrop fade-in"
+          onClick={() => {
+            if (!submitting) setIsModalOpen(false)
+          }}
+        >
           <div className="modal-content scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="font-semibold text-lg">Tạo quyết định bổ nhiệm mới</h3>
-              <button type="button" className="btn-close" onClick={() => { if (!submitting) setIsModalOpen(false) }}>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => {
+                  if (!submitting) setIsModalOpen(false)
+                }}
+              >
                 &times;
               </button>
             </div>
@@ -367,7 +378,9 @@ export const AcademicAppointmentsPage: React.FC = () => {
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => { if (!submitting) setIsModalOpen(false) }}
+                  onClick={() => {
+                    if (!submitting) setIsModalOpen(false)
+                  }}
                   disabled={submitting}
                 >
                   Hủy

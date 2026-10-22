@@ -34,7 +34,15 @@ export function LoginForm({ onSuccess, onClose }: LoginFormProps) {
       if (onSuccess) onSuccess()
       else {
         const from = location.state?.from
-        navigate(typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') && !from.startsWith('/login') ? from : '/dashboard', { replace: true })
+        navigate(
+          typeof from === 'string' &&
+            from.startsWith('/') &&
+            !from.startsWith('//') &&
+            !from.startsWith('/login')
+            ? from
+            : '/dashboard',
+          { replace: true },
+        )
       }
     } catch (err: any) {
       showError(
@@ -100,7 +108,13 @@ export function LoginPage() {
   const { isAuthenticated } = useAuth()
   const location = useLocation()
   const from = location.state?.from
-  const destination = typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') && !from.startsWith('/login') ? from : '/dashboard'
+  const destination =
+    typeof from === 'string' &&
+    from.startsWith('/') &&
+    !from.startsWith('//') &&
+    !from.startsWith('/login')
+      ? from
+      : '/dashboard'
   if (isAuthenticated) return <Navigate to={destination} replace />
   return (
     <main className="login-page">

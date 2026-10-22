@@ -7,16 +7,20 @@ import com.example.qldetai.feature.communication.email.EmailDispatchDtos.SendEma
 import com.example.qldetai.feature.communication.email.EmailTemplateDtos.EmailTemplateResponse;
 import com.example.qldetai.feature.communication.email.EmailTemplateDtos.SaveEmailTemplateRequest;
 import com.example.qldetai.security.UserPrincipal;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import java.net.URI;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URI;
 
 @Validated
 @RestController
@@ -28,14 +32,16 @@ public class EmailTemplateController {
     private final EmailDispatchService dispatch;
 
     @GetMapping
-    public ApiResponse<PageResponse<EmailTemplateResponse>> list(@AuthenticationPrincipal UserPrincipal principal,
+    public ApiResponse<PageResponse<EmailTemplateResponse>> list(
+            @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return ApiResponse.success(templates.list(principal.id(), page, size));
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<EmailTemplateResponse>> create(@AuthenticationPrincipal UserPrincipal principal,
+    public ResponseEntity<ApiResponse<EmailTemplateResponse>> create(
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody SaveEmailTemplateRequest request) {
         var created = templates.create(principal.id(), request);
         return ResponseEntity.created(URI.create("/api/v1/email-templates/" + created.id()))
@@ -43,14 +49,20 @@ public class EmailTemplateController {
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<EmailTemplateResponse> update(@PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal,
+    public ApiResponse<EmailTemplateResponse> update(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody SaveEmailTemplateRequest request) {
         return ApiResponse.success(templates.update(id, principal.id(), request));
     }
 
     @PostMapping("/{id}/send")
-    public ApiResponse<EmailQueuedResponse> send(@PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal,
+    public ApiResponse<EmailQueuedResponse> send(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody SendEmailRequest request) {
-        return ApiResponse.success("Đã xếp hàng gửi email đến người nhận đã chọn.", dispatch.sendTemplate(principal.id(), id, request));
+        return ApiResponse.success(
+                "Đã xếp hàng gửi email đến người nhận đã chọn.",
+                dispatch.sendTemplate(principal.id(), id, request));
     }
 }

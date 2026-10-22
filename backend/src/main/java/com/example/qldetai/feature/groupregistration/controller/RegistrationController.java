@@ -14,6 +14,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,7 +30,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
@@ -37,7 +38,6 @@ import lombok.RequiredArgsConstructor;
 public class RegistrationController {
 
     private final RegistrationService registrationService;
-
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
@@ -80,7 +80,7 @@ public class RegistrationController {
     @PatchMapping("/{id}/review")
     @PreAuthorize(
             "hasRole('ADMIN') or @registrationAuthorization.canManageRegistration(#id,"
-                + " authentication)")
+                    + " authentication)")
     public ApiResponse<TopicRegistrationResponse> review(
             @PathVariable Long id,
             @Valid @RequestBody ReviewTopicRegistrationRequest request,

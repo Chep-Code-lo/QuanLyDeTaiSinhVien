@@ -41,9 +41,7 @@ export function AccountPage() {
       <PageHeader title="Tài khoản" />
       <div className="account-layout">
         <section className="page-card account-profile">
-          <div className="profile-avatar">
-            {avatarInitial(user?.fullName)}
-          </div>
+          <div className="profile-avatar">{avatarInitial(user?.fullName)}</div>
           <div>
             <h2>{user?.fullName}</h2>
             <p>{user?.username}</p>

@@ -34,14 +34,22 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label }) => {
   const getLabel = (st: string) => {
     if (label) return label
     switch (st?.toUpperCase()) {
-      case 'PENDING': return 'Chờ duyệt'
-      case 'APPROVED': return 'Đã duyệt'
-      case 'REJECTED': return 'Từ chối'
-      case 'WITHDRAWN': return 'Đã rút'
-      case 'FORMING': return 'Đang lập nhóm'
-      case 'IN_PROGRESS': return 'Đang thực hiện'
-      case 'COMPLETED': return 'Hoàn thành'
-      case 'SCHEDULED': return 'Đã xếp lịch'
+      case 'PENDING':
+        return 'Chờ duyệt'
+      case 'APPROVED':
+        return 'Đã duyệt'
+      case 'REJECTED':
+        return 'Từ chối'
+      case 'WITHDRAWN':
+        return 'Đã rút'
+      case 'FORMING':
+        return 'Đang lập nhóm'
+      case 'IN_PROGRESS':
+        return 'Đang thực hiện'
+      case 'COMPLETED':
+        return 'Hoàn thành'
+      case 'SCHEDULED':
+        return 'Đã xếp lịch'
       case 'DRAFT':
         return 'Nháp'
       case 'LOCKED':

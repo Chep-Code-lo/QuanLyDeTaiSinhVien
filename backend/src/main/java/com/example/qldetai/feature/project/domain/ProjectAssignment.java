@@ -5,6 +5,7 @@ import com.example.qldetai.feature.groupregistration.domain.StudentGroup;
 import com.example.qldetai.feature.groupregistration.domain.TopicRegistration;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.topic.domain.Topic;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -17,17 +18,22 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.Version;
 import jakarta.persistence.UniqueConstraint;
-import java.time.LocalDateTime;
+import jakarta.persistence.Version;
+
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Entity
-@Table(name = "project_assignments", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_project_assignments_02", columnNames = "group_id"),
-        @UniqueConstraint(name = "uq_project_assignments_03", columnNames = "topic_id")})
+@Table(
+        name = "project_assignments",
+        uniqueConstraints = {
+            @UniqueConstraint(name = "uq_project_assignments_02", columnNames = "group_id"),
+            @UniqueConstraint(name = "uq_project_assignments_03", columnNames = "topic_id")
+        })
 @Getter
 @Setter
 @NoArgsConstructor

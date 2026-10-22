@@ -1,7 +1,7 @@
 package com.example.qldetai.feature.communication.service;
 
-import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.common.api.PageResponse;
+import com.example.qldetai.common.audit.BusinessAudit;
 import com.example.qldetai.exception.BusinessRuleException;
 import com.example.qldetai.exception.ResourceNotFoundException;
 import com.example.qldetai.feature.academic.domain.Faculty;
@@ -16,14 +16,17 @@ import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.progress.domain.StoredFile;
 import com.example.qldetai.feature.progress.repository.StoredFileRepository;
-import java.time.Clock;
-import java.time.LocalDateTime;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -35,14 +38,20 @@ public class AnnouncementService {
     private final StoredFileRepository storedFileRepository;
     private final Clock clock;
 
-
     /** Public feed: unpublished or archived content is intentionally never returned here. */
     @Transactional(readOnly = true)
     public PageResponse<AnnouncementResponse> listPublished(Long facultyId, int page, int size) {
-        PageRequest pageable = PageRequest.of(page, size, Sort.by("publishedAt").descending().and(Sort.by("createdAt").descending()));
-        Page<Announcement> announcements = facultyId == null
-                ? announcementRepository.findByStatus(AnnouncementStatus.PUBLISHED, pageable)
-                : announcementRepository.findByFacultyIdAndStatus(facultyId, AnnouncementStatus.PUBLISHED, pageable);
+        PageRequest pageable =
+                PageRequest.of(
+                        page,
+                        size,
+                        Sort.by("publishedAt").descending().and(Sort.by("createdAt").descending()));
+        Page<Announcement> announcements =
+                facultyId == null
+                        ? announcementRepository.findByStatus(
+                                AnnouncementStatus.PUBLISHED, pageable)
+                        : announcementRepository.findByFacultyIdAndStatus(
+                                facultyId, AnnouncementStatus.PUBLISHED, pageable);
         return PageResponse.from(announcements.map(this::toResponse));
     }
 
@@ -51,9 +60,11 @@ public class AnnouncementService {
     public PageResponse<AnnouncementResponse> listForManagement(
             Long facultyId, AnnouncementStatus status, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Announcement> announcements = status == null
-                ? announcementRepository.findByFacultyId(facultyId, pageable)
-                : announcementRepository.findByFacultyIdAndStatus(facultyId, status, pageable);
+        Page<Announcement> announcements =
+                status == null
+                        ? announcementRepository.findByFacultyId(facultyId, pageable)
+                        : announcementRepository.findByFacultyIdAndStatus(
+                                facultyId, status, pageable);
         return PageResponse.from(announcements.map(this::toResponse));
     }
 
@@ -65,11 +76,21 @@ public class AnnouncementService {
     @Transactional
     @BusinessAudit(action = "ANNOUNCEMENT_CREATE", entityType = "ANNOUNCEMENT")
     public AnnouncementResponse create(CreateAnnouncementRequest request, Long actorId) {
-        Faculty faculty = facultyRepository.findById(request.facultyId())
-                .filter(Faculty::isActive)
-                .orElseThrow(() -> new ResourceNotFoundException("Active faculty was not found."));
-        User creator = userRepository.findById(actorId)
-                .orElseThrow(() -> new ResourceNotFoundException("Creating user was not found."));
+        Faculty faculty =
+                facultyRepository
+                        .findById(request.facultyId())
+                        .filter(Faculty::isActive)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Active faculty was not found."));
+        User creator =
+                userRepository
+                        .findById(actorId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Creating user was not found."));
 
         Announcement announcement = new Announcement();
         announcement.setFaculty(faculty);
@@ -80,7 +101,10 @@ public class AnnouncementService {
     }
 
     @Transactional
-    @BusinessAudit(action = "ANNOUNCEMENT_UPDATE", entityType = "ANNOUNCEMENT", entityIdArgument = 0)
+    @BusinessAudit(
+            action = "ANNOUNCEMENT_UPDATE",
+            entityType = "ANNOUNCEMENT",
+            entityIdArgument = 0)
     public AnnouncementResponse update(Long id, UpdateAnnouncementRequest request) {
         Announcement announcement = requireAnnouncement(id);
         if (announcement.getStatus() != AnnouncementStatus.DRAFT) {
@@ -91,7 +115,10 @@ public class AnnouncementService {
     }
 
     @Transactional
-    @BusinessAudit(action = "ANNOUNCEMENT_PUBLISH", entityType = "ANNOUNCEMENT", entityIdArgument = 0)
+    @BusinessAudit(
+            action = "ANNOUNCEMENT_PUBLISH",
+            entityType = "ANNOUNCEMENT",
+            entityIdArgument = 0)
     public AnnouncementResponse publish(Long id) {
         Announcement announcement = requireAnnouncement(id);
         if (announcement.getStatus() != AnnouncementStatus.DRAFT) {
@@ -103,7 +130,10 @@ public class AnnouncementService {
     }
 
     @Transactional
-    @BusinessAudit(action = "ANNOUNCEMENT_ARCHIVE", entityType = "ANNOUNCEMENT", entityIdArgument = 0)
+    @BusinessAudit(
+            action = "ANNOUNCEMENT_ARCHIVE",
+            entityType = "ANNOUNCEMENT",
+            entityIdArgument = 0)
     public AnnouncementResponse archive(Long id) {
         Announcement announcement = requireAnnouncement(id);
         if (announcement.getStatus() != AnnouncementStatus.PUBLISHED) {
@@ -114,28 +144,36 @@ public class AnnouncementService {
     }
 
     @Transactional
-    @BusinessAudit(action = "ANNOUNCEMENT_DELETE", entityType = "ANNOUNCEMENT", entityIdArgument = 0)
+    @BusinessAudit(
+            action = "ANNOUNCEMENT_DELETE",
+            entityType = "ANNOUNCEMENT",
+            entityIdArgument = 0)
     public void delete(Long id) {
         Announcement announcement = requireAnnouncement(id);
         if (announcement.getStatus() == AnnouncementStatus.PUBLISHED) {
-            throw new BusinessRuleException("Archive a published announcement instead of deleting it.");
+            throw new BusinessRuleException(
+                    "Archive a published announcement instead of deleting it.");
         }
         announcementRepository.delete(announcement);
     }
 
-    private void apply(Announcement announcement, String title, String content, Long attachmentFileId) {
+    private void apply(
+            Announcement announcement, String title, String content, Long attachmentFileId) {
         announcement.setTitle(title.trim());
         announcement.setContent(content.trim());
-        announcement.setAttachment(attachmentFileId == null ? null : requireAttachment(attachmentFileId));
+        announcement.setAttachment(
+                attachmentFileId == null ? null : requireAttachment(attachmentFileId));
     }
 
     private StoredFile requireAttachment(Long id) {
-        return storedFileRepository.findById(id)
+        return storedFileRepository
+                .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Attachment file was not found."));
     }
 
     private Announcement requireAnnouncement(Long id) {
-        return announcementRepository.findById(id)
+        return announcementRepository
+                .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Announcement was not found."));
     }
 

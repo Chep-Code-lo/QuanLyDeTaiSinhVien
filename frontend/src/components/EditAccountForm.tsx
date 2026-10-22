@@ -81,7 +81,10 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
   const hasLecturerProfile = Boolean(user.lecturer)
   const requiresDepartments = hasStudentProfile || hasLecturerProfile
   const loadError = requiresDepartments && departmentError
-  const [loading, setLoading] = useRequestLoading(JSON.stringify([requiresDepartments, loadAttempt]), requiresDepartments)
+  const [loading, setLoading] = useRequestLoading(
+    JSON.stringify([requiresDepartments, loadAttempt]),
+    requiresDepartments,
+  )
 
   if (formUser !== user) {
     setFormUser(user)
@@ -96,7 +99,10 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
     academicApi
       .getDepartments()
       .then((items) => {
-        if (active) { setDepartments(items); setLoadError(false) }
+        if (active) {
+          setDepartments(items)
+          setLoadError(false)
+        }
       })
       .catch(() => {
         if (active) setLoadError(true)
@@ -137,7 +143,12 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
 
     if (hasStudentProfile) {
       const departmentId = Number(form.studentDepartmentId)
-      if (!departmentId || !form.studentCode.trim() || !form.className.trim() || !form.cohort.trim()) {
+      if (
+        !departmentId ||
+        !form.studentCode.trim() ||
+        !form.className.trim() ||
+        !form.cohort.trim()
+      ) {
         fail('Vui lòng điền đầy đủ hồ sơ sinh viên.')
         return
       }
@@ -175,7 +186,8 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
     }
   }
 
-  const unavailableDepartments = requiresDepartments && !loading && !loadError && departments.length === 0
+  const unavailableDepartments =
+    requiresDepartments && !loading && !loadError && departments.length === 0
 
   return (
     <form className="account-edit-form" onSubmit={submit}>
@@ -203,13 +215,21 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
         </div>
       )}
 
-      <fieldset disabled={submitting || loading || loadError || unavailableDepartments} className="account-edit-form__fields">
-        <p className="account-edit-form__roles">Vai trò: {user.roles.map((role) => roleLabel(role)).join(', ')}</p>
+      <fieldset
+        disabled={submitting || loading || loadError || unavailableDepartments}
+        className="account-edit-form__fields"
+      >
+        <p className="account-edit-form__roles">
+          Vai trò: {user.roles.map((role) => roleLabel(role)).join(', ')}
+        </p>
         <h2 className="section-title">Thông tin tài khoản</h2>
         <div className="account-edit-form__grid">
           <div className="form-group">
             <label className="form-label" htmlFor="edit-account-name">
-              Họ và tên <span className="text-red" aria-hidden="true">*</span>
+              Họ và tên{' '}
+              <span className="text-red" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="edit-account-name"
@@ -223,7 +243,10 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
           </div>
           <div className="form-group">
             <label className="form-label" htmlFor="edit-account-email">
-              Email đăng nhập <span className="text-red" aria-hidden="true">*</span>
+              Email đăng nhập{' '}
+              <span className="text-red" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="edit-account-email"
@@ -237,7 +260,9 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
             />
           </div>
           <div className="form-group">
-            <label className="form-label" htmlFor="edit-account-phone">Số điện thoại</label>
+            <label className="form-label" htmlFor="edit-account-phone">
+              Số điện thoại
+            </label>
             <input
               id="edit-account-phone"
               className="form-input"
@@ -256,7 +281,10 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
             <div className="account-edit-form__grid">
               <div className="form-group">
                 <label className="form-label" htmlFor="edit-student-department">
-                  Bộ môn <span className="text-red" aria-hidden="true">*</span>
+                  Bộ môn{' '}
+                  <span className="text-red" aria-hidden="true">
+                    *
+                  </span>
                 </label>
                 <AnimatedSelect
                   id="edit-student-department"
@@ -265,12 +293,19 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
                   required
                 >
                   <option value="">Chọn bộ môn</option>
-                  {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+                  {departments.map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
                 </AnimatedSelect>
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="edit-student-code">
-                  Mã sinh viên <span className="text-red" aria-hidden="true">*</span>
+                  Mã sinh viên{' '}
+                  <span className="text-red" aria-hidden="true">
+                    *
+                  </span>
                 </label>
                 <input
                   id="edit-student-code"
@@ -283,7 +318,10 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="edit-student-class">
-                  Lớp <span className="text-red" aria-hidden="true">*</span>
+                  Lớp{' '}
+                  <span className="text-red" aria-hidden="true">
+                    *
+                  </span>
                 </label>
                 <input
                   id="edit-student-class"
@@ -296,7 +334,10 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="edit-student-cohort">
-                  Khóa <span className="text-red" aria-hidden="true">*</span>
+                  Khóa{' '}
+                  <span className="text-red" aria-hidden="true">
+                    *
+                  </span>
                 </label>
                 <input
                   id="edit-student-cohort"
@@ -317,7 +358,10 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
             <div className="account-edit-form__grid">
               <div className="form-group">
                 <label className="form-label" htmlFor="edit-lecturer-department">
-                  Bộ môn <span className="text-red" aria-hidden="true">*</span>
+                  Bộ môn{' '}
+                  <span className="text-red" aria-hidden="true">
+                    *
+                  </span>
                 </label>
                 <AnimatedSelect
                   id="edit-lecturer-department"
@@ -326,12 +370,19 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
                   required
                 >
                   <option value="">Chọn bộ môn</option>
-                  {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+                  {departments.map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
                 </AnimatedSelect>
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="edit-lecturer-code">
-                  Mã giảng viên <span className="text-red" aria-hidden="true">*</span>
+                  Mã giảng viên{' '}
+                  <span className="text-red" aria-hidden="true">
+                    *
+                  </span>
                 </label>
                 <input
                   id="edit-lecturer-code"
@@ -343,18 +394,26 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
                 />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="edit-lecturer-degree">Học vị</label>
+                <label className="form-label" htmlFor="edit-lecturer-degree">
+                  Học vị
+                </label>
                 <AnimatedSelect
                   id="edit-lecturer-degree"
                   value={form.academicDegree}
                   onChange={(event) => updateField('academicDegree', event.target.value)}
                 >
                   <option value="">Chọn học vị</option>
-                  {academicDegrees.map((degree) => <option key={degree} value={degree}>{degree}</option>)}
+                  {academicDegrees.map((degree) => (
+                    <option key={degree} value={degree}>
+                      {degree}
+                    </option>
+                  ))}
                 </AnimatedSelect>
               </div>
               <div className="form-group account-edit-form__wide-field">
-                <label className="form-label" htmlFor="edit-lecturer-specialization">Chuyên môn</label>
+                <label className="form-label" htmlFor="edit-lecturer-specialization">
+                  Chuyên môn
+                </label>
                 <textarea
                   id="edit-lecturer-specialization"
                   className="form-input account-edit-form__textarea"
@@ -368,9 +427,20 @@ export function EditAccountForm({ user, onCancel, onUpdated }: EditAccountFormPr
           </>
         )}
 
-        {errorMessage && <p className="account-edit-form__error" role="alert">{errorMessage}</p>}
+        {errorMessage && (
+          <p className="account-edit-form__error" role="alert">
+            {errorMessage}
+          </p>
+        )}
         <div className="account-edit-form__actions">
-          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={submitting}>Hủy</button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onCancel}
+            disabled={submitting}
+          >
+            Hủy
+          </button>
           <button type="submit" className="btn btn-primary" disabled={submitting}>
             {submitting ? 'Đang lưu...' : 'Lưu thay đổi'}
           </button>

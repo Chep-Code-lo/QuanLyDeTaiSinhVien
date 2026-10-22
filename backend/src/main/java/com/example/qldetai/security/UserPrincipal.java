@@ -3,13 +3,15 @@ package com.example.qldetai.security;
 import com.example.qldetai.feature.identity.domain.RoleCode;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.domain.UserStatus;
+
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
 
 public record UserPrincipal(
         Long id,
@@ -17,7 +19,8 @@ public record UserPrincipal(
         String fullName,
         String password,
         UserStatus status,
-        Set<RoleCode> roles) implements UserDetails {
+        Set<RoleCode> roles)
+        implements UserDetails {
 
     @Override
     public String toString() {
@@ -25,9 +28,10 @@ public record UserPrincipal(
     }
 
     public static UserPrincipal from(User user) {
-        Set<RoleCode> roles = user.getUserRoles().stream()
-                .map(userRole -> userRole.getRole().getCode())
-                .collect(Collectors.toUnmodifiableSet());
+        Set<RoleCode> roles =
+                user.getUserRoles().stream()
+                        .map(userRole -> userRole.getRole().getCode())
+                        .collect(Collectors.toUnmodifiableSet());
         return new UserPrincipal(
                 user.getId(),
                 user.getEmail(),

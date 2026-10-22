@@ -3,8 +3,8 @@ package com.example.qldetai.feature.groupregistration.service;
 import com.example.qldetai.feature.groupregistration.repository.GroupMemberRepository;
 import com.example.qldetai.feature.groupregistration.repository.TopicRegistrationRepository;
 import com.example.qldetai.feature.identity.domain.RoleCode;
-import com.example.qldetai.security.UserPrincipal;
 import com.example.qldetai.feature.topic.service.TopicAuthorization;
+import com.example.qldetai.security.UserPrincipal;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
@@ -42,7 +42,8 @@ public class RegistrationAuthorization {
         if (principal == null) {
             return false;
         }
-        if (principal.roles().contains(RoleCode.ADMIN) || principal.roles().contains(RoleCode.LECTURER)) {
+        if (principal.roles().contains(RoleCode.ADMIN)
+                || principal.roles().contains(RoleCode.LECTURER)) {
             return true;
         }
         return topicRegistrationRepository

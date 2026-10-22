@@ -12,6 +12,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,7 +26,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import lombok.RequiredArgsConstructor;
 
 @Validated
 @RestController
@@ -33,16 +34,22 @@ import lombok.RequiredArgsConstructor;
 public class EvaluationAssignmentController {
 
     private final EvaluationService service;
-    private final com.example.qldetai.feature.evaluation.service.EvaluationAssignmentBatchService batchService;
+    private final com.example.qldetai.feature.evaluation.service.EvaluationAssignmentBatchService
+            batchService;
 
     @PostMapping("/evaluation-assignments/batch")
     @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
-    public ApiResponse<com.example.qldetai.feature.evaluation.dto.EvaluationDtos.BatchEvaluationResponse> assignBatch(
-            @Valid @RequestBody com.example.qldetai.feature.evaluation.dto.EvaluationDtos.BatchEvaluationRequest request,
-            @AuthenticationPrincipal UserPrincipal principal) {
+    public ApiResponse<
+                    com.example.qldetai.feature.evaluation.dto.EvaluationDtos
+                            .BatchEvaluationResponse>
+            assignBatch(
+                    @Valid @RequestBody
+                            com.example.qldetai.feature.evaluation.dto.EvaluationDtos
+                                            .BatchEvaluationRequest
+                                    request,
+                    @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(batchService.assign(request, principal.id()));
     }
-
 
     @GetMapping("/evaluation-assignments")
     @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
@@ -52,9 +59,11 @@ public class EvaluationAssignmentController {
             @RequestParam(required = false) Long lecturerId,
             @RequestParam(required = false) EvaluationStatus status,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size, @AuthenticationPrincipal UserPrincipal principal) {
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                service.listAssignments(periodId, assignmentId, lecturerId, status, page, size, principal.id()));
+                service.listAssignments(
+                        periodId, assignmentId, lecturerId, status, page, size, principal.id()));
     }
 
     @PostMapping("/evaluation-assignments")

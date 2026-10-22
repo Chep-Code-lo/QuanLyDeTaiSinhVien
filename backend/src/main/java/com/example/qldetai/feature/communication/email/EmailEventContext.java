@@ -16,5 +16,4 @@ public record EmailEventContext(
         Long actorUserId,
         List<Long> directRecipientUserIds,
         List<Long> responsibleLecturerUserIds,
-        Map<String, String> variables) {
-}
+        Map<String, String> variables) {}

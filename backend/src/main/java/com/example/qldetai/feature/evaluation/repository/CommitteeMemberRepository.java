@@ -2,13 +2,16 @@ package com.example.qldetai.feature.evaluation.repository;
 
 import com.example.qldetai.feature.evaluation.domain.CommitteeMember;
 import com.example.qldetai.feature.evaluation.domain.CommitteeRole;
-import java.util.List;
-import java.util.Collection;
-import org.springframework.data.jpa.repository.JpaRepository;
+
 import jakarta.persistence.LockModeType;
+
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.jpa.repository.EntityGraph;
+
+import java.util.Collection;
+import java.util.List;
 
 public interface CommitteeMemberRepository extends JpaRepository<CommitteeMember, Long> {
 

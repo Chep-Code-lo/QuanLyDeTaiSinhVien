@@ -8,13 +8,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.qldetai.feature.identity.domain.Role;
 import com.example.qldetai.feature.identity.domain.RoleCode;
-import com.example.qldetai.feature.identity.repository.RoleRepository;
 import com.example.qldetai.feature.identity.domain.User;
-import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.feature.identity.domain.UserStatus;
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.util.Set;
+import com.example.qldetai.feature.identity.repository.RoleRepository;
+import com.example.qldetai.feature.identity.repository.UserRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -26,6 +24,10 @@ import org.springframework.test.context.TestConstructor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.Set;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -63,8 +65,7 @@ class EmailNotificationControllerSecurityTests {
 
     @Test
     void notificationSettingsRequireAuthentication() throws Exception {
-        mockMvc.perform(get("/api/v1/notification-settings"))
-                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/notification-settings")).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -79,10 +80,12 @@ class EmailNotificationControllerSecurityTests {
     void updateStillRequiresExistingCsrfProtection() throws Exception {
         MockHttpSession session = login(administrator.getEmail());
 
-        mockMvc.perform(put("/api/v1/notification-settings/TASK_ASSIGNED")
-                        .session(session)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        mockMvc.perform(
+                        put("/api/v1/notification-settings/TASK_ASSIGNED")
+                                .session(session)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
                                 {
                                   "scopeType":"SYSTEM",
                                   "scopeId":0,
@@ -97,14 +100,18 @@ class EmailNotificationControllerSecurityTests {
     }
 
     private MockHttpSession login(String email) throws Exception {
-        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        MvcResult login =
+                mockMvc.perform(
+                                post("/api/v1/auth/login")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                """
                                 {"username":"%s","password":"TestPassword123!"}
-                                """.formatted(email)))
-                .andExpect(status().isOk())
-                .andReturn();
+                                """
+                                                        .formatted(email)))
+                        .andExpect(status().isOk())
+                        .andReturn();
         return (MockHttpSession) login.getRequest().getSession(false);
     }
 
