@@ -1,5 +1,4 @@
 import React, { useEffect, useId, useRef, useState } from 'react'
-import { allPages } from '../api/student'
 import { lecturerApi } from '../api/lecturers'
 import type { LecturerDirectoryResponse } from '../types/domain'
 
@@ -63,9 +62,9 @@ export const LecturerAutocomplete: React.FC<LecturerAutocompleteProps> = ({
     let active = true
     if (value && selectedOption?.id === value) return
     if (value && (!selectedLecturer || selectedLecturer.id !== value)) {
-      allPages(page => lecturerApi.list({ facultyId, departmentId, page, size: 100 }))
+      lecturerApi.list({ lecturerId: value, facultyId, departmentId, page: 0, size: 1 })
         .then((res) => {
-          const found = res.find((l) => l.id === value)
+          const found = res.content.find((l) => l.id === value)
           if (active && found) {
             setResolvedLecturer(found)
           }

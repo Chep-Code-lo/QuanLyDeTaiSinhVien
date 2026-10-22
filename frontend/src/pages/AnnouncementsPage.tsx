@@ -262,6 +262,7 @@ export function AnnouncementsPage() {
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
                     placeholder="Tiêu đề thông báo"
+                    aria-label="Tiêu đề thông báo"
                     maxLength={250}
                     required
                   />
@@ -270,6 +271,7 @@ export function AnnouncementsPage() {
                     value={content}
                     onChange={(event) => setContent(event.target.value)}
                     placeholder="Nội dung thông báo"
+                    aria-label="Nội dung thông báo"
                     required
                   />
                   <input
@@ -277,6 +279,7 @@ export function AnnouncementsPage() {
                     value={attachmentFileId}
                     onChange={(event) => setAttachmentFileId(event.target.value)}
                     placeholder="Mã tệp đính kèm (không bắt buộc)"
+                    aria-label="Mã tệp đính kèm (không bắt buộc)"
                     inputMode="numeric"
                   />
                   <div className="announcement-editor__actions">

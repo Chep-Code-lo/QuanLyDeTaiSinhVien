@@ -21,6 +21,7 @@ public class LecturerDirectoryService {
 
     @Transactional(readOnly = true)
     public PageResponse<LecturerDirectoryResponse> list(
+            Long lecturerId,
             String search,
             Long facultyId,
             Long departmentId,
@@ -28,6 +29,7 @@ public class LecturerDirectoryService {
             int size) {
         String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
         return PageResponse.from(lecturerRepository.search(
+                        lecturerId,
                         normalizedSearch,
                         facultyId,
                         departmentId,

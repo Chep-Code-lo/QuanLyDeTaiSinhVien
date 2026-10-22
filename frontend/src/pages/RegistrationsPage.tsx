@@ -2,6 +2,7 @@ import { AnimatedSelect } from '../components/AnimatedSelect'
 import { useCallback, useEffect, useState } from 'react'
 import { academicApi } from '../api/academic'
 import { allPages } from '../api/student'
+import { useRequestLoading } from '../hooks/useRequestLoading'
 import { groupApi } from '../api/groups'
 import { registrationApi } from '../api/registrations'
 import { topicApi } from '../api/topics'
@@ -54,7 +55,11 @@ export function RegistrationsPage() {
   const [periods, setPeriods] = useState<RegistrationPeriodResponse[]>([])
   const [groupId, setGroupId] = useState('')
   const [topicId, setTopicId] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [reviewPage, setReviewPage] = useState(0)
+  const [totalReviewPages, setTotalReviewPages] = useState(0)
+  const [loadError, setLoadError] = useState('')
+  const [reloadVersion, setReloadVersion] = useState(0)
+  const [loading, setLoading] = useRequestLoading(JSON.stringify([student, user?.id, reviewPage, reloadVersion]))
   const [submitting, setSubmitting] = useState(false)
   const [currentTime, setCurrentTime] = useState(Date.now)
   const selectedGroup = groups.find((group) => group.id === Number(groupId))
@@ -90,26 +95,34 @@ export function RegistrationsPage() {
     return ''
   }
   const blockedReason = registrationError(currentTime)
-  const load = useCallback(() => Promise.all([
-      allPages(page => student ? registrationApi.mine({ page, size: 100 }) : registrationApi.list({ page, size: 100 })),
+  const load = useCallback((isCurrent: () => boolean = () => true) => Promise.all([
+      student ? allPages(page => registrationApi.mine({ page, size: 100 })).then(content => ({ content, totalPages: 0 }))
+        : registrationApi.list({ page: reviewPage, size: 10 }),
       student ? groupApi.mine() : Promise.resolve([]),
       student ? allPages(page => academicApi.getRegistrationPeriods(undefined, page, 100)) : Promise.resolve([]),
-      allPages(page => topicApi.list({ status: 'PUBLISHED', page, size: 100 })),
+      student ? allPages(page => topicApi.list({ status: 'PUBLISHED', page, size: 100 })) : Promise.resolve([]),
     ]).then(([xs, mine, periodPage, topicRows]) => {
-      setItems(xs)
+      if (!isCurrent()) return
+      setItems(xs.content)
+      setTotalReviewPages(xs.totalPages)
+      setLoadError('')
       if (student) {
         setGroups(mine)
         setPeriods(periodPage)
       }
       setTopics(topicRows)
     }).catch(error => {
+      if (!isCurrent()) return
+      setLoadError('Không tải được hồ sơ đăng ký. Vui lòng thử lại.')
       showError(messageOf(error))
     }).finally(() => {
-      setLoading(false)
-    }), [student, showError])
+      if (isCurrent()) setLoading(false)
+    }), [student, reviewPage, showError, setLoading])
   useEffect(() => {
-    void load()
-  }, [load])
+    let current = true
+    void load(() => current)
+    return () => { current = false }
+  }, [load, reloadVersion])
   useEffect(() => {
     if (!student) return
     const timer = window.setInterval(() => setCurrentTime(Date.now()), 1000)
@@ -245,12 +258,13 @@ export function RegistrationsPage() {
       )}
       <section className="page-card">
         <h2 className="section-title">Danh sách hồ sơ</h2>
+        {loadError && !loading && <div role="alert"><p>{loadError}</p><button type="button" className="btn btn-secondary" onClick={() => setReloadVersion(value => value + 1)}>Thử lại</button></div>}
         {loading ? (
           <div className="content-state">
             <span className="spinner" />
             <p>Đang tải đăng ký...</p>
           </div>
-        ) : (
+        ) : loadError ? null : (
           <div className="table-container">
             <table className="data-table">
               <thead>
@@ -309,6 +323,12 @@ export function RegistrationsPage() {
             </table>
           </div>
         )}
+        {!student && totalReviewPages > 1 && <nav className="table-pagination" aria-label="Phân trang hồ sơ đăng ký">
+          <span>Trang {reviewPage + 1} / {totalReviewPages}</span><div>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={loading || reviewPage === 0} onClick={() => setReviewPage(value => value - 1)}>Trang trước</button>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={loading || reviewPage + 1 >= totalReviewPages} onClick={() => setReviewPage(value => value + 1)}>Trang sau</button>
+          </div>
+        </nav>}
       </section>
     </>
   )

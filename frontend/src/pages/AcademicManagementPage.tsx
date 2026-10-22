@@ -3,7 +3,7 @@ import { DateTimeInput } from '../components/DateTimeInput'
 import { AnimatedSelect } from '../components/AnimatedSelect'
 import React, { useCallback, useEffect, useState } from 'react'
 import { academicApi } from '../api/academic'
-import { allPages } from '../api/student'
+import { useRequestLoading } from '../hooks/useRequestLoading'
 import { StatusBadge } from '../components/StatusBadge'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { useAuth } from '../context/AuthContext'
@@ -36,7 +36,11 @@ export const AcademicManagementPage: React.FC = () => {
 
   // Registration Periods state
   const [periods, setPeriods] = useState<RegistrationPeriodResponse[]>([])
-  const [loadingPeriods, setLoadingPeriods] = useState(true)
+  const [periodPage, setPeriodPage] = useState(0)
+  const [periodRevision, setPeriodRevision] = useState(0)
+  const [totalPeriodPages, setTotalPeriodPages] = useState(0)
+  const [periodError, setPeriodError] = useState('')
+  const [loadingPeriods, setLoadingPeriods] = useRequestLoading(JSON.stringify([user?.id, periodPage, periodRevision]))
   const [isPeriodModalOpen, setIsPeriodModalOpen] = useState(false)
   const [submittingPeriod, setSubmittingPeriod] = useState(false)
   const [pendingStatusChange, setPendingStatusChange] = useState<{
@@ -108,21 +112,29 @@ export const AcademicManagementPage: React.FC = () => {
       .then(setFaculties)
       .catch((error) => showError(error.message))
     academicApi.getSemesters().then(setSemesters)
+      .catch(() => showError('Không tải được danh sách học kỳ. Vui lòng tải lại trang trước khi tạo đợt.'))
   }, [showError])
 
   // Load registration periods
-  const loadRegistrationPeriods = useCallback(() => {
-    return allPages(page => academicApi.getRegistrationPeriods(undefined, page, 100))
-      .then(setPeriods)
-      .catch((err) =>
-        showError('Lỗi tải đợt đăng ký: ' + (err.response?.data?.message || err.message)),
-      )
-      .finally(() => setLoadingPeriods(false))
-  }, [showError])
+  const loadRegistrationPeriods = useCallback((isCurrent: () => boolean) => {
+    return academicApi.getRegistrationPeriods(undefined, periodPage, 10)
+      .then(result => {
+        if (!isCurrent()) return
+        setPeriods(result.content)
+        setTotalPeriodPages(result.totalPages)
+        setPeriodError('')
+      })
+      .catch(() => {
+        if (isCurrent()) setPeriodError('Không tải được danh sách đợt đăng ký. Vui lòng thử lại.')
+      })
+      .finally(() => { if (isCurrent()) setLoadingPeriods(false) })
+  }, [periodPage, setLoadingPeriods])
 
   useEffect(() => {
-    loadRegistrationPeriods()
-  }, [loadRegistrationPeriods])
+    let current = true
+    void loadRegistrationPeriods(() => current)
+    return () => { current = false }
+  }, [loadRegistrationPeriods, periodRevision])
 
   const handleCreatePeriod = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -197,7 +209,7 @@ export const AcademicManagementPage: React.FC = () => {
 
     try {
       setSubmittingPeriod(true)
-      const created = await academicApi.createRegistrationPeriod({
+      await academicApi.createRegistrationPeriod({
         ...newPeriod,
         name: newPeriod.name.trim(),
         proposalStartAt: new Date(newPeriod.proposalStartAt).toISOString(),
@@ -210,7 +222,8 @@ export const AcademicManagementPage: React.FC = () => {
         defenseDate: requiresDefense ? newPeriod.defenseDate : null,
       })
       showSuccess('Tạo đợt đăng ký thành công ở trạng thái nháp!')
-      setPeriods((prev) => [created, ...prev])
+      setPeriodPage(0)
+      setPeriodRevision(value => value + 1)
       setIsPeriodModalOpen(false)
       setNewPeriod({
         facultyId: 0,
@@ -279,12 +292,13 @@ export const AcademicManagementPage: React.FC = () => {
           )}
         </div>
 
+        {periodError && !loadingPeriods && <div role="alert"><p>{periodError}</p><button type="button" className="btn btn-secondary" onClick={() => setPeriodRevision(value => value + 1)}>Thử lại</button></div>}
         {loadingPeriods ? (
           <div className="text-center py-8">
             <div className="spinner" />
             <p className="text-secondary mt-2">Đang tải danh sách đợt đăng ký...</p>
           </div>
-        ) : periods.length === 0 ? (
+        ) : periodError ? null : periods.length === 0 ? (
           <p className="text-secondary text-center py-6">Chưa có đợt đăng ký nào.</p>
         ) : (
           <div className="table-container">
@@ -313,7 +327,7 @@ export const AcademicManagementPage: React.FC = () => {
                 {periods.map((p, idx) => {
                   const nextStatus = nextPeriodStatus(p.status)
                   return <tr key={p.id}>
-                    <td>{idx + 1}</td>
+                    <td>{periodPage * 10 + idx + 1}</td>
                     <td className="registration-periods-table__period">
                       <strong>{p.name}</strong>
                       <span>
@@ -373,6 +387,12 @@ export const AcademicManagementPage: React.FC = () => {
             </table>
           </div>
         )}
+        {totalPeriodPages > 1 && <nav className="table-pagination" aria-label="Phân trang đợt đăng ký">
+          <span>Trang {periodPage + 1} / {totalPeriodPages}</span><div>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={loadingPeriods || periodPage === 0} onClick={() => setPeriodPage(value => value - 1)}>Trang trước</button>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={loadingPeriods || periodPage + 1 >= totalPeriodPages} onClick={() => setPeriodPage(value => value + 1)}>Trang sau</button>
+          </div>
+        </nav>}
       </div>
 
       <ConfirmModal
@@ -399,6 +419,7 @@ export const AcademicManagementPage: React.FC = () => {
               <button
                 type="button"
                 className="btn-close"
+                aria-label="Đóng biểu mẫu đợt đăng ký"
                 onClick={() => setIsPeriodModalOpen(false)}
               >
                 &times;

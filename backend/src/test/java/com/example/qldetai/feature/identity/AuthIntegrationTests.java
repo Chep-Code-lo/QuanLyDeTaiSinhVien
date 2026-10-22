@@ -280,6 +280,19 @@ class AuthIntegrationTests {
                 .andExpect(jsonPath("$.data.content[0].fullName").value("Nguyen Van Search"))
                 .andExpect(jsonPath("$.data.content[0].facultyId").value(faculty.getId()))
                 .andExpect(jsonPath("$.data.content[0].departmentId").value(targetDepartment.getId()));
+
+        mockMvc.perform(get("/api/v1/lecturers").session(session)
+                        .param("lecturerId", matched.getId().toString()).param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].id").value(matched.getId()));
+        mockMvc.perform(get("/api/v1/lecturers").session(session)
+                        .param("lecturerId", matched.getId().toString())
+                        .param("departmentId", otherDepartment.getId().toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        mockMvc.perform(get("/api/v1/lecturers").session(session)
+                        .param("lecturerId", locked.getId().toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
     }
 
     @Test

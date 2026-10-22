@@ -147,7 +147,8 @@ public class DefenseSessionService {
                 committee.getId(), request.startsAt(), request.endsAt()).isEmpty()) {
             throw new ConflictException("The committee already has a defense in this time range.");
         }
-        if (!defenses.findRoomConflictsForUpdate(request.location(), request.startsAt(), request.endsAt()).isEmpty()) {
+        if (!defenses.findRoomConflictsForUpdate(DefenseLocation.key(request.location()),
+                DefenseLocation.NORMALIZATION_PATTERN, request.startsAt(), request.endsAt()).isEmpty()) {
             throw new ConflictException("Phòng đã có lịch bảo vệ trong khoảng thời gian này. Vui lòng chọn phòng hoặc thời gian khác.");
         }
         if (!defenses.findLecturerConflictsForUpdate(

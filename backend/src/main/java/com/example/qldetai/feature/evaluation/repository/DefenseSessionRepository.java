@@ -32,9 +32,9 @@ public interface DefenseSessionRepository
     @Query("""
             select d from DefenseSession d
             where d.status = 'SCHEDULED' and d.startsAt < :endsAt and d.endsAt > :startsAt
-              and lower(trim(d.location)) = lower(trim(:location))
+              and function('regexp_replace', lower(trim(d.location)), :pattern, '') = :locationKey
             """)
-    List<DefenseSession> findRoomConflictsForUpdate(String location, LocalDateTime startsAt, LocalDateTime endsAt);
+    List<DefenseSession> findRoomConflictsForUpdate(String locationKey, String pattern, LocalDateTime startsAt, LocalDateTime endsAt);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
@@ -45,6 +45,7 @@ public interface DefenseSessionRepository
             """)
     List<DefenseSession> findLecturerConflictsForUpdate(List<Long> lecturerIds, LocalDateTime startsAt, LocalDateTime endsAt);
 
+    @EntityGraph(attributePaths = {"assignment.topic", "assignment.group", "period", "committee"})
     @Query("""
             select defense from DefenseSession defense
             join GroupMember member on member.group.id = defense.assignment.group.id

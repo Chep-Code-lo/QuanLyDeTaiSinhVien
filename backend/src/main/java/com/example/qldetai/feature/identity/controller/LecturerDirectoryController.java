@@ -24,11 +24,12 @@ public class LecturerDirectoryController {
 
     @GetMapping
     public ApiResponse<PageResponse<LecturerDirectoryResponse>> list(
+            @RequestParam(required = false) Long lecturerId,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long facultyId,
             @RequestParam(required = false) Long departmentId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(lecturerDirectoryService.list(search, facultyId, departmentId, page, size));
+        return ApiResponse.success(lecturerDirectoryService.list(lecturerId, search, facultyId, departmentId, page, size));
     }
 }

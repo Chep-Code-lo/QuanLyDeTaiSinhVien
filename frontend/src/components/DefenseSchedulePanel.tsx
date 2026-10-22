@@ -56,9 +56,11 @@ export function DefenseSchedulePanel({ committees, projects, defenses, periods =
     return () => { live = false }
   }, [projectId, committeeId, eligibilityKey])
   // MySQL currently allows one session per project, including completed/cancelled sessions.
-  const available = projects.filter(project => project.status !== 'CANCELLED' && project.status !== 'COMPLETED'
+  const available = projects.filter(project => (!committee || project.periodId === committee.periodId)
+    && project.status !== 'CANCELLED' && project.status !== 'COMPLETED'
     && !defenses.some(defense => defense.assignmentId === project.id))
   const savedCommittees = committees.filter(committee => committee.status !== 'COMPLETED')
+  const selectedProject = available.find(project => String(project.id) === projectId)
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -119,7 +121,7 @@ export function DefenseSchedulePanel({ committees, projects, defenses, periods =
       <fieldset disabled={saving || refreshNeeded || !savedCommittees.length}>
         <div className="ea-grid">
           <div className="ea-field"><label htmlFor="schedule-committee">Hội đồng đã lưu *</label>
-            <AnimatedSelect id="schedule-committee" required value={committeeId} onChange={event => { setCommitteeId(event.target.value); setEligibility(null); setError('') }}>
+            <AnimatedSelect id="schedule-committee" required value={committeeId} onChange={event => { setCommitteeId(event.target.value); setProjectId(''); setEligibility(null); setError('') }}>
               <option value="">Chọn hội đồng</option>{savedCommittees.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
             </AnimatedSelect></div>
           <div className="ea-field"><label htmlFor="schedule-project">Đề tài / nhóm *</label>
@@ -127,7 +129,7 @@ export function DefenseSchedulePanel({ committees, projects, defenses, periods =
               <option value="">{available.length ? 'Chọn đề tài chưa có lịch' : 'Không còn đề tài chưa xếp lịch'}</option>
               {available.map(item => <option key={item.id} value={item.id}>{item.topicCode} · {item.topicTitle} · {item.groupName}</option>)}
             </AnimatedSelect></div>
-          <div className="ea-field"><label htmlFor="schedule-location">Địa điểm *</label><input id="schedule-location" className="form-input" required maxLength={255} value={location} onChange={event => setLocation(event.target.value)} /></div>
+          <div className="ea-field"><label htmlFor="schedule-location">Địa điểm *</label><input id="schedule-location" className="form-input" required maxLength={200} value={location} onChange={event => setLocation(event.target.value)} /></div>
           <div className="ea-field"><label htmlFor="schedule-start">Bắt đầu *</label><DateTimeInput id="schedule-start" type="datetime-local" required min={fixedDate ? `${fixedDate}T00:00` : undefined} max={fixedDate ? `${fixedDate}T23:59` : undefined} aria-invalid={!!dateError} value={startsAt} onValueChange={setStartsAt} /></div>
           <div className="ea-field"><label htmlFor="schedule-end">Kết thúc *</label><DateTimeInput id="schedule-end" type="datetime-local" required min={fixedDate ? `${fixedDate}T00:00` : undefined} max={fixedDate ? `${fixedDate}T23:59` : undefined} aria-invalid={!!dateError} value={endsAt} onValueChange={setEndsAt} /></div>
         </div>
@@ -144,7 +146,7 @@ export function DefenseSchedulePanel({ committees, projects, defenses, periods =
       })}</tbody>
     </table></div>}
     <ConfirmModal isOpen={confirming} title="Xác nhận xếp lịch bảo vệ"
-      message={`Xếp lịch cho ${available.find(project => String(project.id) === projectId)?.topicCode ?? ''} tại ${location}, từ ${graduation ? formatDateInput(startsAt, true) : formatDateTime(startsAt)} đến ${graduation ? formatDateInput(endsAt, true) : formatDateTime(endsAt)}${graduation ? ' (giờ Việt Nam)' : ''}?`}
+      message={`Xếp lịch cho ${selectedProject?.topicCode ?? ''} · ${selectedProject?.topicTitle ?? ''} · ${selectedProject?.groupName ?? ''}, hội đồng ${committee?.name ?? ''}, tại ${location}, từ ${graduation ? formatDateInput(startsAt, true) : formatDateTime(startsAt)} đến ${graduation ? formatDateInput(endsAt, true) : formatDateTime(endsAt)}${graduation ? ' (giờ Việt Nam)' : ''}?`}
       confirmText="Xác nhận xếp lịch" variant="primary" loading={saving} onConfirm={() => void save()} onCancel={() => { if (!saving) setConfirming(false) }} />
   </section>
 }

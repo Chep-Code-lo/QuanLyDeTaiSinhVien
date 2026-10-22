@@ -45,7 +45,7 @@ public final class EvaluationAdminDtos {
     public record CreateDefenseRequest(
             @NotNull Long assignmentId,
             @NotNull Long committeeId,
-            @NotBlank @Size(max = 255) String location,
+            @NotBlank @Size(max = 200) String location,
             @NotNull LocalDateTime startsAt,
             @NotNull LocalDateTime endsAt) {
     }

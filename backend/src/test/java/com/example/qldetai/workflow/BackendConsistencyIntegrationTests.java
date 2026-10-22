@@ -80,6 +80,7 @@ class BackendConsistencyIntegrationTests {
     @Autowired DepartmentRepository departments;
     @Autowired SemesterRepository semesters;
     @Autowired RegistrationPeriodRepository periods;
+    @Autowired com.example.qldetai.feature.academic.service.RegistrationPeriodService periodService;
     @Autowired UserRepository users;
     @Autowired RoleRepository roles;
     @Autowired AcademicAppointmentRepository auditAppointments;
@@ -408,7 +409,7 @@ class BackendConsistencyIntegrationTests {
         addCommitteeMember(committee, lecturerB, 2, CommitteeRole.SECRETARY);
         addCommitteeMember(committee, lecturerD, 3, CommitteeRole.MEMBER);
         LocalDateTime starts = now().plusDays(2); LocalDateTime ends = starts.plusHours(1);
-        assertOneSuccess(race(() -> defenses.schedule(new CreateDefenseRequest(first, committee, roomPrefix + "-A1", starts, ends), admin.getId()),
+        assertOneDefenseSuccess(race(() -> defenses.schedule(new CreateDefenseRequest(first, committee, roomPrefix + "-A1", starts, ends), admin.getId()),
                 () -> defenses.schedule(new CreateDefenseRequest(second, committee, roomPrefix + "-A2", starts, ends), admin.getId())));
         assertThat(defenses.listDefenses(period.getId(), committee, 0, 20).totalElements()).isEqualTo(1);
     }
@@ -420,7 +421,7 @@ class BackendConsistencyIntegrationTests {
         Long left = fullCommittee(lecturerA, lecturerB, lecturerD);
         Long right = tx.execute(status -> fullCommittee(lecturer(), lecturer(), lecturer()));
         LocalDateTime starts = now().plusDays(2);
-        assertOneSuccess(race(
+        assertOneDefenseSuccess(race(
                 () -> defenses.schedule(new CreateDefenseRequest(first, left, " " + roomPrefix + "-Room-A ", starts, starts.plusHours(1)), admin.getId()),
                 () -> defenses.schedule(new CreateDefenseRequest(second, right, roomPrefix + "-room-a", starts, starts.plusHours(1)), admin.getId())));
     }
@@ -432,9 +433,81 @@ class BackendConsistencyIntegrationTests {
         Long left = fullCommittee(lecturerA, lecturerB, lecturerD);
         Long right = tx.execute(status -> fullCommittee(lecturerA, lecturer(), lecturer()));
         LocalDateTime starts = now().plusDays(2);
-        assertOneSuccess(race(
+        assertOneDefenseSuccess(race(
                 () -> defenses.schedule(new CreateDefenseRequest(first, left, roomPrefix + "-B1", starts, starts.plusHours(1)), admin.getId()),
                 () -> defenses.schedule(new CreateDefenseRequest(second, right, roomPrefix + "-B2", starts.plusMinutes(30), starts.plusHours(2)), admin.getId())));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"Phòng ", "phòng ", "PHONG ", ""})
+    void roomAliasesCannotBypassConflictChecks(String prefix) throws Exception {
+        Long first = assignedProject();
+        Long second = secondProject();
+        Long left = fullCommittee(lecturerA, lecturerB, lecturerD);
+        Long right = tx.execute(status -> fullCommittee(lecturer(), lecturer(), lecturer()));
+        LocalDateTime starts = now().plusDays(2);
+        // The stored label simulates a legacy room; normalization must not rewrite it.
+        String legacyLabel = "\u00a0Phòng " + roomPrefix + " A 101";
+        defenses.schedule(new CreateDefenseRequest(first, left, legacyLabel, starts, starts.plusHours(1)), admin.getId());
+        assertThatThrownBy(() -> defenses.schedule(new CreateDefenseRequest(second, right,
+                prefix + roomPrefix.toLowerCase(java.util.Locale.ROOT) + "A101", starts, starts.plusHours(1)), admin.getId()))
+                .isInstanceOf(ConflictException.class).hasMessageContaining("Phòng");
+        assertThat(defenses.listDefenses(period.getId(), left, 0, 20).content().getFirst().location())
+                .isEqualTo(legacyLabel);
+    }
+
+    @Test
+    void concurrentRoomAliasesAllowOnlyOneScheduledSession() throws Exception {
+        Long first = assignedProject();
+        Long second = secondProject();
+        Long left = fullCommittee(lecturerA, lecturerB, lecturerD);
+        Long right = tx.execute(status -> fullCommittee(lecturer(), lecturer(), lecturer()));
+        LocalDateTime starts = now().plusDays(2);
+        assertOneDefenseSuccess(race(
+                () -> defenses.schedule(new CreateDefenseRequest(first, left, "Phòng " + roomPrefix + " A 101", starts, starts.plusHours(1)), admin.getId()),
+                () -> defenses.schedule(new CreateDefenseRequest(second, right, roomPrefix + "A101", starts, starts.plusHours(1)), admin.getId())));
+        assertThat(defenses.listDefenses(period.getId(), null, 0, 20).totalElements()).isEqualTo(1);
+    }
+
+    @Test
+    void existingGraduationSchedulePreventsChangingThePeriodDate() {
+        Long project = assignedProject();
+        Long committee = fullCommittee(lecturerA, lecturerB, lecturerD);
+        LocalDateTime starts = now().plusDays(5);
+        tx.executeWithoutResult(status -> {
+            var current = periods.findById(period.getId()).orElseThrow();
+            current.setProjectType(ProjectType.GRADUATION);
+            current.setReviewDeadlineAt(starts.minusHours(1));
+            current.setDefenseDate(com.example.qldetai.common.time.VietnamTime.dateOf(starts));
+        });
+        defenses.schedule(new CreateDefenseRequest(project, committee, roomPrefix, starts, starts.plusHours(1)), admin.getId());
+        var current = periodService.get(period.getId());
+        var request = new com.example.qldetai.feature.academic.dto.AcademicDtos.UpdateRegistrationPeriodRequest(
+                current.version(), current.semesterId(), current.name(), current.projectType(),
+                current.proposalStartAt(), current.proposalEndAt(), current.registrationStartAt(), current.registrationEndAt(),
+                current.reviewDeadlineAt(), current.defenseDate().plusDays(1));
+        assertThatThrownBy(() -> periodService.update(current.id(), request))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("Only a draft");
+        assertThat(periodService.get(current.id()).defenseDate()).isEqualTo(current.defenseDate());
+    }
+
+    @Test
+    void studentDefenseListFetchesDisplayRelationsInOneQuery() {
+        Long project = assignedProject();
+        Long committee = fullCommittee(lecturerA, lecturerB, lecturerD);
+        LocalDateTime starts = now().plusDays(2);
+        defenses.schedule(new CreateDefenseRequest(project, committee, roomPrefix, starts, starts.plusHours(1)), admin.getId());
+        var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        tx.executeWithoutResult(status -> {
+            entityManager.clear();
+            statistics.clear();
+            var list = defenses.listDefensesForStudent(leaderA.getUser().getId());
+            assertThat(list).hasSize(1);
+            assertThat(list.getFirst().groupName()).isNotBlank();
+            assertThat(list.getFirst().topicTitle()).isNotBlank();
+            assertThat(list.getFirst().committeeName()).isNotBlank();
+            assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+        });
     }
 
     @Test
@@ -787,5 +860,11 @@ class BackendConsistencyIntegrationTests {
         assertThat(outcomes.stream().filter(Throwable.class::isInstance).map(Throwable.class::cast).toList())
                 .allSatisfy(error -> assertThat(error).isInstanceOfAny(BusinessRuleException.class, ConflictException.class,
                         org.springframework.dao.ConcurrencyFailureException.class, org.springframework.dao.DataIntegrityViolationException.class));
+    }
+
+    private void assertOneDefenseSuccess(List<Object> outcomes) {
+        assertOneSuccess(outcomes);
+        assertThat(outcomes.stream().filter(Throwable.class::isInstance).toList())
+                .allMatch(ConflictException.class::isInstance);
     }
 }

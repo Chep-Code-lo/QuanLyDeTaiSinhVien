@@ -45,6 +45,7 @@ public interface LecturerRepository extends JpaRepository<Lecturer, Long> {
             join l.department d
             join d.faculty f
             where u.status = :status
+              and (:lecturerId is null or l.id = :lecturerId)
               and (:facultyId is null or f.id = :facultyId)
               and (:departmentId is null or d.id = :departmentId)
               and (:search is null
@@ -52,6 +53,7 @@ public interface LecturerRepository extends JpaRepository<Lecturer, Long> {
                    or lower(l.lecturerCode) like lower(concat('%', :search, '%')))
             """)
     Page<Lecturer> search(
+            @Param("lecturerId") Long lecturerId,
             @Param("search") String search,
             @Param("facultyId") Long facultyId,
             @Param("departmentId") Long departmentId,

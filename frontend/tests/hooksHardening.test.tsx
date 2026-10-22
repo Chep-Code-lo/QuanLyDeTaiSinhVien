@@ -27,6 +27,7 @@ it('không thay lựa chọn mới khi request lấy giảng viên cũ hoàn t�
   mocks.list.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
   const { rerender } = render(<LecturerAutocomplete value={1} onChange={mocks.change} />)
   await waitFor(() => expect(mocks.list).toHaveBeenCalledOnce())
+  expect(mocks.list).toHaveBeenCalledWith(expect.objectContaining({ lecturerId: 1, page: 0, size: 1 }))
   rerender(<LecturerAutocomplete value={2} selectedOption={lecturerB} onChange={mocks.change} />)
   await act(async () => { resolveOld(page([lecturerA])) })
   expect(screen.getByText('Giảng viên B')).toBeTruthy()

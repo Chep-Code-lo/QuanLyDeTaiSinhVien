@@ -126,9 +126,10 @@ public class SecurityConfig {
     @Bean
     PasswordEncoder passwordEncoder() {
         PasswordEncoder bcrypt = new BCryptPasswordEncoder(12);
-        var encoder = new DelegatingPasswordEncoder("pbkdf2", Map.of(
+        var encoder = new DelegatingPasswordEncoder("bcrypt", Map.of(
                 "pbkdf2", Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8(), "bcrypt", bcrypt));
-        // Existing BCrypt hashes have no prefix. New hashes support the full 100-character policy.
+        // Keep BCrypt for new passwords. Retain readers for previously stored hashes.
+        // BCrypt's 72-byte limit remains separate from the DTO's 100-character limit.
         encoder.setDefaultPasswordEncoderForMatches(bcrypt);
         return encoder;
     }

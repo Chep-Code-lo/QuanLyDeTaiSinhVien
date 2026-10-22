@@ -3,6 +3,7 @@ import type { ApiResponse, PageResponse } from '../types/api'
 import type { LecturerDirectoryResponse } from '../types/domain'
 
 export interface ListLecturersParams {
+  lecturerId?: number
   search?: string
   facultyId?: number
   departmentId?: number

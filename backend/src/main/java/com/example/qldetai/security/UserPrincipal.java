@@ -19,6 +19,11 @@ public record UserPrincipal(
         UserStatus status,
         Set<RoleCode> roles) implements UserDetails {
 
+    @Override
+    public String toString() {
+        return "UserPrincipal[id=" + id + ", status=" + status + ", roles=" + roles + "]";
+    }
+
     public static UserPrincipal from(User user) {
         Set<RoleCode> roles = user.getUserRoles().stream()
                 .map(userRole -> userRole.getRole().getCode())

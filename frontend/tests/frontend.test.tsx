@@ -147,12 +147,13 @@ describe('Hồi quy frontend', () => {
   })
 
   it('khôi phục đúng giảng viên ở trang sau, không nhầm userId với lecturerId', async () => {
-    mocks.lecturers.mockImplementation(({ page: index }) => Promise.resolve(page(index === 0
-      ? [{ id: 1, userId: 7, fullName: 'Giảng viên không được chọn', lecturerCode: 'GV01' }]
-      : [{ id: 7, userId: 12, fullName: 'Giảng viên được chọn', lecturerCode: 'GV07' }], 2)))
+    mocks.lecturers.mockImplementation(({ lecturerId }) => Promise.resolve(page(lecturerId === 7
+      ? [{ id: 7, userId: 12, fullName: 'Giảng viên được chọn', lecturerCode: 'GV07' }]
+      : [{ id: 1, userId: 7, fullName: 'Giảng viên không được chọn', lecturerCode: 'GV01' }], 1)))
     mount(<LecturerAutocomplete value={7} onChange={vi.fn()} />)
     expect(await screen.findByText('Giảng viên được chọn')).toBeTruthy()
     expect(screen.queryByText('Giảng viên không được chọn')).toBeNull()
+    expect(mocks.lecturers).toHaveBeenCalledWith(expect.objectContaining({ lecturerId: 7, page: 0, size: 1 }))
   })
 
   it('mở lại thành phần và bộ tiêu chí đã lưu mà không tạo mới', async () => {

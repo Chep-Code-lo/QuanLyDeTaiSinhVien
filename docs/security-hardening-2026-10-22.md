@@ -1,5 +1,7 @@
 # Hoàn thiện bảo mật và frontend — 22/10/2026
 
+**Cập nhật theo lựa chọn người dùng:** giữ BCrypt khi ghi mật khẩu mới. Phần mô tả PBKDF2 ở phiên bản báo cáo trước đã được thay thế bởi quyết định này; xem báo cáo audit cuối để biết kết quả kiểm thử mới nhất.
+
 Thực hiện 7 mục, mỗi mục một commit. Không push, không deploy, không thay đổi schema hoặc dữ liệu production.
 
 ## Thay đổi
@@ -7,7 +9,7 @@ Thực hiện 7 mục, mỗi mục một commit. Không push, không deploy, kh�
 1. **Upload:** giới hạn file 20 MB và request 21 MB; lỗi vượt dung lượng trả HTTP 413 theo `ApiResponse.failure` với thông báo “Tệp quá lớn. Tối đa 20 MB.”
 2. **File:** whitelist PDF, Office, ZIP, PNG, JPG/JPEG, TXT; đối chiếu MIME với đuôi file và kiểm tra signature nội dung. MIME rỗng/octet-stream chỉ được chấp nhận sau kiểm tra định dạng, rồi lưu MIME chuẩn. Chặn preview SVG, kể cả file cũ. Preview có CSP sandbox và nosniff; download cũng có nosniff.
 3. **Đăng nhập:** tối đa 5 lần sai theo cặp username đã chuẩn hóa + IP trong cửa sổ trượt 15 phút; quá giới hạn trả 429 bằng tiếng Việt. Kiểm tra và cập nhật cùng cặp được tuần tự hóa, bộ đếm có TTL và giới hạn bộ nhớ. Thành công xóa số lần sai. Có test TTL, ranh giới cửa sổ, reset, tách cặp và request đồng thời.
-4. **Mật khẩu:** hai DTO backend có cùng nhóm ký tự Unicode như frontend; sửa chính tả thông báo. BCrypt của phiên bản hiện tại từ chối encode trên 72 byte, nên dùng PBKDF2 cho mật khẩu mới để hỗ trợ giới hạn 100 ký tự. Encoder vẫn xác thực hash BCrypt cũ, có hoặc không có prefix. Không tự chuyển đổi hash đang lưu.
+4. **Mật khẩu:** hai DTO backend có cùng nhóm ký tự Unicode như frontend; sửa chính tả thông báo. Theo lựa chọn người dùng, giữ BCrypt cho mật khẩu mới; giới hạn 72 byte UTF-8 vẫn tồn tại dù DTO cho tối đa 100 ký tự. Encoder vẫn xác thực BCrypt cũ có/không prefix và PBKDF2 nếu đã được lưu từ bản trước. Không tự chuyển đổi hash đang lưu.
 5. **Session:** sau khi transaction đổi mật khẩu commit, cập nhật trạng thái xác thực của phiên hiện tại. Những phiên còn giữ hash cũ bị trả 401 và invalidate ở request tiếp theo. Đổi thất bại không thu hồi phiên. Không thêm bảng hoặc dịch vụ session mới.
 6. **Triển khai:** bỏ wildcard tunnel khỏi CORS mặc định; chỉ bật qua `CORS_ALLOWED_ORIGINS`. Nginx có CSP, DENY, Referrer-Policy và nosniff, bao gồm các location tự khai báo Cache-Control. Backend chạy UID/GID 10001; service khởi tạo quyền volume giữ nguyên nội dung file cũ. Compose yêu cầu mật khẩu MySQL khác rỗng. Demo có env riêng, chỉ dùng local.
 7. **Frontend:** chạy `npm audit fix`, nâng mức Vite tối thiểu lên 8.3.5. Sửa hai nhóm cảnh báo hook được yêu cầu, bắt đầu ở autocomplete; giữ hủy kết quả cũ khi đổi lựa chọn. Trạng thái tải theo request key, reset form trước khi hiển thị dữ liệu mới và dependency ổn định. Không tắt rule lint.
@@ -33,7 +35,7 @@ Thực hiện 7 mục, mỗi mục một commit. Không push, không deploy, kh�
 5. Khai báo `MYSQL_ROOT_PASSWORD`, `MYSQL_APP_PASSWORD`, CORS cần dùng và kiểm tra quyền file sau khi chuyển sang user 10001. Bước init volume chỉ đổi chủ sở hữu, không xóa nội dung; cần được tính vào quy trình triển khai hiện có.
 6. Kiểm tra CSP với trang đăng nhập, form, xem trước báo cáo và mẫu email. Nếu có tài nguyên ngoài domain đang dùng thực tế, bổ sung nguồn cụ thể sau khi xác minh; không mở wildcard mặc định.
 
-Mật khẩu mới có prefix `{pbkdf2}`. Khi rollback, backend vẫn cần giữ khả năng đọc PBKDF2; phiên bản cũ chỉ hỗ trợ BCrypt không xác thực được hash mới. Không có migration dữ liệu tự động trong thay đổi này.
+Mật khẩu mới có prefix `{bcrypt}`. Mật khẩu vượt 72 byte có thể qua validation 100 ký tự nhưng bị encoder từ chối; không cắt ngầm mật khẩu. Khi rollback, vẫn phải giữ khả năng đọc các định dạng hash đã lưu nếu có. Không có migration dữ liệu tự động.
 
 Demo local dùng project/volume riêng:
 

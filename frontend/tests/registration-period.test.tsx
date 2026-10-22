@@ -35,7 +35,11 @@ beforeEach(() => {
   mocks.create.mockReset()
   mocks.error.mockReset()
   mocks.success.mockReset()
-  mocks.create.mockImplementation(async payload => ({ ...payload, id: 1, version: 0, status: 'DRAFT' }))
+  mocks.create.mockImplementation(async payload => {
+    const created = { ...payload, id: 1, version: 0, status: 'DRAFT' }
+    mocks.periods = [created, ...mocks.periods]
+    return created
+  })
   mocks.changeStatus.mockImplementation(async (_id, payload) => ({
     ...registrationPeriod('CLOSED'),
     status: payload.status,
@@ -121,7 +125,7 @@ describe('Trưởng khoa tạo đợt đăng ký', () => {
     expect(payload).not.toHaveProperty('maxCommitteeMembers')
     expect(mocks.error).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).toBeNull()
-    if (type === 'GRADUATION') expect(screen.getByText('28/02/2099')).toBeTruthy()
+    if (type === 'GRADUATION') expect(await screen.findByText('28/02/2099')).toBeTruthy()
   })
 
   it('xóa mốc không áp dụng khi đổi KLTN sang TLCN rồi môn học', async () => {

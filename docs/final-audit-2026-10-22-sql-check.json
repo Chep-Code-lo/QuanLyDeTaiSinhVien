@@ -1,0 +1,11 @@
+{
+  "database": "isolated MySQL 8.4 tmpfs",
+  "clean_fixture_conflicts": 0,
+  "injected_issues_detected": [
+    "COMMITTEE_OVERLAP",
+    "GRADUATION_DATE",
+    "LECTURER_OVERLAP",
+    "ROOM_OVERLAP"
+  ],
+  "passed": true
+}

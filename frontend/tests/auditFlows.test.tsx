@@ -43,6 +43,18 @@ async function fillSchedule() {
   await waitFor(() => expect((screen.getByRole('button', { name: 'Xếp lịch bảo vệ' }) as HTMLButtonElement).disabled).toBe(false))
 }
 
+it('xác nhận đủ tên đề tài, nhóm, hội đồng và chỉ cho chọn đề tài cùng đợt', async () => {
+  render(<DefenseSchedulePanel committees={[committee]} projects={[project, { ...project, id: 52, periodId: 2, topicCode: 'OTHER' }]} defenses={[]} onScheduled={vi.fn()} />)
+  await fillSchedule()
+  expect(screen.queryByRole('option', { name: /OTHER/ })).toBeNull()
+  await userEvent.click(screen.getByRole('button', { name: 'Xếp lịch bảo vệ' }))
+  const dialog = screen.getByRole('dialog')
+  expect(dialog.textContent).toContain('DT01 · Quản lý đề tài · Nhóm A')
+  expect(dialog.textContent).toContain('hội đồng Hội đồng A')
+  expect(dialog.textContent).toContain('A5-305')
+  expect((screen.getByLabelText(/Địa điểm/) as HTMLInputElement).maxLength).toBe(200)
+})
+
 describe('Hồi quy audit', () => {
   it('mặc định ngày KLTN từ cấu hình và gửi giờ Việt Nam thành UTC kể cả lúc gần nửa đêm', async () => {
     render(<DefenseSchedulePanel periods={[graduationPeriod]} committees={[committee]} projects={[project]} defenses={[]} onScheduled={vi.fn()} />)
