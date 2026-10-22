@@ -42,7 +42,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest(properties = "server.forward-headers-strategy=framework")
+@SpringBootTest(properties = {"server.forward-headers-strategy=none", "app.security.trusted-proxies=127.0.0.1"})
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @AutoConfigureMockMvc(print = org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint.NONE)
 @Transactional

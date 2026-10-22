@@ -172,7 +172,7 @@ try {
     Set-EnvValue 'CSRF_COOKIE_SECURE' 'true'
     Set-EnvValue 'CSRF_COOKIE_SAME_SITE' 'lax'
     Set-EnvValue 'CSRF_COOKIE_DOMAIN' ''
-    Set-EnvValue 'SERVER_FORWARD_HEADERS_STRATEGY' 'framework'
+    Set-EnvValue 'SERVER_FORWARD_HEADERS_STRATEGY' 'none'
     [System.IO.File]::WriteAllText($envPath, $envText, $utf8)
 
     if ($Build) { & docker compose up -d --no-deps --build backend frontend }
