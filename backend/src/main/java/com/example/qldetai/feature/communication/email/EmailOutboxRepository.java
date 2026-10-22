@@ -63,6 +63,10 @@ public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, Long> 
             @Param("createdById") Long createdById,
             @Param("createdAt") LocalDateTime createdAt);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from EmailOutbox o where o.id = :id")
+    java.util.Optional<EmailOutbox> findByIdForUpdate(@Param("id") Long id);
+
     @EntityGraph(attributePaths = "recipientUser")
     java.util.Optional<EmailOutbox> findByIdAndStatus(Long id, EmailOutboxStatus status);
 
@@ -75,10 +79,14 @@ public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, Long> 
             """)
     List<EmailOutbox> lockReadyForDelivery(@Param("now") LocalDateTime now, Pageable pageable);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    List<EmailOutbox> findByStatusAndClaimedAtBefore(
-            EmailOutboxStatus status,
-            LocalDateTime claimedBefore,
+    @Query("""
+            select o.id from EmailOutbox o
+            where o.status = com.example.qldetai.feature.communication.email.EmailOutboxStatus.SENDING
+              and o.claimedAt < :claimedBefore
+            order by o.id
+            """)
+    List<Long> findStaleClaimIds(
+            @Param("claimedBefore") LocalDateTime claimedBefore,
             Pageable pageable);
 
     Page<EmailOutbox> findByFacultyIdIn(Collection<Long> facultyIds, Pageable pageable);
