@@ -91,7 +91,8 @@ services:
       FILE_STORAGE_ROOT: /data/files
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       SESSION_COOKIE_SAME_SITE: ${SESSION_COOKIE_SAME_SITE:-lax}
-      SERVER_FORWARD_HEADERS_STRATEGY: ${SERVER_FORWARD_HEADERS_STRATEGY:-framework}
+      # Trust only the frontend service, never arbitrary Docker/LAN peers.
+      TRUSTED_PROXY_ADDRESSES: ${TRUSTED_PROXY_ADDRESSES:-frontend}
       CSRF_COOKIE_SECURE: ${CSRF_COOKIE_SECURE:-false}
       CSRF_COOKIE_SAME_SITE: ${CSRF_COOKIE_SAME_SITE:-lax}
       CSRF_COOKIE_DOMAIN: ${CSRF_COOKIE_DOMAIN:-}
@@ -130,6 +131,9 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    environment:
+      NGINX_TRUSTED_PROXY_CIDRS: ${NGINX_TRUSTED_PROXY_CIDRS:-}
+      NGINX_REAL_IP_HEADER: ${NGINX_REAL_IP_HEADER:-CF-Connecting-IP}
     ports:
       # Expose only the web UI to the local Wi-Fi/LAN; the API and database
       # remain private behind the frontend reverse proxy.

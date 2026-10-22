@@ -10,6 +10,8 @@ import com.example.qldetai.feature.identity.dto.IdentityDtos.LoginResponse;
 import com.example.qldetai.feature.identity.repository.UserRepository;
 import com.example.qldetai.security.UserPrincipal;
 import com.example.qldetai.security.LoginAttemptLimiter;
+import com.example.qldetai.security.DatabaseUserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -45,18 +47,14 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
     private final LoginAttemptLimiter loginAttempts;
+    private final DatabaseUserDetailsService userDetails;
 
 
     @Transactional
     public LoginResponse login(
             LoginRequest request, HttpServletRequest httpRequest, HttpServletResponse response) {
-        if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
-            throw new BusinessRuleException(PasswordByteLength.MESSAGE);
-        }
         Authentication authentication =
-                loginAttempts.authenticate(request.username(), clientIp(httpRequest), () -> authenticationManager.authenticate(
-                        UsernamePasswordAuthenticationToken.unauthenticated(
-                                request.username().trim(), request.password())));
+                loginAttempts.authenticate(request.username(), clientIp(httpRequest), () -> authenticateExistingPassword(request));
         sessionAuthenticationStrategy.onAuthentication(authentication, httpRequest, response);
 
         SecurityContext context = SecurityContextHolder.createEmptyContext();
@@ -70,6 +68,22 @@ public class AuthService {
         user.setLastLoginAt(now);
         user.setLastLoginIp(clientIp(httpRequest));
         return new LoginResponse(userProfileService.toCurrentUser(user));
+    }
+
+    private Authentication authenticateExistingPassword(LoginRequest request) {
+        if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
+            // Read only the recorded algorithm identifier, never infer the original
+            // password length from a BCrypt hash. PBKDF2 verifies the entire input.
+            try {
+                if (!userDetails.loadUserByUsername(request.username()).getPassword().startsWith("{pbkdf2}")) {
+                    throw new BusinessRuleException(PasswordByteLength.MESSAGE);
+                }
+            } catch (UsernameNotFoundException ignored) {
+                throw new BusinessRuleException(PasswordByteLength.MESSAGE);
+            }
+        }
+        return authenticationManager.authenticate(UsernamePasswordAuthenticationToken.unauthenticated(
+                request.username().trim(), request.password()));
     }
 
     @Transactional(readOnly = true)

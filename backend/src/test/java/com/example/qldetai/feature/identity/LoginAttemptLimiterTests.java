@@ -103,6 +103,34 @@ class LoginAttemptLimiterTests {
     }
 
     @Test
+    void concurrentDistributedFailuresCannotBypassUsernameLimitOrBlockOtherAccounts() throws Exception {
+        var calls = new AtomicInteger();
+        var gate = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(8)) {
+            var tasks = new ArrayList<Future<?>>();
+            for (int index = 0; index < 64; index++) {
+                String ip = "ip-" + index;
+                tasks.add(pool.submit(() -> {
+                    gate.await();
+                    try {
+                        limiter.authenticate("distributed", ip, () -> {
+                            calls.incrementAndGet();
+                            throw new BadCredentialsException("invalid");
+                        });
+                    } catch (BadCredentialsException | TooManyRequestsException expected) {
+                        // Independent IPs share the same account budget.
+                    }
+                    assertThat(limiter.authenticate("other-" + ip, "shared-ip", () -> "ok")).isEqualTo("ok");
+                    return null;
+                }));
+            }
+            gate.countDown();
+            for (var task : tasks) task.get();
+        }
+        assertThat(calls.get()).isEqualTo(20);
+    }
+
+    @Test
     void concurrentFailuresStillRunOnlyFiveAuthentications() throws Exception {
         var calls = new AtomicInteger();
         var startGate = new CountDownLatch(1);
