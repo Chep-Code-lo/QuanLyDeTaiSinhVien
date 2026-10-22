@@ -116,14 +116,14 @@ public class AnnouncementService {
                         .orElseThrow(
                                 () ->
                                         new ResourceNotFoundException(
-                                                "Active faculty was not found."));
+                                                "Không tìm thấy khoa đang hoạt động."));
         User creator =
                 userRepository
                         .findById(actorId)
                         .orElseThrow(
                                 () ->
                                         new ResourceNotFoundException(
-                                                "Creating user was not found."));
+                                                "Không tìm thấy tài khoản tạo thông báo."));
 
         Announcement announcement = new Announcement();
         announcement.setFaculty(faculty);
@@ -141,7 +141,7 @@ public class AnnouncementService {
     public AnnouncementResponse update(Long id, UpdateAnnouncementRequest request) {
         Announcement announcement = requireAnnouncement(id);
         if (announcement.getStatus() != AnnouncementStatus.DRAFT) {
-            throw new BusinessRuleException("Only a draft announcement can be edited.");
+            throw new BusinessRuleException("Chỉ có thể sửa thông báo ở trạng thái nháp.");
         }
         apply(announcement, request.title(), request.content(), request.attachmentFileId());
         return toResponse(announcement);
@@ -155,7 +155,7 @@ public class AnnouncementService {
     public AnnouncementResponse publish(Long id) {
         Announcement announcement = requireAnnouncement(id);
         if (announcement.getStatus() != AnnouncementStatus.DRAFT) {
-            throw new BusinessRuleException("Only a draft announcement can be published.");
+            throw new BusinessRuleException("Chỉ có thể công bố thông báo ở trạng thái nháp.");
         }
         announcement.setStatus(AnnouncementStatus.PUBLISHED);
         announcement.setPublishedAt(LocalDateTime.now(clock));
@@ -170,7 +170,7 @@ public class AnnouncementService {
     public AnnouncementResponse archive(Long id) {
         Announcement announcement = requireAnnouncement(id);
         if (announcement.getStatus() != AnnouncementStatus.PUBLISHED) {
-            throw new BusinessRuleException("Only a published announcement can be archived.");
+            throw new BusinessRuleException("Chỉ có thể lưu trữ thông báo đã công bố.");
         }
         announcement.setStatus(AnnouncementStatus.ARCHIVED);
         return toResponse(announcement);
@@ -184,8 +184,7 @@ public class AnnouncementService {
     public void delete(Long id) {
         Announcement announcement = requireAnnouncement(id);
         if (announcement.getStatus() == AnnouncementStatus.PUBLISHED) {
-            throw new BusinessRuleException(
-                    "Archive a published announcement instead of deleting it.");
+            throw new BusinessRuleException("Hãy lưu trữ thông báo đã công bố thay vì xóa.");
         }
         announcementRepository.delete(announcement);
     }
@@ -201,13 +200,13 @@ public class AnnouncementService {
     private StoredFile requireAttachment(Long id) {
         return storedFileRepository
                 .findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Attachment file was not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tệp đính kèm."));
     }
 
     private Announcement requireAnnouncement(Long id) {
         return announcementRepository
                 .findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Announcement was not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông báo."));
     }
 
     private AnnouncementResponse toResponse(Announcement announcement) {

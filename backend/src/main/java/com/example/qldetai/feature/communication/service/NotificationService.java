@@ -70,7 +70,9 @@ public class NotificationService {
                 notificationRepository
                         .findByIdAndUserId(notificationId, userId)
                         .orElseThrow(
-                                () -> new ResourceNotFoundException("Notification was not found."));
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Không tìm thấy thông báo cá nhân."));
         if (notification.getReadAt() == null) {
             notification.setReadAt(LocalDateTime.now(clock));
         }
@@ -89,7 +91,7 @@ public class NotificationService {
                         .orElseThrow(
                                 () ->
                                         new ResourceNotFoundException(
-                                                "Notification recipient was not found."));
+                                                "Không tìm thấy người nhận thông báo."));
         Notification notification = new Notification();
         notification.setUser(user);
         notification.setEventKey(eventKey);

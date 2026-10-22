@@ -42,7 +42,7 @@ class GlobalExceptionHandlerTests {
                 .andExpect(
                         jsonPath("$.message")
                                 .value(
-                                        "The data was changed by another request. Reload and try again."))
+                                        "Dữ liệu đã được thay đổi bởi yêu cầu khác. Vui lòng tải lại và thử lại."))
                 .andExpect(jsonPath("$.stackTrace").doesNotExist());
     }
 
@@ -63,8 +63,82 @@ class GlobalExceptionHandlerTests {
                 .andExpect(jsonPath("$.success").value(false));
     }
 
+    @Test
+    void commonErrorsKeepTheirStatusAndNeverReturnInternalDiagnostics() throws Exception {
+        for (String[] sample :
+                new String[][] {
+                    {"business", "400", "Dữ liệu nghiệp vụ chưa hợp lệ."},
+                    {"authentication", "401", "Email hoặc mật khẩu không chính xác."},
+                    {"denied", "403", "Bạn không có quyền thực hiện thao tác này."},
+                    {"missing", "404", "Không tìm thấy thông báo."},
+                    {"integrity", "409", "Thay đổi bị trùng hoặc xung đột với dữ liệu hiện có."},
+                    {"limited", "429", "Bạn thao tác quá nhanh. Vui lòng thử lại sau."},
+                    {"unexpected", "500", "Hệ thống gặp lỗi. Vui lòng thử lại sau."}
+                }) {
+            mvc.perform(get("/probe/error").param("kind", sample[0]))
+                    .andExpect(status().is(Integer.parseInt(sample[1])))
+                    .andExpect(jsonPath("$.message").value(sample[2]))
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.stackTrace").doesNotExist())
+                    .andExpect(
+                            org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                                    .content()
+                                    .string(
+                                            org.hamcrest.Matchers.not(
+                                                    org.hamcrest.Matchers.containsString(
+                                                            "internal-diagnostic"))));
+        }
+    }
+
+    @Test
+    void validationFieldMessagesAreVietnameseAndDoNotReturnRejectedValues() throws Exception {
+        mvc.perform(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                                        "/probe/validation")
+                                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                                .content("{\"email\":\"invalid-address\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.email").value("Địa chỉ email không hợp lệ."))
+                .andExpect(jsonPath("$.data.name").value("Không được để trống."))
+                .andExpect(
+                        jsonPath("$.message")
+                                .value(
+                                        "Thông tin chưa hợp lệ. Vui lòng kiểm tra lại các trường đã nhập."));
+    }
+
     @RestController
     static class ProbeController {
+        @GetMapping("/probe/error")
+        void error(@RequestParam String kind) {
+            switch (kind) {
+                case "business" ->
+                        throw new BusinessRuleException("Dữ liệu nghiệp vụ chưa hợp lệ.");
+                case "authentication" ->
+                        throw new org.springframework.security.authentication
+                                .BadCredentialsException("internal-diagnostic");
+                case "denied" ->
+                        throw new org.springframework.security.access.AccessDeniedException(
+                                "internal-diagnostic");
+                case "missing" -> throw new ResourceNotFoundException("Không tìm thấy thông báo.");
+                case "integrity" ->
+                        throw new org.springframework.dao.DataIntegrityViolationException(
+                                "internal-diagnostic SELECT secret FROM users");
+                case "limited" ->
+                        throw new TooManyRequestsException(
+                                "Bạn thao tác quá nhanh. Vui lòng thử lại sau.");
+                default -> throw new IllegalStateException("internal-diagnostic");
+            }
+        }
+
+        @org.springframework.web.bind.annotation.PostMapping("/probe/validation")
+        void validation(
+                @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody
+                        ValidationProbe input) {}
+
+        record ValidationProbe(
+                @jakarta.validation.constraints.Email String email,
+                @jakarta.validation.constraints.NotBlank String name) {}
+
         @GetMapping("/probe/upload-size")
         void uploadSize() {
             throw new MaxUploadSizeExceededException(20 * 1024 * 1024);

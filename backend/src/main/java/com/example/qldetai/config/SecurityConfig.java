@@ -133,7 +133,7 @@ public class SecurityConfig {
                                                     objectMapper.writeValue(
                                                             response.getOutputStream(),
                                                             ApiResponse.failure(
-                                                                    "Authentication is required."));
+                                                                    "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."));
                                                 })
                                         .accessDeniedHandler(
                                                 (request, response, exception) -> {
@@ -143,7 +143,7 @@ public class SecurityConfig {
                                                     objectMapper.writeValue(
                                                             response.getOutputStream(),
                                                             ApiResponse.failure(
-                                                                    "You do not have permission to perform this action."));
+                                                                    "Bạn không có quyền thực hiện thao tác này."));
                                                 }))
                 .addFilterAfter(currentUserRefreshFilter, SecurityContextHolderFilter.class)
                 .formLogin(AbstractHttpConfigurer::disable)

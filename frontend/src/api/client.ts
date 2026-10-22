@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { localizeApiError } from '../utils/errorMessages'
 import type { InternalAxiosRequestConfig } from 'axios'
 import type { ApiResponse } from '../types/api'
 
@@ -116,7 +117,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 403) {
       clearCsrfToken()
     }
-    return Promise.reject(error)
+    return Promise.reject(localizeApiError(error))
   },
 )
 
