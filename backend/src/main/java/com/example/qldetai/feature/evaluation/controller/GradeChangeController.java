@@ -50,6 +50,13 @@ public class GradeChangeController {
                 service.listChanges(status, sheetId, page, size, principal.id()));
     }
 
+    @GetMapping("/grade-change-requests/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    public ApiResponse<GradeChangeRequestResponse> change(
+            @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(service.getChange(id, principal.id()));
+    }
+
     @PostMapping("/score-sheets/{id}/grade-change-requests")
     @PreAuthorize("hasRole('LECTURER')")
     public ResponseEntity<ApiResponse<Long>> request(

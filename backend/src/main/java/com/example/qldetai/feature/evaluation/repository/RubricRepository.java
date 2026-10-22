@@ -7,8 +7,15 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.Sort;
 
-public interface RubricRepository extends JpaRepository<Rubric, Long> {
+public interface RubricRepository extends JpaRepository<Rubric, Long>, JpaSpecificationExecutor<Rubric> {
+    @Override
+    @EntityGraph(attributePaths = "component")
+    List<Rubric> findAll(Specification<Rubric> specification,
+            Sort sort);
 
     @EntityGraph(attributePaths = "component")
     List<Rubric> findByComponentIdOrderByVersionNoDesc(Long componentId);

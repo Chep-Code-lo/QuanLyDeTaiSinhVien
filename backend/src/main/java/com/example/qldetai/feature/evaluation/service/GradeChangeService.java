@@ -35,6 +35,7 @@ public class GradeChangeService {
     private final GradeChangeRequestRepository changes;
     private final Clock clock;
     private final EvaluationActorAccess actorAccess;
+    private final GradeChangeAccess access;
 
 
     @Transactional(readOnly = true)
@@ -42,7 +43,7 @@ public class GradeChangeService {
             GradeChangeStatus status, Long sheetId, int page, int size, Long actorId) {
         actorAccess.manager(actorId);
         Specification<GradeChangeRequest> specification =
-                (root, query, builder) -> builder.conjunction();
+                access.readableBy(actorId);
         if (status != null) {
             specification =
                     specification.and(
@@ -64,6 +65,17 @@ public class GradeChangeService {
                                                 .descending()
                                                 .and(Sort.by("id").descending())))
                         .map(this::gradeChange));
+    }
+
+    @Transactional(readOnly = true)
+    public GradeChangeRequestResponse getChange(Long id, Long actorId) {
+        actorAccess.manager(actorId);
+        GradeChangeRequest change = changes.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Grade change request was not found."));
+        if (!changes.exists(access.readableBy(actorId).and((root, query, cb) -> cb.equal(root.get("id"), id)))) {
+            throw new AccessDeniedException("You cannot view this grade change request.");
+        }
+        return gradeChange(change);
     }
 
     @Transactional
@@ -100,6 +112,9 @@ public class GradeChangeService {
                                 () ->
                                         new ResourceNotFoundException(
                                                 "Grade change request was not found."));
+        if (!changes.exists(access.manageableBy(actorId).and((root, query, cb) -> cb.equal(root.get("id"), id)))) {
+            throw new AccessDeniedException("You cannot review this grade change request.");
+        }
         if (changeRequest.getStatus() != GradeChangeStatus.PENDING) {
             throw new BusinessRuleException("Only a pending request may be reviewed.");
         }

@@ -36,8 +36,8 @@ public class RubricController {
 
     @GetMapping("/rubrics")
     public ApiResponse<List<RubricResponse>> rubrics(
-            @RequestParam Long componentId) {
-        return ApiResponse.success(service.listRubrics(componentId));
+            @RequestParam Long componentId, @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(service.listRubrics(componentId, principal.id()));
     }
 
     @PostMapping("/rubrics")

@@ -310,7 +310,7 @@ class BackendConsistencyIntegrationTests {
         Long component = component();
         List<Object> outcomes = race(() -> rubric(component), () -> rubric(component));
         assertThat(outcomes).allMatch(RubricResponse.class::isInstance);
-        assertThat(evaluation.listRubrics(component)).extracting(RubricResponse::versionNo).containsExactly(2, 1);
+        assertThat(evaluation.listRubrics(component, admin.getId())).extracting(RubricResponse::versionNo).containsExactly(2, 1);
     }
 
     @Test
@@ -328,7 +328,7 @@ class BackendConsistencyIntegrationTests {
                 .isInstanceOf(BusinessRuleException.class);
         assertThatThrownBy(() -> evaluation.createRubric(new CreateRubricRequest(component, "Invalid",
                 List.of(criterion(1), criterion(1))), admin.getId())).isInstanceOf(BusinessRuleException.class);
-        assertThat(evaluation.listRubrics(component)).isEmpty();
+        assertThat(evaluation.listRubrics(component, admin.getId())).isEmpty();
     }
 
     @Test
@@ -742,7 +742,7 @@ class BackendConsistencyIntegrationTests {
         var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
         tx.executeWithoutResult(status -> {
             entityManager.clear(); statistics.clear();
-            assertThat(evaluation.listRubrics(component)).hasSize(3).allSatisfy(rubric -> assertThat(rubric.criteria()).hasSize(1));
+            assertThat(evaluation.listRubrics(component, admin.getId())).hasSize(3).allSatisfy(rubric -> assertThat(rubric.criteria()).hasSize(1));
             assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
         });
         tx.executeWithoutResult(status -> {

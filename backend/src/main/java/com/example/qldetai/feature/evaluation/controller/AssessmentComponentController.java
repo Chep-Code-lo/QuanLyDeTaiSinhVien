@@ -36,8 +36,8 @@ public class AssessmentComponentController {
 
     @GetMapping("/assessment-components")
     public ApiResponse<List<AssessmentComponentResponse>> components(
-            @RequestParam Long periodId) {
-        return ApiResponse.success(service.listComponents(periodId));
+            @RequestParam Long periodId, @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(service.listComponents(periodId, principal.id()));
     }
 
     @PostMapping("/assessment-components")
