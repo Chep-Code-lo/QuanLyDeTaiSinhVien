@@ -214,7 +214,7 @@ export function EvaluatorAssignmentPage() {
       showError('Mỗi giảng viên chỉ đảm nhiệm một vai trò trong hội đồng.'); return
     }
     const due = assigningTopics ? new Date(deadline) : null
-    if (due && (!Number.isFinite(due.getTime()) || due.getTime() <= Date.now())) {
+    if (due && (!Number.isFinite(due.getTime()) || due.getTime() <= new Date().getTime())) {
       showError('Hạn chót chấm điểm phải sau thời điểm hiện tại.'); return
     }
     let saved = 0

@@ -28,3 +28,8 @@ test('Vietnamese business errors stay intact and unknown English server details 
   assert.equal(vietnameseErrorMessage('Internal database exception with sensitive details', 500), 'Hệ thống gặp lỗi. Vui lòng thử lại sau.')
   assert.match(vietnameseErrorMessage(undefined), /Không thể/)
 })
+
+test('password errors match the backend Vietnamese messages', () => {
+  assert.equal(vietnameseErrorMessage('The current password is incorrect.'), 'Mật khẩu hiện tại không chính xác.')
+  assert.equal(vietnameseErrorMessage('The new password must differ from the current password.'), 'Mật khẩu mới phải khác mật khẩu hiện tại.')
+})

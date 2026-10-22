@@ -67,12 +67,11 @@ export function DashboardPage() {
     ...type,
     count: summary?.topicTypes.find((item) => item.projectType === type.type)?.count ?? 0,
   }))
-  let chartOffset = 0
-  const chartSegments = counts.map((item) => {
+  const chartSegments = counts.map((item, index) => {
     const percentage = summary?.totalTopics ? (item.count / summary.totalTopics) * 100 : 0
-    const segment = { ...item, percentage, offset: chartOffset }
-    chartOffset += percentage
-    return segment
+    const previousCount = counts.slice(0, index).reduce((total, previous) => total + previous.count, 0)
+    const offset = summary?.totalTopics ? (previousCount / summary.totalTopics) * 100 : 0
+    return { ...item, percentage, offset }
   })
   const updateTooltipPosition = (clientX: number, clientY: number) => {
     const bounds = chartWrapperRef.current?.getBoundingClientRect()

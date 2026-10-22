@@ -1,4 +1,6 @@
 const messages: Record<string, string> = {
+  'The current password is incorrect.': 'Mật khẩu hiện tại không chính xác.',
+  'The new password must differ from the current password.': 'Mật khẩu mới phải khác mật khẩu hiện tại.',
   'Defense start time must be before end time.': 'Thời gian kết thúc phải sau thời gian bắt đầu.',
   'The committee already has a defense in this time range.': 'Hội đồng đã có lịch bảo vệ trùng giờ. Vui lòng chọn thời gian khác.',
   'A topic supervisor cannot be on its defense committee.': 'Hội đồng có giảng viên hướng dẫn của đề tài này. Vui lòng chọn hội đồng khác.',

@@ -1,5 +1,5 @@
-import { AuthProvider } from '../context/AuthContext'
-import { ToastProvider } from '../context/ToastContext'
+import { AuthProvider } from '../context/AuthProvider'
+import { ToastProvider } from '../context/ToastProvider'
 import { AppRoutes } from '../routes/AppRoutes'
 import '../styles/app.css'
 import '../styles/student-workspace.css'

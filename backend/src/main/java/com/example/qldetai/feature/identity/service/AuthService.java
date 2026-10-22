@@ -82,11 +82,11 @@ public class AuthService {
             HttpServletRequest httpRequest, HttpServletResponse response) {
         User user = requireUser(userId);
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
-            throw new BusinessRuleException("The current password is incorrect.");
+            throw new BusinessRuleException("Mật khẩu hiện tại không chính xác.");
         }
         if (passwordEncoder.matches(request.newPassword(), user.getPasswordHash())) {
             throw new BusinessRuleException(
-                    "The new password must differ from the current password.");
+                    "Mật khẩu mới phải khác mật khẩu hiện tại.");
         }
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         UserPrincipal updated = UserPrincipal.from(user);
@@ -107,7 +107,7 @@ public class AuthService {
     private User requireUser(Long userId) {
         return userRepository
                 .findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User account was not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản người dùng."));
     }
 
     private String clientIp(HttpServletRequest request) {

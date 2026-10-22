@@ -88,7 +88,7 @@ export function GroupsPage() {
   const loadRequest = useRef(0)
   const [pendingAction, setPendingAction] = useState<{ message: string; action: () => Promise<void> } | null>(null)
   const [actionBusy, setActionBusy] = useState(false)
-  const [currentTime, setCurrentTime] = useState(() => Date.now())
+  const [currentTime, setCurrentTime] = useState(() => new Date().getTime())
   const student = hasRole('STUDENT')
   const [loading, setLoading] = useRequestLoading(JSON.stringify([periodId, student, user?.id, page]))
 
@@ -96,7 +96,7 @@ export function GroupsPage() {
     group.members.some((member) => member.userId === user?.id && member.memberRole === 'LEADER'), [user?.id])
 
   useEffect(() => {
-    const timer = window.setInterval(() => setCurrentTime(Date.now()), 30_000)
+    const timer = window.setInterval(() => setCurrentTime(new Date().getTime()), 30_000)
     return () => window.clearInterval(timer)
   }, [])
 
@@ -169,7 +169,7 @@ export function GroupsPage() {
     if (!studentCode) return showError('Nhập mã số sinh viên trước.')
     const period = periods.find((item) => item.id === group.periodId)
     if (!period) return showError('Chưa tải được thông tin đợt đăng ký. Vui lòng tải lại trang.')
-    const now = Date.now()
+    const now = new Date().getTime()
     if (
       period.status !== 'ACTIVE' ||
       now < parseUtcDateTime(period.registrationStartAt).getTime() ||

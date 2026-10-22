@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.qldetai.feature.identity.service.AuthService;
 import com.example.qldetai.feature.identity.domain.RoleCode;
 import com.example.qldetai.feature.identity.domain.User;
 import com.example.qldetai.feature.identity.domain.UserStatus;
@@ -19,6 +20,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.aop.support.AopUtils;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -35,6 +38,7 @@ class AuthSessionIntegrationTests {
     @Autowired private RoleRepository roles;
     @Autowired private PasswordEncoder passwords;
     @Autowired private Clock clock;
+    @Autowired private AuthService authService;
     private String email;
 
     @AfterEach
@@ -63,6 +67,8 @@ class AuthSessionIntegrationTests {
 
     @Test
     void passwordChangeKeepsOnlyTheCurrentSessionAndRejectsTheOldPassword() throws Exception {
+        assertThat(AopUtils.isAopProxy(authService)).isTrue();
+        assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
         var current = login();
         var other = login();
         String currentId = current.getId();
@@ -70,6 +76,7 @@ class AuthSessionIntegrationTests {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"currentPassword\":\"OldPassword123!\",\"newPassword\":\"NewPassword456!\"}"))
                 .andExpect(status().isOk());
+        assertThat(passwords.matches("NewPassword456!", users.findByEmailIgnoreCase(email).orElseThrow().getPasswordHash())).isTrue();
         assertThat(current.getId()).isEqualTo(currentId);
         mvc.perform(get("/api/v1/auth/me").session(current)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/auth/me").session(other)).andExpect(status().isUnauthorized())
@@ -90,7 +97,21 @@ class AuthSessionIntegrationTests {
         mvc.perform(post("/api/v1/auth/change-password").session(current).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"currentPassword\":\"incorrect\",\"newPassword\":\"NewPassword456!\"}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Mật khẩu hiện tại không chính xác."));
+        mvc.perform(get("/api/v1/auth/me").session(current)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/auth/me").session(other)).andExpect(status().isOk());
+    }
+
+    @Test
+    void unchangedPasswordIsRejectedInVietnameseWithoutInvalidatingSessions() throws Exception {
+        var current = login();
+        var other = login();
+        mvc.perform(post("/api/v1/auth/change-password").session(current).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"currentPassword\":\"OldPassword123!\",\"newPassword\":\"OldPassword123!\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Mật khẩu mới phải khác mật khẩu hiện tại."));
         mvc.perform(get("/api/v1/auth/me").session(current)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/auth/me").session(other)).andExpect(status().isOk());
     }
