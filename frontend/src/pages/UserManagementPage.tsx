@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { AccountAccessForm } from '../components/AccountAccessForm'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
 import { PencilLine, Plus, Search, Trash2, X } from 'lucide-react'
 import { adminApi } from '../api/admin'
@@ -50,6 +51,10 @@ export function UserManagementPage() {
   const [loadError, setLoadError] = useState('')
   const [reload, setReload] = useState(0)
   const [createOpen, setCreateOpen] = useState(false)
+  const [lookupId, setLookupId] = useState('')
+  const [lookupBusy, setLookupBusy] = useState(false)
+  const lookupSending = useRef(false)
+  const [accessUser, setAccessUser] = useState<UserResponse | null>(null)
   const [userToEdit, setUserToEdit] = useState<UserResponse | null>(null)
   const [userToDelete, setUserToDelete] = useState<UserResponse | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -220,6 +225,13 @@ export function UserManagementPage() {
                           </button>
                           <button
                             type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setAccessUser(user)}
+                          >
+                            Quyền truy cập
+                          </button>
+                          <button
+                            type="button"
                             className="btn btn-danger btn-sm user-management__delete"
                             onClick={() => setUserToDelete(user)}
                             disabled={isCurrentUser}
@@ -266,6 +278,63 @@ export function UserManagementPage() {
         )}
       </section>
 
+      <section className="page-card">
+        <h2>Tra cứu tài khoản đã ngừng hoạt động</h2>
+        <p>
+          Tài khoản ngừng hoạt động được ẩn khỏi danh sách. Nếu cần mở lại, tra cứu theo ID tài
+          khoản.
+        </p>
+        <form
+          className="inline-form"
+          onSubmit={async (event) => {
+            event.preventDefault()
+            const id = Number(lookupId)
+            if (!Number.isSafeInteger(id) || id <= 0 || lookupSending.current) return
+            lookupSending.current = true
+            setLookupBusy(true)
+            try {
+              setAccessUser(await adminApi.getUser(id))
+            } catch (error) {
+              showError(
+                isAxiosError(error)
+                  ? error.response?.data?.message || 'Không tìm thấy tài khoản.'
+                  : 'Không tải được tài khoản.',
+              )
+            } finally {
+              lookupSending.current = false
+              setLookupBusy(false)
+            }
+          }}
+        >
+          <label>
+            ID tài khoản
+            <input
+              className="form-input"
+              type="number"
+              min="1"
+              step="1"
+              required
+              disabled={lookupBusy}
+              value={lookupId}
+              onChange={(event) => setLookupId(event.target.value)}
+            />
+          </label>
+          <button className="btn btn-secondary" disabled={lookupBusy}>
+            {lookupBusy ? 'Đang tra cứu...' : 'Tra cứu tài khoản'}
+          </button>
+        </form>
+      </section>
+      {accessUser && (
+        <AccountAccessForm
+          key={accessUser.id}
+          account={accessUser}
+          onClose={() => setAccessUser(null)}
+          onUpdated={(updated) => {
+            handleUpdated(updated)
+            setAccessUser(null)
+          }}
+        />
+      )}
       <ConfirmModal
         isOpen={userToDelete !== null}
         title="Xóa tài khoản"

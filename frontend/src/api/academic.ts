@@ -33,7 +33,12 @@ export const academicApi = {
     const response = await apiClient.get<ApiResponse<SemesterResponse[]>>('/semesters')
     return response.data.data
   },
-  createSemester: async (payload: { code: string; name: string; academicYear: string }) => {
+  createSemester: async (payload: {
+    academicYear: string
+    semesterNo: number
+    startsOn: string
+    endsOn: string
+  }) => {
     const response = await apiClient.post<ApiResponse<SemesterResponse>>('/semesters', payload)
     return response.data.data
   },
@@ -75,6 +80,24 @@ export const academicApi = {
     )
     return response.data.data
   },
+  updateFaculty: async (id: number, payload: { name: string; active: boolean }) =>
+    (await apiClient.patch<ApiResponse<FacultyResponse>>(`/faculties/${id}`, payload)).data.data,
+  updateDepartment: async (id: number, payload: { name: string; active: boolean }) =>
+    (await apiClient.patch<ApiResponse<DepartmentResponse>>(`/departments/${id}`, payload)).data
+      .data,
+  getProject: async (id: number) =>
+    (await apiClient.get<ApiResponse<ProjectAssignmentResponse>>(`/project-assignments/${id}`)).data
+      .data,
+  updateProjectStatus: async (
+    id: number,
+    payload: { version: number; status: 'COMPLETED' | 'CANCELLED' },
+  ) =>
+    (
+      await apiClient.patch<ApiResponse<ProjectAssignmentResponse>>(
+        `/project-assignments/${id}/status`,
+        payload,
+      )
+    ).data.data,
   getProjectAssignments: async (periodId?: number, page = 0, size = 20) => {
     const response = await apiClient.get<ApiResponse<PageResponse<ProjectAssignmentResponse>>>(
       '/project-assignments',

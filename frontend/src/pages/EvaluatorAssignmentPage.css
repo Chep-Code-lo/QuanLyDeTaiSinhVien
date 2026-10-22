@@ -62,6 +62,11 @@
   font-size: 18px;
   line-height: 1.25;
 }
+.ea-card .ea-scheduled-title {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ea-border);
+}
 .ea-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

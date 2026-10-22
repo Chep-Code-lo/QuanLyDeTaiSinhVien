@@ -2,6 +2,7 @@ import { apiClient } from './client'
 import type { ApiResponse, PageResponse } from '../types/api'
 import type {
   EmailLogResponse,
+  EmailLogDetailResponse,
   EmailNotificationEventType,
   EmailNotificationSettingResponse,
   EmailPreviewResponse,
@@ -97,13 +98,15 @@ export const emailNotificationsApi = {
     )
     return response.data.data
   },
-  sendTest: async (eventType: EmailNotificationEventType) => {
+  sendTest: async (eventType: EmailNotificationEventType, scope: EmailScope = systemScope) => {
     const response = await apiClient.post<ApiResponse<EmailTestQueuedResponse>>(
       `/notification-settings/${eventType}/test`,
-      systemScope,
+      scope,
     )
     return response.data.data
   },
+  getLog: async (id: number) =>
+    (await apiClient.get<ApiResponse<EmailLogDetailResponse>>(`/email-logs/${id}`)).data.data,
   listLogs: async ({ page = 0, size = 10 }: { page?: number; size?: number } = {}) => {
     const response = await apiClient.get<ApiResponse<PageResponse<EmailLogResponse>>>(
       '/email-logs',

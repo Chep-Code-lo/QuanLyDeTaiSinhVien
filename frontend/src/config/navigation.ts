@@ -28,6 +28,26 @@ export type NavigationItem = {
 export const navigationItems: NavigationItem[] = [
   { icon: Home, label: 'Tổng quan', to: '/dashboard' },
   { icon: BookOpen, label: 'Đề tài & Dự án', to: '/topics' },
+  { icon: BookOpen, label: 'Đề xuất & Xét duyệt', to: '/topic-workflow' },
+  {
+    icon: ClipboardCheck,
+    label: 'Đề tài được giao',
+    to: '/project-assignments',
+    roles: ['LECTURER', 'ADMIN'],
+  },
+  {
+    icon: ListChecks,
+    label: 'Yêu cầu đổi điểm',
+    to: '/grade-change-requests',
+    roles: ['LECTURER', 'ADMIN'],
+  },
+  {
+    icon: Building2,
+    label: 'Danh mục học thuật',
+    to: '/academic-catalog',
+    requireAcademicManagement: true,
+  },
+  { icon: ShieldCheck, label: 'Nhật ký thao tác', to: '/audit-logs', adminOnly: true },
   { icon: UsersRound, label: 'Nhóm đề tài', to: '/groups' },
   { icon: ClipboardCheck, label: 'Đăng ký đề tài', to: '/registrations' },
   { icon: ListChecks, label: 'Tiến độ & Mốc báo cáo', to: '/progress' },
@@ -44,6 +64,12 @@ export const navigationItems: NavigationItem[] = [
     roles: ['LECTURER', 'ADMIN'],
   },
   { icon: ClipboardCheck, label: 'Chấm điểm đề tài', to: '/score-sheets', roles: ['LECTURER'] },
+  {
+    icon: ListChecks,
+    label: 'Tổng hợp & Công bố điểm',
+    to: '/evaluation-results',
+    roles: ['LECTURER', 'ADMIN'],
+  },
   {
     icon: Building2,
     label: 'Quản lý Học thuật',

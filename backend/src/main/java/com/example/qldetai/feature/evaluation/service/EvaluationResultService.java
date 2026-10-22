@@ -19,6 +19,7 @@ import com.example.qldetai.feature.evaluation.domain.ResultVersion;
 import com.example.qldetai.feature.evaluation.domain.ScoreDetail;
 import com.example.qldetai.feature.evaluation.domain.ScoreSheet;
 import com.example.qldetai.feature.evaluation.domain.ScoreSheetStatus;
+import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultActionsResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultDetailResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultInputResponse;
 import com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.ResultMemberResponse;
@@ -185,6 +186,38 @@ public class EvaluationResultService {
         return results.findPublishedByStudentUserId(userId).stream()
                 .map(this::resultDetail)
                 .toList();
+    }
+
+    // These flags describe authorization only. Finalization still validates every required
+    // assignment and score sheet inside its existing transaction.
+    @Transactional(readOnly = true)
+    public ResultActionsResponse actions(Long assignmentId, Long actorId) {
+        actorAccess.manager(actorId);
+        ProjectAssignment assignment =
+                assignments
+                        .findById(assignmentId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Project assignment was not found."));
+        var principal = UserPrincipal.from(actorAccess.user(actorId));
+        var authentication =
+                new UsernamePasswordAuthenticationToken(
+                        principal, null, principal.getAuthorities());
+        boolean canPublish =
+                principal.roles().contains(RoleCode.ADMIN)
+                        || projectAuthorization.canManageAssignment(assignmentId, authentication);
+        boolean canFinalize;
+        try {
+            requireFinalizer(
+                    assignment,
+                    components.findByPeriodIdOrderByCodeAsc(assignment.getPeriod().getId()),
+                    actorId);
+            canFinalize = true;
+        } catch (AccessDeniedException denied) {
+            canFinalize = false;
+        }
+        return new ResultActionsResponse(canFinalize, canPublish);
     }
 
     @Transactional

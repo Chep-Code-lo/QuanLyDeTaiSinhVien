@@ -1861,6 +1861,9 @@ class ProjectLifecycleIntegrationTests {
     void onlyTheCorrespondingChairCanFinalizeACommitteeResultThroughHttp(@Autowired MockMvc mvc)
             throws Exception {
         var project = createAssignedProject("chair-only", leaderStudent, secondStudent);
+        var reviewCatalog =
+                createLockedCatalog("chair-review", "Review", AssessmentComponentType.REVIEW);
+        submitFullScore(project.id(), reviewCatalog, lecturerThree, null);
         var catalog =
                 createLockedCatalog("committee", "Committee", AssessmentComponentType.COMMITTEE);
         Long committeeId =
@@ -1898,6 +1901,23 @@ class ProjectLifecycleIntegrationTests {
                 otherCommittee,
                 new AddCommitteeMemberRequest(lecturerOne.getId(), 1, CommitteeRole.CHAIR),
                 admin.getId());
+        String actionsUrl = "/api/v1/project-assignments/" + project.id() + "/results/actions";
+        mvc.perform(get(actionsUrl).with(user(UserPrincipal.from(lecturerThree.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.canFinalize").value(true))
+                .andExpect(jsonPath("$.data.canPublish").value(false));
+        mvc.perform(get(actionsUrl).with(user(UserPrincipal.from(admin))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.canFinalize").value(false))
+                .andExpect(jsonPath("$.data.canPublish").value(true));
+        for (User denied : List.of(lecturerFour.getUser(), lecturerOne.getUser())) {
+            mvc.perform(get(actionsUrl).with(user(UserPrincipal.from(denied))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.canFinalize").value(false))
+                    .andExpect(jsonPath("$.data.canPublish").value(false));
+        }
+        mvc.perform(get(actionsUrl).with(user(UserPrincipal.from(leaderStudent.getUser()))))
+                .andExpect(status().isForbidden());
         String url = "/api/v1/project-assignments/" + project.id() + "/results/finalize";
         for (User denied : List.of(admin, lecturerFour.getUser(), lecturerOne.getUser())) {
             mvc.perform(post(url).with(user(UserPrincipal.from(denied))).with(csrf()))

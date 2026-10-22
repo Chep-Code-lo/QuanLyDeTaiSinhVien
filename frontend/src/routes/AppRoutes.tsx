@@ -48,6 +48,30 @@ const EvaluatorAssignmentPage = lazy(() =>
     default: module.EvaluatorAssignmentPage,
   })),
 )
+const AuditLogsPage = lazy(() =>
+  import('../pages/AuditLogsPage').then((module) => ({ default: module.AuditLogsPage })),
+)
+const GradeChangesPage = lazy(() =>
+  import('../pages/GradeChangesPage').then((module) => ({ default: module.GradeChangesPage })),
+)
+const TopicWorkflowPage = lazy(() =>
+  import('../pages/TopicWorkflowPage').then((module) => ({ default: module.TopicWorkflowPage })),
+)
+const AcademicCatalogPage = lazy(() =>
+  import('../pages/AcademicCatalogPage').then((module) => ({
+    default: module.AcademicCatalogPage,
+  })),
+)
+const ProjectAssignmentsPage = lazy(() =>
+  import('../pages/ProjectAssignmentsPage').then((module) => ({
+    default: module.ProjectAssignmentsPage,
+  })),
+)
+const EvaluationResultsPage = lazy(() =>
+  import('../pages/EvaluationResultsPage').then((module) => ({
+    default: module.EvaluationResultsPage,
+  })),
+)
 const EvaluationsPage = lazy(() =>
   import('../pages/EvaluationsPage').then((module) => ({ default: module.EvaluationsPage })),
 )
@@ -104,6 +128,8 @@ export function AppRoutes() {
           <Route element={<AppLayout />}>
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="topics" element={<TopicsPage />} />
+            <Route path="topics/:id" element={<TopicWorkflowPage />} />
+            <Route path="topic-workflow" element={<TopicWorkflowPage />} />
             <Route path="groups" element={<GroupsPage />} />
             <Route path="registrations" element={<RegistrationsPage />} />
 
@@ -119,6 +145,7 @@ export function AppRoutes() {
             {/* Student Routes */}
             <Route element={<ProtectedRoute roles={['STUDENT']} />}>
               <Route path="results" element={<StudentResultsPage />} />
+              <Route path="results/:id" element={<Navigate to="/results" replace />} />
             </Route>
 
             {/* Lecturer & Admin Routes */}
@@ -129,16 +156,21 @@ export function AppRoutes() {
               <Route path="email-settings" element={<EmailSettingsPage />} />
               <Route path="evaluations" element={<AssessmentSetupWizardPage />} />
               <Route path="evaluator-assignment" element={<EvaluatorAssignmentPage />} />
+              <Route path="evaluation-results" element={<EvaluationResultsPage />} />
+              <Route path="grade-change-requests" element={<GradeChangesPage />} />
+              <Route path="project-assignments" element={<ProjectAssignmentsPage />} />
             </Route>
 
             {/* Academic Management Routes */}
             <Route element={<ProtectedRoute requireAcademicManagement />}>
               <Route path="academic-management" element={<AcademicManagementPage />} />
+              <Route path="academic-catalog" element={<AcademicCatalogPage />} />
             </Route>
 
             {/* Admin Only Routes */}
             <Route element={<ProtectedRoute roles={['ADMIN']} />}>
               <Route path="admin-users" element={<UserManagementPage />} />
+              <Route path="audit-logs" element={<AuditLogsPage />} />
               <Route path="admin-users/new" element={<Navigate to="/admin-users" replace />} />
               <Route path="admin-appointments" element={<AcademicAppointmentsPage />} />
             </Route>

@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { PageControls } from '../components/PageControls'
+import { EmailScopePicker, type EmailScopeSelection } from '../components/EmailScopePicker'
+import { EmailDeliveryDetail } from '../components/EmailDeliveryDetail'
+import { ConfirmModal } from '../components/ConfirmModal'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
 import { Eye, Plus, RefreshCw, Save, Send } from 'lucide-react'
 import { emailNotificationsApi } from '../api/emailNotifications'
@@ -104,7 +108,7 @@ function formFromSetting(setting: EmailNotificationSettingResponse): EmailForm {
 
 function settingFromTemplate(
   template: EmailTemplateResponse,
-  scopeType: 'SYSTEM' | 'LECTURER',
+  scopeType: 'SYSTEM' | 'LECTURER' | 'FACULTY',
   scopeId: number,
 ): EmailNotificationSettingResponse {
   return {
@@ -145,19 +149,32 @@ export function EmailSettingsPage() {
   const { showError, showSuccess } = useToast()
   const { user } = useAuth()
   const isAdmin = user?.roles.includes('ADMIN') ?? false
-  const scopeType = isAdmin ? 'SYSTEM' : 'LECTURER'
-  const scopeId = isAdmin ? 0 : (user?.id ?? 0)
+  const [selectedScope, setSelectedScope] = useState<EmailScopeSelection | null>(null)
+  const [pendingScope, setPendingScope] = useState<EmailScopeSelection | null>(null)
+  const scopeType = selectedScope?.scopeType ?? (isAdmin ? 'SYSTEM' : 'LECTURER')
+  const scopeId = selectedScope?.scopeId ?? (isAdmin ? 0 : (user?.id ?? 0))
   const [settings, setSettings] = useState<EmailNotificationSettingResponse[]>([])
   const [logs, setLogs] = useState<EmailLogResponse[]>([])
   const [selectedEvent, setSelectedEvent] = useState<EmailNotificationEventType>('TASK_ASSIGNED')
   const [form, setForm] = useState<EmailForm>(defaultForm)
   const [preview, setPreview] = useState<EmailPreviewResponse | null>(null)
   const [loading, setLoading] = useRequestLoading(JSON.stringify([scopeType, scopeId]))
-  const [logsLoading, setLogsLoading] = useState(true)
+  const [logError, setLogError] = useState('')
+  const [logPage, setLogPage] = useState(0)
+  const [logPages, setLogPages] = useState(0)
+  const [logsLoading, setLogsLoading] = useRequestLoading(JSON.stringify([user?.id, logPage]))
+  const logGeneration = useRef(0)
+  const invalidateLogs = useCallback(() => {
+    logGeneration.current++
+  }, [])
   const [loadError, setLoadError] = useState('')
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const [sending, setSending] = useState(false)
+  const [testOpen, setTestOpen] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const testSending = useRef(false)
+  const [logId, setLogId] = useState<number | null>(null)
   const [recipientType, setRecipientType] = useState<'STUDENT' | 'LECTURER' | 'SPECIFIC'>(
     'SPECIFIC',
   )
@@ -195,18 +212,26 @@ export function EmailSettingsPage() {
     [selectedEvent, selectedCustom, creatingTemplate],
   )
 
-  const loadSettings = useCallback(
-    () =>
-      emailNotificationsApi
-        .listSettings({ scopeType, scopeId })
-        .then((items) => {
-          setSettings(items)
-          setLoadError('')
-        })
-        .catch((error) => setLoadError(emailError(error)))
-        .finally(() => setLoading(false)),
-    [scopeType, scopeId, setLoading],
-  )
+  const settingsGeneration = useRef(0)
+  const invalidateSettings = useCallback(() => {
+    settingsGeneration.current++
+  }, [])
+  const loadSettings = useCallback(() => {
+    const generation = ++settingsGeneration.current
+    return emailNotificationsApi
+      .listSettings({ scopeType, scopeId })
+      .then((items) => {
+        if (generation !== settingsGeneration.current) return
+        setSettings(items)
+        setLoadError('')
+      })
+      .catch((error) => {
+        if (generation === settingsGeneration.current) setLoadError(emailError(error))
+      })
+      .finally(() => {
+        if (generation === settingsGeneration.current) setLoading(false)
+      })
+  }, [scopeType, scopeId, setLoading])
 
   const loadTemplates = useCallback(
     (page = 0) =>
@@ -226,25 +251,38 @@ export function EmailSettingsPage() {
     [showError],
   )
 
-  const loadLogs = useCallback(
-    () =>
-      emailNotificationsApi
-        .listLogs()
-        .then((result) => setLogs(result.content))
-        .catch((error) => {
-          showError(emailError(error))
-        })
-        .finally(() => {
-          setLogsLoading(false)
-        }),
-    [showError],
-  )
+  const loadLogs = useCallback(() => {
+    const generation = ++logGeneration.current
+    return emailNotificationsApi
+      .listLogs({ page: logPage, size: 10 })
+      .then((result) => {
+        if (generation !== logGeneration.current) return
+        setLogs(result.content)
+        setLogPages(result.totalPages)
+        setLogError('')
+      })
+      .catch((error) => {
+        if (generation === logGeneration.current) {
+          setLogs([])
+          setLogError(emailError(error))
+        }
+      })
+      .finally(() => {
+        if (generation === logGeneration.current) setLogsLoading(false)
+      })
+  }, [logPage, setLogsLoading])
 
   useEffect(() => {
     void loadSettings()
+    return invalidateSettings
+  }, [loadSettings, invalidateSettings])
+  useEffect(() => {
     void loadLogs()
+    return invalidateLogs
+  }, [loadLogs, invalidateLogs])
+  useEffect(() => {
     void loadTemplates()
-  }, [loadLogs, loadSettings, loadTemplates])
+  }, [loadTemplates])
 
   const [formSetting, setFormSetting] = useState(selectedSetting)
   const [formCreating, setFormCreating] = useState(creatingTemplate)
@@ -427,6 +465,7 @@ export function EmailSettingsPage() {
   }
 
   const beginTemplate = () => {
+    setSelectedScope(null)
     setSelectedCustom(null)
     setCreatingTemplate(true)
     setSelectedEvent('TASK_ASSIGNED')
@@ -455,6 +494,18 @@ export function EmailSettingsPage() {
       <div className="content-state" role="alert">
         <strong>Không thể tải cấu hình email</strong>
         <p>{loadError || 'Không tìm thấy cấu hình email phù hợp.'}</p>
+        {selectedScope && (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => {
+              setSelectedScope(null)
+              setSelectedEvent('TASK_ASSIGNED')
+            }}
+          >
+            Quay về phạm vi mặc định
+          </button>
+        )}
         <button
           type="button"
           className="btn btn-secondary"
@@ -474,6 +525,60 @@ export function EmailSettingsPage() {
     <div className="email-settings-page">
       <PageHeader title="Cấu hình email" />
 
+      <EmailScopePicker
+        value={{ scopeType, scopeId }}
+        disabled={saving || sending || testing || previewing}
+        onChange={(next) => {
+          if (hasUnsavedChanges) setPendingScope(next)
+          else {
+            setSelectedScope(next)
+            setSelectedCustom(null)
+            setCreatingTemplate(false)
+            setSelectedEvent('TASK_ASSIGNED')
+          }
+        }}
+      />
+      <ConfirmModal
+        isOpen={!!pendingScope}
+        title="Đổi phạm vi email"
+        message="Bỏ các thay đổi chưa lưu và chuyển phạm vi cấu hình email?"
+        onCancel={() => setPendingScope(null)}
+        onConfirm={() => {
+          setSelectedScope(pendingScope)
+          setPendingScope(null)
+          setSelectedCustom(null)
+          setCreatingTemplate(false)
+          setSelectedEvent('TASK_ASSIGNED')
+        }}
+      />
+      {logId && <EmailDeliveryDetail key={logId} id={logId} onClose={() => setLogId(null)} />}
+      <ConfirmModal
+        isOpen={testOpen}
+        title="Gửi email thử"
+        message="Gửi email thử từ cấu hình đã lưu đến chính tài khoản đang đăng nhập?"
+        loading={testing}
+        onCancel={() => {
+          if (!testSending.current) setTestOpen(false)
+        }}
+        onConfirm={async () => {
+          if (testSending.current || !selectedSetting?.id || hasUnsavedChanges) return
+          testSending.current = true
+          setTesting(true)
+          try {
+            const result = await emailNotificationsApi.sendTest(selectedEvent, {
+              scopeType,
+              scopeId,
+            })
+            showSuccess(`Đã xếp hàng email thử đến ${result.recipientEmail}.`)
+          } catch (error) {
+            showError(emailError(error))
+          } finally {
+            testSending.current = false
+            setTesting(false)
+            setTestOpen(false)
+          }
+        }}
+      />
       <div className="email-settings__layout">
         <nav className="page-card email-settings__events" aria-label="Loại thông báo email">
           <div className="email-settings__template-heading">
@@ -537,6 +642,7 @@ export function EmailSettingsPage() {
                 aria-pressed={!creatingTemplate && selectedCustom?.id === template.id}
                 disabled={saving || sending}
                 onClick={() => {
+                  setSelectedScope(null)
                   setSelectedCustom(template)
                   setCreatingTemplate(false)
                   setSelectedEvent('TASK_ASSIGNED')
@@ -715,10 +821,53 @@ export function EmailSettingsPage() {
             />
           </div>
 
-          {resultEmail ? (
+          {!creatingTemplate && !selectedCustom && (
+            <fieldset
+              disabled={saving || sending || testing}
+              className="email-settings__recipients"
+            >
+              <legend>Nhóm nhận email tự động</legend>
+              {(selectedEvent === 'REGISTRATION_OPENED'
+                ? ['FACULTY_STUDENTS', 'FACULTY_LECTURERS', 'ADMINS']
+                : selectedEvent === 'RESULT_PUBLISHED'
+                  ? ['DIRECT_PARTICIPANTS']
+                  : ['DIRECT_PARTICIPANTS', 'GROUP_STUDENTS', 'TOPIC_STUDENTS', 'SUPERVISORS']
+              ).map((value) => {
+                const group = value as EmailRecipientGroup
+                const label = {
+                  DIRECT_PARTICIPANTS: 'Người trực tiếp tham gia',
+                  FACULTY_STUDENTS: 'Sinh viên trong khoa',
+                  FACULTY_LECTURERS: 'Giảng viên trong khoa',
+                  ADMINS: 'Quản trị viên',
+                  GROUP_STUDENTS: 'Sinh viên trong nhóm',
+                  TOPIC_STUDENTS: 'Sinh viên của đề tài',
+                  SUPERVISORS: 'Giảng viên hướng dẫn',
+                }[group]
+                return (
+                  <label key={group}>
+                    <input
+                      type="checkbox"
+                      checked={form.recipientGroups.includes(group)}
+                      onChange={(event) =>
+                        updateField(
+                          'recipientGroups',
+                          event.target.checked
+                            ? [...form.recipientGroups, group]
+                            : form.recipientGroups.filter((item) => item !== group),
+                        )
+                      }
+                    />{' '}
+                    {label}
+                  </label>
+                )
+              })}
+            </fieldset>
+          )}
+          {resultEmail || scopeType === 'FACULTY' ? (
             <p className="email-settings__field-help">
-              Người nhận là sinh viên có tên trong kết quả đã chốt. Email tự động được xếp hàng khi
-              công bố kết quả; không gửi từ biểu mẫu này.
+              {resultEmail
+                ? 'Người nhận là sinh viên có tên trong kết quả đã chốt. Email tự động được xếp hàng khi công bố kết quả; không gửi từ biểu mẫu này.'
+                : 'Cấu hình của khoa áp dụng cho email tự động theo sự kiện. Có thể gửi thử đến tài khoản của bạn trước khi bật.'}
             </p>
           ) : (
             <fieldset className="email-settings__recipients" disabled={sending}>
@@ -877,7 +1026,24 @@ export function EmailSettingsPage() {
               <Eye size={17} aria-hidden="true" />{' '}
               {previewing ? 'Đang tạo xem trước...' : 'Xem trước'}
             </button>
-            {!resultEmail && (
+            {!creatingTemplate && !selectedCustom && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={
+                  testing ||
+                  saving ||
+                  sending ||
+                  previewing ||
+                  hasUnsavedChanges ||
+                  !selectedSetting.id
+                }
+                onClick={() => setTestOpen(true)}
+              >
+                Gửi thử đến tài khoản của tôi
+              </button>
+            )}
+            {!resultEmail && scopeType !== 'FACULTY' && (
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -977,6 +1143,8 @@ export function EmailSettingsPage() {
             <span className="spinner" />
             <p>Đang tải nhật ký email...</p>
           </div>
+        ) : logError ? (
+          <p role="alert">{logError}</p>
         ) : logs.length === 0 ? (
           <div className="content-state">
             <strong>Chưa có email nào trong hàng đợi</strong>
@@ -993,6 +1161,7 @@ export function EmailSettingsPage() {
                   <th>Tiêu đề</th>
                   <th>Trạng thái</th>
                   <th>Lần thử</th>
+                  <th>Chi tiết</th>
                 </tr>
               </thead>
               <tbody>
@@ -1019,12 +1188,28 @@ export function EmailSettingsPage() {
                       </span>
                     </td>
                     <td>{log.attemptCount}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setLogId(log.id)}
+                      >
+                        Xem lần gửi #{log.id}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+        <PageControls
+          label="Phân trang lịch sử email"
+          page={logPage}
+          totalPages={logPages}
+          loading={logsLoading || !!logError}
+          onPage={setLogPage}
+        />
       </section>
     </div>
   )

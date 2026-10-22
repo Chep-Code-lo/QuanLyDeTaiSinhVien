@@ -15,6 +15,9 @@ import type {
   SaveSheetRequest,
   ScoreSheetResponse,
   ReviewProgressResponse,
+  ResultResponse,
+  GradeChangeResponse,
+  ResultDetailResponse,
 } from '../types/domain'
 
 export interface ListAssignmentsParams {
@@ -148,6 +151,55 @@ export const evaluationApi = {
     const response = await apiClient.post<ApiResponse<number>>('/defense-sessions', payload)
     return response.data.data
   },
+
+  resultActions: async (assignmentId: number) => {
+    const response = await apiClient.get<
+      ApiResponse<{ canFinalize: boolean; canPublish: boolean }>
+    >(`/project-assignments/${assignmentId}/results/actions`)
+    return response.data.data
+  },
+  listResults: async (params: { assignmentId: number; page: number; size: number }) => {
+    const response = await apiClient.get<ApiResponse<PageResponse<ResultDetailResponse>>>(
+      '/results',
+      { params },
+    )
+    return response.data.data
+  },
+  finalizeResult: async (assignmentId: number) => {
+    const response = await apiClient.post<ApiResponse<ResultResponse>>(
+      `/project-assignments/${assignmentId}/results/finalize`,
+    )
+    return response.data.data
+  },
+  publishResult: async (id: number) => {
+    const response = await apiClient.post<ApiResponse<ResultResponse>>(`/results/${id}/publish`)
+    return response.data.data
+  },
+
+  listGradeChanges: async (params: {
+    page: number
+    size: number
+    status?: GradeChangeResponse['status']
+    sheetId?: number
+  }) =>
+    (
+      await apiClient.get<ApiResponse<PageResponse<GradeChangeResponse>>>(
+        '/grade-change-requests',
+        { params },
+      )
+    ).data.data,
+  getGradeChange: async (id: number) =>
+    (await apiClient.get<ApiResponse<GradeChangeResponse>>(`/grade-change-requests/${id}`)).data
+      .data,
+  requestGradeChange: async (id: number, reason: string) =>
+    (
+      await apiClient.post<ApiResponse<number>>(`/score-sheets/${id}/grade-change-requests`, {
+        reason,
+      })
+    ).data.data,
+  reviewGradeChange: async (id: number, payload: { approved: boolean; comment: string }) =>
+    (await apiClient.patch<ApiResponse<void>>(`/grade-change-requests/${id}/review`, payload)).data
+      .data,
 
   // Score Sheets
   getScoreSheet: async (assignmentId: number) => {

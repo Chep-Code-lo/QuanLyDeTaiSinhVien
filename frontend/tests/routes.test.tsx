@@ -1,5 +1,6 @@
+import { StrictMode } from 'react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import type { AxiosAdapter } from 'axios'
@@ -57,6 +58,10 @@ const requested: string[] = []
 const sentEmails: { recipientRoles: string[]; recipientUserIds: number[] }[] = []
 const savedTemplates: EmailTemplateResponse[] = []
 const settingScopes: unknown[] = []
+const testEmails: unknown[] = []
+let delayedSettings: Promise<void> | null = null
+let logFixture: Record<string, unknown>[][] = []
+const logRequests: number[] = []
 const emailRecipients = [
   { userId: 10, fullName: 'Sinh viên An', email: 'an@example.edu.vn', role: 'STUDENT' },
   { userId: 11, fullName: 'Sinh viên Bình', email: 'binh@example.edu.vn', role: 'STUDENT' },
@@ -77,6 +82,8 @@ const paged = new Set([
   '/evaluation-committees',
   '/lecturers',
   '/admin/users',
+  '/admin/audit-logs',
+  '/grade-change-requests',
 ])
 const lists = new Set([
   '/groups/mine',
@@ -117,7 +124,16 @@ const adapter: AxiosAdapter = async (config) => {
     const items = currentUser?.roles.includes('ADMIN')
       ? [...emailSettings, resultEmailSetting]
       : emailSettings
-    data = items.map((setting) => ({ ...setting, ...config.params }))
+    data = items.map((setting) => ({
+      ...setting,
+      ...config.params,
+      ...(config.params?.scopeType === 'FACULTY' ? { senderName: 'Người gửi khoa' } : {}),
+    }))
+    if (delayedSettings) {
+      const pending = delayedSettings
+      delayedSettings = null
+      await pending
+    }
   } else if (url === '/notification-settings/RESULT_PUBLISHED' && config.method === 'put') {
     data = { ...resultEmailSetting, ...JSON.parse(config.data) }
   } else if (url === '/email-templates' && config.method === 'get') {
@@ -138,8 +154,20 @@ const adapter: AxiosAdapter = async (config) => {
       version: savedTemplates[index].version + 1,
     }
     savedTemplates[index] = data as EmailTemplateResponse
-  } else if (url === '/email-logs') data = emptyPage
-  else if (url === '/email-recipients') {
+  } else if (url.endsWith('/test') && url.startsWith('/notification-settings/')) {
+    testEmails.push(JSON.parse(config.data))
+    data = { outboxId: 99, recipientEmail: currentUser?.username, status: 'PENDING' }
+  } else if (url === '/email-logs') {
+    const page = config.params?.page ?? 0
+    logRequests.push(page)
+    data = {
+      ...emptyPage,
+      page,
+      content: logFixture[page] ?? [],
+      totalPages: logFixture.length,
+      totalElements: logFixture.flat().length,
+    }
+  } else if (url === '/email-recipients') {
     const role = config.params?.role
     const search = (config.params?.search ?? '').toLowerCase()
     const content = emailRecipients.filter(
@@ -206,6 +234,10 @@ beforeEach(() => {
   sentEmails.length = 0
   savedTemplates.length = 0
   settingScopes.length = 0
+  testEmails.length = 0
+  delayedSettings = null
+  logFixture = []
+  logRequests.length = 0
 })
 afterEach(() => {
   cleanup()
@@ -219,12 +251,17 @@ const common = [
   ['/groups', 'Nhóm đề tài'],
   ['/registrations', 'Đăng ký đề tài'],
   ['/account', 'Tài khoản'],
+  ['/topic-workflow', 'Đề xuất & Xét duyệt đề tài'],
   ['/announcements', 'Thông báo'],
 ] as const
 const management = [
   ['/progress', 'Tiến độ & Mốc báo cáo'],
   ['/evaluations', 'Tiêu chuẩn đánh giá'],
   ['/evaluator-assignment', 'Phân công hội đồng'],
+  ['/evaluation-results', 'Tổng hợp & Công bố điểm'],
+  ['/grade-change-requests', 'Yêu cầu đổi điểm'],
+  ['/project-assignments', 'Theo dõi đề tài được giao'],
+  ['/academic-catalog', 'Danh mục học thuật'],
   ['/academic-management', 'Quản lý Học thuật'],
 ] as const
 
@@ -236,6 +273,7 @@ describe.each(['STUDENT', 'LECTURER', 'ADMIN'] as RoleCode[])('Trang dành cho %
           ['/topics', 'Danh sách đề tài đã công bố'],
           ['/progress', 'Tiến độ & báo cáo'],
           ['/results', 'Lịch bảo vệ & kết quả'],
+          ['/results/7', 'Lịch bảo vệ & kết quả'],
         ]
       : role === 'LECTURER'
         ? [
@@ -250,6 +288,7 @@ describe.each(['STUDENT', 'LECTURER', 'ADMIN'] as RoleCode[])('Trang dành cho %
             ['/admin-users', 'Quản lý tài khoản'],
             ['/email-settings', 'Cấu hình email'],
             ['/admin-appointments', 'Bổ nhiệm chức vụ'],
+            ['/audit-logs', 'Nhật ký thao tác'],
           ]
 
   it.each(routes)('%s hiển thị được với dữ liệu trống', async (path, heading) => {
@@ -501,4 +540,118 @@ describe('Trang công khai', () => {
     ).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'Đăng nhập hệ thống' })).toBeNull()
   })
+})
+
+it('sinh viên không truy cập được màn hình quản lý tổng hợp và công bố điểm', async () => {
+  currentUser = user('STUDENT')
+  render(
+    <MemoryRouter initialEntries={['/evaluation-results']}>
+      <App />
+    </MemoryRouter>,
+  )
+  expect(await screen.findByRole('heading', { name: 'Không có quyền truy cập' })).toBeTruthy()
+  expect(requested.some((path) => path === '/results' || path.includes('/results/actions'))).toBe(
+    false,
+  )
+})
+
+it.each(['/grade-change-requests', '/project-assignments', '/audit-logs', '/academic-catalog'])(
+  'sinh viên không truy cập nghiệp vụ quản lý %s',
+  async (path) => {
+    currentUser = user('STUDENT')
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByRole('heading', { name: 'Không có quyền truy cập' })).toBeTruthy()
+  },
+)
+
+it.each(['ADMIN', 'LECTURER'] as RoleCode[])(
+  '%s gửi thử email đến chính tài khoản với đúng scope sau xác nhận',
+  async (role) => {
+    currentUser = user(role)
+    render(
+      <MemoryRouter initialEntries={['/email-settings']}>
+        <App />
+      </MemoryRouter>,
+    )
+    const button = await screen.findByRole('button', { name: 'Gửi thử đến tài khoản của tôi' })
+    await userEvent.click(button)
+    expect(testEmails).toHaveLength(0)
+    await userEvent.click(screen.getByRole('button', { name: 'Xác nhận' }))
+    await waitFor(() =>
+      expect(testEmails).toEqual([
+        { scopeType: role === 'ADMIN' ? 'SYSTEM' : 'LECTURER', scopeId: role === 'ADMIN' ? 0 : 1 },
+      ]),
+    )
+  },
+)
+it('Trưởng khoa chuyển phạm vi email khoa, không gửi thủ công nhầm cấu hình cá nhân', async () => {
+  currentUser = user('LECTURER')
+  render(
+    <MemoryRouter initialEntries={['/email-settings']}>
+      <App />
+    </MemoryRouter>,
+  )
+  const picker = await screen.findByLabelText('Phạm vi cấu hình email')
+  await screen.findByRole('option', { name: /Khoa Công nghệ thông tin/ })
+  await userEvent.selectOptions(picker, 'FACULTY:1')
+  await waitFor(() => expect(settingScopes).toContainEqual({ scopeType: 'FACULTY', scopeId: 1 }))
+  await screen.findByText(/Cấu hình của khoa áp dụng cho email tự động/)
+  expect(screen.queryByRole('button', { name: /^Gửi email$/ })).toBeNull()
+})
+
+it('phản hồi cấu hình scope cũ đến muộn không ghi đè scope khoa trong StrictMode', async () => {
+  let release!: () => void
+  delayedSettings = new Promise((resolve) => {
+    release = resolve
+  })
+  currentUser = user('LECTURER')
+  render(
+    <StrictMode>
+      <MemoryRouter initialEntries={['/email-settings']}>
+        <App />
+      </MemoryRouter>
+    </StrictMode>,
+  )
+  const picker = await screen.findByLabelText('Phạm vi cấu hình email')
+  await screen.findByRole('option', { name: /Khoa Công nghệ thông tin/ })
+  await userEvent.selectOptions(picker, 'FACULTY:1')
+  const sender = await screen.findByLabelText('Tên người gửi')
+  await waitFor(() => expect((sender as HTMLInputElement).value).toBe('Người gửi khoa'))
+  await act(async () => release())
+  expect((screen.getByLabelText('Tên người gửi') as HTMLInputElement).value).toBe('Người gửi khoa')
+})
+
+it('phân trang lịch sử email tại server không làm mất cấu hình đang sửa', async () => {
+  const row = {
+    id: 1,
+    eventType: 'TASK_ASSIGNED',
+    eventKey: 'task:1',
+    recipientName: 'GV A',
+    recipientEmail: 'a@example.edu.vn',
+    subject: 'Email trang một',
+    status: 'PENDING',
+    attemptCount: 0,
+    createdAt: '2026-10-22',
+  }
+  logFixture = [[row], [{ ...row, id: 2, subject: 'Email trang hai' }]]
+  currentUser = user('ADMIN')
+  render(
+    <MemoryRouter initialEntries={['/email-settings']}>
+      <App />
+    </MemoryRouter>,
+  )
+  await screen.findByText('Email trang một')
+  const subject = await screen.findByLabelText('Tiêu đề thư')
+  fireEvent.change(subject, { target: { value: 'Bản nháp chưa lưu' } })
+  const settingCount = settingScopes.length
+  const pager = screen.getByRole('navigation', { name: 'Phân trang lịch sử email' })
+  await userEvent.click(within(pager).getByRole('button', { name: 'Trang sau' }))
+  await screen.findByText('Email trang hai')
+  expect(logRequests).toEqual([0, 1])
+  expect((screen.getByLabelText('Tiêu đề thư') as HTMLInputElement).value).toBe('Bản nháp chưa lưu')
+  expect(settingScopes.length).toBe(settingCount)
 })

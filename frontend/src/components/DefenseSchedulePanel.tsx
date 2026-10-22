@@ -20,6 +20,7 @@ type Props = {
   defenses: DefenseSessionResponse[]
   periods?: RegistrationPeriodResponse[]
   unlockedReviews?: AssessmentComponentResponse[]
+  onAssign?: (defense: DefenseSessionResponse) => void
   onScheduled: () => Promise<void>
   onBusyChange?: (busy: boolean) => void
 }
@@ -30,6 +31,7 @@ export function DefenseSchedulePanel({
   defenses,
   periods = [],
   unlockedReviews = [],
+  onAssign,
   onScheduled,
   onBusyChange,
 }: Props) {
@@ -361,10 +363,6 @@ export function DefenseSchedulePanel({
               />
             </div>
           </div>
-          <p className="ea-hint">
-            Đề tài phải hoàn tất phản biện. Hệ thống kiểm tra trùng hội đồng, phòng và giảng viên
-            khi lưu.
-          </p>
           <button
             className="btn ea-save"
             disabled={
@@ -382,7 +380,11 @@ export function DefenseSchedulePanel({
           </button>
         </fieldset>
       </form>
-      <h2>Lịch đã xếp</h2>
+      <h2 className="ea-scheduled-title">Lịch đã xếp</h2>
+      <p className="ea-hint">
+        Xếp lịch chưa tạo phiếu chấm. Cần phân công bộ tiêu chí và hạn chấm cho các thành viên hội
+        đồng.
+      </p>
       {!defenses.length ? (
         <p className="ea-empty">Chưa có lịch bảo vệ trong đợt này.</p>
       ) : (
@@ -396,6 +398,7 @@ export function DefenseSchedulePanel({
                 <th>Bắt đầu</th>
                 <th>Kết thúc</th>
                 <th>Trạng thái</th>
+                {onAssign && <th>Chấm điểm</th>}
               </tr>
             </thead>
             <tbody>
@@ -419,6 +422,20 @@ export function DefenseSchedulePanel({
                           ? 'Hoàn tất'
                           : 'Đã hủy'}
                     </td>
+                    {onAssign && (
+                      <td>
+                        {item.status === 'SCHEDULED' && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            disabled={saving}
+                            onClick={() => onAssign(item)}
+                          >
+                            Phân công chấm
+                          </button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 )
               })}

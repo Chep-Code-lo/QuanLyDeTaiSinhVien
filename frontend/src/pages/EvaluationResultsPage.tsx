@@ -1,0 +1,330 @@
+import { useEffect, useRef, useState } from 'react'
+import { academicApi } from '../api/academic'
+import { evaluationApi } from '../api/evaluation'
+import { errorMessage } from '../api/student'
+import { ConfirmModal } from '../components/ConfirmModal'
+import { PageHeader } from '../components/PageHeader'
+import { RemoteState } from '../components/RemoteState'
+import { useToast } from '../context/ToastContext'
+import type { PageResponse } from '../types/api'
+import type { ProjectAssignmentResponse, ResultDetailResponse, ResultStatus } from '../types/domain'
+import { formatDateTime } from '../utils/dateTime'
+
+const statusLabels: Record<ResultStatus, string> = {
+  FINALIZED: 'Đã chốt, chờ công bố',
+  PUBLISHED: 'Đã công bố',
+  SUPERSEDED: 'Đã thay thế',
+}
+
+export function EvaluationResultsPage() {
+  const [page, setPage] = useState(0)
+  const [revision, setRevision] = useState(0)
+  const key = `${page}:${revision}`
+  const [response, setResponse] = useState<{
+    key: string
+    data?: PageResponse<ProjectAssignmentResponse>
+    error?: string
+  } | null>(null)
+  const [selected, setSelected] = useState<ProjectAssignmentResponse | null>(null)
+  const current = response?.key === key ? response : null
+  useEffect(() => {
+    let live = true
+    academicApi
+      .getProjectAssignments(undefined, page, 10)
+      .then((data) => {
+        if (live) setResponse({ key, data })
+      })
+      .catch((error) => {
+        if (live) setResponse({ key, error: errorMessage(error) })
+      })
+    return () => {
+      live = false
+    }
+  }, [page, key])
+  const go = (next: number) => {
+    setPage(next)
+    setSelected(null)
+  }
+  return (
+    <>
+      <PageHeader title="Tổng hợp & Công bố điểm" />
+      <section className="page-card">
+        <p>
+          Chủ tịch hội đồng chốt kết quả sau khi đủ phiếu điểm. Admin hoặc người quản lý đúng phạm
+          vi công bố kết quả cho sinh viên.
+        </p>
+        <RemoteState
+          loading={!current}
+          error={current?.error ?? ''}
+          retry={() => setRevision((value) => value + 1)}
+        />
+        {current?.data && (
+          <>
+            {!current.data.content.length && <p>Chưa có đề tài được giao.</p>}
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Đề tài</th>
+                    <th>Nhóm</th>
+                    <th>Đợt</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {current.data.content.map((project) => (
+                    <tr key={project.id}>
+                      <td>
+                        {project.topicCode} · {project.topicTitle}
+                      </td>
+                      <td>{project.groupName}</td>
+                      <td>{project.periodName}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          aria-pressed={selected?.id === project.id}
+                          onClick={() => setSelected(project)}
+                        >
+                          Xem điểm {project.topicCode}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <nav aria-label="Phân trang đề tài">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={page === 0}
+                onClick={() => go(page - 1)}
+              >
+                Trang trước
+              </button>
+              <span>
+                {' '}
+                Trang {page + 1}/{Math.max(1, current.data.totalPages)}{' '}
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={page + 1 >= current.data.totalPages}
+                onClick={() => go(page + 1)}
+              >
+                Trang sau
+              </button>
+            </nav>
+          </>
+        )}
+      </section>
+      {selected && <ProjectResults key={selected.id} project={selected} />}
+    </>
+  )
+}
+
+function ProjectResults({ project }: { project: ProjectAssignmentResponse }) {
+  const { showSuccess, showError } = useToast()
+  const [page, setPage] = useState(0)
+  const [revision, setRevision] = useState(0)
+  const key = `${page}:${revision}`
+  const [response, setResponse] = useState<{
+    key: string
+    data?: PageResponse<ResultDetailResponse>
+    actions?: { canFinalize: boolean; canPublish: boolean }
+    error?: string
+  } | null>(null)
+  const current = response?.key === key ? response : null
+  const [pending, setPending] = useState<{ kind: 'finalize' | 'publish'; id: number } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const inFlight = useRef(false)
+  const live = useRef(true)
+  useEffect(() => {
+    live.current = true
+    return () => {
+      live.current = false
+    }
+  }, [])
+  useEffect(() => {
+    let active = true
+    Promise.all([
+      evaluationApi.listResults({ assignmentId: project.id, page, size: 10 }),
+      evaluationApi.resultActions(project.id),
+    ])
+      .then(([data, actions]) => {
+        if (active) setResponse({ key, data, actions })
+      })
+      .catch((error) => {
+        if (active) setResponse({ key, error: errorMessage(error) })
+      })
+    return () => {
+      active = false
+    }
+  }, [project.id, page, key])
+  async function confirm() {
+    if (!pending || inFlight.current || !current?.actions) return
+    if (pending.kind === 'finalize' ? !current.actions.canFinalize : !current.actions.canPublish)
+      return
+    inFlight.current = true
+    setBusy(true)
+    try {
+      if (pending.kind === 'finalize') await evaluationApi.finalizeResult(project.id)
+      else await evaluationApi.publishResult(pending.id)
+      if (live.current)
+        showSuccess(
+          pending.kind === 'finalize'
+            ? 'Đã chốt kết quả. Kết quả chưa hiển thị cho sinh viên cho đến khi được công bố.'
+            : 'Đã công bố kết quả cho sinh viên.',
+        )
+    } catch (error) {
+      if (live.current) showError(errorMessage(error))
+    } finally {
+      inFlight.current = false
+      if (live.current) {
+        setBusy(false)
+        setPending(null)
+        setPage(0)
+        setRevision((value) => value + 1)
+      }
+    }
+  }
+  const awaitingPublication = current?.data?.content.some((result) => result.status === 'FINALIZED')
+  return (
+    <section className="page-card" aria-label={`Kết quả ${project.topicCode}`}>
+      <h2>
+        {project.topicCode} · {project.groupName}
+      </h2>
+      <p>
+        Điểm được hệ thống tính bằng trung bình các điểm thành phần. Mỗi thành phần lấy trung bình
+        điểm của các giảng viên được phân công.
+      </p>
+      <RemoteState
+        loading={!current}
+        error={current?.error ?? ''}
+        retry={() => setRevision((value) => value + 1)}
+      />
+      <button
+        type="button"
+        className="btn btn-secondary"
+        disabled={busy}
+        onClick={() => setRevision((value) => value + 1)}
+      >
+        Làm mới kết quả
+      </button>
+      {current?.data && (
+        <>
+          {current.actions?.canFinalize && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={busy || awaitingPublication || page !== 0}
+              onClick={() => setPending({ kind: 'finalize', id: project.id })}
+            >
+              Chốt kết quả
+            </button>
+          )}
+          {!current.data.content.length && (
+            <p>
+              Chưa có kết quả được chốt. Cần phân công đủ và nộp đầy đủ phiếu của các thành phần
+              đánh giá bắt buộc trước khi chốt.
+            </p>
+          )}
+          {current.data.content.map((result) => (
+            <article key={result.id} className="page-card">
+              <h3>
+                Phiên bản {result.versionNo} · {statusLabels[result.status]}
+              </h3>
+              <p>
+                Điểm tổng hợp: <strong>{Number(result.finalScore).toFixed(2)}/10</strong>
+              </p>
+              <p>
+                Chốt bởi {result.finalizedByName} · {formatDateTime(result.finalizedAt)}
+              </p>
+              {result.publishedAt && (
+                <p>
+                  Công bố bởi {result.publishedByName} · {formatDateTime(result.publishedAt)}
+                </p>
+              )}
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Thành phần</th>
+                      <th>Phiếu chấm</th>
+                      <th>Điểm phiếu</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.inputs.map((input) => (
+                      <tr key={input.id}>
+                        <td>{input.componentCode}</td>
+                        <td>
+                          #{input.sheetId} · phiên bản {input.sheetVersion}
+                        </td>
+                        <td>{Number(input.scoreSnapshot).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p>
+                Sinh viên:{' '}
+                {result.members
+                  .map((member) => `${member.studentCodeSnapshot} · ${member.fullNameSnapshot}`)
+                  .join('; ')}
+              </p>
+              {result.status === 'FINALIZED' && current.actions?.canPublish && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={busy}
+                  onClick={() => setPending({ kind: 'publish', id: result.id })}
+                >
+                  Công bố kết quả
+                </button>
+              )}
+            </article>
+          ))}
+          <nav aria-label="Phân trang phiên bản kết quả">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={busy || page === 0}
+              onClick={() => setPage((value) => value - 1)}
+            >
+              Phiên bản trước
+            </button>
+            <span>
+              {' '}
+              Trang {page + 1}/{Math.max(1, current.data.totalPages)}{' '}
+            </span>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={busy || page + 1 >= current.data.totalPages}
+              onClick={() => setPage((value) => value + 1)}
+            >
+              Phiên bản sau
+            </button>
+          </nav>
+        </>
+      )}
+      <ConfirmModal
+        isOpen={!!pending}
+        title={pending?.kind === 'publish' ? 'Công bố kết quả' : 'Chốt kết quả'}
+        message={
+          pending?.kind === 'publish'
+            ? `Công bố kết quả ${project.topicCode} cho sinh viên trong nhóm?`
+            : `Chốt kết quả ${project.topicCode}? Hệ thống sẽ kiểm tra đủ phiếu và lưu ảnh chụp điểm. Điểm đã chốt chỉ được điều chỉnh qua quy trình được phê duyệt.`
+        }
+        confirmText="Xác nhận"
+        loading={busy}
+        onConfirm={() => void confirm()}
+        onCancel={() => {
+          if (!inFlight.current) setPending(null)
+        }}
+      />
+    </section>
+  )
+}
