@@ -6,8 +6,8 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_as_cs
       - --default-time-zone=+00:00
-      # The idempotent schema migrations create triggers. MySQL requires this
-      # when binary logging is enabled, including for users with TRIGGER privilege.
+      # Bootstrap and migrations create triggers. MySQL requires this when binary
+      # logging is enabled, including for users with TRIGGER privilege.
       - --log-bin-trust-function-creators=1
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD before starting Docker Compose}
@@ -18,7 +18,14 @@ services:
       - "127.0.0.1:${MYSQL_PORT:-3307}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./database/ql_de_tai_sinh_vien_schema.sql:/docker-entrypoint-initdb.d/00-ql_de_tai_sinh_vien_schema.sql:ro
+      # MySQL executes only these ordered bootstrap files on a new, empty volume.
+      # Do not mount the compatibility wrapper or any demo seed here.
+      - ./database/bootstrap/00-create-database.sql:/docker-entrypoint-initdb.d/00-create-database.sql:ro
+      - ./database/schema/01-tables-and-local-constraints.sql:/docker-entrypoint-initdb.d/10-tables.sql:ro
+      - ./database/constraints/01-foreign-keys.sql:/docker-entrypoint-initdb.d/20-foreign-keys.sql:ro
+      - ./database/seed/00-system-data.sql:/docker-entrypoint-initdb.d/30-system-data.sql:ro
+      - ./database/objects/01-views.sql:/docker-entrypoint-initdb.d/40-views.sql:ro
+      - ./database/objects/02-triggers.sql:/docker-entrypoint-initdb.d/50-triggers.sql:ro
     healthcheck:
       test:
         [
@@ -30,24 +37,31 @@ services:
       retries: 12
       start_period: 30s
 
-  schema-migrate:
-    image: mysql:8.4
+  db-migrate:
+    image: flyway/flyway:13.10.3
     restart: "no"
     depends_on:
       mysql:
         condition: service_healthy
     environment:
-      MYSQL_APP_USER: ${MYSQL_APP_USER:-ql_de_tai_app}
-      MYSQL_PWD: ${MYSQL_APP_PASSWORD:?Set MYSQL_APP_PASSWORD before starting Docker Compose}
+      # Flyway's MySQL driver connects over the private Compose network. Explicit
+      # public-key retrieval keeps MySQL 8.4 caching_sha2_password authentication
+      # reliable without depending on a self-signed TLS certificate.
+      FLYWAY_URL: jdbc:mysql://mysql:3306/ql_de_tai_sinh_vien?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true
+      FLYWAY_USER: ${MYSQL_APP_USER:-ql_de_tai_app}
+      FLYWAY_PASSWORD: ${MYSQL_APP_PASSWORD:?Set MYSQL_APP_PASSWORD before starting Docker Compose}
+      # Existing deployments have no Flyway history. Baseline at 0, then apply
+      # the guarded V001+ migrations once; no bootstrap file is re-run.
+      FLYWAY_BASELINE_ON_MIGRATE: "true"
+      FLYWAY_BASELINE_VERSION: "0"
+      FLYWAY_DEFAULT_SCHEMA: ql_de_tai_sinh_vien
+      FLYWAY_CREATE_SCHEMAS: "false"
+      FLYWAY_CLEAN_DISABLED: "true"
+      FLYWAY_CONNECT_RETRIES: "60"
+      FLYWAY_LOCATIONS: filesystem:/flyway/sql
     volumes:
-      - ./database/migrations:/migrations:ro
-    entrypoint: ["/bin/sh", "-ec"]
-    command:
-      - |
-        for migration in /migrations/*.sql; do
-          [ -f "$$migration" ] || continue
-          mysql --protocol=TCP -h mysql -u "$$MYSQL_APP_USER" ql_de_tai_sinh_vien < "$$migration"
-        done
+      - ./database/migrations:/flyway/sql:ro
+    command: migrate
 
   file-storage-init:
     image: alpine:3
@@ -67,7 +81,7 @@ services:
         condition: service_completed_successfully
       mysql:
         condition: service_healthy
-      schema-migrate:
+      db-migrate:
         condition: service_completed_successfully
     environment:
       DB_URL: jdbc:mysql://mysql:3306/ql_de_tai_sinh_vien?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC

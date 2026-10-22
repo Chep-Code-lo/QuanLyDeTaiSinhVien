@@ -4,4 +4,5 @@
 services:
   mysql:
     volumes:
-      - ./database/seed/demo-data.sql:/docker-entrypoint-initdb.d/02-demo-data.sql:ro
+      # Runs after tables, foreign keys, required system data, views and triggers.
+      - ./database/seed/demo-data.sql:/docker-entrypoint-initdb.d/60-demo-data.sql:ro

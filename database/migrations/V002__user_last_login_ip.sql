@@ -1,4 +1,8 @@
 -- Store the address from the most recent successful login for account administration.
+SET NAMES utf8mb4 COLLATE utf8mb4_0900_as_cs;
+SET SESSION time_zone = '+00:00';
+SET SESSION sql_mode = 'STRICT_ALL_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
+
 SET @column_exists = (
   SELECT COUNT(*)
   FROM information_schema.columns

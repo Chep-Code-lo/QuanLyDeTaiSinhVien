@@ -1,5 +1,8 @@
 -- Preserve existing committees while adding their selected rubric and editable role labels.
--- This migration is idempotent because Docker applies all migration files on every deployment.
+-- The guards support adoption by a database upgraded before Flyway tracked it.
+SET NAMES utf8mb4 COLLATE utf8mb4_0900_as_cs;
+SET SESSION time_zone = '+00:00';
+SET SESSION sql_mode = 'STRICT_ALL_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
 
 SET @committee_configuration_sql = IF(EXISTS(
   SELECT 1 FROM information_schema.COLUMNS

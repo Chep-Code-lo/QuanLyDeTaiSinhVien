@@ -1,9 +1,0 @@
-{
-  "tests": 44,
-  "failures": 0,
-  "errors": 0,
-  "skipped": 0,
-  "suites": [
-    "com.example.qldetai.workflow.BackendConsistencyIntegrationTests"
-  ]
-}

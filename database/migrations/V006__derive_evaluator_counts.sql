@@ -1,5 +1,8 @@
 -- The evaluator count is no longer configured with the rubric.  Existing column values are
 -- retained for compatibility only; all workflow checks derive the count from actual assignments.
+SET NAMES utf8mb4 COLLATE utf8mb4_0900_as_cs;
+SET SESSION time_zone = '+00:00';
+SET SESSION sql_mode = 'STRICT_ALL_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
 
 SET @legacy_evaluator_column_sql = IF(EXISTS(
   SELECT 1 FROM information_schema.COLUMNS
@@ -56,7 +59,7 @@ BEGIN
   IF NOT (NEW.overall_comment <=> OLD.overall_comment)
      OR NOT (NEW.submitted_at <=> OLD.submitted_at)
      OR NOT ((NEW.status = OLD.status) OR (OLD.status = 'SUBMITTED' AND NEW.status = 'LOCKED')) THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Submitted score sheet is locked for editing';
+   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Submitted score sheet is locked for editing';
   END IF;
  END IF;
  IF OLD.status = 'DRAFT' AND NEW.status <> 'DRAFT' THEN
@@ -76,29 +79,30 @@ BEGIN
   WHERE ea.id = NEW.evaluation_id;
   IF v_component_type = 'COMMITTEE' THEN
    IF NOT EXISTS (
-     SELECT 1 FROM assessment_components ac
-     JOIN project_assignments pa ON pa.period_id = ac.period_id
-     WHERE pa.id = v_assignment AND ac.component_type = 'REVIEW' AND ac.status = 'LOCKED'
+    SELECT 1 FROM assessment_components ac
+    JOIN project_assignments pa ON pa.period_id = ac.period_id
+    WHERE pa.id = v_assignment AND ac.component_type = 'REVIEW' AND ac.status = 'LOCKED'
    ) OR EXISTS (
-     SELECT 1 FROM assessment_components ac
-     JOIN project_assignments pa ON pa.period_id = ac.period_id
-     WHERE pa.id = v_assignment AND ac.component_type = 'REVIEW' AND ac.status = 'LOCKED'
-       AND (
-        NOT EXISTS (SELECT 1 FROM evaluation_assignments ea
-                    WHERE ea.assignment_id = v_assignment AND ea.component_id = ac.id
-                      AND ea.status = 'ACTIVE')
-        OR EXISTS (SELECT 1 FROM evaluation_assignments ea
-                   LEFT JOIN score_sheets ss ON ss.evaluation_id = ea.id
-                   LEFT JOIN v_score_sheet_totals st ON st.sheet_id = ss.id
+    SELECT 1 FROM assessment_components ac
+    JOIN project_assignments pa ON pa.period_id = ac.period_id
+    WHERE pa.id = v_assignment AND ac.component_type = 'REVIEW' AND ac.status = 'LOCKED'
+      AND (
+       NOT EXISTS (SELECT 1 FROM evaluation_assignments ea
                    WHERE ea.assignment_id = v_assignment AND ea.component_id = ac.id
-                     AND ea.status = 'ACTIVE'
-                     AND (ss.id IS NULL OR ss.status NOT IN ('SUBMITTED','LOCKED')
-                          OR st.total_score IS NULL))
-       )
+                     AND ea.status = 'ACTIVE')
+       OR EXISTS (SELECT 1 FROM evaluation_assignments ea
+                  LEFT JOIN score_sheets ss ON ss.evaluation_id = ea.id
+                  LEFT JOIN v_score_sheet_totals st ON st.sheet_id = ss.id
+                  WHERE ea.assignment_id = v_assignment AND ea.component_id = ac.id
+                    AND ea.status = 'ACTIVE'
+                    AND (ss.id IS NULL OR ss.status NOT IN ('SUBMITTED','LOCKED')
+                         OR st.total_score IS NULL))
+      )
    ) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Complete reviewer assignment and review scoring before committee scoring';
    END IF;
   END IF;
  END IF;
 END$$
+
 DELIMITER ;

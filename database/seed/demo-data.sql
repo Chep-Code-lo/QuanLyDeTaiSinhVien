@@ -1,9 +1,72 @@
 -- LOCAL/DEMO ONLY. Not imported by the default Docker/VPS configuration.
--- Requires the main schema and empty application tables. Import once only.
--- Docker local demo: docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build -d
+-- Requires the structured bootstrap and an otherwise empty application database.
+-- This guard fails before any INSERT when data is already present, so it cannot
+-- silently duplicate unique values or mix demo accounts into a real deployment.
+-- Docker local demo: docker compose --env-file docker-compose.demo.env -p qldetai-demo -f docker-compose.yml -f docker-compose.demo.yml up --build -d
 SET NAMES utf8mb4 COLLATE utf8mb4_0900_as_cs;
 SET SESSION time_zone = '+00:00';
+SET SESSION sql_mode = 'STRICT_ALL_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
 USE `ql_de_tai_sinh_vien`;
+
+-- A temporary CHECK lets the SQL client stop before inserts without leaving a
+-- procedure or other persistent object behind if the preflight fails.
+DROP TEMPORARY TABLE IF EXISTS demo_seed_preflight;
+CREATE TEMPORARY TABLE demo_seed_preflight (
+  id TINYINT NOT NULL PRIMARY KEY,
+  is_valid TINYINT NOT NULL,
+  CONSTRAINT ck_demo_seed_preflight_valid CHECK (is_valid = 1)
+) ENGINE=MEMORY;
+
+SET @demo_seed_preflight_ok := NOT (
+  EXISTS (SELECT 1 FROM faculties LIMIT 1)
+  OR EXISTS (SELECT 1 FROM departments LIMIT 1)
+  OR EXISTS (SELECT 1 FROM users LIMIT 1)
+  OR EXISTS (SELECT 1 FROM user_roles LIMIT 1)
+  OR EXISTS (SELECT 1 FROM students LIMIT 1)
+  OR EXISTS (SELECT 1 FROM lecturers LIMIT 1)
+  OR EXISTS (SELECT 1 FROM academic_appointments LIMIT 1)
+  OR EXISTS (SELECT 1 FROM semesters LIMIT 1)
+  OR EXISTS (SELECT 1 FROM registration_periods LIMIT 1)
+  OR EXISTS (SELECT 1 FROM student_groups LIMIT 1)
+  OR EXISTS (SELECT 1 FROM topics LIMIT 1)
+  OR EXISTS (SELECT 1 FROM topic_supervisors LIMIT 1)
+  OR EXISTS (SELECT 1 FROM topic_reviews LIMIT 1)
+  OR EXISTS (SELECT 1 FROM group_members LIMIT 1)
+  OR EXISTS (SELECT 1 FROM group_invitations LIMIT 1)
+  OR EXISTS (SELECT 1 FROM topic_registrations LIMIT 1)
+  OR EXISTS (SELECT 1 FROM project_assignments LIMIT 1)
+  OR EXISTS (SELECT 1 FROM milestones LIMIT 1)
+  OR EXISTS (SELECT 1 FROM stored_files LIMIT 1)
+  OR EXISTS (SELECT 1 FROM report_submissions LIMIT 1)
+  OR EXISTS (SELECT 1 FROM report_feedback LIMIT 1)
+  OR EXISTS (SELECT 1 FROM evaluation_committees LIMIT 1)
+  OR EXISTS (SELECT 1 FROM committee_members LIMIT 1)
+  OR EXISTS (SELECT 1 FROM defense_sessions LIMIT 1)
+  OR EXISTS (SELECT 1 FROM assessment_components LIMIT 1)
+  OR EXISTS (SELECT 1 FROM rubrics LIMIT 1)
+  OR EXISTS (SELECT 1 FROM rubric_criteria LIMIT 1)
+  OR EXISTS (SELECT 1 FROM evaluation_assignments LIMIT 1)
+  OR EXISTS (SELECT 1 FROM score_sheets LIMIT 1)
+  OR EXISTS (SELECT 1 FROM score_details LIMIT 1)
+  OR EXISTS (SELECT 1 FROM result_versions LIMIT 1)
+  OR EXISTS (SELECT 1 FROM result_inputs LIMIT 1)
+  OR EXISTS (SELECT 1 FROM result_members LIMIT 1)
+  OR EXISTS (SELECT 1 FROM grade_change_requests LIMIT 1)
+  OR EXISTS (SELECT 1 FROM announcements LIMIT 1)
+  OR EXISTS (SELECT 1 FROM notifications LIMIT 1)
+  OR EXISTS (SELECT 1 FROM audit_logs LIMIT 1)
+  OR EXISTS (SELECT 1 FROM email_notification_settings LIMIT 1)
+  OR EXISTS (SELECT 1 FROM email_outbox LIMIT 1)
+  OR EXISTS (SELECT 1 FROM email_delivery_logs LIMIT 1)
+  OR EXISTS (SELECT 1 FROM email_templates LIMIT 1)
+  OR (SELECT COUNT(*) FROM roles WHERE code IN ('STUDENT', 'LECTURER', 'ADMIN')) <> 3
+  OR NOT EXISTS (SELECT 1 FROM defense_schedule_guard WHERE id = 1)
+);
+SELECT IF(@demo_seed_preflight_ok, 'Demo seed preflight passed',
+  'Demo seed stopped: database is not empty or system data is missing') AS demo_seed_preflight;
+INSERT INTO demo_seed_preflight (id, is_valid) VALUES (1, @demo_seed_preflight_ok);
+DROP TEMPORARY TABLE demo_seed_preflight;
+
 START TRANSACTION;
 
 SET @seed_now := UTC_TIMESTAMP(6);
