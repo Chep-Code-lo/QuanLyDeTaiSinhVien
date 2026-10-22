@@ -453,7 +453,8 @@ describe('Xếp lịch bảo vệ', () => {
         defenseId: 71,
         rubricId: 7,
         lecturerId: member.lecturerId,
-        deadlineAt: '2099-02-21T03:00:00.000Z',
+        // datetime-local follows the browser timezone, including UTC on CI.
+        deadlineAt: new Date(2099, 1, 21, 10, 0).toISOString(),
       })),
     )
   })
