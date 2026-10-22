@@ -93,10 +93,14 @@ export const evaluationApi = {
     >('/evaluation-assignments/batch', { assignments })
     return response.data.data
   },
-  defenseEligibility: async (assignmentId: number, committeeId: number) => {
+  defenseEligibility: async (
+    assignmentId: number,
+    committeeId: number,
+    proposed?: { location: string; startsAt: string; endsAt: string },
+  ) => {
     const response = await apiClient.get<ApiResponse<{ eligible: boolean; reason: string | null }>>(
       '/defense-sessions/eligibility',
-      { params: { assignmentId, committeeId } },
+      { params: { assignmentId, committeeId, ...proposed } },
     )
     return response.data.data
   },

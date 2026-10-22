@@ -10,10 +10,15 @@ import com.example.qldetai.feature.progress.dto.ProgressDtos.StoredFileResponse;
 import com.example.qldetai.feature.progress.repository.StoredFileRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -35,6 +40,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class StoredFileService {
 
@@ -64,17 +70,25 @@ public class StoredFileService {
     private final Clock clock;
     private final Path storageRoot;
 
+    @Value("${spring.servlet.multipart.max-file-size:20MB}")
+    private DataSize maxFileSize = DataSize.ofMegabytes(20);
+
     @Transactional
     public StoredFileResponse store(MultipartFile file, Long actorId) {
         if (file == null || file.isEmpty()) {
             throw new BusinessRuleException("Please choose a non-empty file to upload.");
         }
 
+        if (file.getSize() > maxFileSize.toBytes())
+            throw new BusinessRuleException("Tệp vượt quá dung lượng cho phép.");
         String originalName = normalizeOriginalName(file.getOriginalFilename());
+        if (originalName.length() > 255)
+            throw new BusinessRuleException("Tên tệp không được vượt quá 255 ký tự.");
         String mimeType = validatedMimeType(file, originalName);
         String storageKey = buildStorageKey(originalName);
         Path targetPath = resolveTarget(storageKey);
 
+        boolean created = false;
         try {
             Files.createDirectories(targetPath.getParent());
             MessageDigest digest = sha256();
@@ -86,7 +100,17 @@ public class StoredFileService {
                                     targetPath,
                                     StandardOpenOption.CREATE_NEW,
                                     StandardOpenOption.WRITE)) {
-                sizeBytes = digestStream.transferTo(outputStream);
+                created = true;
+                cleanOnRollback(targetPath);
+                sizeBytes = 0;
+                byte[] buffer = new byte[8192];
+                int count;
+                while ((count = digestStream.read(buffer)) != -1) {
+                    sizeBytes += count;
+                    if (sizeBytes > maxFileSize.toBytes())
+                        throw new BusinessRuleException("Tệp vượt quá dung lượng cho phép.");
+                    outputStream.write(buffer, 0, count);
+                }
             }
 
             if (sizeBytes <= 0) {
@@ -113,7 +137,33 @@ public class StoredFileService {
             storedFile.setStatus(StoredFileStatus.READY);
             return toResponse(storedFileRepository.save(storedFile));
         } catch (IOException exception) {
+            if (created) deleteContent(targetPath);
             throw new IllegalStateException("The file could not be stored.", exception);
+        } catch (RuntimeException exception) {
+            if (created) deleteContent(targetPath);
+            throw exception;
+        }
+    }
+
+    private void cleanOnRollback(Path path) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) return;
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        // Unknown commit outcomes may have persisted metadata; retain the content
+                        // then.
+                        if (status == STATUS_ROLLED_BACK) deleteContent(path);
+                    }
+                });
+    }
+
+    private void deleteContent(Path path) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException exception) {
+            log.error(
+                    "Unable to clean rolled-back upload. type={}", exception.getClass().getName());
         }
     }
 
@@ -259,8 +309,12 @@ public class StoredFileService {
             if (value == 0) return false;
         }
         byte[] buffer = new byte[8192];
+        long total = header.length;
         int count;
         while ((count = remaining.read(buffer)) != -1) {
+            total += count;
+            if (total > maxFileSize.toBytes())
+                throw new BusinessRuleException("Tệp vượt quá dung lượng cho phép.");
             for (int index = 0; index < count; index++) {
                 if (buffer[index] == 0) return false;
             }

@@ -66,7 +66,14 @@ export function DefenseSchedulePanel({
   const [success, setSuccess] = useState('')
   const [refreshNeeded, setRefreshNeeded] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  const eligibilityKey = JSON.stringify([projectId, committeeId])
+  const eligibilityKey = JSON.stringify([
+    projectId,
+    committeeId,
+    location,
+    startsAt,
+    endsAt,
+    graduation,
+  ])
   const [eligibilityResult, setEligibility] = useState<{
     key: string
     eligible: boolean
@@ -78,7 +85,21 @@ export function DefenseSchedulePanel({
     let live = true
     if (!projectId || !committeeId) return
     evaluationApi
-      .defenseEligibility(Number(projectId), Number(committeeId))
+      .defenseEligibility(
+        Number(projectId),
+        Number(committeeId),
+        location.trim() &&
+          startsAt &&
+          endsAt &&
+          Number.isFinite(defenseInstant(startsAt, graduation).getTime()) &&
+          Number.isFinite(defenseInstant(endsAt, graduation).getTime())
+          ? {
+              location: location.trim(),
+              startsAt: defenseInstant(startsAt, graduation).toISOString(),
+              endsAt: defenseInstant(endsAt, graduation).toISOString(),
+            }
+          : undefined,
+      )
       .then((result) => {
         if (live) setEligibility({ ...result, key: eligibilityKey })
       })
@@ -93,7 +114,7 @@ export function DefenseSchedulePanel({
     return () => {
       live = false
     }
-  }, [projectId, committeeId, eligibilityKey])
+  }, [projectId, committeeId, eligibilityKey, location, startsAt, endsAt, graduation])
   // MySQL currently allows one session per project, including completed/cancelled sessions.
   const available = projects.filter(
     (project) =>

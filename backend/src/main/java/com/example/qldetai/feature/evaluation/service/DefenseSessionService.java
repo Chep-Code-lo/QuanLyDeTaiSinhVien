@@ -115,18 +115,7 @@ public class DefenseSessionService {
     @BusinessAudit(action = "DEFENSE_SCHEDULE", entityType = "DEFENSE_SESSION")
     public Long schedule(CreateDefenseRequest request, Long actorId) {
         actorAccess.manager(actorId);
-        // MySQL DATETIME(6) and JPA timestamp(6) cannot preserve nanoseconds.
-        // Compare and persist the same precision, especially at adjacent-session boundaries.
-        request =
-                new CreateDefenseRequest(
-                        request.assignmentId(),
-                        request.committeeId(),
-                        request.location(),
-                        request.startsAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS),
-                        request.endsAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
-        if (!request.startsAt().isBefore(request.endsAt())) {
-            throw new BusinessRuleException("Defense start time must be before end time.");
-        }
+        request = normalizeSchedule(request);
 
         // Acquire before loading project/committee rows. Hold until transaction commit.
         // Conflict queries below are locking/current reads under MySQL REPEATABLE READ.
@@ -192,6 +181,30 @@ public class DefenseSessionService {
         return defense.getId();
     }
 
+    private CreateDefenseRequest normalizeSchedule(CreateDefenseRequest request) {
+        if (request.location() == null
+                || request.location().isBlank()
+                || request.location().length() > 200
+                || request.startsAt() == null
+                || request.endsAt() == null) {
+            throw new BusinessRuleException(
+                    "Vui lòng nhập đầy đủ phòng, thời gian bắt đầu và kết thúc hợp lệ.");
+        }
+        // MySQL DATETIME(6) and JPA timestamp(6) cannot preserve nanoseconds.
+        // Compare and persist the same precision, especially at adjacent-session boundaries.
+        request =
+                new CreateDefenseRequest(
+                        request.assignmentId(),
+                        request.committeeId(),
+                        request.location(),
+                        request.startsAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS),
+                        request.endsAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+        if (!request.startsAt().isBefore(request.endsAt())) {
+            throw new BusinessRuleException("Defense start time must be before end time.");
+        }
+        return request;
+    }
+
     private void validateDefenseDate(RegistrationPeriod period, CreateDefenseRequest request) {
         if (period.getProjectType() != ProjectType.GRADUATION) return;
         var date = period.getDefenseDate();
@@ -199,6 +212,7 @@ public class DefenseSessionService {
             throw new BusinessRuleException(
                     "Đợt KLTN chưa cấu hình ngày bảo vệ. Vui lòng cập nhật cấu hình đợt trước khi xếp lịch.");
         }
+        if (request == null) return;
         if (!date.equals(VietnamTime.dateOf(request.startsAt()))
                 || !date.equals(VietnamTime.dateOf(request.endsAt()))) {
             throw new BusinessRuleException(
@@ -247,6 +261,16 @@ public class DefenseSessionService {
     @Transactional(readOnly = true)
     public com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.DefenseEligibilityResponse
             eligibility(Long assignmentId, Long committeeId, Long actorId) {
+        return eligibility(assignmentId, committeeId, actorId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos.DefenseEligibilityResponse
+            eligibility(
+                    Long assignmentId,
+                    Long committeeId,
+                    Long actorId,
+                    CreateDefenseRequest proposed) {
         actorAccess.manager(actorId);
         var assignment =
                 assignments
@@ -270,7 +294,28 @@ public class DefenseSessionService {
                 throw new BusinessRuleException(
                         "Project or committee already has a completed defense configuration.");
             }
-            ensureEligible(assignment, committee, committeeMembers.findByCommitteeId(committeeId));
+            var members = committeeMembers.findByCommitteeId(committeeId);
+            if (proposed != null) proposed = normalizeSchedule(proposed);
+            validateDefenseDate(assignment.getPeriod(), proposed);
+            ensureEligible(assignment, committee, members);
+            if (proposed != null) {
+                if (defenses.hasCommitteeConflict(
+                        committeeId, proposed.startsAt(), proposed.endsAt()))
+                    throw new BusinessRuleException("Hội đồng đã có lịch bảo vệ trùng giờ.");
+                if (defenses.hasRoomConflict(
+                        DefenseLocation.key(proposed.location()),
+                        DefenseLocation.NORMALIZATION_PATTERN,
+                        proposed.startsAt(),
+                        proposed.endsAt()))
+                    throw new BusinessRuleException(
+                            "Phòng đã có lịch bảo vệ trong khoảng thời gian này.");
+                if (defenses.hasLecturerConflict(
+                        members.stream().map(member -> member.getLecturer().getId()).toList(),
+                        proposed.startsAt(),
+                        proposed.endsAt()))
+                    throw new BusinessRuleException(
+                            "Có giảng viên trong hội đồng đã có lịch bảo vệ trùng giờ.");
+            }
             return new com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos
                     .DefenseEligibilityResponse(true, null);
         } catch (BusinessRuleException exception) {

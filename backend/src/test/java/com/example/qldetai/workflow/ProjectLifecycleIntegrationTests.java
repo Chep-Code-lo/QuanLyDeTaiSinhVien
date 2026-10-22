@@ -143,8 +143,12 @@ class ProjectLifecycleIntegrationTests {
             }
             properties.add("spring.datasource.url", () -> url);
             properties.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-            properties.add("spring.datasource.username", () -> "root");
-            properties.add("spring.datasource.password", () -> "isolated-email-test");
+            properties.add(
+                    "spring.datasource.username",
+                    () -> System.getProperty("result.email.mysql.user", "root"));
+            properties.add(
+                    "spring.datasource.password",
+                    () -> System.getProperty("result.email.mysql.password", "isolated-email-test"));
             properties.add("spring.jpa.hibernate.ddl-auto", () -> "none");
             properties.add("spring.sql.init.mode", () -> "never");
         }
@@ -206,7 +210,9 @@ class ProjectLifecycleIntegrationTests {
                 new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER),
                 admin.getId());
         period.setProjectType(type);
-        period.setDefenseDate(LocalDate.of(2027, 5, 1));
+        period.setDefenseDate(type == ProjectType.GRADUATION ? LocalDate.of(2027, 5, 1) : null);
+        if (type == ProjectType.GRADUATION || type == ProjectType.SPECIALIZED)
+            period.setReviewDeadlineAt(nowUtc().plusDays(30));
         var result =
                 mvc.perform(
                                 post("/api/v1/defense-sessions")
@@ -246,6 +252,198 @@ class ProjectLifecycleIntegrationTests {
                                 assertThat(item.endsAt()).isEqualTo(end);
                             });
         }
+    }
+
+    @Test
+    void graduationEligibilityRejectsMissingDefenseDateBeforeSaving() {
+        var project =
+                createAssignedProject("eligibility-missing-date", leaderStudent, secondStudent);
+        Long committeeId =
+                evaluationCommitteeService.createCommittee(
+                        new CreateCommitteeRequest(period.getId(), "Eligibility"), admin.getId());
+        evaluationCommitteeService.addMember(
+                committeeId,
+                new AddCommitteeMemberRequest(lecturerThree.getId(), 1, CommitteeRole.CHAIR),
+                admin.getId());
+        evaluationCommitteeService.addMember(
+                committeeId,
+                new AddCommitteeMemberRequest(lecturerFour.getId(), 2, CommitteeRole.SECRETARY),
+                admin.getId());
+        evaluationCommitteeService.addMember(
+                committeeId,
+                new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER),
+                admin.getId());
+        period.setProjectType(ProjectType.GRADUATION);
+        period.setDefenseDate(null);
+        period.setStatus(RegistrationPeriodStatus.DRAFT);
+        var response = defenseSessionService.eligibility(project.id(), committeeId, admin.getId());
+        assertThat(response.eligible()).isFalse();
+        assertThat(response.reason()).contains("chưa cấu hình ngày bảo vệ");
+    }
+
+    @Test
+    void deanCannotAttachAnotherUsersPrivateFileToCreateOrUpdateAnnouncement(
+            @Autowired MockMvc mvc,
+            @Autowired
+                    com.example.qldetai.feature.progress.repository.StoredFileRepository
+                            storedFiles,
+            @Autowired
+                    com.example.qldetai.feature.communication.service.AnnouncementService
+                            announcements)
+            throws Exception {
+        var dean = new AcademicAppointment();
+        dean.setLecturer(lecturerFive);
+        dean.setFaculty(faculty);
+        dean.setPositionCode(PositionCode.DEAN);
+        dean.setStartsAt(nowUtc().minusDays(1));
+        dean.setAssignedBy(admin);
+        appointments.saveAndFlush(dean);
+        var file = new com.example.qldetai.feature.progress.domain.StoredFile();
+        file.setStorageKey("private/" + java.util.UUID.randomUUID());
+        file.setOriginalName("private.txt");
+        file.setMimeType("text/plain");
+        file.setSizeBytes(1);
+        file.setSha256("a".repeat(64));
+        file.setUploadedBy(leaderStudent.getUser());
+        file.setUploadedAt(nowUtc());
+        storedFiles.saveAndFlush(file);
+        mvc.perform(
+                        get("/api/v1/files/{id}", file.getId())
+                                .with(user(UserPrincipal.from(lecturerFive.getUser()))))
+                .andExpect(status().isForbidden());
+        String payload =
+                "{\"facultyId\":%d,\"title\":\"Thông báo\",\"content\":\"Nội dung\",\"attachmentFileId\":%d}"
+                        .formatted(faculty.getId(), file.getId());
+        mvc.perform(
+                        post("/api/v1/announcements")
+                                .with(user(UserPrincipal.from(lecturerFive.getUser())))
+                                .with(csrf())
+                                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                                .content(payload))
+                .andExpect(status().isForbidden());
+        var draft =
+                announcements.create(
+                        new com.example.qldetai.feature.communication.dto.CommunicationDtos
+                                .CreateAnnouncementRequest(
+                                faculty.getId(), "Draft", "Content", null),
+                        admin.getId());
+        mvc.perform(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                                        "/api/v1/announcements/{id}", draft.id())
+                                .with(user(UserPrincipal.from(lecturerFive.getUser())))
+                                .with(csrf())
+                                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                                .content(payload))
+                .andExpect(status().isForbidden());
+        assertThat(announcements.get(draft.id()).attachmentFileId()).isNull();
+        file.setUploadedBy(lecturerFive.getUser());
+        storedFiles.saveAndFlush(file);
+        mvc.perform(
+                        post("/api/v1/announcements")
+                                .with(user(UserPrincipal.from(lecturerFive.getUser())))
+                                .with(csrf())
+                                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                                .content(payload))
+                .andExpect(status().isCreated());
+        mvc.perform(
+                        post("/api/v1/announcements")
+                                .with(user(UserPrincipal.from(admin)))
+                                .with(csrf())
+                                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                                .content(payload))
+                .andExpect(status().isCreated());
+    }
+
+    private Long eligibilityCommittee(String name) {
+        Long id =
+                evaluationCommitteeService.createCommittee(
+                        new CreateCommitteeRequest(period.getId(), name), admin.getId());
+        evaluationCommitteeService.addMember(
+                id,
+                new AddCommitteeMemberRequest(lecturerThree.getId(), 1, CommitteeRole.CHAIR),
+                admin.getId());
+        evaluationCommitteeService.addMember(
+                id,
+                new AddCommitteeMemberRequest(lecturerFour.getId(), 2, CommitteeRole.SECRETARY),
+                admin.getId());
+        evaluationCommitteeService.addMember(
+                id,
+                new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER),
+                admin.getId());
+        return id;
+    }
+
+    @Test
+    void defenseEligibilityPreviewChecksDatesOffsetsAndObjectPermissions(@Autowired MockMvc mvc)
+            throws Exception {
+        var project = createAssignedProject("eligibility-preview", leaderStudent, secondStudent);
+        Long committeeId = eligibilityCommittee("Preview");
+        period.setProjectType(ProjectType.GRADUATION);
+        period.setDefenseDate(LocalDate.of(2027, 5, 1));
+        period.setReviewDeadlineAt(nowUtc().plusDays(30));
+        for (String start : List.of("2027-05-01T08:00:00+07:00", "2027-05-02T08:00:00+07:00")) {
+            mvc.perform(
+                            get("/api/v1/defense-sessions/eligibility")
+                                    .with(user(UserPrincipal.from(admin)))
+                                    .param("assignmentId", project.id().toString())
+                                    .param("committeeId", committeeId.toString())
+                                    .param("location", "A101")
+                                    .param("startsAt", start)
+                                    .param("endsAt", start.replace("08:00", "09:00")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.eligible").value(start.startsWith("2027-05-01")));
+        }
+        for (User denied : List.of(lecturerOne.getUser(), leaderStudent.getUser())) {
+            mvc.perform(
+                            get("/api/v1/defense-sessions/eligibility")
+                                    .with(user(UserPrincipal.from(denied)))
+                                    .param("assignmentId", project.id().toString())
+                                    .param("committeeId", committeeId.toString()))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void defenseEligibilityPreviewDetectsRoomAndLecturerConflictsAndAllowsAdjacentSlots(
+            @Autowired MockMvc mvc) throws Exception {
+        var firstTopic = createPublishedTopic("preview-first");
+        var nextTopic = createPublishedTopic("preview-next");
+        var first = createAssignedProject(firstTopic, leaderStudent, secondStudent);
+        var next = createAssignedProject(nextTopic, thirdStudent, fourthStudent);
+        Long firstCommittee = eligibilityCommittee("First preview council");
+        Long nextCommittee = eligibilityCommittee("Next preview council");
+        var start = nowUtc().plusDays(5).withNano(0);
+        defenseSessionService.schedule(
+                new CreateDefenseRequest(
+                        first.id(), firstCommittee, "A101", start, start.plusHours(1)),
+                admin.getId());
+        for (String room : List.of(" Phòng A101 ", "B202")) {
+            mvc.perform(
+                            get("/api/v1/defense-sessions/eligibility")
+                                    .with(user(UserPrincipal.from(admin)))
+                                    .param("assignmentId", next.id().toString())
+                                    .param("committeeId", nextCommittee.toString())
+                                    .param("location", room)
+                                    .param("startsAt", start + "Z")
+                                    .param("endsAt", start.plusHours(1) + "Z"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.eligible").value(false))
+                    .andExpect(
+                            jsonPath("$.data.reason")
+                                    .value(
+                                            org.hamcrest.Matchers.containsString(
+                                                    room.equals("B202") ? "giảng viên" : "Phòng")));
+        }
+        mvc.perform(
+                        get("/api/v1/defense-sessions/eligibility")
+                                .with(user(UserPrincipal.from(admin)))
+                                .param("assignmentId", next.id().toString())
+                                .param("committeeId", nextCommittee.toString())
+                                .param("location", "A101")
+                                .param("startsAt", start.plusHours(1) + "Z")
+                                .param("endsAt", start.plusHours(2) + "Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.eligible").value(true));
     }
 
     @Test
@@ -1997,7 +2195,12 @@ class ProjectLifecycleIntegrationTests {
 
     private ProjectAssignmentResponse createAssignedProject(
             String topicCode, Student leader, Student member) {
-        TopicResponse topic = createPublishedTopic(topicCode);
+        return createAssignedProject(createPublishedTopic(topicCode), leader, member);
+    }
+
+    private ProjectAssignmentResponse createAssignedProject(
+            TopicResponse topic, Student leader, Student member) {
+        String topicCode = topic.code();
         if (System.getProperty("result.email.mysql.url") != null) {
             // Advance the fixture from proposal to registration without overlapping SQL time
             // windows.

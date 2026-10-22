@@ -74,7 +74,7 @@ public class AnnouncementController {
 
     @PostMapping
     @PreAuthorize(
-            "hasRole('ADMIN') or @academicAuthorization.canManageFaculty(#request.facultyId, authentication)")
+            "hasRole('ADMIN') or (@academicAuthorization.canManageFaculty(#request.facultyId, authentication) and (#request.attachmentFileId == null or @storedFileAuthorization.canView(#request.attachmentFileId, authentication)))")
     public ResponseEntity<ApiResponse<AnnouncementResponse>> create(
             @Valid @RequestBody CreateAnnouncementRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -84,7 +84,8 @@ public class AnnouncementController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or @announcementAuthorization.canManage(#id, authentication)")
+    @PreAuthorize(
+            "hasRole('ADMIN') or (@announcementAuthorization.canManage(#id, authentication) and (#request.attachmentFileId == null or @storedFileAuthorization.canView(#request.attachmentFileId, authentication)))")
     public ApiResponse<AnnouncementResponse> update(
             @PathVariable Long id, @Valid @RequestBody UpdateAnnouncementRequest request) {
         return ApiResponse.success(
