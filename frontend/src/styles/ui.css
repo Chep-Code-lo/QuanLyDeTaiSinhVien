@@ -668,6 +668,17 @@ div.member-list {
   min-height: 104px;
 }
 
+.table-pagination .communication-page-size {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.table-pagination .communication-page-size > .form-select {
+  width: 80px;
+  min-width: 0;
+}
+
 .table-pagination.result-pagination {
   margin-top: 24px;
   padding-top: 16px;

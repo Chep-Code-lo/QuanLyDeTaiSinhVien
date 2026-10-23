@@ -139,7 +139,7 @@ export function CommunicationPagination({
 }) {
   return (
     <nav className="table-pagination" aria-label={`Phân trang ${label.toLocaleLowerCase('vi')}`}>
-      <label>
+      <label className="communication-page-size">
         Số thông báo mỗi trang
         <select
           className="form-select"

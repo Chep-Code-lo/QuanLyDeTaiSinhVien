@@ -534,6 +534,35 @@ describe('Xếp lịch bảo vệ', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
+  it('xóa chủ tịch trong hội đồng bốn người rồi chuyển vai trò cho người còn lại', async () => {
+    mocks.saveCommittee.mockResolvedValueOnce({ ...committee, version: 1 })
+    mocks.committees.mockResolvedValue(page([{
+      ...committee,
+      members: [...committee.members, {
+        id: 4, lecturerId: 6, lecturerCode: 'GV06', lecturerName: 'Giảng viên 6',
+        slotNo: 4, role: 'MEMBER', roleName: 'Ủy viên',
+      }],
+    }]))
+    render(<EvaluatorAssignmentPage />)
+    const picker = await screen.findByLabelText('Hội đồng đã tạo')
+    await waitFor(() => expect(screen.queryByText('Đang tải dữ liệu phân công...')).toBeNull())
+    fireEvent.change(picker, { target: { value: String(committee.id) } })
+    await userEvent.click(screen.getByRole('button', { name: 'Xóa thành viên 1', exact: true }))
+    const role = screen.getByRole('combobox', { name: 'Vai trò thành viên 2' })
+    expect(within(role).getByRole('option', { name: 'Chủ tịch' })).toBeTruthy()
+    await userEvent.selectOptions(role, 'Chủ tịch')
+    expect((role as HTMLSelectElement).value).toBe('Chủ tịch')
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu hội đồng' }))
+    await waitFor(() => expect(mocks.saveCommittee).toHaveBeenCalledWith(
+      committee.id,
+      expect.objectContaining({ members: [
+        { lecturerId: 4, roleName: 'Thư ký' },
+        { lecturerId: 5, roleName: 'Chủ tịch' },
+        { lecturerId: 6, roleName: 'Ủy viên' },
+      ] }),
+    ))
+  })
+
   it('lỗi lưu cấu hình không xếp lịch; sửa và lưu hội đồng thành công trước khi chuyển qua lịch', async () => {
     mocks.saveCommittee.mockRejectedValueOnce({
       response: { status: 400, data: { message: 'Hội đồng cần đúng một Chủ tịch và một Thư ký.' } },

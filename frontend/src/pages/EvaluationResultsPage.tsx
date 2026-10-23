@@ -276,7 +276,7 @@ function ProjectResults({
             error={current?.error ?? ''}
             retry={() => setRevision((value) => value + 1)}
           />
-          <div className="inline-form">
+          <div className="inline-form mb-6">
             <button
               type="button"
               className="btn btn-secondary"
@@ -441,7 +441,7 @@ function ProjectScorePreview({ projectId, revision }: { projectId: number; revis
             <p>Chưa có phân công chấm trong phạm vi bạn được xem.</p>
           ) : (
             <div className="table-container">
-              <table className="data-table">
+              <table className="data-table result-input-table">
                 <thead>
                   <tr>
                     <th>Thành phần</th>

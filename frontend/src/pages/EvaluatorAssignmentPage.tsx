@@ -729,11 +729,6 @@ export function EvaluatorAssignmentPage() {
                       <Plus size={16} /> Thêm thành viên
                     </button>
                   </div>
-                  <datalist id="ea-role-suggestions">
-                    <option value="Chủ tịch" />
-                    <option value="Thư ký" />
-                    <option value="Ủy viên" />
-                  </datalist>
                   <div className="ea-members-table ea-members-table--editable">
                     <div className="ea-member-head">
                       <span>Vai trò</span>
@@ -743,24 +738,38 @@ export function EvaluatorAssignmentPage() {
                     {memberDrafts.map((member, index) => (
                       <div className="ea-member-row" key={member.key}>
                         <div className="ea-member-role">
-                          <input
-                            className="form-input"
-                            list="ea-role-suggestions"
+                          <AnimatedSelect
                             aria-label={'Vai trò thành viên ' + (index + 1)}
-                            value={member.roleName}
+                            value={Object.values(roleLabels).includes(member.roleName) ? member.roleName : '__custom'}
                             required
-                            maxLength={100}
-                            placeholder="Nhập vai trò"
                             onChange={(event) =>
                               setMemberDrafts((items) =>
                                 items.map((item) =>
                                   item.key === member.key
-                                    ? { ...item, roleName: event.target.value }
+                                    ? { ...item, roleName: event.target.value === '__custom' ? '' : event.target.value }
                                     : item,
                                 ),
                               )
                             }
-                          />
+                          >
+                            {Object.values(roleLabels).map((label) => (
+                              <option key={label} value={label}>{label}</option>
+                            ))}
+                            <option value="__custom">Vai trò khác</option>
+                          </AnimatedSelect>
+                          {!Object.values(roleLabels).includes(member.roleName) && (
+                            <input
+                              className="form-input"
+                              aria-label={'Tên vai trò khác thành viên ' + (index + 1)}
+                              value={member.roleName}
+                              required
+                              maxLength={100}
+                              placeholder="Nhập vai trò"
+                              onChange={(event) => setMemberDrafts((items) => items.map((item) =>
+                                item.key === member.key ? { ...item, roleName: event.target.value } : item,
+                              ))}
+                            />
+                          )}
                         </div>
                         <div className="ea-member-lecturer">
                           <LecturerAutocomplete

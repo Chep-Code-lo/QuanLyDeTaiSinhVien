@@ -79,7 +79,6 @@ export function AssessmentSetupWizardPage() {
       .then((response) => {
         if (!active) return
         setPeriods(response)
-        setPeriodId((previous) => previous ?? response[0]?.id ?? null)
       })
       .catch((error: unknown) => {
         if (active) setLoadError(`Không tải được đợt đăng ký. ${errorMessage(error)}`)
@@ -485,16 +484,16 @@ export function AssessmentSetupWizardPage() {
       <div className="assessment-setup-page">
         <PageHeader title="Tiêu chuẩn đánh giá" />
         <section className="page-card">
-          <p>Bộ tiêu chí đã khóa dùng cho các nhiệm vụ chấm điểm được phân công.</p>
-          <label htmlFor="assessment-period">Đợt đăng ký</label>
           <AnimatedSelect
             id="assessment-period"
+            aria-label="Đợt đăng ký"
             value={periodId ?? ''}
             onChange={(event) => {
               setPeriodId(Number(event.target.value) || null)
               resetSelection()
             }}
           >
+            <option value="">Chọn đợt đăng ký</option>
             {periods.map((period) => (
               <option key={period.id} value={period.id}>
                 {period.name}
@@ -529,7 +528,7 @@ export function AssessmentSetupWizardPage() {
               {criteriaTable(false, true)}
             </>
           )}
-          {!loadingComponents && components.length === 0 && (
+          {periodId && !loadingComponents && components.length === 0 && (
             <p>Chưa có thành phần đánh giá đã khóa.</p>
           )}
         </section>
