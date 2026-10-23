@@ -844,7 +844,10 @@ it('ordinary lecturers can read locked catalogs but cannot configure assessment'
       <App />
     </MemoryRouter>,
   )
-  await screen.findByText('Bộ tiêu chí đã khóa dùng cho các nhiệm vụ chấm điểm được phân công.')
+  const period = await screen.findByRole('combobox', { name: 'Đợt đăng ký' })
+  expect((period as HTMLSelectElement).value).toBe('')
+  expect(within(period).getByRole('option', { name: 'Chọn đợt đăng ký' })).toBeTruthy()
+  expect(screen.getByRole('combobox', { name: 'Thành phần đánh giá' })).toBeTruthy()
   expect(screen.queryByRole('button', { name: /Tiếp tục: Tạo/ })).toBeNull()
   expect(screen.queryByRole('button', { name: 'Phân công giảng viên' })).toBeNull()
 })

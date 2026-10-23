@@ -475,6 +475,11 @@ describe('Hồi quy frontend', () => {
 
   it('mở lại thành phần và bộ tiêu chí đã lưu mà không tạo mới', async () => {
     mount(<AssessmentSetupWizardPage />)
+    const period = await screen.findByRole('combobox', { name: 'Đợt đăng ký' })
+    expect((period as HTMLSelectElement).value).toBe('')
+    expect(screen.queryByLabelText('Tiếp tục cấu hình đã lưu')).toBeNull()
+    await screen.findByRole('option', { name: 'Đợt A' })
+    await userEvent.selectOptions(period, '1')
     await userEvent.selectOptions(await screen.findByLabelText('Tiếp tục cấu hình đã lưu'), '3')
     expect(await screen.findByDisplayValue('Chất lượng sản phẩm')).toBeTruthy()
     expect(screen.getByRole('button', { name: /Tiếp tục: Khóa bộ tiêu chí/ })).toBeTruthy()
@@ -483,6 +488,9 @@ describe('Hồi quy frontend', () => {
   it('không cấu hình số người chấm khi tạo tiêu chuẩn đánh giá', async () => {
     mocks.components.mockResolvedValue([])
     mount(<AssessmentSetupWizardPage />)
+    const period = await screen.findByRole('combobox', { name: 'Đợt đăng ký' })
+    await screen.findByRole('option', { name: 'Đợt A' })
+    await userEvent.selectOptions(period, '1')
 
     expect(await screen.findByLabelText(/Tên thành phần/)).toBeTruthy()
     expect(screen.queryByLabelText(/Số người chấm/)).toBeNull()
