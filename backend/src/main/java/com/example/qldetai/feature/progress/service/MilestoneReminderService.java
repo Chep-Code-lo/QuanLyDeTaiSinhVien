@@ -35,13 +35,14 @@ public class MilestoneReminderService {
     private final NotificationService notificationService;
     private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
+    private final com.example.qldetai.feature.academic.service.AcademicAuthorization authorization;
 
     @Transactional
     @BusinessAudit(
             action = "MILESTONE_REMINDER_SEND",
             entityType = "PROJECT_ASSIGNMENT",
             entityIdArgument = 0)
-    public MilestoneReminderResponse send(Long assignmentId) {
+    public MilestoneReminderResponse send(Long assignmentId, Long actorId) {
         ProjectAssignment assignment =
                 projectAssignmentRepository
                         .findById(assignmentId)
@@ -49,6 +50,7 @@ public class MilestoneReminderService {
                                 () ->
                                         new ResourceNotFoundException(
                                                 "Project assignment was not found."));
+        authorization.requireDepartmentManagement(assignment.getTopic().getDepartment().getId(), actorId);
         if (assignment.getStatus() != AssignmentStatus.IN_PROGRESS) {
             throw new BusinessRuleException(
                     "Deadline reminders can only be sent for an in-progress assignment.");

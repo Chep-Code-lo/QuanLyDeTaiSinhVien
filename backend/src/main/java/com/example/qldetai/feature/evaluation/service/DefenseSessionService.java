@@ -130,6 +130,7 @@ public class DefenseSessionService {
         ProjectAssignment assignment = assignment(request.assignmentId());
         academicAuthorization.requireDepartmentManagement(assignment.getTopic().getDepartment().getId(), actorId);
         EvaluationCommittee committee = committee(request.committeeId());
+        academicAuthorization.requirePeriodManagement(committee.getPeriod().getId(), actorId);
         if (committee.getStatus() == CommitteeStatus.COMPLETED) {
             throw new BusinessRuleException(
                     "Hội đồng đã hoàn tất, không thể xếp thêm lịch bảo vệ.");
@@ -286,6 +287,8 @@ public class DefenseSessionService {
                         .findById(committeeId)
                         .orElseThrow(
                                 () -> new ResourceNotFoundException("Committee was not found."));
+        academicAuthorization.requireDepartmentManagement(assignment.getTopic().getDepartment().getId(), actorId);
+        academicAuthorization.requirePeriodManagement(committee.getPeriod().getId(), actorId);
         try {
             if (!assignment.getPeriod().getId().equals(committee.getPeriod().getId())) {
                 throw new BusinessRuleException(

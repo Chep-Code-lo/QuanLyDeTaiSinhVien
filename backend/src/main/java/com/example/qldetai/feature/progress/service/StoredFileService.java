@@ -73,6 +73,15 @@ public class StoredFileService {
     @Value("${spring.servlet.multipart.max-file-size:20MB}")
     private DataSize maxFileSize = DataSize.ofMegabytes(20);
 
+    @Value("${app.files.user-quota:500MB}")
+    private DataSize userQuota = DataSize.ofMegabytes(500);
+
+    @Value("${app.files.max-uploads-per-minute:10}")
+    private int maxUploadsPerMinute = 10;
+
+    @Value("${app.files.max-unattached-per-user:20}")
+    private int maxUnattachedPerUser = 20;
+
     @Transactional
     public StoredFileResponse store(MultipartFile file, Long actorId) {
         if (file == null || file.isEmpty()) {
@@ -82,9 +91,26 @@ public class StoredFileService {
         if (file.getSize() > maxFileSize.toBytes())
             throw new BusinessRuleException("Tệp vượt quá dung lượng cho phép.");
         String originalName = normalizeOriginalName(file.getOriginalFilename());
+        if (originalName.codePoints().anyMatch(Character::isISOControl))
+            throw new BusinessRuleException("Tên tệp không được chứa ký tự điều khiển.");
         if (originalName.length() > 255)
             throw new BusinessRuleException("Tên tệp không được vượt quá 255 ký tự.");
         String mimeType = validatedMimeType(file, originalName);
+        // Serialize quota checks and metadata writes for this owner across server instances.
+        User uploadedBy = userRepository.findByIdForUpdate(actorId)
+                .orElseThrow(() -> new ResourceNotFoundException("User account was not found."));
+        if (storedFileRepository.countByUploadedByIdAndUploadedAtGreaterThanEqual(
+                actorId, LocalDateTime.now(clock).minusMinutes(1)) >= maxUploadsPerMinute) {
+            throw new com.example.qldetai.exception.TooManyRequestsException(
+                    "Bạn tải tệp quá nhanh. Vui lòng thử lại sau một phút.");
+        }
+        if (storedFileRepository.countUnattachedByUser(actorId) >= maxUnattachedPerUser) {
+            throw new BusinessRuleException("Bạn có quá nhiều tệp chưa gắn với báo cáo hoặc thông báo. Hãy hoàn tất các thao tác đang dở trước khi tải thêm.");
+        }
+        long remainingQuota = userQuota.toBytes() - storedFileRepository.readyBytesByUser(actorId);
+        if (remainingQuota <= 0 || file.getSize() > remainingQuota) {
+            throw new BusinessRuleException("Đã vượt hạn mức dung lượng tệp của tài khoản.");
+        }
         String storageKey = buildStorageKey(originalName);
         Path targetPath = resolveTarget(storageKey);
 
@@ -109,6 +135,8 @@ public class StoredFileService {
                     sizeBytes += count;
                     if (sizeBytes > maxFileSize.toBytes())
                         throw new BusinessRuleException("Tệp vượt quá dung lượng cho phép.");
+                    if (sizeBytes > remainingQuota)
+                        throw new BusinessRuleException("Đã vượt hạn mức dung lượng tệp của tài khoản.");
                     outputStream.write(buffer, 0, count);
                 }
             }
@@ -117,14 +145,6 @@ public class StoredFileService {
                 Files.deleteIfExists(targetPath);
                 throw new BusinessRuleException("Please choose a non-empty file to upload.");
             }
-
-            User uploadedBy =
-                    userRepository
-                            .findById(actorId)
-                            .orElseThrow(
-                                    () ->
-                                            new ResourceNotFoundException(
-                                                    "User account was not found."));
 
             StoredFile storedFile = new StoredFile();
             storedFile.setStorageKey(storageKey);

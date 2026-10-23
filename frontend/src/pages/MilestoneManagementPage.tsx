@@ -248,8 +248,7 @@ export const MilestoneManagementPage: React.FC = () => {
   const { data: selectedTopic } = useRemoteData(loadTopic)
   const isLecturerOrAdmin =
     !!selectedTopic &&
-    (!!user?.roles.includes('ADMIN') ||
-      canManageDepartment(user, selectedTopic.departmentId, selectedTopic.facultyId))
+    canManageDepartment(user, selectedTopic.departmentId, selectedTopic.facultyId)
   const canFeedback =
     !!user?.roles.includes('LECTURER') &&
     !!selectedTopic?.supervisors.some((supervisor) => supervisor.lecturerId === user.lecturer?.id)

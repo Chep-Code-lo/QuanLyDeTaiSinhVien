@@ -42,8 +42,7 @@ public class RubricController {
 
     @PostMapping("/rubrics")
     @PreAuthorize(
-            "hasRole('ADMIN') or"
-                    + " @evaluationAuthorization.canManageAssessmentComponent(#request.componentId,"
+            "@evaluationAuthorization.canManageAssessmentComponent(#request.componentId,"
                     + " authentication)")
     public ResponseEntity<ApiResponse<RubricResponse>> rubric(
             @Valid @RequestBody CreateRubricRequest request,
@@ -55,7 +54,7 @@ public class RubricController {
 
     @PatchMapping("/rubrics/{id}/lock")
     @PreAuthorize(
-            "hasRole('ADMIN') or @evaluationAuthorization.canManageRubric(#id, authentication)")
+            "@evaluationAuthorization.canManageRubric(#id, authentication)")
     public ApiResponse<RubricResponse> lockRubric(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(

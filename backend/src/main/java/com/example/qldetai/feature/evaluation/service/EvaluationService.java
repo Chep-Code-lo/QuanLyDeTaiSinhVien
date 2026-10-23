@@ -120,6 +120,7 @@ public class EvaluationService {
     public AssessmentComponentResponse createComponent(
             CreateAssessmentComponentRequest request, Long actorId) {
         manager(actorId);
+        academicAuthorization.requirePeriodManagement(request.periodId(), actorId);
         RegistrationPeriod period =
                 registrationPeriods
                         .findById(request.periodId())
@@ -149,6 +150,7 @@ public class EvaluationService {
     public AssessmentComponentResponse lockComponent(Long componentId, Long actorId) {
         manager(actorId);
         AssessmentComponent component = componentForUpdate(componentId);
+        academicAuthorization.requirePeriodManagement(component.getPeriod().getId(), actorId);
         if (!STATUS_DRAFT.equals(component.getStatus())) {
             throw new BusinessRuleException("Only a DRAFT assessment component can be locked.");
         }
@@ -193,6 +195,7 @@ public class EvaluationService {
         manager(actorId);
         validateCriteria(request.criteria());
         AssessmentComponent component = componentForUpdate(request.componentId());
+        academicAuthorization.requirePeriodManagement(component.getPeriod().getId(), actorId);
         if (STATUS_LOCKED.equals(component.getStatus())) {
             throw new BusinessRuleException(
                     "A locked assessment component cannot receive a new rubric.");
@@ -225,6 +228,7 @@ public class EvaluationService {
     public RubricResponse lockRubric(Long rubricId, Long actorId) {
         manager(actorId);
         Rubric rubric = rubricEntity(rubricId);
+        academicAuthorization.requirePeriodManagement(rubric.getComponent().getPeriod().getId(), actorId);
         if (!STATUS_DRAFT.equals(rubric.getStatus())) {
             throw new BusinessRuleException("Only a DRAFT rubric can be locked.");
         }
@@ -313,11 +317,20 @@ public class EvaluationService {
                                         java.util.stream.Collectors.toMap(
                                                 sheet -> sheet.getEvaluation().getId(),
                                                 sheet -> sheet));
+        List<Long> submittedSheetIds = sheetsByEvaluation.values().stream()
+                .filter(sheet -> sheet.getStatus() == ScoreSheetStatus.SUBMITTED
+                        || sheet.getStatus() == ScoreSheetStatus.LOCKED)
+                .map(ScoreSheet::getId).toList();
+        Map<Long, BigDecimal> submittedTotals = submittedSheetIds.isEmpty() ? Map.of()
+                : details.totalsBySheetIds(submittedSheetIds).stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                ScoreDetailRepository.SheetTotal::getSheetId,
+                                ScoreDetailRepository.SheetTotal::getTotalScore));
         return PageResponse.from(
                 found.map(
                         evaluation ->
                                 assignment(
-                                        evaluation, sheetsByEvaluation.get(evaluation.getId()))));
+                                        evaluation, sheetsByEvaluation.get(evaluation.getId()), submittedTotals)));
     }
 
     @Transactional
@@ -583,15 +596,17 @@ public class EvaluationService {
             entityManager.lock(sheet, LockModeType.PESSIMISTIC_FORCE_INCREMENT);
         }
 
-        gradeChangeRequests
-                .findFirstBySheetIdAndStatusOrderByCreatedAtDesc(
-                        sheet.getId(), GradeChangeStatus.APPROVED)
-                .filter(requestedChange -> requestedChange.getAppliedAt() == null)
-                .ifPresent(
-                        requestedChange -> {
-                            requestedChange.setStatus(GradeChangeStatus.APPLIED);
-                            requestedChange.setAppliedAt(LocalDateTime.now(clock));
-                        });
+        if (request.submit()) {
+            gradeChangeRequests
+                    .findFirstBySheetIdAndStatusOrderByCreatedAtDesc(
+                            sheet.getId(), GradeChangeStatus.APPROVED)
+                    .filter(requestedChange -> requestedChange.getAppliedAt() == null)
+                    .ifPresent(
+                            requestedChange -> {
+                                requestedChange.setStatus(GradeChangeStatus.APPLIED);
+                                requestedChange.setAppliedAt(LocalDateTime.now(clock));
+                            });
+        }
 
         if (request.submit()
                 && evaluation.getComponent().getComponentType() == AssessmentComponentType.REVIEW) {
@@ -854,7 +869,8 @@ public class EvaluationService {
     }
 
     private EvaluationAssignmentResponse assignment(
-            EvaluationAssignment evaluationAssignment, ScoreSheet scoreSheet) {
+            EvaluationAssignment evaluationAssignment, ScoreSheet scoreSheet,
+            Map<Long, BigDecimal> submittedTotals) {
         ProjectAssignment assignment = evaluationAssignment.getAssignment();
         return new EvaluationAssignmentResponse(
                 evaluationAssignment.getId(),
@@ -882,7 +898,8 @@ public class EvaluationService {
                 evaluationAssignment.getStatus(),
                 evaluationAssignment.getDeadlineAt(),
                 scoreSheet == null ? null : scoreSheet.getId(),
-                scoreSheet == null ? null : scoreSheet.getStatus());
+                scoreSheet == null ? null : scoreSheet.getStatus(),
+                scoreSheet == null ? null : submittedTotals.get(scoreSheet.getId()));
     }
 
     private ScoreSheetResponse sheet(ScoreSheet scoreSheet) {

@@ -795,7 +795,7 @@ class BackendConsistencyIntegrationTests {
                         current.registrationEndAt(),
                         current.reviewDeadlineAt(),
                         current.defenseDate().plusDays(1));
-        assertThatThrownBy(() -> periodService.update(current.id(), request))
+        assertThatThrownBy(() -> periodService.update(current.id(), request, admin.getId()))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Only a draft");
         assertThat(periodService.get(current.id()).defenseDate()).isEqualTo(current.defenseDate());
@@ -1449,7 +1449,8 @@ class BackendConsistencyIntegrationTests {
                     assertThat(evaluation.listRubrics(component, admin.getId()))
                             .hasSize(3)
                             .allSatisfy(rubric -> assertThat(rubric.criteria()).hasSize(1));
-                    assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
+                    // One current-role lookup plus the batched rubric and criterion queries.
+                    assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
                 });
         tx.executeWithoutResult(
                 status -> {

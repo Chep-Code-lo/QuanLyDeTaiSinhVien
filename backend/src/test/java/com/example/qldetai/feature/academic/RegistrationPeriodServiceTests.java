@@ -43,9 +43,16 @@ import java.time.LocalDateTime;
 import java.util.Set;
 
 @SpringBootTest
+@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @Transactional
 class RegistrationPeriodServiceTests {
+    @org.springframework.beans.factory.annotation.Autowired
+    private jakarta.persistence.EntityManager entityManager;
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.test.web.servlet.MockMvc mvc;
+    @org.springframework.beans.factory.annotation.Autowired
+    private tools.jackson.databind.ObjectMapper mapper;
 
     private final RegistrationPeriodService registrationPeriodService;
     private final FacultyRepository facultyRepository;
@@ -108,6 +115,97 @@ class RegistrationPeriodServiceTests {
         admin.setUpdatedAt(now);
         admin.replaceRoles(Set.of(role), now);
         admin = userRepository.save(admin);
+        var department = new com.example.qldetai.feature.academic.domain.Department();
+        department.setFaculty(faculty);
+        department.setCode("PERIOD-MANAGER");
+        department.setName("Period management fixture");
+        department.setActive(true);
+        entityManager.persist(department);
+        com.example.qldetai.support.AcademicManagerFixture.appointDean(entityManager, admin, department, now);
+    }
+
+    @Test
+    void periodWritesRequireAnActiveDeanAndRefreshAuthorityWithinTheSameSession() throws Exception {
+        var request = new CreateRegistrationPeriodRequest(faculty.getId(), semester.getId(), "Authorization matrix",
+                ProjectType.COURSE, LocalDateTime.of(2027, 2, 1, 0, 0), LocalDateTime.of(2027, 2, 10, 0, 0),
+                LocalDateTime.of(2027, 2, 10, 0, 0), LocalDateTime.of(2027, 2, 20, 0, 0), null, null);
+        var pureAdmin = new User();
+        pureAdmin.setEmail("pure-" + System.nanoTime() + "@period.local");
+        pureAdmin.setFullName("Monitoring admin");
+        pureAdmin.setPasswordHash("unused-verifier");
+        pureAdmin.setStatus(UserStatus.ACTIVE);
+        pureAdmin.replaceRoles(Set.of(roleRepository.findByCode(RoleCode.ADMIN).orElseThrow()), LocalDateTime.now(clock));
+        pureAdmin = userRepository.saveAndFlush(pureAdmin);
+        final Long pureAdminId = pureAdmin.getId();
+        assertThatThrownBy(() -> registrationPeriodService.create(request, pureAdminId))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        var created = registrationPeriodService.create(request, admin.getId());
+        var update = new UpdateRegistrationPeriodRequest(created.version(), request.semesterId(), request.name(),
+                request.projectType(), request.proposalStartAt(), request.proposalEndAt(), request.registrationStartAt(),
+                request.registrationEndAt(), request.reviewDeadlineAt(), request.defenseDate());
+        assertThatThrownBy(() -> registrationPeriodService.update(created.id(), update, pureAdminId))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        var purePrincipal = com.example.qldetai.security.UserPrincipal.from(pureAdmin);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/registration-periods")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(purePrincipal))
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .contentType("application/json").content(mapper.writeValueAsString(request)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/registration-periods/" + created.id())
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(purePrincipal))
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .contentType("application/json").content(mapper.writeValueAsString(update)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        var activate = new ChangePeriodStatusRequest(created.version(), RegistrationPeriodStatus.ACTIVE);
+        assertThatThrownBy(() -> registrationPeriodService.changeStatus(created.id(), activate, pureAdminId))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        var session = new org.springframework.mock.web.MockHttpSession();
+        var principal = com.example.qldetai.security.UserPrincipal.from(admin);
+        var context = org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(
+                principal, null, principal.getAuthorities()));
+        session.setAttribute("SPRING_SECURITY_CONTEXT", context);
+        String url = "/api/v1/registration-periods/" + created.id() + "/status";
+        String body = "{\"version\":%d,\"status\":\"ACTIVE\"}".formatted(created.version());
+        var appointment = entityManager.createQuery("select a from AcademicAppointment a where a.lecturer.user.id = :id",
+                com.example.qldetai.feature.identity.domain.AcademicAppointment.class).setParameter("id", admin.getId()).getSingleResult();
+        var originalFaculty = appointment.getFaculty();
+        var outside = new Faculty(); outside.setCode("OUT" + System.nanoTime()); outside.setName("Other faculty"); outside.setActive(true);
+        entityManager.persist(outside);
+        appointment.setFaculty(outside); entityManager.flush();
+        assertThatThrownBy(() -> registrationPeriodService.changeStatus(created.id(), activate, admin.getId()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        appointment.setFaculty(originalFaculty);
+        appointment.setEndsAt(LocalDateTime.now(clock).minusSeconds(1)); entityManager.flush();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(url).session(session)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .contentType("application/json").content(body))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        appointment.setEndsAt(null); entityManager.flush();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(url).session(session)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .contentType("application/json").content(body))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        var active = registrationPeriodService.get(created.id());
+        admin.replaceRoles(Set.of(roleRepository.findByCode(RoleCode.ADMIN).orElseThrow()), LocalDateTime.now(clock));
+        userRepository.saveAndFlush(admin);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(url).session(session)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .contentType("application/json").content("{\"version\":%d,\"status\":\"CLOSED\"}".formatted(active.version())))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        admin.replaceRoles(Set.of(roleRepository.findByCode(RoleCode.ADMIN).orElseThrow(),
+                roleRepository.findByCode(RoleCode.LECTURER).orElseThrow()), LocalDateTime.now(clock));
+        userRepository.saveAndFlush(admin);
+        appointment.setPositionCode(com.example.qldetai.feature.identity.domain.PositionCode.DEPARTMENT_HEAD);
+        entityManager.flush();
+        assertThatThrownBy(() -> registrationPeriodService.changeStatus(created.id(),
+                new ChangePeriodStatusRequest(active.version(), RegistrationPeriodStatus.CLOSED), admin.getId()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        entityManager.remove(appointment); entityManager.flush();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(url).session(session)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .contentType("application/json").content("{\"version\":%d,\"status\":\"CLOSED\"}".formatted(active.version())))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
     }
 
     @Test
@@ -134,7 +232,7 @@ class RegistrationPeriodServiceTests {
                                         created.id(),
                                         new ChangePeriodStatusRequest(
                                                 created.version(),
-                                                RegistrationPeriodStatus.ACTIVE)))
+                                                RegistrationPeriodStatus.ACTIVE), admin.getId()))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Review deadline");
     }
@@ -198,7 +296,7 @@ class RegistrationPeriodServiceTests {
                         request.registrationEndAt(),
                         LocalDateTime.of(2027, 5, 5, 1, 0),
                         request.defenseDate());
-        assertThatThrownBy(() -> registrationPeriodService.update(created.id(), update))
+        assertThatThrownBy(() -> registrationPeriodService.update(created.id(), update, admin.getId()))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Hạn phản biện");
         assertThat(registrationPeriodService.get(created.id()).reviewDeadlineAt())

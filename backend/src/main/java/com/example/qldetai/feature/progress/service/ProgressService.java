@@ -60,6 +60,7 @@ public class ProgressService {
     public MilestoneResponse create(CreateMilestoneRequest request, Long actorId) {
         ProjectAssignment a = assignment(request.assignmentId());
         requireManager(actorId);
+        academicAuthorization.requireDepartmentManagement(a.getTopic().getDepartment().getId(), actorId);
         if (a.getStatus() != AssignmentStatus.IN_PROGRESS)
             throw new BusinessRuleException(
                     "Milestones can only be created for an in-progress assignment.");
@@ -75,8 +76,10 @@ public class ProgressService {
 
     @Transactional
     @BusinessAudit(action = "MILESTONE_UPDATE", entityType = "MILESTONE", entityIdArgument = 0)
-    public MilestoneResponse update(Long milestoneId, UpdateMilestoneRequest request) {
+    public MilestoneResponse update(Long milestoneId, UpdateMilestoneRequest request, Long actorId) {
         Milestone milestone = milestone(milestoneId);
+        academicAuthorization.requireDepartmentManagement(
+                milestone.getAssignment().getTopic().getDepartment().getId(), actorId);
         if (milestone.getAssignment().getStatus() != AssignmentStatus.IN_PROGRESS)
             throw new BusinessRuleException(
                     "Milestones can only be updated for an in-progress assignment.");
@@ -141,6 +144,8 @@ public class ProgressService {
             entityType = "REPORT_SUBMISSION",
             entityIdArgument = 0)
     public SubmissionResponse feedback(Long submissionId, FeedbackRequest request, Long actorId) {
+        if (!academicAuthorization.lecturer(actorId))
+            throw new AccessDeniedException("Only current lecturers can give feedback.");
         ReportSubmission s = submissionEntity(submissionId);
         milestone(s.getMilestone().getId());
         Lecturer lecturer =
@@ -170,7 +175,7 @@ public class ProgressService {
 
     private void requireAssignmentParticipant(ProjectAssignment a, Long userId) {
         if (hasAdminRole(userId)
-                || isSupervisor(a, lecturerId(userId))
+                || (academicAuthorization.lecturer(userId) && isSupervisor(a, lecturerId(userId)))
                 || academicAuthorization.canManageDepartment(
                         a.getTopic().getDepartment().getId(), userId)) return;
         Student s =

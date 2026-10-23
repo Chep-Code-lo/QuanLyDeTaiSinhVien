@@ -16,7 +16,8 @@ vi.mock('../src/context/AuthContext', () => ({
   useAuth: () => ({
     user: {
       id: 1,
-      activeAppointments: [{ id: 1, facultyId: 1, positionCode: 'DEAN' }],
+      roles: mocks.dean ? ['LECTURER'] : ['ADMIN'],
+      activeAppointments: mocks.dean ? [{ id: 1, facultyId: 1, positionCode: 'DEAN', startsAt: '2020-01-01T00:00:00Z' }] : [],
     },
     hasRole: () => false,
     hasAppointment: (code: string) => mocks.dean && code === 'DEAN',
@@ -211,6 +212,20 @@ describe('Trưởng khoa tạo đợt đăng ký', () => {
     mocks.dean = false
     render(<AcademicManagementPage />)
     await screen.findByText('Chưa có đợt đăng ký nào.')
+    expect(screen.queryByRole('button', { name: /Tạo Đợt Đăng Ký Mới/ })).toBeNull()
+  })
+
+  it('admin thuần chỉ xem đợt và trưởng khoa không đổi trạng thái đợt ngoài khoa', async () => {
+    mocks.periods = [{ ...registrationPeriod('DRAFT'), facultyId: 2 }]
+    const view = render(<AcademicManagementPage />)
+    await screen.findByText('Đợt đã kết thúc')
+    expect(screen.queryByRole('button', { name: 'Bật' })).toBeNull()
+    view.unmount()
+    mocks.dean = false
+    mocks.periods = [registrationPeriod('DRAFT')]
+    render(<AcademicManagementPage />)
+    await screen.findByText('Đợt đã kết thúc')
+    expect(screen.queryByRole('button', { name: 'Bật' })).toBeNull()
     expect(screen.queryByRole('button', { name: /Tạo Đợt Đăng Ký Mới/ })).toBeNull()
   })
 

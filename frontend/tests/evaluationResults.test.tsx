@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   projects: vi.fn(),
   results: vi.fn(),
   actions: vi.fn(),
+  assignments: vi.fn(),
   finalize: vi.fn(),
   publish: vi.fn(),
   success: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock('../src/api/evaluation', () => ({
   evaluationApi: {
     listResults: mocks.results,
     resultActions: mocks.actions,
+    listAssignments: mocks.assignments,
     finalizeResult: mocks.finalize,
     publishResult: mocks.publish,
   },
@@ -69,6 +71,7 @@ beforeEach(() => {
   mocks.projects.mockResolvedValue(page([project(), project(2)], 2))
   mocks.results.mockResolvedValue(page([]))
   mocks.actions.mockResolvedValue({ canFinalize: true, canPublish: false })
+  mocks.assignments.mockResolvedValue(page([]))
   mocks.finalize.mockResolvedValue({ id: 7 })
   mocks.publish.mockResolvedValue({ id: 7 })
 })
@@ -78,6 +81,53 @@ async function selectProject() {
   await userEvent.click(await screen.findByRole('button', { name: 'Xem điểm DT01' }))
   await screen.findByText(/Chưa có kết quả được chốt/)
 }
+it('xem điểm đã nộp trước khi chốt, phiếu nháp và chưa chấm không lộ điểm', async () => {
+  mocks.actions.mockResolvedValue({ canFinalize: false, canPublish: false })
+  mocks.assignments.mockResolvedValue(page([
+    { id: 1, componentName: 'Đồ án môn học', lecturerName: 'GV A', scoreSheetStatus: 'SUBMITTED', submittedScore: 9.5 },
+    { id: 2, componentName: 'Đồ án môn học', lecturerName: 'GV B', scoreSheetStatus: 'DRAFT', submittedScore: null },
+    { id: 3, componentName: 'Phản biện', lecturerName: 'GV C', submittedScore: null },
+    { id: 4, componentName: 'Phản biện', lecturerName: 'GV D', scoreSheetStatus: 'SUBMITTED', submittedScore: 0 },
+  ]))
+  await selectProject()
+  const preview = screen.getByRole('region', { name: 'Xem trước điểm' })
+  await within(preview).findByText('9.50/10')
+  expect(within(preview).getByText('0.00/10')).toBeTruthy()
+  expect(within(preview).getByText('Đang chấm')).toBeTruthy()
+  expect(within(preview).getByText('Chưa chấm')).toBeTruthy()
+  expect(within(preview).getAllByText('—')).toHaveLength(2)
+  expect(mocks.assignments).toHaveBeenCalledWith({ assignmentId: 1, status: 'ACTIVE', page: 0, size: 10 })
+  expect(mocks.finalize).not.toHaveBeenCalled()
+  expect(mocks.publish).not.toHaveBeenCalled()
+})
+it('làm mới tải lại điểm xem trước, lỗi tải điểm không chặn kết quả và có thể thử lại', async () => {
+  mocks.assignments.mockRejectedValueOnce({ response: { data: { message: 'Không tải được điểm xem trước' } } })
+  await selectProject()
+  const preview = screen.getByRole('region', { name: 'Xem trước điểm' })
+  await within(preview).findByText('Không tải được điểm xem trước')
+  expect(screen.getByRole('button', { name: 'Chốt kết quả' })).toBeTruthy()
+  mocks.assignments.mockResolvedValue(page([
+    { id: 1, componentName: 'Phản biện', lecturerName: 'GV A', scoreSheetStatus: 'LOCKED', submittedScore: 8 },
+  ]))
+  await userEvent.click(within(preview).getByRole('button', { name: /Thử lại/ }))
+  await within(preview).findByText('8.00/10')
+  mocks.assignments.mockResolvedValue(page([
+    { id: 1, componentName: 'Phản biện', lecturerName: 'GV A', scoreSheetStatus: 'SUBMITTED', submittedScore: 9 },
+  ]))
+  await userEvent.click(screen.getByRole('button', { name: 'Làm mới kết quả' }))
+  await screen.findByText('9.00/10')
+})
+it('phân trang phiếu điểm xem trước trên server, không bỏ các phiếu sau trang đầu', async () => {
+  mocks.assignments.mockResolvedValue(page([
+    { id: 1, componentName: 'Phản biện', lecturerName: 'GV A', scoreSheetStatus: 'SUBMITTED', submittedScore: 8 },
+  ], 2))
+  await selectProject()
+  const pager = await screen.findByRole('navigation', { name: 'Phân trang phiếu điểm xem trước' })
+  await userEvent.click(within(pager).getByRole('button', { name: 'Sau' }))
+  await waitFor(() => expect(mocks.assignments).toHaveBeenLastCalledWith({
+    assignmentId: 1, status: 'ACTIVE', page: 1, size: 10,
+  }))
+})
 it('xem điểm mở hộp thoại, khóa cuộn nền và trả focus về nút khi đóng', async () => {
   await selectProject()
   const dialog = screen.getByRole('dialog', { name: 'DT01 · Nhóm 1' })

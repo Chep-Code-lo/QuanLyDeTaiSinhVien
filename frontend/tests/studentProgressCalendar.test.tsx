@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   milestones: vi.fn(),
   error: vi.fn(),
   success: vi.fn(),
+  upload: vi.fn(),
+  submit: vi.fn(),
 }))
 vi.mock('../src/context/AuthContext', () => ({ useAuth: () => ({ user: { id: 1 } }) }))
 vi.mock('../src/context/ToastContext', () => ({
@@ -17,7 +19,7 @@ vi.mock('../src/context/ToastContext', () => ({
 }))
 vi.mock('../src/api/student', async (importOriginal) => {
   const original = await importOriginal<typeof import('../src/api/student')>()
-  return { ...original, studentApi: { ...original.studentApi, projectAssignments: mocks.projects } }
+  return { ...original, studentApi: { ...original.studentApi, projectAssignments: mocks.projects, upload: mocks.upload, submit: mocks.submit } }
 })
 vi.mock('../src/api/groups', () => ({ groupApi: { mine: mocks.groups } }))
 vi.mock('../src/api/milestones', () => ({ milestoneApi: { listByAssignment: mocks.milestones } }))
@@ -106,6 +108,24 @@ it('lịch theo bộ lọc dự án, không tải thêm dữ liệu khi đổi l
   )
   expect(mocks.milestones).toHaveBeenCalledTimes(2)
   expect(mocks.projects).toHaveBeenCalledOnce()
+})
+
+it('thử nộp lại báo cáo tái sử dụng tệp đã tải, không tạo thêm tệp mồ côi', async () => {
+  mocks.upload.mockResolvedValue({ id: 99 })
+  mocks.submit.mockRejectedValueOnce({ response: { data: { message: 'Lỗi nộp báo cáo' } } }).mockResolvedValueOnce({ id: 1 })
+  render(<StudentProgressPage />)
+  const trigger = (await screen.findAllByRole('button', { name: /Nộp báo cáo/ }))[0]
+  fireEvent.click(trigger)
+  const dialog = screen.getByRole('dialog')
+  fireEvent.change(within(dialog).getByLabelText(/Tệp báo cáo/), {
+    target: { files: [new File(['Report'], 'report.txt', { type: 'text/plain' })] },
+  })
+  fireEvent.submit(within(dialog).getByLabelText(/Tệp báo cáo/).closest('form')!)
+  await waitFor(() => expect(mocks.error).toHaveBeenCalledWith('Lỗi nộp báo cáo'))
+  fireEvent.submit(within(dialog).getByLabelText(/Tệp báo cáo/).closest('form')!)
+  await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(2))
+  expect(mocks.upload).toHaveBeenCalledTimes(1)
+  expect(mocks.submit).toHaveBeenLastCalledWith(1, 99, '')
 })
 
 it('thành viên xem được lịch nhưng không có quyền nộp báo cáo hoặc quản lý mốc', async () => {

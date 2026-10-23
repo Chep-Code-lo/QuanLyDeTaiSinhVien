@@ -5,7 +5,7 @@ import com.example.qldetai.feature.evaluation.domain.Rubric;
 import com.example.qldetai.feature.identity.domain.AcademicAppointment;
 import com.example.qldetai.feature.identity.domain.PositionCode;
 import com.example.qldetai.feature.identity.domain.RoleCode;
-import com.example.qldetai.feature.identity.domain.UserRole;
+import com.example.qldetai.feature.identity.repository.UserRepository;
 
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class EvaluationCatalogAccess {
     private final Clock clock;
+    private final UserRepository users;
 
     public Specification<AssessmentComponent> components(Long periodId, Long actorId) {
         LocalDateTime now = LocalDateTime.now(clock);
@@ -63,12 +64,11 @@ public class EvaluationCatalogAccess {
             LocalDateTime now,
             CriteriaQuery<?> query,
             CriteriaBuilder cb) {
-        var roles = query.subquery(Long.class);
-        var role = roles.from(UserRole.class);
-        roles.select(role.get("id"))
-                .where(
-                        cb.equal(role.get("user").get("id"), actorId),
-                        cb.equal(role.get("role").get("code"), RoleCode.ADMIN));
+        var actor = actorId == null ? null : users.findWithRolesById(actorId).orElse(null);
+        if (actor == null) return cb.disjunction();
+        var roles = actor.getUserRoles().stream().map(role -> role.getRole().getCode()).toList();
+        if (roles.contains(RoleCode.ADMIN)) return cb.conjunction();
+        if (!roles.contains(RoleCode.LECTURER)) return cb.disjunction();
         var appointments = query.subquery(Long.class);
         var appointment = appointments.from(AcademicAppointment.class);
         appointments
@@ -81,7 +81,7 @@ public class EvaluationCatalogAccess {
                         cb.or(
                                 cb.isNull(appointment.get("endsAt")),
                                 cb.greaterThan(appointment.get("endsAt"), now)));
-        // Locked catalogs are shared reference data. Drafts stay within management scope.
-        return cb.or(cb.exists(roles), cb.exists(appointments));
+        // An appointment alone cannot retain draft access after the lecturer role is revoked.
+        return cb.exists(appointments);
     }
 }

@@ -46,7 +46,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
     if (item.appointments && item.appointments.length > 0) {
       const hasAppt = item.appointments.some((apt) => hasAppointment(apt))
-      if (!hasAppt && !user.roles?.includes('ADMIN')) return false
+      if (!hasAppt) return false
     }
 
     return true

@@ -63,6 +63,7 @@ public class RegistrationPeriodService {
     private final UserRepository userRepository;
     private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
+    private final AcademicAuthorization authorization;
 
     @Transactional(readOnly = true)
     public PageResponse<RegistrationPeriodResponse> list(Long facultyId, int page, int size) {
@@ -84,6 +85,10 @@ public class RegistrationPeriodService {
     @BusinessAudit(action = "REGISTRATION_PERIOD_CREATE", entityType = "REGISTRATION_PERIOD")
     public RegistrationPeriodResponse create(
             CreateRegistrationPeriodRequest request, Long creatorId) {
+        if (!authorization.canManageFaculty(request.facultyId(), creatorId)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "An active dean appointment in this faculty is required.");
+        }
         Faculty faculty = requireFaculty(request.facultyId());
         Semester semester = requireSemester(request.semesterId());
         User creator =
@@ -129,7 +134,8 @@ public class RegistrationPeriodService {
             action = "REGISTRATION_PERIOD_UPDATE",
             entityType = "REGISTRATION_PERIOD",
             entityIdArgument = 0)
-    public RegistrationPeriodResponse update(Long id, UpdateRegistrationPeriodRequest request) {
+    public RegistrationPeriodResponse update(Long id, UpdateRegistrationPeriodRequest request, Long actorId) {
+        authorization.requirePeriodManagement(id, actorId);
         RegistrationPeriod period = requirePeriod(id);
         verifyVersion(period, request.version());
         if (period.getStatus() != RegistrationPeriodStatus.DRAFT) {
@@ -167,17 +173,9 @@ public class RegistrationPeriodService {
             action = "REGISTRATION_PERIOD_STATUS_CHANGE",
             entityType = "REGISTRATION_PERIOD",
             entityIdArgument = 0)
-    public RegistrationPeriodResponse changeStatus(Long id, ChangePeriodStatusRequest request) {
-        return changeStatus(id, request, null);
-    }
-
-    @Transactional
-    @BusinessAudit(
-            action = "REGISTRATION_PERIOD_STATUS_CHANGE",
-            entityType = "REGISTRATION_PERIOD",
-            entityIdArgument = 0)
     public RegistrationPeriodResponse changeStatus(
             Long id, ChangePeriodStatusRequest request, Long actorId) {
+        authorization.requirePeriodManagement(id, actorId);
         RegistrationPeriod period = requirePeriod(id);
         verifyVersion(period, request.version());
         if (!TRANSITIONS.get(period.getStatus()).contains(request.status())) {

@@ -42,7 +42,7 @@ public class AssessmentComponentController {
 
     @PostMapping("/assessment-components")
     @PreAuthorize(
-            "hasRole('ADMIN') or @academicAuthorization.canManagePeriod(#request.periodId,"
+            "@academicAuthorization.canManagePeriod(#request.periodId,"
                     + " authentication)")
     public ResponseEntity<ApiResponse<AssessmentComponentResponse>> createComponent(
             @Valid @RequestBody CreateAssessmentComponentRequest request,
@@ -54,7 +54,7 @@ public class AssessmentComponentController {
 
     @PatchMapping("/assessment-components/{id}/lock")
     @PreAuthorize(
-            "hasRole('ADMIN') or @evaluationAuthorization.canManageAssessmentComponent(#id,"
+            "@evaluationAuthorization.canManageAssessmentComponent(#id,"
                     + " authentication)")
     public ApiResponse<AssessmentComponentResponse> lockComponent(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {

@@ -65,7 +65,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   if (appointments && appointments.length > 0) {
     const hasAnyAppt = appointments.some((apt) => hasAppointment(apt))
-    if (!hasAnyAppt && !user?.roles?.includes('ADMIN')) {
+    if (!hasAnyAppt) {
       return (
         <div className="page-card error-container text-center py-12">
           <h2>Không có quyền truy cập</h2>

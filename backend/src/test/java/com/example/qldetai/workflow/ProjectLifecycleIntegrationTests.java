@@ -1367,6 +1367,105 @@ class ProjectLifecycleIntegrationTests {
     }
 
     @Test
+    void gradeChangeRemainsApprovedUntilTheCorrectedSheetIsResubmitted() {
+        var project = createAssignedProject("grade-change-resubmit", leaderStudent, secondStudent);
+        var catalog = createLockedCatalog("correction", "Correction", AssessmentComponentType.OTHER);
+        Long evaluatorId = lecturerThree.getUser().getId();
+        Long evaluationId = evaluationService.assign(
+                new CreateEvaluationRequest(project.id(), catalog.rubric().id(),
+                        lecturerThree.getId(), null, nowUtc().plusDays(4)), admin.getId());
+        var initial = evaluationService.saveSheet(evaluationId,
+                new SaveSheetRequest(0, "Initial",
+                        scoreRequests(catalog.rubric(), new BigDecimal("5"), new BigDecimal("3")), true),
+                evaluatorId);
+        Long changeId = gradeChangeService.requestChange(initial.id(),
+                new CreateGradeChangeRequest(" Correct criterion scores "), evaluatorId);
+        assertThat(gradeChangeService.getChange(changeId, evaluatorId).reason())
+                .isEqualTo("Correct criterion scores");
+        assertThatThrownBy(() -> gradeChangeService.requestChange(initial.id(),
+                new CreateGradeChangeRequest("Duplicate"), evaluatorId))
+                .isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(() -> evaluationService.saveSheet(evaluationId,
+                new SaveSheetRequest(initial.version(), "Before approval",
+                        initial.scores(), true), evaluatorId))
+                .isInstanceOf(BusinessRuleException.class);
+
+        gradeChangeService.reviewChange(changeId,
+                new ReviewGradeChangeRequest(true, "Checked"), admin.getId());
+        var reopened = evaluationService.mySheet(evaluationId, evaluatorId);
+        assertThat(reopened.status()).isEqualTo(ScoreSheetStatus.DRAFT);
+        assertThat(reopened.totalScore()).isEqualByComparingTo("8");
+        assertThat(gradeChangeService.getChange(changeId, evaluatorId).status())
+                .isEqualTo(GradeChangeStatus.APPROVED);
+        assertThatThrownBy(() -> gradeChangeService.reviewChange(changeId,
+                new ReviewGradeChangeRequest(false, "Second review"), admin.getId()))
+                .isInstanceOf(BusinessRuleException.class);
+
+        var draft = evaluationService.saveSheet(evaluationId,
+                new SaveSheetRequest(reopened.version(), "Corrected draft",
+                        scoreRequests(catalog.rubric(), new BigDecimal("6"), new BigDecimal("3")), false),
+                evaluatorId);
+        assertThat(draft.status()).isEqualTo(ScoreSheetStatus.DRAFT);
+        var awaitingSubmission = gradeChangeService.getChange(changeId, evaluatorId);
+        assertThat(awaitingSubmission.status()).isEqualTo(GradeChangeStatus.APPROVED);
+        assertThat(awaitingSubmission.appliedAt()).isNull();
+
+        var resubmitted = evaluationService.saveSheet(evaluationId,
+                new SaveSheetRequest(draft.version(), "Corrected final",
+                        draft.scores(), true), evaluatorId);
+        assertThat(resubmitted.status()).isEqualTo(ScoreSheetStatus.SUBMITTED);
+        assertThat(resubmitted.totalScore()).isEqualByComparingTo("9");
+        var applied = gradeChangeService.getChange(changeId, evaluatorId);
+        assertThat(applied.status()).isEqualTo(GradeChangeStatus.APPLIED);
+        assertThat(applied.appliedAt()).isNotNull();
+        assertThat(applied.reviewedBy()).isEqualTo(admin.getId());
+        assertThat(applied.reviewComment()).isEqualTo("Checked");
+        assertThat(evaluationResultService.finalizeResult(project.id(), admin.getId()).finalScore())
+                .isEqualByComparingTo("9");
+    }
+
+    @Test
+    void gradeChangeRejectionKeepsScoresAndAllowsANewRequest(@Autowired MockMvc mvc) throws Exception {
+        var project = createAssignedProject("grade-change-reject", leaderStudent, secondStudent);
+        var catalog = createLockedCatalog("reject", "Correction", AssessmentComponentType.OTHER);
+        Long evaluatorId = lecturerThree.getUser().getId();
+        Long evaluationId = evaluationService.assign(
+                new CreateEvaluationRequest(project.id(), catalog.rubric().id(),
+                        lecturerThree.getId(), null, nowUtc().plusDays(4)), admin.getId());
+        var sheet = evaluationService.saveSheet(evaluationId,
+                new SaveSheetRequest(0, "Original",
+                        scoreRequests(catalog.rubric(), new BigDecimal("5"), new BigDecimal("3")), true),
+                evaluatorId);
+        for (var actor : List.of(lecturerFour.getUser(), leaderStudent.getUser(),
+                createUser("monitor", "Pure admin", Set.of(RoleCode.ADMIN)))) {
+            mvc.perform(post("/api/v1/score-sheets/{id}/grade-change-requests", sheet.id())
+                    .with(user(UserPrincipal.from(actor))).with(csrf())
+                    .contentType("application/json").content("{\"reason\":\"Correction\"}"))
+                    .andExpect(status().isForbidden());
+        }
+        mvc.perform(post("/api/v1/score-sheets/{id}/grade-change-requests", sheet.id())
+                .with(user(UserPrincipal.from(lecturerThree.getUser()))).with(csrf())
+                .contentType("application/json").content("{\"reason\":\"   \"}"))
+                .andExpect(status().isBadRequest());
+        Long changeId = gradeChangeService.requestChange(sheet.id(),
+                new CreateGradeChangeRequest("Please check"), evaluatorId);
+        gradeChangeService.reviewChange(changeId,
+                new ReviewGradeChangeRequest(false, "Original scores are correct"), admin.getId());
+        var rejected = gradeChangeService.getChange(changeId, evaluatorId);
+        assertThat(rejected.status()).isEqualTo(GradeChangeStatus.REJECTED);
+        assertThat(rejected.appliedAt()).isNull();
+        var unchanged = evaluationService.mySheet(evaluationId, evaluatorId);
+        assertThat(unchanged.status()).isEqualTo(ScoreSheetStatus.SUBMITTED);
+        assertThat(unchanged.totalScore()).isEqualByComparingTo("8");
+        assertThat(unchanged.version()).isEqualTo(sheet.version());
+        Long nextId = gradeChangeService.requestChange(sheet.id(),
+                new CreateGradeChangeRequest("Additional evidence"), evaluatorId);
+        assertThat(nextId).isNotEqualTo(changeId);
+        assertThat(gradeChangeService.getChange(nextId, evaluatorId).status())
+                .isEqualTo(GradeChangeStatus.PENDING);
+    }
+
+    @Test
     void gradeChangeCannotReopenAScoreSheetUsedByAFinalizedResult() {
         ProjectAssignmentResponse assignment =
                 createAssignedProject("dt-grade-change-01", leaderStudent, secondStudent);
@@ -1730,6 +1829,23 @@ class ProjectLifecycleIntegrationTests {
         User pureAdmin = createUser("observer-admin", "Observer Admin", Set.of(RoleCode.ADMIN));
         for (User actor : List.of(pureAdmin, lecturerThree.getUser())) {
             var principal = UserPrincipal.from(actor);
+            assertThatThrownBy(() -> evaluationService.createComponent(
+                    new CreateAssessmentComponentRequest(period.getId(), "FORBIDDEN", "Forbidden", AssessmentComponentType.OTHER), actor.getId()))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThatThrownBy(() -> evaluationService.lockComponent(catalog.component().id(), actor.getId()))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThatThrownBy(() -> evaluationService.lockRubric(catalog.rubric().id(), actor.getId()))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            mvc.perform(post("/api/v1/assessment-components")
+                    .with(user(principal)).with(csrf()).contentType("application/json")
+                    .content("{\"periodId\":%d,\"code\":\"FORBIDDEN\",\"name\":\"Forbidden\",\"componentType\":\"OTHER\"}".formatted(period.getId())))
+                    .andExpect(status().isForbidden());
+            mvc.perform(patch("/api/v1/rubrics/{id}/lock", catalog.rubric().id())
+                    .with(user(principal)).with(csrf())).andExpect(status().isForbidden());
+            mvc.perform(post("/api/v1/milestones")
+                    .with(user(principal)).with(csrf()).contentType("application/json")
+                    .content("{\"assignmentId\":%d,\"title\":\"Forbidden\",\"milestoneType\":\"PROGRESS\",\"description\":\"Forbidden\",\"dueAt\":\"2099-01-01T00:00:00\"}".formatted(project.id())))
+                    .andExpect(status().isForbidden());
             String assignmentPayload = "{\"assignmentId\":%d,\"rubricId\":%d,\"lecturerId\":%d,\"deadlineAt\":\"2099-01-01T00:00:00\"}"
                     .formatted(project.id(), catalog.rubric().id(), lecturerFive.getId());
             mvc.perform(post("/api/v1/evaluation-assignments")
@@ -2011,6 +2127,232 @@ class ProjectLifecycleIntegrationTests {
                 .hasMessageContaining("evaluator assignment is missing");
         assertThat(resultRepository.countByAssignmentId(project.id())).isZero();
     }
+
+    @Test
+    void configuredCouncilDoesNotRequireAnotherUnusedCommitteeComponent() {
+        var fixture = configuredCouncilFixture("selected-council");
+        var unused = createLockedCatalog("essay", "Đánh giá tiểu luận", AssessmentComponentType.COMMITTEE);
+        for (var lecturer : List.of(lecturerThree, lecturerFour, lecturerFive)) {
+            submitFullScore(fixture.project().id(), fixture.catalog(), lecturer, fixture.defenseId());
+        }
+        assertThatThrownBy(() -> evaluationResultService.finalizeResult(fixture.project().id(), admin.getId()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        var finalized = evaluationResultService.finalizeResult(fixture.project().id(), lecturerThree.getUser().getId());
+        assertThat(finalized.finalScore()).isEqualByComparingTo("10");
+        var snapshot = evaluationResultService.getResult(finalized.id(), admin.getId());
+        assertThat(snapshot.inputs()).hasSize(4)
+                .noneMatch(input -> input.componentId().equals(unused.component().id()));
+    }
+
+    @Test
+    void configuredCouncilStillRequiresAllMembersAndSubmittedSheets() {
+        var fixture = configuredCouncilFixture("incomplete-council");
+        createLockedCatalog("essay", "Unused essay", AssessmentComponentType.COMMITTEE);
+        submitFullScore(fixture.project().id(), fixture.catalog(), lecturerThree, fixture.defenseId());
+        submitFullScore(fixture.project().id(), fixture.catalog(), lecturerFour, fixture.defenseId());
+        assertThatThrownBy(() -> evaluationResultService.finalizeResult(fixture.project().id(), lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("committee member assignment is missing");
+        Long evaluationId = evaluationService.assign(new CreateEvaluationRequest(
+                fixture.project().id(), fixture.catalog().rubric().id(), lecturerFive.getId(),
+                fixture.defenseId(), nowUtc().plusDays(1)), admin.getId());
+        assertThatThrownBy(() -> evaluationResultService.finalizeResult(fixture.project().id(), lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("score sheet is missing");
+        var draft = evaluationService.saveSheet(evaluationId,
+                new SaveSheetRequest(0, "Draft", scoreRequests(fixture.catalog().rubric(),
+                        new BigDecimal("6"), new BigDecimal("4")), false), lecturerFive.getUser().getId());
+        assertThatThrownBy(() -> evaluationResultService.finalizeResult(fixture.project().id(), lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("score sheet is missing");
+        assertThat(resultRepository.countByAssignmentId(fixture.project().id())).isZero();
+        evaluationService.saveSheet(evaluationId,
+                new SaveSheetRequest(draft.version(), "Submitted", draft.scores(), true), lecturerFive.getUser().getId());
+        assertThat(evaluationResultService.finalizeResult(fixture.project().id(), lecturerThree.getUser().getId()).status().name())
+                .isEqualTo("FINALIZED");
+    }
+
+    @Test
+    void configuredCouncilStillRequiresUnassignedReviewAndOtherComponents() {
+        var fixture = configuredCouncilFixture("required-noncommittee");
+        for (var lecturer : List.of(lecturerThree, lecturerFour, lecturerFive)) {
+            submitFullScore(fixture.project().id(), fixture.catalog(), lecturer, fixture.defenseId());
+        }
+        var review = createLockedCatalog("extra-review", "Required review", AssessmentComponentType.REVIEW);
+        var other = createLockedCatalog("other", "Required other", AssessmentComponentType.OTHER);
+        assertThatThrownBy(() -> evaluationResultService.finalizeResult(fixture.project().id(), lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("evaluator assignment is missing");
+        submitFullScore(fixture.project().id(), review, lecturerThree, null);
+        assertThatThrownBy(() -> evaluationResultService.finalizeResult(fixture.project().id(), lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("evaluator assignment is missing");
+        submitFullScore(fixture.project().id(), other, lecturerThree, null);
+        assertThat(evaluationResultService.finalizeResult(fixture.project().id(), lecturerThree.getUser().getId()).finalScore())
+                .isEqualByComparingTo("10");
+    }
+
+    @Test
+    void configuredCouncilRejectsActiveAssignmentsForADifferentCommitteeComponent() {
+        var fixture = configuredCouncilFixture("mismatched-council");
+        for (var lecturer : List.of(lecturerThree, lecturerFour, lecturerFive)) {
+            submitFullScore(fixture.project().id(), fixture.catalog(), lecturer, fixture.defenseId());
+        }
+        var other = createLockedCatalog("essay", "Other committee", AssessmentComponentType.COMMITTEE);
+        submitFullScore(fixture.project().id(), other, lecturerThree, fixture.defenseId());
+        assertThatThrownBy(() -> evaluationResultService.finalizeResult(fixture.project().id(), lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("does not match");
+        assertThat(resultRepository.countByAssignmentId(fixture.project().id())).isZero();
+    }
+
+    @Test
+    void legacyCouncilWithoutSelectedRubricKeepsAllRequiredComponents() {
+        var fixture = configuredCouncilFixture("legacy-council");
+        for (var lecturer : List.of(lecturerThree, lecturerFour, lecturerFive)) {
+            submitFullScore(fixture.project().id(), fixture.catalog(), lecturer, fixture.defenseId());
+        }
+        academicFixtureEntityManager.find(com.example.qldetai.feature.evaluation.domain.DefenseSession.class,
+                fixture.defenseId()).getCommittee().setRubric(null);
+        createLockedCatalog("essay", "Unselected legacy component", AssessmentComponentType.COMMITTEE);
+        assertThatThrownBy(() -> evaluationResultService.finalizeResult(fixture.project().id(), lecturerThree.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("evaluator assignment is missing");
+        assertThat(resultRepository.countByAssignmentId(fixture.project().id())).isZero();
+    }
+
+    @Test
+    void submittedScoresAreVisibleToScopedManagersAndChairWithoutExposingDraftScores(@Autowired MockMvc mvc)
+            throws Exception {
+        var fixture = configuredCouncilFixture("score-preview");
+        submitFullScore(fixture.project().id(), fixture.catalog(), lecturerThree, fixture.defenseId());
+        Long draftEvaluation = evaluationService.assign(new CreateEvaluationRequest(
+                fixture.project().id(), fixture.catalog().rubric().id(), lecturerFour.getId(),
+                fixture.defenseId(), nowUtc().plusDays(1)), admin.getId());
+        evaluationService.saveSheet(draftEvaluation, new SaveSheetRequest(0, "Private draft",
+                scoreRequests(fixture.catalog().rubric(), new BigDecimal("5"), new BigDecimal("3")), false),
+                lecturerFour.getUser().getId());
+        evaluationService.assign(new CreateEvaluationRequest(fixture.project().id(), fixture.catalog().rubric().id(),
+                lecturerFive.getId(), fixture.defenseId(), nowUtc().plusDays(1)), admin.getId());
+        for (var actor : List.of(admin, lecturerThree.getUser(),
+                createUser("preview-admin", "Monitoring admin", Set.of(RoleCode.ADMIN)))) {
+            var rows = evaluationService.listAssignments(null, fixture.project().id(), null,
+                    EvaluationStatus.ACTIVE, 0, 10, actor.getId());
+            assertThat(rows.totalElements()).isEqualTo(4);
+            assertThat(rows.content()).filteredOn(row -> row.scoreSheetStatus() == ScoreSheetStatus.SUBMITTED)
+                    .hasSize(2).allSatisfy(row -> assertThat(row.submittedScore()).isEqualByComparingTo("10"));
+            assertThat(rows.content()).filteredOn(row -> row.scoreSheetStatus() != ScoreSheetStatus.SUBMITTED)
+                    .hasSize(2).allSatisfy(row -> assertThat(row.submittedScore()).isNull());
+        }
+        var own = evaluationService.listAssignments(null, fixture.project().id(), null,
+                EvaluationStatus.ACTIVE, 0, 10, lecturerFour.getUser().getId());
+        assertThat(own.content()).singleElement().satisfies(row -> {
+            assertThat(row.id()).isEqualTo(draftEvaluation);
+            assertThat(row.submittedScore()).isNull();
+        });
+        for (var actor : List.of(lecturerOne.getUser(), lecturerTwo.getUser())) {
+            assertThat(evaluationService.listAssignments(null, fixture.project().id(), null,
+                    EvaluationStatus.ACTIVE, 0, 10, actor.getId()).totalElements()).isZero();
+        }
+        mvc.perform(get("/api/v1/evaluation-assignments").param("assignmentId", fixture.project().id().toString())
+                .with(user(UserPrincipal.from(leaderStudent.getUser())))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/evaluation-assignments/{id}/score-sheet", draftEvaluation)
+                .with(user(UserPrincipal.from(lecturerThree.getUser())))).andExpect(status().isForbidden());
+        academicFixtureEntityManager.find(com.example.qldetai.feature.evaluation.domain.DefenseSession.class,
+                fixture.defenseId()).setStatus(com.example.qldetai.feature.evaluation.domain.DefenseStatus.CANCELLED);
+        assertThat(evaluationService.listAssignments(null, fixture.project().id(), null,
+                EvaluationStatus.ACTIVE, 0, 10, lecturerThree.getUser().getId()).totalElements()).isEqualTo(2);
+        assertThat(resultRepository.countByAssignmentId(fixture.project().id())).isZero();
+    }
+
+    @Test
+    void departmentHeadDoesNotGainDeanSchedulingAuthorityOrManageAnotherDepartment() {
+        var fixture = configuredCouncilFixture("head-scope");
+        var appointment = new AcademicAppointment();
+        appointment.setLecturer(lecturerFour);
+        appointment.setFaculty(faculty);
+        appointment.setDepartment(createDepartment(faculty, "OUTSIDE"));
+        appointment.setPositionCode(PositionCode.DEPARTMENT_HEAD);
+        appointment.setStartsAt(nowUtc().minusDays(1));
+        appointment.setAssignedBy(admin);
+        appointments.saveAndFlush(appointment);
+        assertThatThrownBy(() -> projectAssignmentService.updateStatus(fixture.project().id(),
+                new com.example.qldetai.feature.project.dto.ProjectDtos.UpdateAssignmentStatusRequest(
+                        fixture.project().version(), com.example.qldetai.feature.project.domain.AssignmentStatus.CANCELLED),
+                lecturerFour.getUser().getId())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        appointment.setDepartment(department); appointments.flush();
+        Long committeeId = academicFixtureEntityManager.find(com.example.qldetai.feature.evaluation.domain.DefenseSession.class,
+                fixture.defenseId()).getCommittee().getId();
+        assertThatThrownBy(() -> defenseSessionService.eligibility(fixture.project().id(), committeeId,
+                lecturerFour.getUser().getId())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(() -> defenseSessionService.schedule(new CreateDefenseRequest(fixture.project().id(), committeeId,
+                "A102", nowUtc().plusDays(3), nowUtc().plusDays(3).plusHours(1)), lecturerFour.getUser().getId()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    @Test
+    void revokedLecturerRoleRemovesSupervisionFilesAndDraftCatalogAccess(
+            @Autowired com.example.qldetai.feature.progress.service.ProgressService progress,
+            @Autowired com.example.qldetai.feature.progress.repository.StoredFileRepository storedFiles,
+            @Autowired com.example.qldetai.feature.progress.service.StoredFileAuthorization fileAuthorization,
+            @Autowired MockMvc mvc) throws Exception {
+        var project = createAssignedProject("revoked-lecturer-access", leaderStudent, secondStudent);
+        var milestone = progress.create(new com.example.qldetai.feature.progress.dto.ProgressDtos.CreateMilestoneRequest(
+                project.id(), "Report", com.example.qldetai.feature.progress.domain.MilestoneType.PROGRESS,
+                "Report", nowUtc().plusDays(1)), admin.getId());
+        var file = new com.example.qldetai.feature.progress.domain.StoredFile();
+        file.setStorageKey(java.util.UUID.randomUUID() + ".txt");
+        file.setOriginalName("report.txt"); file.setMimeType("text/plain"); file.setSizeBytes(3);
+        file.setSha256("0".repeat(64)); file.setUploadedAt(nowUtc()); file.setUploadedBy(leaderStudent.getUser());
+        file = storedFiles.saveAndFlush(file);
+        var submission = progress.submit(milestone.id(),
+                new com.example.qldetai.feature.progress.dto.ProgressDtos.SubmitReportRequest(file.getId(), "Report"),
+                leaderStudent.getUser().getId());
+        var oldPrincipal = UserPrincipal.from(lecturerOne.getUser());
+        assertThat(progress.list(project.id(), oldPrincipal.id())).hasSize(1);
+        var auth = org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(
+                oldPrincipal, null, oldPrincipal.getAuthorities());
+        assertThat(fileAuthorization.canView(file.getId(), auth)).isTrue();
+        lecturerOne.getUser().replaceRoles(Set.of(roleRepository.findByCode(RoleCode.STUDENT).orElseThrow()), nowUtc());
+        userRepository.saveAndFlush(lecturerOne.getUser());
+        assertThatThrownBy(() -> progress.list(project.id(), oldPrincipal.id()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(() -> progress.feedback(submission.id(),
+                new com.example.qldetai.feature.progress.dto.ProgressDtos.FeedbackRequest("Forbidden", true), oldPrincipal.id()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        mvc.perform(get("/api/v1/files/{id}", file.getId()).with(user(oldPrincipal)))
+                .andExpect(status().isForbidden());
+
+        var draft = evaluationService.createComponent(new CreateAssessmentComponentRequest(period.getId(),
+                "PRIVATE-DRAFT", "Private draft", AssessmentComponentType.OTHER), admin.getId());
+        var appointment = new AcademicAppointment();
+        appointment.setLecturer(lecturerFive); appointment.setFaculty(faculty);
+        appointment.setPositionCode(PositionCode.DEAN); appointment.setStartsAt(nowUtc().minusDays(1));
+        appointment.setAssignedBy(admin); appointments.saveAndFlush(appointment);
+        assertThat(evaluationService.listComponents(period.getId(), lecturerFive.getUser().getId()))
+                .extracting(item -> item.id()).contains(draft.id());
+        lecturerFive.getUser().replaceRoles(Set.of(roleRepository.findByCode(RoleCode.STUDENT).orElseThrow()), nowUtc());
+        userRepository.saveAndFlush(lecturerFive.getUser());
+        assertThat(userRepository.findWithRolesById(lecturerFive.getUser().getId()).orElseThrow().getUserRoles())
+                .extracting(role -> role.getRole().getCode()).containsExactly(RoleCode.STUDENT);
+        assertThat(evaluationService.listComponents(period.getId(), lecturerFive.getUser().getId()))
+                .extracting(item -> item.id()).doesNotContain(draft.id());
+    }
+
+    private ConfiguredCouncilFixture configuredCouncilFixture(String code) {
+        var project = createAssignedProject(code, leaderStudent, secondStudent);
+        var review = createLockedCatalog("review", "Review", AssessmentComponentType.REVIEW);
+        submitFullScore(project.id(), review, lecturerThree, null);
+        var catalog = createLockedCatalog("project", "Đồ án môn học", AssessmentComponentType.COMMITTEE);
+        Long committeeId = evaluationCommitteeService.createCommittee(
+                new CreateCommitteeRequest(period.getId(), "Council"), admin.getId());
+        evaluationCommitteeService.addMember(committeeId,
+                new AddCommitteeMemberRequest(lecturerThree.getId(), 1, CommitteeRole.CHAIR), admin.getId());
+        evaluationCommitteeService.addMember(committeeId,
+                new AddCommitteeMemberRequest(lecturerFour.getId(), 2, CommitteeRole.SECRETARY), admin.getId());
+        evaluationCommitteeService.addMember(committeeId,
+                new AddCommitteeMemberRequest(lecturerFive.getId(), 3, CommitteeRole.MEMBER), admin.getId());
+        academicFixtureEntityManager.find(com.example.qldetai.feature.evaluation.domain.EvaluationCommittee.class, committeeId)
+                .setRubric(academicFixtureEntityManager.find(com.example.qldetai.feature.evaluation.domain.Rubric.class, catalog.rubric().id()));
+        Long defenseId = defenseSessionService.schedule(new CreateDefenseRequest(
+                project.id(), committeeId, "A101", nowUtc().plusDays(2), nowUtc().plusDays(2).plusHours(1)), admin.getId());
+        return new ConfiguredCouncilFixture(project, catalog, defenseId);
+    }
+
+    private record ConfiguredCouncilFixture(ProjectAssignmentResponse project, LockedCatalog catalog, Long defenseId) {}
 
     @Test
     void onlyTheCorrespondingChairCanFinalizeACommitteeResultThroughHttp(@Autowired MockMvc mvc)

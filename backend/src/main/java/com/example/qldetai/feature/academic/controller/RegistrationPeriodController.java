@@ -54,7 +54,7 @@ public class RegistrationPeriodController {
 
     @PostMapping
     @PreAuthorize(
-            "hasRole('ADMIN') or @academicAuthorization.canManageFaculty(#request.facultyId, authentication)")
+            "@academicAuthorization.canManageFaculty(#request.facultyId, authentication)")
     public ResponseEntity<ApiResponse<RegistrationPeriodResponse>> create(
             @Valid @RequestBody CreateRegistrationPeriodRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -65,15 +65,16 @@ public class RegistrationPeriodController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManagePeriod(#id, authentication)")
+    @PreAuthorize("@academicAuthorization.canManagePeriod(#id, authentication)")
     public ApiResponse<RegistrationPeriodResponse> update(
-            @PathVariable Long id, @Valid @RequestBody UpdateRegistrationPeriodRequest request) {
+            @PathVariable Long id, @Valid @RequestBody UpdateRegistrationPeriodRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(
-                "Đã cập nhật đợt đăng ký.", registrationPeriodService.update(id, request));
+                "Đã cập nhật đợt đăng ký.", registrationPeriodService.update(id, request, principal.id()));
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN') or @academicAuthorization.canManagePeriod(#id, authentication)")
+    @PreAuthorize("@academicAuthorization.canManagePeriod(#id, authentication)")
     public ApiResponse<RegistrationPeriodResponse> changeStatus(
             @PathVariable Long id,
             @Valid @RequestBody ChangePeriodStatusRequest request,

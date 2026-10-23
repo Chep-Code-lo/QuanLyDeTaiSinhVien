@@ -23,6 +23,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [refreshUser])
 
   useEffect(() => {
+    if (!user?.id) return
+    const refreshVisible = () => {
+      if (document.visibilityState === 'visible') void refreshUser()
+    }
+    window.addEventListener('focus', refreshVisible)
+    document.addEventListener('visibilitychange', refreshVisible)
+    const timer = window.setInterval(refreshVisible, 60_000)
+    return () => {
+      window.removeEventListener('focus', refreshVisible)
+      document.removeEventListener('visibilitychange', refreshVisible)
+      window.clearInterval(timer)
+    }
+  }, [user?.id, refreshUser])
+
+  useEffect(() => {
     const expired = () => setUser(null)
     window.addEventListener('session-expired', expired)
     return () => window.removeEventListener('session-expired', expired)

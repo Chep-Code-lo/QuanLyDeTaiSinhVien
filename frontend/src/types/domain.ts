@@ -256,6 +256,7 @@ export interface EvaluationAssignmentResponse {
   deadlineAt: string
   scoreSheetId?: number
   scoreSheetStatus?: ScoreSheetStatus
+  submittedScore?: number | null
 }
 
 export interface ScoreRequest {

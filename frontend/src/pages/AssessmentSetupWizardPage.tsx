@@ -478,7 +478,6 @@ export function AssessmentSetupWizardPage() {
   )
 
   const canConfigure =
-    !!user?.roles.includes('ADMIN') ||
     canManageFaculty(user, periods.find((period) => period.id === periodId)?.facultyId ?? 0)
 
   if (!canConfigure)

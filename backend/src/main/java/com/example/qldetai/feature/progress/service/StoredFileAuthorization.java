@@ -85,8 +85,9 @@ public class StoredFileAuthorization {
     private boolean canViewAssignment(
             ProjectAssignment assignment, UserPrincipal principal, Authentication authentication) {
         if (projectAuthorization.canManageAssignment(assignment.getId(), authentication)
-                || topicSupervisorRepository.existsByTopicIdAndLecturerUserId(
-                        assignment.getTopic().getId(), principal.id())) {
+                || (principal.roles().contains(RoleCode.LECTURER)
+                    && topicSupervisorRepository.existsByTopicIdAndLecturerUserId(
+                        assignment.getTopic().getId(), principal.id()))) {
             return true;
         }
         return studentRepository

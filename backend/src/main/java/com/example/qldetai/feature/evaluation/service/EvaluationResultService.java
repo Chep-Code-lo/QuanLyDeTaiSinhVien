@@ -233,8 +233,7 @@ public class EvaluationResultService {
                                 () ->
                                         new ResourceNotFoundException(
                                                 "Project assignment was not found."));
-        List<AssessmentComponent> requiredComponents =
-                components.findByPeriodIdOrderByCodeAsc(assignment.getPeriod().getId());
+        List<AssessmentComponent> requiredComponents = requiredComponentsFor(assignment);
         requireFinalizer(assignment, requiredComponents, actorId);
         List<ResultVersion> currentResults = results.findByAssignmentIdForUpdate(assignmentId);
         if (currentResults.stream()
@@ -247,6 +246,18 @@ public class EvaluationResultService {
                 evaluations.findByAssignmentIdAndStatus(assignmentId, EvaluationStatus.ACTIVE);
         if (activeEvaluations.isEmpty()) {
             throw new BusinessRuleException("This assignment has no evaluation assignments.");
+        }
+        Set<Long> requiredComponentIds =
+                requiredComponents.stream()
+                        .map(AssessmentComponent::getId)
+                        .collect(java.util.stream.Collectors.toSet());
+        if (activeEvaluations.stream()
+                .anyMatch(
+                        evaluation ->
+                                !requiredComponentIds.contains(evaluation.getComponent().getId()))) {
+            throw new BusinessRuleException(
+                    "An active evaluator assignment does not match the assessment component"
+                            + " selected by the defense committee.");
         }
 
         Map<Long, List<EvaluationAssignment>> byComponent =
@@ -338,6 +349,33 @@ public class EvaluationResultService {
         return result(resultVersion);
     }
 
+    private List<AssessmentComponent> requiredComponentsFor(ProjectAssignment assignment) {
+        List<AssessmentComponent> configured =
+                components.findByPeriodIdOrderByCodeAsc(assignment.getPeriod().getId());
+        var defense = defenses.findByAssignmentId(assignment.getId());
+        // Legacy councils without an explicit rubric retain the stricter period-wide rules.
+        if (defense.isEmpty() || defense.get().getCommittee().getRubric() == null) {
+            return configured;
+        }
+        var rubric = defense.get().getCommittee().getRubric();
+        AssessmentComponent selected = rubric.getComponent();
+        if (!selected.getPeriod().getId().equals(assignment.getPeriod().getId())
+                || selected.getComponentType() != AssessmentComponentType.COMMITTEE
+                || !"LOCKED".equals(rubric.getStatus())) {
+            throw new BusinessRuleException(
+                    "The defense committee must select a locked committee rubric from this"
+                            + " registration period.");
+        }
+        // The saved council rubric explicitly selects the applicable committee component.
+        // Review and other required components are still checked even when unassigned.
+        return configured.stream()
+                .filter(
+                        component ->
+                                component.getComponentType() != AssessmentComponentType.COMMITTEE
+                                        || component.getId().equals(selected.getId()))
+                .toList();
+    }
+
     private void requireFinalizer(
             ProjectAssignment assignment, List<AssessmentComponent> required, Long actorId) {
         var defense = defenses.findByAssignmentId(assignment.getId());
@@ -382,6 +420,15 @@ public class EvaluationResultService {
                 committeeMembers.findByCommitteeId(defense.getCommittee().getId()).stream()
                         .map(member -> member.getLecturer().getId())
                         .collect(java.util.stream.Collectors.toSet());
+        var selectedRubric = defense.getCommittee().getRubric();
+        if (selectedRubric != null
+                && componentEvaluations.stream()
+                        .anyMatch(
+                                evaluation ->
+                                        !selectedRubric.getId().equals(evaluation.getRubric().getId()))) {
+            throw new BusinessRuleException(
+                    "Committee evaluations must use the rubric selected by the defense committee.");
+        }
         Set<Long> evaluatorIds =
                 componentEvaluations.stream()
                         .filter(

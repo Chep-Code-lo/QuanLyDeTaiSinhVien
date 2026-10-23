@@ -39,7 +39,7 @@ class StoredFileSecurityTests {
         files = mock(StoredFileRepository.class);
         users = mock(UserRepository.class);
         service = new StoredFileService(files, users, Clock.systemUTC(), root);
-        when(users.findById(1L)).thenReturn(Optional.of(new User()));
+        when(users.findByIdForUpdate(1L)).thenReturn(Optional.of(new User()));
         when(files.save(any())).thenAnswer(call -> call.getArgument(0));
     }
 
@@ -93,6 +93,42 @@ class StoredFileSecurityTests {
         try (var entries = Files.list(root)) {
             assertThat(entries).isEmpty();
         }
+    }
+
+    @Test
+    void rejectsControlCharactersInOriginalNamesBeforeStorage() {
+        for (var name : java.util.List.of("report\n.txt", "report\u0000.txt")) {
+            assertThatThrownBy(() -> service.store(new MockMultipartFile("file", name, "text/plain", "Report".getBytes()), 1L))
+                    .isInstanceOf(BusinessRuleException.class);
+        }
+        verifyNoInteractions(files);
+    }
+
+    @Test
+    void quotaRateAndUnattachedLimitsRejectBeforeWritingContent() throws Exception {
+        var upload = new MockMultipartFile("file", "report.txt", "text/plain", "Report".getBytes());
+        when(files.readyBytesByUser(1L)).thenReturn(500L * 1024 * 1024);
+        assertThatThrownBy(() -> service.store(upload, 1L)).isInstanceOf(BusinessRuleException.class);
+        when(files.readyBytesByUser(1L)).thenReturn(0L);
+        when(files.countUnattachedByUser(1L)).thenReturn(20L);
+        assertThatThrownBy(() -> service.store(upload, 1L)).isInstanceOf(BusinessRuleException.class);
+        when(files.countUnattachedByUser(1L)).thenReturn(0L);
+        when(files.countByUploadedByIdAndUploadedAtGreaterThanEqual(org.mockito.ArgumentMatchers.eq(1L), any())).thenReturn(10L);
+        assertThatThrownBy(() -> service.store(upload, 1L)).isInstanceOf(com.example.qldetai.exception.TooManyRequestsException.class);
+        try (var paths = Files.walk(root)) {
+            assertThat(paths.filter(Files::isRegularFile)).isEmpty();
+        }
+    }
+
+    @Test
+    void falseMultipartSizeCannotBypassTheRemainingUserQuota() throws Exception {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "userQuota",
+                org.springframework.util.unit.DataSize.ofBytes(8));
+        var upload = new MockMultipartFile("file", "report.txt", "text/plain", "Longer than the quota".getBytes()) {
+            @Override public long getSize() { return 4; }
+        };
+        assertThatThrownBy(() -> service.store(upload, 1L)).isInstanceOf(BusinessRuleException.class);
+        try (var paths = Files.walk(root)) { assertThat(paths.filter(Files::isRegularFile)).isEmpty(); }
     }
 
     @Test
@@ -159,6 +195,25 @@ class StoredFileSecurityTests {
         try (var paths = Files.walk(root)) {
             assertThat(paths.filter(Files::isRegularFile)).isEmpty();
         }
+    }
+
+    @Test
+    void pathSegmentsInOriginalNamesCannotEscapeTheStorageRoot() {
+        var result = service.store(new MockMultipartFile("file", "..\\..\\report.txt", "text/plain", "Report".getBytes()), 1L);
+        assertThat(result.originalName()).isEqualTo("report.txt");
+        assertThat(root.resolve(result.storageKey()).normalize().startsWith(root)).isTrue();
+    }
+
+    @Test
+    void tamperedMetadataCannotDownloadAPathOutsideTheStorageRoot() {
+        var file = new StoredFile();
+        file.setStorageKey("../outside.txt");
+        file.setOriginalName("outside.txt");
+        file.setMimeType("text/plain");
+        file.setStatus(StoredFileStatus.READY);
+        when(files.findById(1L)).thenReturn(Optional.of(file));
+        assertThatThrownBy(() -> service.download(1L)).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("escapes the storage root");
     }
 
     @Test

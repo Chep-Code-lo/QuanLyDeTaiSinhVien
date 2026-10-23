@@ -45,6 +45,8 @@ class MilestoneReminderServiceTests {
     private final EmailNotificationEventService emailNotificationEventService =
             mock(EmailNotificationEventService.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-10-21T00:00:00Z"), ZoneOffset.UTC);
+    private final com.example.qldetai.feature.academic.service.AcademicAuthorization authorization =
+            mock(com.example.qldetai.feature.academic.service.AcademicAuthorization.class);
     private final MilestoneReminderService service =
             new MilestoneReminderService(
                     assignmentRepository,
@@ -52,7 +54,7 @@ class MilestoneReminderServiceTests {
                     groupMemberRepository,
                     notificationService,
                     emailNotificationEventService,
-                    clock);
+                    clock, authorization);
 
     @Test
     void sendsOneReminderToEachActiveMemberForUpcomingOpenMilestones() {
@@ -68,7 +70,8 @@ class MilestoneReminderServiceTests {
         when(groupMemberRepository.findByGroupIdAndLeftAtIsNullOrderBySlotNoAsc(17L))
                 .thenReturn(List.of(member(301L), member(302L)));
 
-        MilestoneReminderResponse response = service.send(assignment.getId());
+        MilestoneReminderResponse response = service.send(assignment.getId(), 1L);
+        verify(authorization).requireDepartmentManagement(21L, 1L);
 
         assertThat(response.recipientCount()).isEqualTo(2);
         assertThat(response.milestoneCount()).isEqualTo(2);
@@ -101,7 +104,7 @@ class MilestoneReminderServiceTests {
         when(milestoneRepository.findByAssignmentIdOrderByDueAtAsc(assignment.getId()))
                 .thenReturn(List.of(submitted, expired));
 
-        MilestoneReminderResponse response = service.send(assignment.getId());
+        MilestoneReminderResponse response = service.send(assignment.getId(), 1L);
 
         assertThat(response.recipientCount()).isZero();
         assertThat(response.milestoneCount()).isZero();
@@ -116,6 +119,11 @@ class MilestoneReminderServiceTests {
         assignment.setId(assignmentId);
         assignment.setGroup(group);
         assignment.setStatus(AssignmentStatus.IN_PROGRESS);
+        var topic = new com.example.qldetai.feature.topic.domain.Topic();
+        var department = new com.example.qldetai.feature.academic.domain.Department();
+        department.setId(21L);
+        topic.setDepartment(department);
+        assignment.setTopic(topic);
         return assignment;
     }
 

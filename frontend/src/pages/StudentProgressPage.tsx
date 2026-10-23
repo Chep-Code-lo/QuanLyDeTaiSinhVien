@@ -37,6 +37,7 @@ export function StudentProgressPage() {
   const [uploading, setUploading] = useState(false)
   const [target, setTarget] = useState<MilestoneResponse>()
   const [file, setFile] = useState<File>()
+  const [uploadedFile, setUploadedFile] = useState<{ file: File; id: number }>()
   const [note, setNote] = useState('')
   const [currentTime, setCurrentTime] = useState(() => Date.now())
   const [month, setMonth] = useState(
@@ -97,11 +98,13 @@ export function StudentProgressPage() {
 
     setUploading(true)
     try {
-      const uploaded = await studentApi.upload(file)
+      const uploaded = uploadedFile?.file === file ? uploadedFile : await studentApi.upload(file)
+      setUploadedFile({ file, id: uploaded.id })
       await studentApi.submit(target.id, uploaded.id, note)
       showSuccess('Báo cáo đã được lưu trên hệ thống.')
       setTarget(undefined)
       setFile(undefined)
+      setUploadedFile(undefined)
       setNote('')
       await load()
     } catch (submitError) {
@@ -223,6 +226,7 @@ export function StudentProgressPage() {
                           onClick={() => {
                             setTarget(milestone)
                             setFile(undefined)
+                            setUploadedFile(undefined)
                             setNote('')
                           }}
                         >

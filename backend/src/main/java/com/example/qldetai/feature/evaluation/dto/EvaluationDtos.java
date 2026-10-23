@@ -109,7 +109,8 @@ public final class EvaluationDtos {
             EvaluationStatus status,
             LocalDateTime deadlineAt,
             Long scoreSheetId,
-            ScoreSheetStatus scoreSheetStatus) {}
+            ScoreSheetStatus scoreSheetStatus,
+            BigDecimal submittedScore) {}
 
     public record ReviewProgressResponse(
             long assignedCount, long submittedCount, long draftCount, long notStartedCount) {}

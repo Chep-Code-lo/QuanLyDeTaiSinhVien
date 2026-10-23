@@ -7,6 +7,7 @@ import { useRequestLoading } from '../hooks/useRequestLoading'
 import { StatusBadge } from '../components/StatusBadge'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { useAuth } from '../context/AuthContext'
+import { canManageFaculty, academicAppointments } from '../utils/managementAccess'
 import { useToast } from '../context/ToastContext'
 import { statusLabel, projectTypeLabel } from '../utils/displayLabels'
 import './AcademicManagementPage.css'
@@ -31,10 +32,9 @@ const nextPeriodStatus = (
 const periodStatusActionLabel = (status: NextPeriodStatus) => (status === 'ACTIVE' ? 'Bật' : 'Đóng')
 
 export const AcademicManagementPage: React.FC = () => {
-  const { user, hasRole, hasAppointment } = useAuth()
+  const { user, hasAppointment } = useAuth()
   const { showSuccess, showError } = useToast()
   const isDean = hasAppointment('DEAN')
-  const isAdmin = hasRole('ADMIN')
 
   // Registration Periods state
   const [periods, setPeriods] = useState<RegistrationPeriodResponse[]>([])
@@ -58,11 +58,7 @@ export const AcademicManagementPage: React.FC = () => {
   const [semesters, setSemesters] = useState<SemesterResponse[]>([])
   const managedFaculties = faculties.filter(
     (faculty) =>
-      isAdmin ||
-      user?.activeAppointments.some(
-        (appointment) =>
-          appointment.positionCode === 'DEAN' && appointment.facultyId === faculty.id,
-      ),
+      canManageFaculty(user, faculty.id),
   )
 
   // Form State for Registration Period creation
@@ -155,7 +151,7 @@ export const AcademicManagementPage: React.FC = () => {
 
   const handleCreatePeriod = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (submittingPeriod) return
+    if (submittingPeriod || !canManageFaculty(user, newPeriod.facultyId)) return
     if (!newPeriod.facultyId) {
       showError('Vui lòng chọn khoa quản lý đợt đăng ký.')
       return
@@ -265,6 +261,7 @@ export const AcademicManagementPage: React.FC = () => {
   const handleChangePeriodStatus = async () => {
     if (!pendingStatusChange || changingPeriodStatus) return
     const { period, nextStatus } = pendingStatusChange
+    if (!canManageFaculty(user, period.facultyId)) return
     setChangingPeriodStatus(true)
     try {
       const updated = await academicApi.changeRegistrationPeriodStatus(period.id, {
@@ -288,7 +285,7 @@ export const AcademicManagementPage: React.FC = () => {
           <h1>Quản lý Học thuật</h1>
         </div>
         <div className="flex gap-2">
-          {user?.activeAppointments?.map((apt) => (
+          {academicAppointments(user).map((apt) => (
             <span key={apt.id} className="badge badge-success text-sm py-2 px-3">
               Vị trí: {apt.positionCode === 'DEAN' ? 'Trưởng Khoa' : 'Trưởng Bộ Môn'}
             </span>
@@ -299,7 +296,7 @@ export const AcademicManagementPage: React.FC = () => {
       <div className="page-card fade-in">
         <div className="registration-periods-header">
           <h2 className="section-title">Danh sách Đợt Đăng Ký Đề Tài</h2>
-          {(isAdmin || isDean) && (
+          {isDean && (
             <button
               type="button"
               className="btn btn-primary"
@@ -405,7 +402,7 @@ export const AcademicManagementPage: React.FC = () => {
                         <StatusBadge status={p.status} />
                       </td>
                       <td className="registration-periods-table__action">
-                        {(isAdmin || isDean) && nextStatus && (
+                        {canManageFaculty(user, p.facultyId) && nextStatus && (
                           <button
                             type="button"
                             className="btn btn-outline btn-sm"

@@ -449,6 +449,41 @@ it('giảng viên chỉ đọc không có nút duyệt yêu cầu', async () => 
   await screen.findByText('Lý do: Cần sửa nhận xét')
   expect(screen.queryByRole('button', { name: 'Duyệt yêu cầu' })).toBeNull()
 })
+it('admin thuần chỉ theo dõi yêu cầu đổi điểm', async () => {
+  mocks.user = { ...lecturer(), roles: ['ADMIN'], lecturer: undefined, activeAppointments: [] }
+  render(<GradeChangesPage />)
+  await userEvent.click(await screen.findByRole('button', { name: 'Xem yêu cầu #4' }))
+  await screen.findByText('Lý do: Cần sửa nhận xét')
+  expect(screen.queryByRole('button', { name: 'Duyệt yêu cầu' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Từ chối yêu cầu' })).toBeNull()
+})
+it.each([
+  ['APPROVED', 'Đã duyệt, chờ nộp lại'],
+  ['REJECTED', 'Đã từ chối'],
+  ['APPLIED', 'Đã áp dụng'],
+])('yêu cầu %s hiển thị trạng thái và không cho xét duyệt lại', async (status, label) => {
+  const reviewed = { ...request, status, reviewedByName: 'Trưởng khoa', reviewComment: 'Đã kiểm tra' }
+  mocks.gradeList.mockResolvedValue(page([reviewed]))
+  mocks.grade.mockResolvedValue(reviewed)
+  render(<GradeChangesPage />)
+  await screen.findByText(label)
+  await userEvent.click(screen.getByRole('button', { name: 'Xem yêu cầu #4' }))
+  await screen.findByText('Phản hồi: Đã kiểm tra')
+  expect(screen.queryByRole('button', { name: 'Duyệt yêu cầu' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Từ chối yêu cầu' })).toBeNull()
+})
+it('gửi yêu cầu lỗi giữ nguyên lý do để thử lại', async () => {
+  mocks.gradeRequest.mockRejectedValueOnce(new Error('Không thể gửi yêu cầu'))
+  render(<GradeChangeRequestForm sheetId={5} />)
+  const reason = screen.getByLabelText('Lý do điều chỉnh')
+  fireEvent.change(reason, { target: { value: 'Bổ sung bằng chứng' } })
+  await userEvent.click(screen.getByRole('button', { name: 'Gửi yêu cầu đổi điểm' }))
+  await waitFor(() => expect(mocks.error).toHaveBeenCalled())
+  expect((reason as HTMLTextAreaElement).value).toBe('Bổ sung bằng chứng')
+  await userEvent.click(screen.getByRole('button', { name: 'Gửi yêu cầu đổi điểm' }))
+  await screen.findByRole('status')
+  expect(mocks.gradeRequest).toHaveBeenCalledTimes(2)
+})
 it.each([true, false])(
   'người quản lý duyệt/từ chối qua xác nhận, approved=%s',
   async (approved) => {

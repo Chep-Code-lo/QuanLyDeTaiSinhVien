@@ -37,10 +37,21 @@ public class EvaluationReadScope {
     public Specification<EvaluationAssignment> assignments(Long actorId) {
         if (actorId == null || admin(actorId)) return (root, query, cb) -> cb.conjunction();
         var active = appointments.findActiveByUserId(actorId, LocalDateTime.now(clock));
-        return (root, query, cb) ->
-                cb.or(
+        return (root, query, cb) -> {
+            var chaired = query.subquery(Long.class);
+            var defense = chaired.from(DefenseSession.class);
+            var chair = chaired.from(CommitteeMember.class);
+            chaired.select(defense.get("id")).where(
+                    cb.equal(defense.get("assignment"), root.get("assignment")),
+                    cb.notEqual(defense.get("status"), DefenseStatus.CANCELLED),
+                    cb.equal(chair.get("committee"), defense.get("committee")),
+                    cb.equal(chair.get("lecturer").get("user").get("id"), actorId),
+                    cb.equal(chair.get("committeeRole"), CommitteeRole.CHAIR));
+            return cb.or(
                         cb.equal(root.get("lecturer").get("user").get("id"), actorId),
+                        cb.exists(chaired),
                         managed(root.get("assignment").get("topic"), active, cb));
+        };
     }
 
     public Specification<DefenseSession> defenses(Long actorId) {

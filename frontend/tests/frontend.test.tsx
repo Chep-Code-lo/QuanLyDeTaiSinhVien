@@ -159,7 +159,7 @@ beforeEach(() => {
   mocks.logout.mockReset()
   mocks.logout.mockResolvedValue(undefined)
   mocks.topics.mockResolvedValue(page([]))
-  mocks.periods.mockResolvedValue(page([{ id: 1, name: 'Đợt A' }]))
+  mocks.periods.mockResolvedValue(page([{ id: 1, name: 'Đợt A', facultyId: 1 }]))
   mocks.faculties.mockResolvedValue([])
   mocks.departments.mockResolvedValue([])
   mocks.createTopic.mockResolvedValue({})

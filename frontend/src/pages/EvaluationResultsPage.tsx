@@ -1,6 +1,8 @@
 import { hasAcademicLeadership } from '../utils/managementAccess'
 import { useAuth } from '../context/AuthContext'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useRemoteData } from '../hooks/useRemoteData'
+import { PageControls } from '../components/PageControls'
 import { academicApi } from '../api/academic'
 import { evaluationApi } from '../api/evaluation'
 import { errorMessage } from '../api/student'
@@ -274,31 +276,36 @@ function ProjectResults({
             error={current?.error ?? ''}
             retry={() => setRevision((value) => value + 1)}
           />
-          <button
-            type="button"
-            className="btn btn-secondary"
-            disabled={busy}
-            onClick={() => setRevision((value) => value + 1)}
-          >
-            Làm mới kết quả
-          </button>
+          <div className="inline-form">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={busy}
+              onClick={() => setRevision((value) => value + 1)}
+            >
+              Làm mới kết quả
+            </button>
+            {current?.data && current.actions?.canFinalize && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={busy || awaitingPublication || page !== 0}
+                onClick={() => setPending({ kind: 'finalize', id: project.id })}
+              >
+                Chốt kết quả
+              </button>
+            )}
+          </div>
           {current?.data && (
             <>
-              {current.actions?.canFinalize && (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={busy || awaitingPublication || page !== 0}
-                  onClick={() => setPending({ kind: 'finalize', id: project.id })}
-                >
-                  Chốt kết quả
-                </button>
-              )}
               {!current.data.content.length && (
-                <p>
-                  Chưa có kết quả được chốt. Cần phân công đủ và nộp đầy đủ phiếu của các thành phần
-                  đánh giá bắt buộc trước khi chốt.
-                </p>
+                <>
+                  <p>
+                    Chưa có kết quả được chốt. Cần phân công đủ và nộp đầy đủ phiếu của các thành phần
+                    đánh giá bắt buộc trước khi chốt.
+                  </p>
+                  <ProjectScorePreview projectId={project.id} revision={revision} />
+                </>
               )}
               {current.data.content.map((result) => (
                 <article key={result.id} className="page-card">
@@ -411,5 +418,66 @@ function ProjectResults({
         </>
       )}
     </dialog>
+  )
+}
+
+function ProjectScorePreview({ projectId, revision }: { projectId: number; revision: number }) {
+  const [page, setPage] = useState(0)
+  const [retry, setRetry] = useState(0)
+  const load = useCallback(
+    () => evaluationApi.listAssignments({ assignmentId: projectId, status: 'ACTIVE', page, size: 10 }),
+    [projectId, page],
+  )
+  const { data, loading, error } = useRemoteData(load, revision + retry)
+  const sheetLabels = { DRAFT: 'Đang chấm', SUBMITTED: 'Đã nộp', LOCKED: 'Đã khóa' }
+  return (
+    <section className="page-card" aria-label="Xem trước điểm">
+      <h3>Xem trước điểm</h3>
+      <p>Điểm các phiếu đã nộp trong phạm vi bạn được xem. Đây chưa phải kết quả đã chốt hoặc công bố.</p>
+      <RemoteState loading={loading} error={error} retry={() => setRetry((value) => value + 1)} />
+      {data && (
+        <>
+          {!data.content.length ? (
+            <p>Chưa có phân công chấm trong phạm vi bạn được xem.</p>
+          ) : (
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Thành phần</th>
+                    <th>Giảng viên</th>
+                    <th>Trạng thái phiếu</th>
+                    <th>Điểm đã nộp</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.content.map((item) => (
+                    <tr key={item.id}>
+                      <td>{item.componentName}</td>
+                      <td>{item.lecturerName}</td>
+                      <td>{item.scoreSheetStatus ? sheetLabels[item.scoreSheetStatus] : 'Chưa chấm'}</td>
+                      <td>
+                        {item.submittedScore != null
+                          ? `${Number(item.submittedScore).toFixed(2)}/10`
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {data.totalPages > 1 && (
+            <PageControls
+              label="Phân trang phiếu điểm xem trước"
+              page={page}
+              totalPages={data.totalPages}
+              loading={loading}
+              onPage={setPage}
+            />
+          )}
+        </>
+      )}
+    </section>
   )
 }
