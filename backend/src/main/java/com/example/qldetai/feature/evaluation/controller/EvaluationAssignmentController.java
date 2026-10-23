@@ -79,7 +79,7 @@ public class EvaluationAssignmentController {
 
     @PostMapping("/evaluation-assignments")
     @PreAuthorize(
-            "hasRole('ADMIN') or @projectAuthorization.canManageAssignment(#request.assignmentId,"
+            "@projectAuthorization.canManageAssignment(#request.assignmentId,"
                     + " authentication)")
     public ResponseEntity<ApiResponse<Long>> assign(
             @Valid @RequestBody CreateEvaluationRequest request,

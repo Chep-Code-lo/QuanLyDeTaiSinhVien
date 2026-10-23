@@ -1,3 +1,5 @@
+import { hasAcademicLeadership } from '../utils/managementAccess'
+import { useAuth } from '../context/AuthContext'
 import { useEffect, useId, useRef, useState } from 'react'
 import { academicApi } from '../api/academic'
 import { evaluationApi } from '../api/evaluation'
@@ -23,6 +25,7 @@ const statusLabels: Record<ResultStatus, string> = {
 }
 
 export function EvaluationResultsPage() {
+  const { user } = useAuth()
   const [page, setPage] = useState(0)
   const [revision, setRevision] = useState(0)
   const key = `${page}:${revision}`
@@ -53,7 +56,15 @@ export function EvaluationResultsPage() {
   }
   return (
     <>
-      <PageHeader title="Tổng hợp & Công bố điểm" />
+      <PageHeader
+        title={
+          hasAcademicLeadership(user)
+            ? 'Tổng hợp & Công bố điểm'
+            : user?.roles.includes('ADMIN')
+              ? 'Tổng hợp kết quả'
+              : 'Kết quả đánh giá'
+        }
+      />
       <section className="page-card">
         <RemoteState
           loading={!current}

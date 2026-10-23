@@ -30,6 +30,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class GradeChangeService {
+    private final com.example.qldetai.feature.project.service.ProjectAuthorization projectAuthorization;
 
     private final ScoreSheetRepository sheets;
     private final ResultInputRepository resultInputs;
@@ -84,12 +85,14 @@ public class GradeChangeService {
     }
 
     @Transactional
+    @com.example.qldetai.common.audit.BusinessAudit(action = "GRADE_CHANGE_REQUEST", entityType = "SCORE_SHEET", entityIdArgument = 0)
     public Long requestChange(Long sheetId, CreateGradeChangeRequest request, Long actorId) {
         ScoreSheet sheet =
                 sheets.findById(sheetId)
                         .orElseThrow(
                                 () -> new ResourceNotFoundException("Score sheet was not found."));
-        if (!sheet.getEvaluation().getLecturer().getUser().getId().equals(actorId)) {
+        if (!sheet.getEvaluation().getLecturer().getUser().getId().equals(actorId)
+                || sheet.getEvaluation().getStatus() != com.example.qldetai.feature.evaluation.domain.EvaluationStatus.ACTIVE) {
             throw new AccessDeniedException("Only the evaluator can request a score change.");
         }
         ensureScoreSheetCanBeChanged(sheet);
@@ -109,6 +112,7 @@ public class GradeChangeService {
     }
 
     @Transactional
+    @com.example.qldetai.common.audit.BusinessAudit(action = "GRADE_CHANGE_REVIEW", entityType = "GRADE_CHANGE_REQUEST", entityIdArgument = 0)
     public void reviewChange(Long id, ReviewGradeChangeRequest request, Long actorId) {
         actorAccess.manager(actorId);
         GradeChangeRequest changeRequest =
@@ -117,7 +121,8 @@ public class GradeChangeService {
                                 () ->
                                         new ResourceNotFoundException(
                                                 "Grade change request was not found."));
-        if (!changes.exists(
+        if (!projectAuthorization.canManageAssignment(changeRequest.getSheet().getEvaluation().getAssignment().getId(), actorId)
+                || !changes.exists(
                 access.manageableBy(actorId)
                         .and((root, query, cb) -> cb.equal(root.get("id"), id)))) {
             throw new AccessDeniedException("You cannot review this grade change request.");

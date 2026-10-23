@@ -71,7 +71,7 @@ public class ProgressController {
 
     @PostMapping("/report-submissions/{id}/feedback")
     @PreAuthorize(
-            "hasRole('ADMIN') or @progressAuthorization.canManageSubmission(#id, authentication)")
+            "@progressAuthorization.canSuperviseSubmission(#id, authentication)")
     public ApiResponse<SubmissionResponse> feedback(
             @PathVariable Long id,
             @Valid @RequestBody FeedbackRequest request,

@@ -1,3 +1,4 @@
+import { canManageDepartment, canManageFaculty } from '../utils/managementAccess'
 import { formatDate } from '../utils/dateTime'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
@@ -56,9 +57,8 @@ export function RegistrationTopicForm({
 }: {
   onCreated: (topic: TopicResponse) => void
 }) {
-  const { user, hasRole } = useAuth()
+  const { user } = useAuth()
   const { showError, showSuccess } = useToast()
-  const admin = hasRole('ADMIN')
   const [expanded, setExpanded] = useState(false)
   const [periods, setPeriods] = useState<RegistrationPeriodResponse[]>([])
   const [departments, setDepartments] = useState<DepartmentResponse[]>([])
@@ -77,15 +77,8 @@ export function RegistrationTopicForm({
   const [created, setCreated] = useState<TopicResponse>()
   const [checkedAt, setCheckedAt] = useState(Date.now)
 
-  const allowedDepartments = departments.filter(
-    (department) =>
-      admin ||
-      user?.activeAppointments.some((appointment) =>
-        appointment.positionCode === 'DEAN'
-          ? appointment.facultyId === department.facultyId
-          : appointment.positionCode === 'DEPARTMENT_HEAD' &&
-            appointment.departmentId === department.id,
-      ),
+  const allowedDepartments = departments.filter((department) =>
+    canManageDepartment(user, department.id, department.facultyId),
   )
   const allowedPeriods = periods.filter(
     (period) =>
@@ -105,11 +98,7 @@ export function RegistrationTopicForm({
   const proposalEnd = serverTimestamp(selectedPeriod?.proposalEndAt)
   const proposalEnded = checkedAt > proposalEnd
   const periodNotStarted = checkedAt < proposalStart
-  const canManagePeriod =
-    admin ||
-    user?.activeAppointments.some(
-      (appointment) => appointment.positionCode === 'DEAN' && appointment.facultyId === facultyId,
-    )
+  const canManagePeriod = canManageFaculty(user, facultyId ?? 0)
 
   useEffect(() => {
     if (!expanded) return

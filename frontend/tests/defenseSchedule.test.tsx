@@ -48,6 +48,11 @@ vi.mock('../src/api/evaluation', () => ({
   },
 }))
 vi.mock('../src/api/lecturers', () => ({ lecturerApi: { list: mocks.lecturers } }))
+const academicManager = vi.hoisted(() => ({
+  roles: ['LECTURER'],
+  activeAppointments: [{ positionCode: 'DEAN', facultyId: 1, startsAt: '2020-01-01T00:00:00Z' }],
+}))
+vi.mock('../src/context/AuthContext', () => ({ useAuth: () => ({ user: academicManager }) }))
 vi.mock('../src/context/ToastContext', () => ({
   useToast: () => ({ showError: mocks.showError, showSuccess: mocks.showSuccess }),
 }))

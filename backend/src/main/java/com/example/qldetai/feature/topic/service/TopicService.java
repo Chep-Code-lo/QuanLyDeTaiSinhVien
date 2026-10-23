@@ -82,6 +82,8 @@ public class TopicService {
     private final NotificationService notificationService;
     private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
+    private final com.example.qldetai.feature.academic.service.AcademicReadScope readScope;
+    private final com.example.qldetai.feature.academic.service.AcademicAuthorization academicAuthorization;
     private final EntityManager entityManager;
 
     @Transactional(readOnly = true)
@@ -111,6 +113,9 @@ public class TopicService {
                     if (periodId != null)
                         conditions.add(cb.equal(root.get("period").get("id"), periodId));
                     if (status != null) conditions.add(cb.equal(root.get("status"), status));
+                    if (staff) {
+                        conditions.add(readScope.topics(actorId).toPredicate(root, query, cb));
+                    }
                     if (!staff) {
                         var membership = query.subquery(Long.class);
                         var member =
@@ -184,6 +189,9 @@ public class TopicService {
         Topic topic = requireTopic(id);
         User actor = requireUser(actorId);
         if (isAcademicStaff(actor)) {
+            if (!topicRepository.exists(readScope.topics(actorId).and((r, q, cb) -> cb.equal(r.get("id"), id)))) {
+                throw new AccessDeniedException("You cannot view this topic.");
+            }
             return toResponse(topic);
         }
         if (!hasRole(actor, RoleCode.STUDENT) || !canStudentView(topic, actorId)) {
@@ -214,7 +222,7 @@ public class TopicService {
         LocalDateTime now = LocalDateTime.now(clock);
         ProposalSource source = determineProposalSource(actor);
         Department department = resolveDepartment(actor);
-        if (!hasRole(actor, RoleCode.ADMIN) && !isProposalWindowOpen(period, now)) {
+        if (!isProposalWindowOpen(period, now)) {
             throw new BusinessRuleException(
                     "Topics can only be proposed during the proposal window.");
         }
@@ -261,6 +269,9 @@ public class TopicService {
         }
 
         Department department = requireActiveDepartment(request.departmentId());
+        if (!academicAuthorization.canManageDepartment(department.getId(), actorId)) {
+            throw new AccessDeniedException("You cannot manage this department.");
+        }
         if (!department.getFaculty().getId().equals(period.getFaculty().getId())) {
             throw new BusinessRuleException(
                     "Department must belong to the same faculty as the registration period.");
@@ -344,7 +355,7 @@ public class TopicService {
                         .orElseThrow(() -> new ResourceNotFoundException("Topic was not found."));
         User actor = requireUser(actorId);
         verifyVersion(topic, request.version());
-        ensureModerator(actor);
+        ensureModerator(actor, topic);
         if (topic.getStatus() != TopicStatus.APPROVED
                 && topic.getStatus() != TopicStatus.PUBLISHED) {
             throw new BusinessRuleException(
@@ -379,7 +390,7 @@ public class TopicService {
         Topic topic = requireTopic(id);
         User actor = requireUser(actorId);
         verifyVersion(topic, request.version());
-        ensureModerator(actor);
+        ensureModerator(actor, topic);
         if (topic.getStatus() == TopicStatus.PUBLISHED
                 || topic.getStatus() == TopicStatus.WITHDRAWN) {
             throw new BusinessRuleException(
@@ -426,7 +437,7 @@ public class TopicService {
         Topic topic = requireTopic(id);
         User actor = requireUser(actorId);
         verifyVersion(topic, request.version());
-        ensureModerator(actor);
+        ensureModerator(actor, topic);
         if (topic.getStatus() != TopicStatus.APPROVED) {
             throw new BusinessRuleException("Only approved topics can be published.");
         }
@@ -455,8 +466,7 @@ public class TopicService {
         Topic topic = requireTopic(id);
         User actor = requireUser(actorId);
         verifyVersion(topic, request.version());
-        if (!hasRole(actor, RoleCode.ADMIN)
-                && !topic.getProposedBy().getId().equals(actor.getId())) {
+        if (!topic.getProposedBy().getId().equals(actor.getId())) {
             throw new AccessDeniedException(
                     "Only the proposer or an administrator can withdraw this topic.");
         }
@@ -492,10 +502,10 @@ public class TopicService {
     }
 
     private ProposalSource determineProposalSource(User actor) {
-        if (lecturerRepository.findByUserId(actor.getId()).isPresent()) {
+        if (hasRole(actor, RoleCode.LECTURER) && lecturerRepository.findByUserId(actor.getId()).isPresent()) {
             return ProposalSource.LECTURER;
         }
-        if (studentRepository.findByUserId(actor.getId()).isPresent()) {
+        if (hasRole(actor, RoleCode.STUDENT) && studentRepository.findByUserId(actor.getId()).isPresent()) {
             return ProposalSource.STUDENT;
         }
         throw new AccessDeniedException(
@@ -615,8 +625,7 @@ public class TopicService {
     }
 
     private void ensureTopicEditor(Topic topic, User actor) {
-        if (!hasRole(actor, RoleCode.ADMIN)
-                && !topic.getProposedBy().getId().equals(actor.getId())) {
+        if (!topic.getProposedBy().getId().equals(actor.getId())) {
             throw new AccessDeniedException(
                     "Only the topic proposer or an administrator can edit this topic.");
         }
@@ -626,8 +635,8 @@ public class TopicService {
         }
     }
 
-    private void ensureModerator(User actor) {
-        if (!hasRole(actor, RoleCode.ADMIN) && !hasRole(actor, RoleCode.LECTURER)) {
+    private void ensureModerator(User actor, Topic topic) {
+        if (!academicAuthorization.canManageDepartment(topic.getDepartment().getId(), actor.getId())) {
             throw new AccessDeniedException(
                     "Only lecturers or administrators can moderate topics.");
         }

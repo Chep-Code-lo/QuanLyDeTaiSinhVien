@@ -61,6 +61,8 @@ public class RegistrationService {
     private final NotificationService notificationService;
     private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
+    private final com.example.qldetai.feature.academic.service.AcademicAuthorization academicAuthorization;
+    private final com.example.qldetai.feature.academic.service.AcademicReadScope readScope;
 
     @Transactional(readOnly = true)
     public PageResponse<TopicRegistrationResponse> list(
@@ -78,6 +80,20 @@ public class RegistrationService {
             registrations = topicRegistrationRepository.findAll(pageable);
         }
         return PageResponse.from(registrations.map(this::toResponse));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<TopicRegistrationResponse> list(Long periodId, RegistrationStatus status, int page, int size, Long actorId) {
+        var scope = readScope.registrations(actorId);
+        if (periodId != null) scope = scope.and((r, q, cb) -> cb.equal(r.get("period").get("id"), periodId));
+        if (status != null) scope = scope.and((r, q, cb) -> cb.equal(r.get("status"), status));
+        return PageResponse.from(topicRegistrationRepository.findAll(scope,
+                PageRequest.of(page, size, Sort.by("registeredAt").descending())).map(this::toResponse));
+    }
+
+    @Transactional(readOnly = true)
+    public boolean canRead(Long id, Long actorId) {
+        return topicRegistrationRepository.exists(readScope.registrations(actorId).and((r, q, cb) -> cb.equal(r.get("id"), id)));
     }
 
     @Transactional(readOnly = true)
@@ -153,6 +169,7 @@ public class RegistrationService {
             Long id, ReviewTopicRegistrationRequest request, Long actorId) {
         TopicRegistration registration = requireRegistrationForUpdate(id);
         User actor = requireReviewer(actorId);
+        academicAuthorization.requireDepartmentManagement(registration.getTopic().getDepartment().getId(), actorId);
         verifyVersion(registration, request.version());
         if (registration.getStatus() != RegistrationStatus.PENDING) {
             throw new BusinessRuleException("Only pending registrations can be reviewed.");
@@ -334,6 +351,7 @@ public class RegistrationService {
                         : registration.getReviewedBy().getFullName(),
                 registration.getReviewedAt(),
                 registration.getDecisionReason(),
-                registration.getVersion());
+                registration.getVersion(), registration.getTopic().getDepartment().getId(),
+                registration.getTopic().getFaculty().getId());
     }
 }

@@ -97,6 +97,7 @@ public class EvaluationService {
     private final UserRepository users;
     private final TopicSupervisorRepository supervisors;
     private final Clock clock;
+    private final com.example.qldetai.feature.academic.service.AcademicAuthorization academicAuthorization;
     private final EntityManager entityManager;
     private final NotificationService notifications;
     private final com.example.qldetai.feature.identity.repository.AcademicAppointmentRepository
@@ -330,6 +331,7 @@ public class EvaluationService {
                                 () ->
                                         new ResourceNotFoundException(
                                                 "Project assignment was not found."));
+        academicAuthorization.requireDepartmentManagement(assignment.getTopic().getDepartment().getId(), actorId);
         Rubric rubric = rubricEntity(request.rubricId());
         Lecturer lecturer =
                 lecturers

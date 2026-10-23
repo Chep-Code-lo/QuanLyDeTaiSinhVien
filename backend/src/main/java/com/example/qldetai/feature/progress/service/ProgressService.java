@@ -150,8 +150,7 @@ public class ProgressService {
                                 () ->
                                         new AccessDeniedException(
                                                 "Only lecturers can give feedback."));
-        if (!isSupervisor(s.getMilestone().getAssignment(), lecturer.getId())
-                && !hasAdminRole(actorId))
+        if (!isSupervisor(s.getMilestone().getAssignment(), lecturer.getId()))
             throw new AccessDeniedException("Only this topic's supervisor may give feedback.");
         ReportFeedback f = new ReportFeedback();
         f.setSubmission(s);

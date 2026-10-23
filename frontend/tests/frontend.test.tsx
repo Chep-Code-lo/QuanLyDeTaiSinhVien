@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
     fullName: 'Giảng viên thử nghiệm',
     roles: ['LECTURER', 'ADMIN'],
     lecturer: { id: 7 },
-    activeAppointments: [],
+    activeAppointments: [{ positionCode: 'DEAN', facultyId: 1, startsAt: '2020-01-01T00:00:00Z' }],
   },
   showError: vi.fn(),
   showSuccess: vi.fn(),
@@ -43,7 +43,9 @@ vi.mock('../src/context/AuthContext', () => ({
     user: mocks.user,
     hasRole: (role: string) => mocks.user.roles.includes(role),
     hasAnyRole: (roles: string[]) => roles.some((role) => mocks.user.roles.includes(role)),
-    hasAppointment: () => false,
+    hasAppointment: (position: string) =>
+      mocks.user.roles.includes('LECTURER') &&
+      mocks.user.activeAppointments.some((a) => a.positionCode === position),
     canAccessAcademicManagement: () => mocks.user.roles.includes('ADMIN'),
     logout: mocks.logout,
   }),

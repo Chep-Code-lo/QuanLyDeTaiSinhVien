@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,7 +18,11 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public interface TopicRegistrationRepository extends JpaRepository<TopicRegistration, Long> {
+public interface TopicRegistrationRepository extends JpaRepository<TopicRegistration, Long>, JpaSpecificationExecutor<TopicRegistration> {
+
+    @Override
+    @EntityGraph(attributePaths = {"period", "group", "topic", "registeredBy.user", "reviewedBy"})
+    Page<TopicRegistration> findAll(org.springframework.data.jpa.domain.Specification<TopicRegistration> scope, Pageable pageable);
 
     @Override
     @EntityGraph(attributePaths = {"period", "group", "topic", "registeredBy.user", "reviewedBy"})

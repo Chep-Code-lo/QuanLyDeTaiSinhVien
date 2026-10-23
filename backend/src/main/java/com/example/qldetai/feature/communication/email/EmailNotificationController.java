@@ -45,7 +45,7 @@ public class EmailNotificationController {
     @GetMapping("/notification-settings")
     // The service verifies ADMIN, active AcademicAppointment(DEAN), or lecturer
     // scope against database relations. Do not model DEAN as a synthetic role.
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<List<EmailNotificationSettingResponse>> listSettings(
             @RequestParam(required = false) NotificationScopeType scopeType,
             @RequestParam(required = false) Long scopeId,
@@ -54,7 +54,7 @@ public class EmailNotificationController {
     }
 
     @GetMapping("/notification-settings/recipients")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<RecipientCandidatesResponse> recipients(
             @RequestParam EmailNotificationEventType eventType,
             @RequestParam(required = false) NotificationScopeType scopeType,
@@ -75,7 +75,7 @@ public class EmailNotificationController {
     }
 
     @GetMapping("/notification-settings/{eventType}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<EmailNotificationSettingResponse> getSetting(
             @PathVariable EmailNotificationEventType eventType,
             @RequestParam(required = false) NotificationScopeType scopeType,
@@ -86,7 +86,7 @@ public class EmailNotificationController {
     }
 
     @PutMapping("/notification-settings/{eventType}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<EmailNotificationSettingResponse> updateSetting(
             @PathVariable EmailNotificationEventType eventType,
             @Valid @RequestBody UpdateNotificationSettingRequest request,
@@ -97,7 +97,7 @@ public class EmailNotificationController {
     }
 
     @PostMapping("/notification-settings/{eventType}/preview")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<EmailPreviewResponse> preview(
             @PathVariable EmailNotificationEventType eventType,
             @Valid @RequestBody PreviewNotificationSettingRequest request,
@@ -106,7 +106,7 @@ public class EmailNotificationController {
     }
 
     @PostMapping("/notification-settings/{eventType}/test")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<EmailTestQueuedResponse> test(
             @PathVariable EmailNotificationEventType eventType,
             @Valid @RequestBody SendTestEmailRequest request,
@@ -117,7 +117,7 @@ public class EmailNotificationController {
     }
 
     @GetMapping("/email-logs")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<PageResponse<EmailLogResponse>> listLogs(
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
@@ -126,7 +126,7 @@ public class EmailNotificationController {
     }
 
     @GetMapping("/email-logs/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<EmailLogDetailResponse> getLog(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(emailLogService.get(principal.id(), id));

@@ -46,8 +46,9 @@ public class ProjectAssignmentController {
             @RequestParam(required = false) Long periodId,
             @RequestParam(required = false) AssignmentStatus status,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(projectAssignmentService.list(periodId, status, page, size));
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(projectAssignmentService.list(periodId, status, page, size, principal.id()));
     }
 
     @GetMapping("/supervised")
@@ -68,14 +69,14 @@ public class ProjectAssignmentController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('LECTURER')")
-    public ApiResponse<ProjectAssignmentResponse> get(@PathVariable Long id) {
+    public ApiResponse<ProjectAssignmentResponse> get(@PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
+        if (!projectAssignmentService.canRead(id, principal.id())) throw new org.springframework.security.access.AccessDeniedException("You cannot view this record.");
         return ApiResponse.success(projectAssignmentService.get(id));
     }
 
     @PostMapping
     @PreAuthorize(
-            "hasRole('ADMIN') or"
-                    + " @registrationAuthorization.canManageRegistration(#request.registrationId,"
+            "@registrationAuthorization.canManageRegistration(#request.registrationId,"
                     + " authentication)")
     public ResponseEntity<ApiResponse<ProjectAssignmentResponse>> create(
             @Valid @RequestBody CreateAssignmentRequest request,
@@ -88,7 +89,7 @@ public class ProjectAssignmentController {
 
     @PatchMapping("/{id}/status")
     @PreAuthorize(
-            "hasRole('ADMIN') or @projectAuthorization.canManageAssignment(#id, authentication)")
+            "@projectAuthorization.canManageAssignment(#id, authentication)")
     public ApiResponse<ProjectAssignmentResponse> updateStatus(
             @PathVariable Long id,
             @Valid @RequestBody UpdateAssignmentStatusRequest request,

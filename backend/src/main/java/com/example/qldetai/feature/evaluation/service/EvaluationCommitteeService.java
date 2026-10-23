@@ -42,6 +42,7 @@ public class EvaluationCommitteeService {
     private final RegistrationPeriodRepository periods;
     private final LecturerRepository lecturers;
     private final EvaluationActorAccess actorAccess;
+    private final com.example.qldetai.feature.academic.service.AcademicAuthorization academicAuthorization;
 
     @Transactional(readOnly = true)
     public PageResponse<EvaluationCommitteeResponse> listCommittees(
@@ -98,6 +99,7 @@ public class EvaluationCommitteeService {
                                         new ResourceNotFoundException(
                                                 "Registration period was not found."));
 
+        academicAuthorization.requirePeriodManagement(period.getId(), actorId);
         EvaluationCommittee committee = new EvaluationCommittee();
         committee.setPeriod(period);
         committee.setFaculty(period.getFaculty());
@@ -114,6 +116,7 @@ public class EvaluationCommitteeService {
     public void addMember(Long committeeId, AddCommitteeMemberRequest request, Long actorId) {
         actorAccess.manager(actorId);
         EvaluationCommittee committee = committee(committeeId);
+        academicAuthorization.requirePeriodManagement(committee.getPeriod().getId(), actorId);
         if (committee.getStatus() != CommitteeStatus.DRAFT) {
             throw new BusinessRuleException("Only a draft committee can be changed.");
         }

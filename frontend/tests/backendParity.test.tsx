@@ -169,7 +169,21 @@ beforeAll(() => {
 beforeEach(() => {
   for (const value of Object.values(mocks))
     if (typeof value === 'function' && 'mockReset' in value) value.mockReset()
-  mocks.user = { ...lecturer(), roles: ['ADMIN', 'LECTURER'] }
+  mocks.user = {
+    ...lecturer(),
+    roles: ['ADMIN', 'LECTURER'],
+    activeAppointments: [
+      {
+        id: 1,
+        lecturerId: 1,
+        lecturerCode: 'GV01',
+        lecturerName: 'GV A',
+        facultyId: 1,
+        positionCode: 'DEAN',
+        startsAt: '2020-01-01T00:00:00Z',
+      },
+    ],
+  }
   mocks.faculties.mockResolvedValue([
     { id: 1, code: 'CNTT', name: 'Công nghệ thông tin', active: true },
   ])

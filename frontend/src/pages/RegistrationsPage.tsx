@@ -11,6 +11,7 @@ import { StatusBadge } from '../components/StatusBadge'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { formatDateTime } from '../utils/dateTime'
+import { canManageDepartment } from '../utils/managementAccess'
 import { registrationWindowError } from '../utils/registrationWindow'
 import type {
   RegistrationPeriodResponse,
@@ -333,22 +334,24 @@ export function RegistrationsPage({ embedded = false }: { embedded?: boolean }) 
                     </td>
                     <td>{item.decisionReason || '—'}</td>
                     <td>
-                      {reviewer && item.status === 'PENDING' && (
-                        <>
-                          <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => review(item, 'APPROVED')}
-                          >
-                            Duyệt
-                          </button>{' '}
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => review(item, 'REJECTED')}
-                          >
-                            Từ chối
-                          </button>
-                        </>
-                      )}
+                      {reviewer &&
+                        canManageDepartment(user, item.departmentId ?? 0, item.facultyId ?? 0) &&
+                        item.status === 'PENDING' && (
+                          <>
+                            <button
+                              className="btn btn-primary btn-sm"
+                              onClick={() => review(item, 'APPROVED')}
+                            >
+                              Duyệt
+                            </button>{' '}
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => review(item, 'REJECTED')}
+                            >
+                              Từ chối
+                            </button>
+                          </>
+                        )}
                       {canWithdraw(item) && (
                         <button className="btn btn-secondary btn-sm" onClick={() => withdraw(item)}>
                           Rút

@@ -64,7 +64,7 @@ public class TopicController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER','STUDENT')")
+    @PreAuthorize("hasAnyRole('LECTURER','STUDENT')")
     public ResponseEntity<ApiResponse<TopicResponse>> create(
             @Valid @RequestBody CreateTopicRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -75,7 +75,7 @@ public class TopicController {
 
     @PostMapping("/for-registration")
     @PreAuthorize(
-            "hasRole('ADMIN') or @academicAuthorization.canManageDepartment(#request.departmentId, authentication)")
+            "@academicAuthorization.canManageDepartment(#request.departmentId, authentication)")
     public ResponseEntity<ApiResponse<TopicResponse>> createForRegistration(
             @Valid @RequestBody CreateRegistrationTopicRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -85,7 +85,7 @@ public class TopicController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER','STUDENT')")
+    @PreAuthorize("hasAnyRole('LECTURER','STUDENT')")
     public ApiResponse<TopicResponse> update(
             @PathVariable Long id,
             @Valid @RequestBody UpdateTopicRequest request,
@@ -95,7 +95,7 @@ public class TopicController {
     }
 
     @PutMapping("/{id}/supervisors")
-    @PreAuthorize("hasRole('ADMIN') or @topicAuthorization.canManageTopic(#id, authentication)")
+    @PreAuthorize("@topicAuthorization.canManageTopic(#id, authentication)")
     public ApiResponse<TopicResponse> assignSupervisors(
             @PathVariable Long id,
             @Valid @RequestBody AssignSupervisorsRequest request,
@@ -106,7 +106,7 @@ public class TopicController {
     }
 
     @PatchMapping("/{id}/review")
-    @PreAuthorize("hasRole('ADMIN') or @topicAuthorization.canManageTopic(#id, authentication)")
+    @PreAuthorize("@topicAuthorization.canManageTopic(#id, authentication)")
     public ApiResponse<TopicResponse> review(
             @PathVariable Long id,
             @Valid @RequestBody ReviewTopicRequest request,
@@ -117,7 +117,7 @@ public class TopicController {
     }
 
     @PatchMapping("/{id}/publish")
-    @PreAuthorize("hasRole('ADMIN') or @topicAuthorization.canManageTopic(#id, authentication)")
+    @PreAuthorize("@topicAuthorization.canManageTopic(#id, authentication)")
     public ApiResponse<TopicResponse> publish(
             @PathVariable Long id,
             @Valid @RequestBody PublishTopicRequest request,
@@ -127,7 +127,7 @@ public class TopicController {
     }
 
     @PatchMapping("/{id}/withdraw")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER','STUDENT')")
+    @PreAuthorize("hasAnyRole('LECTURER','STUDENT')")
     public ApiResponse<TopicResponse> withdraw(
             @PathVariable Long id,
             @Valid @RequestBody WithdrawTopicRequest request,

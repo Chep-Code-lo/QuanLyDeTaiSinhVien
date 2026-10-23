@@ -26,6 +26,7 @@ type MilestoneBoardProps = {
   error?: string | null
   onRetry?: () => void
   hasAssignment: boolean
+  canFeedback?: boolean
   canManage: boolean
   canEdit: boolean
   reminding: boolean
@@ -39,6 +40,7 @@ export function MilestoneBoard({
   loading,
   hasAssignment,
   canManage,
+  canFeedback = canManage,
   canEdit,
   reminding,
   onEdit,
@@ -269,7 +271,7 @@ export function MilestoneBoard({
                                 <strong>
                                   Phiên bản #{report.versionNo} · {report.submittedByName}
                                 </strong>
-                                {canManage && (
+                                {canFeedback && (
                                   <button
                                     className="milestone-board__button"
                                     type="button"

@@ -15,7 +15,7 @@ export function TopicsPage({ embedded = false }: { embedded?: boolean }) {
   const { showError } = useToast()
   const student = hasRole('STUDENT')
   const canCreateTopic =
-    !student && (hasRole('ADMIN') || hasAppointment('DEAN') || hasAppointment('DEPARTMENT_HEAD'))
+    !student && hasRole('LECTURER') && (hasAppointment('DEAN') || hasAppointment('DEPARTMENT_HEAD'))
   const [topics, setTopics] = useState<TopicResponse[]>([])
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)

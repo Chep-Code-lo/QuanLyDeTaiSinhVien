@@ -46,6 +46,7 @@ public class CommitteeConfigurationService {
     private final RubricRepository rubrics;
     private final LecturerRepository lecturers;
     private final EvaluationActorAccess actorAccess;
+    private final com.example.qldetai.feature.academic.service.AcademicAuthorization academicAuthorization;
     private final EvaluationCommitteeService committeeService;
     private final EntityManager entityManager;
 
@@ -53,6 +54,7 @@ public class CommitteeConfigurationService {
     @BusinessAudit(action = "COMMITTEE_CONFIGURE", entityType = "EVALUATION_COMMITTEE")
     public EvaluationCommitteeResponse save(Long id, SaveCommitteeRequest request, Long actorId) {
         actorAccess.manager(actorId);
+        academicAuthorization.requirePeriodManagement(request.periodId(), actorId);
         RegistrationPeriod period =
                 periods.findById(request.periodId())
                         .orElseThrow(

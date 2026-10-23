@@ -17,14 +17,16 @@ public class RegistrationAuthorization {
     private final TopicRegistrationRepository topicRegistrationRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final TopicAuthorization topicAuthorization;
+    private final RegistrationService registrationService;
 
     public RegistrationAuthorization(
             TopicRegistrationRepository topicRegistrationRepository,
             GroupMemberRepository groupMemberRepository,
-            TopicAuthorization topicAuthorization) {
+            TopicAuthorization topicAuthorization, RegistrationService registrationService) {
         this.topicRegistrationRepository = topicRegistrationRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.topicAuthorization = topicAuthorization;
+        this.registrationService = registrationService;
     }
 
     public boolean canManageRegistration(Long registrationId, Authentication authentication) {
@@ -44,7 +46,7 @@ public class RegistrationAuthorization {
         }
         if (principal.roles().contains(RoleCode.ADMIN)
                 || principal.roles().contains(RoleCode.LECTURER)) {
-            return true;
+            return registrationService.canRead(registrationId, principal.id());
         }
         return topicRegistrationRepository
                 .findById(registrationId)

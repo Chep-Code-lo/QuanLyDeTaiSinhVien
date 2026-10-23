@@ -45,8 +45,9 @@ public class RegistrationController {
             @RequestParam(required = false) Long periodId,
             @RequestParam(required = false) RegistrationStatus status,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(registrationService.list(periodId, status, page, size));
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(registrationService.list(periodId, status, page, size, principal.id()));
     }
 
     @GetMapping("/mine")
@@ -79,7 +80,7 @@ public class RegistrationController {
 
     @PatchMapping("/{id}/review")
     @PreAuthorize(
-            "hasRole('ADMIN') or @registrationAuthorization.canManageRegistration(#id,"
+            "@registrationAuthorization.canManageRegistration(#id,"
                     + " authentication)")
     public ApiResponse<TopicRegistrationResponse> review(
             @PathVariable Long id,

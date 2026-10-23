@@ -35,6 +35,12 @@ public class ProgressAuthorization {
                 .orElse(false);
     }
 
+    public boolean canSuperviseSubmission(Long submissionId, Authentication authentication) {
+        return reportSubmissionRepository.findById(submissionId)
+                .map(s -> projectAuthorization.canSuperviseAssignment(s.getMilestone().getAssignment().getId(), authentication))
+                .orElse(false);
+    }
+
     public boolean canManageSubmission(Long submissionId, Authentication authentication) {
         return reportSubmissionRepository
                 .findById(submissionId)

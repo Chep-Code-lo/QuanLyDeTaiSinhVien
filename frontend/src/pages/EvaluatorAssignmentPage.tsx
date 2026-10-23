@@ -10,6 +10,8 @@ import { DefenseGradingDialog } from '../components/DefenseGradingDialog'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
 import { useToast } from '../context/ToastContext'
+import { useAuth } from '../context/AuthContext'
+import { academicAppointments, canManageFaculty } from '../utils/managementAccess'
 import { formatDateTime } from '../utils/dateTime'
 import { evaluatorRoleLabel } from '../utils/displayLabels'
 import type { PageResponse } from '../types/api'
@@ -60,10 +62,13 @@ const modeLabels = {
 }
 
 export function EvaluatorAssignmentPage() {
+  const { user } = useAuth()
   const { showSuccess, showError } = useToast()
   const [periods, setPeriods] = useState<RegistrationPeriodResponse[]>([])
   const [periodId, setPeriodId] = useState<number | null>(null)
-  const [mode, setMode] = useState<AssessmentComponentType | 'SCHEDULE'>('COMMITTEE')
+  const [mode, setMode] = useState<AssessmentComponentType | 'SCHEDULE'>(() =>
+    academicAppointments(user).some((a) => a.positionCode === 'DEAN') ? 'COMMITTEE' : 'REVIEW',
+  )
   const [projects, setProjects] = useState<ProjectAssignmentResponse[]>([])
   const [components, setComponents] = useState<AssessmentComponentResponse[]>([])
   const [unlockedReviews, setUnlockedReviews] = useState<AssessmentComponentResponse[]>([])
@@ -130,11 +135,15 @@ export function EvaluatorAssignmentPage() {
   const minMembers = activePeriod?.minCommitteeMembers ?? 3
   const assigningTopics = !isCommittee || committeeTask === 'ASSIGN'
   const availableComponents = components.filter((item) => item.componentType === mode)
-  const modes: (AssessmentComponentType | 'SCHEDULE')[] = components.some(
+  const baseModes: (AssessmentComponentType | 'SCHEDULE')[] = components.some(
     (item) => item.componentType === 'OTHER',
   )
     ? ['REVIEW', 'COMMITTEE', 'SCHEDULE', 'OTHER']
     : ['REVIEW', 'COMMITTEE', 'SCHEDULE']
+  const modes = baseModes.filter(
+    (item) =>
+      canManageFaculty(user, activePeriod?.facultyId ?? 0) || item === 'REVIEW' || item === 'OTHER',
+  )
   const rubric = rubrics.find((item) => item.id === rubricId)
   const eligibleProjects = projects.filter(
     (project) =>
@@ -232,11 +241,14 @@ export function EvaluatorAssignmentPage() {
     allPages((page) => academicApi.getRegistrationPeriods(undefined, page, 100))
       .then((result) => {
         if (!live) return
-        setPeriods(result)
-        setPeriodId((current) =>
-          result.some((item) => item.id === current) ? current : (result[0]?.id ?? null),
+        const scoped = result.filter((period) =>
+          academicAppointments(user).some((a) => a.facultyId === period.facultyId),
         )
-        if (!result.length) setLoading(false)
+        setPeriods(scoped)
+        setPeriodId((current) =>
+          scoped.some((item) => item.id === current) ? current : (scoped[0]?.id ?? null),
+        )
+        if (!scoped.length) setLoading(false)
       })
       .catch(() => {
         if (live) {
@@ -247,7 +259,7 @@ export function EvaluatorAssignmentPage() {
     return () => {
       live = false
     }
-  }, [reload])
+  }, [reload, user])
 
   useEffect(() => {
     if (!periodId) return
@@ -488,7 +500,7 @@ export function EvaluatorAssignmentPage() {
 
   return (
     <div className="evaluator-assignment-page">
-      <PageHeader title="Phân công hội đồng" />
+      <PageHeader title="Phân công giảng viên" />
       <div className="ea-period">
         <label htmlFor="ea-period">Đợt đăng ký</label>
         <AnimatedSelect

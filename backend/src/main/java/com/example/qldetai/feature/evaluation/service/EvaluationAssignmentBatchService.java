@@ -5,14 +5,12 @@ import com.example.qldetai.exception.ResourceNotFoundException;
 import com.example.qldetai.feature.evaluation.dto.EvaluationDtos.*;
 import com.example.qldetai.feature.evaluation.repository.EvaluationAssignmentRepository;
 import com.example.qldetai.feature.evaluation.repository.RubricRepository;
-import com.example.qldetai.feature.identity.domain.RoleCode;
 import com.example.qldetai.feature.project.repository.ProjectAssignmentRepository;
 import com.example.qldetai.feature.project.service.ProjectAuthorization;
 
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,9 +36,6 @@ public class EvaluationAssignmentBatchService {
             throw new BusinessRuleException(
                     "Mỗi lần chỉ phân công từ 1 đến 100 giảng viên/đề tài.");
         }
-        boolean admin =
-                access.user(actorId).getUserRoles().stream()
-                        .anyMatch(role -> role.getRole().getCode() == RoleCode.ADMIN);
         int assigned = 0;
         int skipped = 0;
         for (CreateEvaluationRequest request :
@@ -49,10 +44,7 @@ public class EvaluationAssignmentBatchService {
                                 Comparator.comparing(CreateEvaluationRequest::assignmentId)
                                         .thenComparing(CreateEvaluationRequest::lecturerId))
                         .toList()) {
-            if (!admin
-                    && !authorization.canManageAssignment(
-                            request.assignmentId(),
-                            SecurityContextHolder.getContext().getAuthentication())) {
+            if (!authorization.canManageAssignment(request.assignmentId(), actorId)) {
                 throw new AccessDeniedException("Bạn không có quyền phân công đề tài này.");
             }
             projects.findByIdForUpdate(request.assignmentId())

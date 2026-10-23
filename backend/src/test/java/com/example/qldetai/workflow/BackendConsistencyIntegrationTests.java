@@ -67,6 +67,9 @@ import java.util.concurrent.TimeUnit;
         })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class BackendConsistencyIntegrationTests {
+    @org.springframework.beans.factory.annotation.Autowired
+    private jakarta.persistence.EntityManager academicFixtureEntityManager;
+
     @Autowired GroupService groups;
     @Autowired RegistrationService registrations;
     @Autowired ProjectAssignmentService projects;
@@ -161,6 +164,7 @@ class BackendConsistencyIntegrationTests {
                     department.setActive(true);
                     departments.save(department);
                     admin = user(RoleCode.ADMIN);
+        com.example.qldetai.support.AcademicManagerFixture.appointDean(academicFixtureEntityManager, admin, department, now());
                     leaderA = student();
                     leaderB = student();
                     member = student();

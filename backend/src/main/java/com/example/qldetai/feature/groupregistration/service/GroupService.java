@@ -55,6 +55,7 @@ public class GroupService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final Clock clock;
+    private final com.example.qldetai.feature.academic.service.AcademicReadScope readScope;
 
     @Transactional(readOnly = true)
     public PageResponse<StudentGroupResponse> list(Long periodId, int page, int size) {
@@ -81,6 +82,37 @@ public class GroupService {
                                 toResponse(
                                         group,
                                         membersByGroup.getOrDefault(group.getId(), List.of()))));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<StudentGroupResponse> list(Long periodId, int page, int size, Long actorId) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        var scope = readScope.groups(actorId);
+        if (periodId != null) scope = scope.and((r, q, cb) -> cb.equal(r.get("period").get("id"), periodId));
+        Page<StudentGroup> groups = studentGroupRepository.findAll(scope, pageable);
+        Map<Long, List<GroupMember>> membersByGroup =
+                groups.isEmpty()
+                        ? Map.of()
+                        : groupMemberRepository
+                                .findByGroupIdInAndLeftAtIsNullOrderBySlotNoAsc(
+                                        groups.getContent().stream()
+                                                .map(StudentGroup::getId)
+                                                .toList())
+                                .stream()
+                                .collect(
+                                        java.util.stream.Collectors.groupingBy(
+                                                member -> member.getGroup().getId()));
+        return PageResponse.from(
+                groups.map(
+                        group ->
+                                toResponse(
+                                        group,
+                                        membersByGroup.getOrDefault(group.getId(), List.of()))));
+    }
+
+    @Transactional(readOnly = true)
+    public boolean canRead(Long id, Long actorId) {
+        return studentGroupRepository.exists(readScope.groups(actorId).and((r, q, cb) -> cb.equal(r.get("id"), id)));
     }
 
     @Transactional(readOnly = true)

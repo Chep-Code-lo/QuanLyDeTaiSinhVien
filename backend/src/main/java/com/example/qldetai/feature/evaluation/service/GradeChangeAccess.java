@@ -44,7 +44,7 @@ public class GradeChangeAccess {
                         .orElse(false);
         LocalDateTime now = LocalDateTime.now(clock);
         return (root, query, cb) -> {
-            if (admin) return cb.conjunction();
+            if (admin && includeParticipants) return cb.conjunction();
             var assignment = root.get("sheet").get("evaluation").get("assignment");
             var appointments = query.subquery(Long.class);
             var appointment = appointments.from(AcademicAppointment.class);

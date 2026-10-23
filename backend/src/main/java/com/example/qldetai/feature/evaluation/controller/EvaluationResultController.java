@@ -76,7 +76,7 @@ public class EvaluationResultController {
 
     @PostMapping("/results/{id}/publish")
     @PreAuthorize(
-            "hasRole('ADMIN') or @evaluationAuthorization.canManageResult(#id, authentication)")
+            "@evaluationAuthorization.canManageResult(#id, authentication)")
     public ApiResponse<ResultResponse> publish(
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success("Đã công bố kết quả.", service.publish(id, principal.id()));

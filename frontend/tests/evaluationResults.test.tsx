@@ -3,6 +3,10 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import userEvent from '@testing-library/user-event'
 import { EvaluationResultsPage } from '../src/pages/EvaluationResultsPage'
 
+vi.mock('../src/context/AuthContext', () => ({
+  useAuth: () => ({ user: { roles: ['ADMIN'], activeAppointments: [] } }),
+}))
+
 const mocks = vi.hoisted(() => ({
   projects: vi.fn(),
   results: vi.fn(),

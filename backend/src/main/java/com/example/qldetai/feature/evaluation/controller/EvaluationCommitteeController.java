@@ -42,7 +42,7 @@ public class EvaluationCommitteeController {
 
     @PostMapping("/evaluation-committees/configuration")
     @PreAuthorize(
-            "hasRole('ADMIN') or @academicAuthorization.canManagePeriod(#request.periodId, authentication)")
+            "@academicAuthorization.canManagePeriod(#request.periodId, authentication)")
     public ApiResponse<EvaluationCommitteeResponse> createConfiguration(
             @Valid @RequestBody SaveCommitteeRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -51,7 +51,7 @@ public class EvaluationCommitteeController {
 
     @PutMapping("/evaluation-committees/{id}/configuration")
     @PreAuthorize(
-            "hasRole('ADMIN') or @evaluationAuthorization.canManageCommittee(#id, authentication)")
+            "@evaluationAuthorization.canManageCommittee(#id, authentication)")
     public ApiResponse<EvaluationCommitteeResponse> updateConfiguration(
             @PathVariable Long id,
             @Valid @RequestBody SaveCommitteeRequest request,
@@ -71,7 +71,7 @@ public class EvaluationCommitteeController {
 
     @PostMapping("/evaluation-committees")
     @PreAuthorize(
-            "hasRole('ADMIN') or @academicAuthorization.canManagePeriod(#request.periodId,"
+            "@academicAuthorization.canManagePeriod(#request.periodId,"
                     + " authentication)")
     public ResponseEntity<ApiResponse<Long>> committee(
             @Valid @RequestBody CreateCommitteeRequest request,
@@ -83,7 +83,7 @@ public class EvaluationCommitteeController {
 
     @PostMapping("/evaluation-committees/{id}/members")
     @PreAuthorize(
-            "hasRole('ADMIN') or @evaluationAuthorization.canManageCommittee(#id, authentication)")
+            "@evaluationAuthorization.canManageCommittee(#id, authentication)")
     public ApiResponse<Void> member(
             @PathVariable Long id,
             @Valid @RequestBody AddCommitteeMemberRequest request,

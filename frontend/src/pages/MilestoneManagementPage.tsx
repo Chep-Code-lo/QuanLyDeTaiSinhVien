@@ -1,7 +1,10 @@
 import { parseUtcDateTime, toLocalDateTimeInput } from '../utils/dateTime'
 import { DateTimeInput } from '../components/DateTimeInput'
 import { AnimatedSelect } from '../components/AnimatedSelect'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
+import { useRemoteData } from '../hooks/useRemoteData'
+import { topicApi } from '../api/topics'
+import { canManageDepartment, hasAcademicLeadership } from '../utils/managementAccess'
 import { academicApi } from '../api/academic'
 import { allPages } from '../api/student'
 import { milestoneApi } from '../api/milestones'
@@ -19,7 +22,7 @@ import type {
 } from '../types/domain'
 
 export const MilestoneManagementPage: React.FC = () => {
-  const { hasAnyRole } = useAuth()
+  const { user } = useAuth()
   const { showSuccess, showError } = useToast()
 
   const [assignments, setAssignments] = useState<ProjectAssignmentResponse[]>([])
@@ -234,16 +237,32 @@ export const MilestoneManagementPage: React.FC = () => {
     }
   }
 
-  const isLecturerOrAdmin = hasAnyRole(['LECTURER', 'ADMIN'])
   const selectedAssignment = assignments.find(
     (assignment) => assignment.id === selectedAssignmentId,
   )
+
+  const loadTopic = useCallback(
+    () => (selectedAssignment ? topicApi.get(selectedAssignment.topicId) : Promise.resolve(null)),
+    [selectedAssignment],
+  )
+  const { data: selectedTopic } = useRemoteData(loadTopic)
+  const isLecturerOrAdmin =
+    !!selectedTopic &&
+    (!!user?.roles.includes('ADMIN') ||
+      canManageDepartment(user, selectedTopic.departmentId, selectedTopic.facultyId))
+  const canFeedback =
+    !!user?.roles.includes('LECTURER') &&
+    !!selectedTopic?.supervisors.some((supervisor) => supervisor.lecturerId === user.lecturer?.id)
 
   return (
     <div className="milestone-page">
       <div className="page-header">
         <div>
-          <h1>Tiến độ &amp; Mốc báo cáo</h1>
+          <h1>
+            {user?.roles.includes('LECTURER') && !hasAcademicLeadership(user)
+              ? 'Tiến độ & Báo cáo'
+              : 'Tiến độ & Mốc báo cáo'}
+          </h1>
         </div>
       </div>
 
@@ -305,6 +324,7 @@ export const MilestoneManagementPage: React.FC = () => {
         onRetry={() => setMilestoneReload((value) => value + 1)}
         hasAssignment={!!selectedAssignmentId}
         canManage={isLecturerOrAdmin}
+        canFeedback={canFeedback}
         canEdit={selectedAssignment?.status === 'IN_PROGRESS'}
         reminding={reminding}
         onEdit={handleEditMilestone}

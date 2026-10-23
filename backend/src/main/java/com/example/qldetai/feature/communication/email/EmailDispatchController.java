@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/v1")
-@PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+@PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 public class EmailDispatchController {
     private final EmailDispatchService service;

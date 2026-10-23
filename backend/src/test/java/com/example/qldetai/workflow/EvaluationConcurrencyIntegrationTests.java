@@ -92,6 +92,9 @@ import java.util.Set;
         properties =
                 "spring.datasource.url=jdbc:h2:mem:evaluation-concurrency;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1")
 class EvaluationConcurrencyIntegrationTests {
+    @org.springframework.beans.factory.annotation.Autowired
+    private jakarta.persistence.EntityManager academicFixtureEntityManager;
+
     @DynamicPropertySource
     static void isolatedMysql(DynamicPropertyRegistry properties) {
         String url = System.getProperty("race.test.mysql.url");
@@ -173,6 +176,7 @@ class EvaluationConcurrencyIntegrationTests {
                             department = createDepartment(faculty, "KTPM");
                             semester = createSemester();
                             admin = createUser("admin", "Backend 2 Admin", Set.of(RoleCode.ADMIN));
+        com.example.qldetai.support.AcademicManagerFixture.appointDean(academicFixtureEntityManager, admin, department, LocalDateTime.now(clock));
                             lecturerOne = createLecturer("GV01", "Giảng viên 1");
                             lecturerTwo = createLecturer("GV02", "Giảng viên 2");
                             lecturerThree = createLecturer("GV03", "Giảng viên 3");

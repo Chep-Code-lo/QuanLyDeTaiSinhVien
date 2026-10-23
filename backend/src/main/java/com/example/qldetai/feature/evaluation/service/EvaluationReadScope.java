@@ -69,7 +69,6 @@ public class EvaluationReadScope {
                             managed(defense.get("assignment").get("topic"), active, cb));
             return cb.or(
                     member(root, actorId, query, cb),
-                    cb.equal(root.get("createdBy").get("id"), actorId),
                     deanFaculties.isEmpty()
                             ? cb.disjunction()
                             : root.get("faculty").get("id").in(deanFaculties),

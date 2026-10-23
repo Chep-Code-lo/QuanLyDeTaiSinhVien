@@ -2,6 +2,7 @@ import { useEffect, useRef, type UIEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { navigationGroups, navigationItems } from '../config/navigation'
 import { useAuth } from '../context/AuthContext'
+import { hasAcademicLeadership } from '../utils/managementAccess'
 
 type SidebarProps = { onNavigate: () => void }
 
@@ -37,6 +38,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     if (item.requireAcademicManagement && !canAccessAcademicManagement()) {
       return false
     }
+    if (item.requireAcademicLeadership && !hasAcademicLeadership(user)) return false
 
     if (item.roles && item.roles.length > 0) {
       if (!hasAnyRole(item.roles)) return false
@@ -68,7 +70,11 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       </Link>
       <nav className="sidebar__nav" aria-label="Điều hướng chính" onScroll={handleNavScroll}>
         {navigationGroups.map((group) => {
-          const items = filteredItems.filter((item) => item.group === group.id)
+          const adminOnly = user?.roles.includes('ADMIN') && !user.roles.includes('LECTURER')
+          const items = filteredItems.filter(
+            (item) =>
+              (adminOnly && item.group === 'evaluation' ? 'projects' : item.group) === group.id,
+          )
           if (!items.length) return null
           return (
             <div
@@ -78,7 +84,17 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               aria-labelledby={`nav-group-${group.id}`}
             >
               <p id={`nav-group-${group.id}`} className="sidebar__label">
-                {group.label}
+                {group.id === 'projects' &&
+                user?.roles.includes('ADMIN') &&
+                !user.roles.includes('LECTURER')
+                  ? 'Giám sát học thuật'
+                  : group.id === 'projects' &&
+                      user?.roles.includes('LECTURER') &&
+                      !hasAcademicLeadership(user)
+                    ? 'Đề tài & hướng dẫn'
+                    : group.id === 'management' && !user?.roles.includes('ADMIN')
+                      ? 'Quản lý khoa'
+                      : group.label}
               </p>
               {items.map((item) => {
                 const Icon = item.icon
@@ -99,7 +115,23 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                     <span className="sidebar__icon" aria-hidden="true">
                       <Icon size={18} strokeWidth={1.8} />
                     </span>
-                    <span className="sidebar__text">{item.label}</span>
+                    <span className="sidebar__text">
+                      {item.to === '/progress' &&
+                      user?.roles.includes('LECTURER') &&
+                      !hasAcademicLeadership(user)
+                        ? 'Tiến độ & Báo cáo'
+                        : item.to === '/topic-workflow' && !hasAcademicLeadership(user)
+                          ? 'Đề xuất đề tài'
+                          : item.to === '/groups' &&
+                              user?.roles.includes('LECTURER') &&
+                              !hasAcademicLeadership(user)
+                            ? 'Nhóm hướng dẫn'
+                            : item.to === '/evaluation-results' && !hasAcademicLeadership(user)
+                              ? user?.roles.includes('ADMIN')
+                                ? 'Tổng hợp kết quả'
+                                : 'Kết quả đánh giá'
+                              : item.label}
+                    </span>
                   </button>
                 )
               })}
