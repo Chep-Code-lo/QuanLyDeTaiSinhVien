@@ -1670,6 +1670,49 @@ class ProjectLifecycleIntegrationTests {
         }
     }
 
+    @Test
+    void supervisedProjectsIncludeOnlyMyCurrentGroupsAndCurrentMembers(@Autowired MockMvc mvc)
+            throws Exception {
+        var project = createAssignedProject("supervised-project", leaderStudent, secondStudent);
+        for (var supervisor : List.of(lecturerOne, lecturerTwo)) {
+            mvc.perform(get("/api/v1/project-assignments/supervised")
+                            .with(user(UserPrincipal.from(supervisor.getUser()))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.totalElements").value(1))
+                    .andExpect(jsonPath("$.data.content[0].project.id").value(project.id()))
+                    .andExpect(jsonPath("$.data.content[0].students.length()").value(2))
+                    .andExpect(jsonPath("$.data.content[0].students[0].studentCode")
+                            .value(leaderStudent.getStudentCode()));
+        }
+        mvc.perform(get("/api/v1/project-assignments/supervised")
+                        .with(user(UserPrincipal.from(lecturerThree.getUser()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+        mvc.perform(get("/api/v1/project-assignments/supervised")
+                        .with(user(UserPrincipal.from(leaderStudent.getUser()))))
+                .andExpect(status().isForbidden());
+
+        var member = groupMemberRepository.findByGroupIdAndStudentIdAndLeftAtIsNull(
+                project.groupId(), secondStudent.getId()).orElseThrow();
+        member.setLeftAt(nowUtc());
+        groupMemberRepository.saveAndFlush(member);
+        var remaining = projectAssignmentService.listSupervised(lecturerOne.getUser().getId(), 0, 10);
+        assertThat(remaining.content().getFirst().students()).hasSize(1);
+        assertThat(remaining.content().getFirst().students().getFirst().studentId())
+                .isEqualTo(leaderStudent.getId());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"COMPLETED", "CANCELLED"})
+    void supervisedProjectsExcludeFinishedAssignments(AssignmentStatus status) {
+        var project = createAssignedProject("finished-supervision", leaderStudent, secondStudent);
+        projectAssignmentService.updateStatus(project.id(),
+                new com.example.qldetai.feature.project.dto.ProjectDtos.UpdateAssignmentStatusRequest(
+                        project.version(), status), admin.getId());
+        assertThat(projectAssignmentService.listSupervised(lecturerOne.getUser().getId(), 0, 10).content())
+                .isEmpty();
+    }
+
     private TopicResponse createPublishedTopic(String code) {
         TopicResponse created =
                 topicService.create(

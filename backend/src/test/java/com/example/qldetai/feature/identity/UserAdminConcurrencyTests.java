@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.qldetai.feature.identity.domain.*;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserStatusRequest;
+import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserAccessRequest;
 import com.example.qldetai.feature.identity.repository.*;
 import com.example.qldetai.feature.identity.service.UserAdminService;
 
@@ -37,8 +38,8 @@ class UserAdminConcurrencyTests {
         assertThat(users.findActiveAdministrators()).hasSize(2);
         var barrier = new CyclicBarrier(2);
         try (var executor = Executors.newFixedThreadPool(2)) {
-            var first = executor.submit(() -> lock(ids.get(0), barrier));
-            var second = executor.submit(() -> lock(ids.get(1), barrier));
+            var first = executor.submit(() -> lock(ids.get(0), barrier, false));
+            var second = executor.submit(() -> lock(ids.get(1), barrier, true));
             assertThat(List.of(first.get(20, TimeUnit.SECONDS), second.get(20, TimeUnit.SECONDS)))
                     .containsExactlyInAnyOrder(true, false);
         }
@@ -56,10 +57,14 @@ class UserAdminConcurrencyTests {
         return users.saveAndFlush(user).getId();
     }
 
-    private boolean lock(Long id, CyclicBarrier barrier) throws Exception {
+    private boolean lock(Long id, CyclicBarrier barrier, boolean combined) throws Exception {
         barrier.await(10, TimeUnit.SECONDS);
         try {
-            service.updateStatus(id, new UpdateUserStatusRequest(UserStatus.LOCKED));
+            if (combined) {
+                service.updateAccess(id, new UpdateUserAccessRequest(UserStatus.LOCKED, Set.of(RoleCode.ADMIN)));
+            } else {
+                service.updateStatus(id, new UpdateUserStatusRequest(UserStatus.LOCKED));
+            }
             return true;
         } catch (com.example.qldetai.exception.BusinessRuleException expected) {
             return false;

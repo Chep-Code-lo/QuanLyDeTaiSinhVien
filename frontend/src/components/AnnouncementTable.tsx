@@ -157,22 +157,24 @@ export function CommunicationPagination({
       <span>
         Trang {page + 1}/{Math.max(totalPages, 1)} · {totalElements} thông báo
       </span>
-      <button
-        type="button"
-        className="btn btn-secondary btn-sm"
-        disabled={loading || page === 0}
-        onClick={() => onPage(page - 1)}
-      >
-        Trước
-      </button>
-      <button
-        type="button"
-        className="btn btn-secondary btn-sm"
-        disabled={loading || page + 1 >= totalPages}
-        onClick={() => onPage(page + 1)}
-      >
-        Sau
-      </button>
+      <div>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          disabled={loading || page === 0}
+          onClick={() => onPage(page - 1)}
+        >
+          Trước
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          disabled={loading || page + 1 >= totalPages}
+          onClick={() => onPage(page + 1)}
+        >
+          Sau
+        </button>
+      </div>
     </nav>
   )
 }

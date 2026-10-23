@@ -14,10 +14,12 @@ export function TopicProposalForm({
   topic,
   onSaved,
   onClose,
+  onBusyChange,
 }: {
   topic?: TopicResponse
   onSaved: () => void
   onClose: () => void
+  onBusyChange?: (busy: boolean) => void
 }) {
   const { user } = useAuth()
   const { showSuccess, showError } = useToast()
@@ -54,6 +56,7 @@ export function TopicProposalForm({
             return
           sending.current = true
           setBusy(true)
+          onBusyChange?.(true)
           try {
             if (topic) await topicApi.update(topic.id, { ...input, version: topic.version })
             else await topicApi.create({ ...input, code: code.trim(), periodId })
@@ -64,6 +67,7 @@ export function TopicProposalForm({
           } finally {
             sending.current = false
             setBusy(false)
+            onBusyChange?.(false)
           }
         }}
       >

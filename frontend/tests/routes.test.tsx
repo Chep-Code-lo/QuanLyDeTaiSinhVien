@@ -13,6 +13,12 @@ import { resolve } from 'node:path'
 // Load the actual styles: rendering routes alone did not catch the broken shell.
 const stylesheet = document.createElement('style')
 beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute('open', '')
+  }
+  HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute('open')
+  }
   stylesheet.textContent = [
     'styles/base.css',
     'styles/app.css',
@@ -55,6 +61,7 @@ const resultEmailSetting = {
 }
 const originalAdapter = apiClient.defaults.adapter
 const requested: string[] = []
+const topicQueries: Record<string, unknown>[] = []
 const sentEmails: { recipientRoles: string[]; recipientUserIds: number[] }[] = []
 const savedTemplates: EmailTemplateResponse[] = []
 const settingScopes: unknown[] = []
@@ -78,6 +85,7 @@ const paged = new Set([
   '/announcements',
   '/evaluation-assignments',
   '/project-assignments',
+  '/project-assignments/supervised',
   '/defense-sessions',
   '/evaluation-committees',
   '/lecturers',
@@ -96,6 +104,7 @@ const lists = new Set([
 const adapter: AxiosAdapter = async (config) => {
   const url = config.url ?? ''
   requested.push(url)
+  if (url === '/topics') topicQueries.push({ ...config.params })
   let data: unknown
   if (url === '/auth/me') data = currentUser
   else if (url === '/faculties') data = [{ id: 1, code: 'CNTT', name: 'Khoa Công nghệ thông tin' }]
@@ -167,6 +176,9 @@ const adapter: AxiosAdapter = async (config) => {
       totalPages: logFixture.length,
       totalElements: logFixture.flat().length,
     }
+  } else if (/^\/email-logs\/\d+$/.test(url)) {
+    const id = Number(url.split('/').at(-1))
+    data = { log: logFixture.flat().find((row) => row.id === id), attempts: [] }
   } else if (url === '/email-recipients') {
     const role = config.params?.role
     const search = (config.params?.search ?? '').toLowerCase()
@@ -231,6 +243,7 @@ beforeEach(() => {
   apiClient.defaults.adapter = adapter
   apiClient.defaults.headers.common['X-XSRF-TOKEN'] = 'test-csrf'
   requested.length = 0
+  topicQueries.length = 0
   sentEmails.length = 0
   savedTemplates.length = 0
   settingScopes.length = 0
@@ -247,9 +260,9 @@ afterEach(() => {
 
 const common = [
   ['/dashboard', 'Hệ thống quản lý đề tài sinh viên'],
-  ['/topics', 'Đề tài & Dự án'],
+  ['/topics', 'Đề tài & đăng ký'],
   ['/groups', 'Nhóm đề tài'],
-  ['/registrations', 'Đăng ký đề tài'],
+  ['/registrations', 'Đề tài & đăng ký'],
   ['/account', 'Tài khoản'],
   ['/topic-workflow', 'Đề xuất & Xét duyệt đề tài'],
   ['/announcements', 'Thông báo'],
@@ -260,7 +273,7 @@ const management = [
   ['/evaluator-assignment', 'Phân công hội đồng'],
   ['/evaluation-results', 'Tổng hợp & Công bố điểm'],
   ['/grade-change-requests', 'Yêu cầu đổi điểm'],
-  ['/project-assignments', 'Theo dõi đề tài được giao'],
+  ['/project-assignments', 'Đề tài được giao'],
   ['/academic-catalog', 'Danh mục học thuật'],
   ['/academic-management', 'Quản lý Học thuật'],
 ] as const
@@ -269,8 +282,7 @@ describe.each(['STUDENT', 'LECTURER', 'ADMIN'] as RoleCode[])('Trang dành cho %
   const routes =
     role === 'STUDENT'
       ? [
-          ...common.filter(([path]) => path !== '/topics'),
-          ['/topics', 'Danh sách đề tài đã công bố'],
+          ...common,
           ['/progress', 'Tiến độ & báo cáo'],
           ['/results', 'Lịch bảo vệ & kết quả'],
           ['/results/7', 'Lịch bảo vệ & kết quả'],
@@ -309,6 +321,14 @@ describe.each(['STUDENT', 'LECTURER', 'ADMIN'] as RoleCode[])('Trang dành cho %
     expect(document.querySelector('.toast-error')).toBeNull()
     expect(document.querySelector('.app-sidebar')).toBeTruthy()
     expect(document.querySelector('.page-content')).toBeTruthy()
+    if (path === '/registrations') {
+      expect(screen.getByRole('tab', { name: 'Hồ sơ đăng ký' }).getAttribute('aria-selected')).toBe(
+        'true',
+      )
+      expect(
+        screen.getByRole('button', { name: 'Đề tài & đăng ký' }).getAttribute('aria-current'),
+      ).toBe('page')
+    }
     expect(document.querySelector('.app-shell')?.classList.contains('management-shell')).toBe(
       role !== 'STUDENT',
     )
@@ -319,6 +339,60 @@ describe.each(['STUDENT', 'LECTURER', 'ADMIN'] as RoleCode[])('Trang dành cho %
     expect(logo.width).toBe('104px')
     expect(logo.height).toBe(logo.width)
     expect(getComputedStyle(document.querySelector('.app-main')!).minWidth).toBe('0px')
+  })
+})
+
+describe('Đề tài và hồ sơ đăng ký', () => {
+  it.each(['ADMIN', 'LECTURER', 'STUDENT'] as RoleCode[])(
+    '%s dùng hai tab trong một trang và chỉ có một nơi tạo đề tài',
+    async (role) => {
+      currentUser = user(role)
+      render(
+        <MemoryRouter initialEntries={['/topics?q=Kiểm thử']}>
+          <App />
+        </MemoryRouter>,
+      )
+      await screen.findByText('Chưa có đề tài phù hợp.')
+      expect(topicQueries.at(-1)).toMatchObject({
+        status: 'PUBLISHED',
+        q: 'Kiểm thử',
+        page: 0,
+        size: 10,
+      })
+      expect(screen.queryByRole('button', { name: 'Đăng ký đề tài', exact: true })).toBeNull()
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+      expect(screen.queryAllByRole('button', { name: '+ Tạo đề tài', exact: true })).toHaveLength(
+        role === 'STUDENT' ? 0 : 1,
+      )
+      await userEvent.click(screen.getByRole('tab', { name: 'Hồ sơ đăng ký' }))
+      await screen.findByText('Chưa có hồ sơ đăng ký')
+      expect(requested).toContain(
+        role === 'STUDENT' ? '/topic-registrations/mine' : '/topic-registrations',
+      )
+      expect(screen.queryByRole('button', { name: '+ Tạo đề tài', exact: true })).toBeNull()
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+      fireEvent.keyDown(screen.getByRole('tab', { name: 'Hồ sơ đăng ký' }), { key: 'Home' })
+      await screen.findByText('Chưa có đề tài phù hợp.')
+      expect(
+        screen.getByRole('tab', { name: 'Đề tài đã công bố' }).getAttribute('aria-selected'),
+      ).toBe('true')
+      expect((screen.getByRole('textbox', { name: 'Tìm đề tài' }) as HTMLInputElement).value).toBe(
+        'Kiểm thử',
+      )
+    },
+  )
+  it('giảng viên không giữ chức vụ quản lý không được tạo đề tài trực tiếp', async () => {
+    currentUser = { ...user('LECTURER'), activeAppointments: [] }
+    render(
+      <MemoryRouter initialEntries={['/topics']}>
+        <App />
+      </MemoryRouter>,
+    )
+    await screen.findByText('Chưa có đề tài phù hợp.')
+    expect(screen.queryByRole('button', { name: '+ Tạo đề tài', exact: true })).toBeNull()
+    await userEvent.click(screen.getByRole('tab', { name: 'Hồ sơ đăng ký' }))
+    await screen.findByText('Chưa có hồ sơ đăng ký')
+    expect(screen.queryByRole('button', { name: '+ Tạo đề tài', exact: true })).toBeNull()
   })
 })
 
@@ -378,6 +452,7 @@ describe('Cấu hình email', () => {
   it.each(['ADMIN', 'LECTURER'] as RoleCode[])(
     '%s tạo, mở lại, sửa và gửi mẫu email riêng',
     async (role) => {
+      const actor = userEvent.setup()
       currentUser = user(role)
       const firstRender = render(
         <MemoryRouter initialEntries={['/email-settings']}>
@@ -386,9 +461,14 @@ describe('Cấu hình email', () => {
       )
       await screen.findByLabelText('Nội dung thư')
       await userEvent.click(screen.getByRole('button', { name: 'Tạo mẫu mới' }))
-      await userEvent.type(screen.getByLabelText('Tên mẫu email'), 'Nhắc lịch họp')
-      await userEvent.type(screen.getByLabelText('Tiêu đề thư'), 'Lịch họp tuần này')
-      await userEvent.type(screen.getByLabelText('Nội dung thư'), 'Mời tham gia họp lúc 8 giờ.')
+      // This workflow checks persistence and recipients; pasting avoids a timer and
+      // a full editor render for every character on slower CI runners.
+      await actor.click(screen.getByLabelText('Tên mẫu email'))
+      await actor.paste('Nhắc lịch họp')
+      await actor.click(screen.getByLabelText('Tiêu đề thư'))
+      await actor.paste('Lịch họp tuần này')
+      await actor.click(screen.getByLabelText('Nội dung thư'))
+      await actor.paste('Mời tham gia họp lúc 8 giờ.')
       await userEvent.click(screen.getByRole('button', { name: 'Tạo mẫu', exact: true }))
       await waitFor(() => expect(savedTemplates).toHaveLength(1))
       await screen.findByRole('button', { name: 'Lưu mẫu' })
@@ -403,9 +483,11 @@ describe('Cấu hình email', () => {
       expect((screen.getByLabelText('Nội dung thư') as HTMLTextAreaElement).value).toBe(
         'Mời tham gia họp lúc 8 giờ.',
       )
-      await userEvent.type(screen.getByLabelText('Tiêu đề thư'), ' - cập nhật')
+      await actor.click(screen.getByLabelText('Tiêu đề thư'))
+      await actor.paste(' - cập nhật')
       await userEvent.click(screen.getByRole('button', { name: 'Lưu mẫu' }))
       await waitFor(() => expect(savedTemplates[0].version).toBe(1))
+      expect(savedTemplates[0].subjectTemplate).toBe('Lịch họp tuần này - cập nhật')
       await userEvent.selectOptions(screen.getByLabelText('Gửi đến'), 'STUDENT')
       const sendButton = screen.getByRole<HTMLButtonElement>('button', { name: 'Gửi email' })
       await waitFor(() => expect(sendButton.disabled).toBe(false))
@@ -445,6 +527,20 @@ describe('Cấu hình email', () => {
     )
     await userEvent.selectOptions(await screen.findByLabelText('Gửi đến'), role)
     await screen.findByText(new RegExp(`Gửi tới toàn bộ .* ${label.toLowerCase()}`))
+    const recipientPreview = screen.getByRole('button', { name: 'Xem danh sách người nhận' })
+    await userEvent.click(recipientPreview)
+    const recipientDialog = screen.getByRole('dialog', { name: 'Danh sách người nhận' })
+    await within(recipientDialog).findByText(
+      role === 'STUDENT' ? 'an@example.edu.vn' : 'cuong@example.edu.vn',
+    )
+    expect(
+      within(recipientDialog).queryByText(
+        role === 'STUDENT' ? 'cuong@example.edu.vn' : 'an@example.edu.vn',
+      ),
+    ).toBeNull()
+    expect(sentEmails).toEqual([])
+    await userEvent.click(within(recipientDialog).getByRole('button', { name: 'Đóng' }))
+    expect(document.activeElement).toBe(recipientPreview)
     const sendButton = screen.getByRole<HTMLButtonElement>('button', { name: 'Gửi email' })
     await waitFor(() => expect(sendButton.disabled).toBe(false))
     await userEvent.click(sendButton)
@@ -625,6 +721,43 @@ it('phản hồi cấu hình scope cũ đến muộn không ghi đè scope khoa 
   expect((screen.getByLabelText('Tên người gửi') as HTMLInputElement).value).toBe('Người gửi khoa')
 })
 
+it('nút xem lần gửi mở hộp thoại đúng email, đóng và trả focus về nút', async () => {
+  const row = {
+    id: 26,
+    eventType: 'TASK_ASSIGNED',
+    eventKey: 'task:26',
+    recipientName: 'GV A',
+    recipientEmail: 'a@example.edu.vn',
+    subject: 'Email kiểm thử',
+    status: 'PENDING',
+    attemptCount: 0,
+    createdAt: '2026-10-22',
+  }
+  logFixture = [[row, { ...row, id: 25 }]]
+  currentUser = user('ADMIN')
+  render(
+    <MemoryRouter initialEntries={['/email-settings']}>
+      <App />
+    </MemoryRouter>,
+  )
+  const trigger = await screen.findByRole('button', { name: 'Xem lần gửi #26' })
+  await userEvent.click(trigger)
+  const dialog = screen.getByRole('dialog', { name: 'Lịch sử gửi email #26' })
+  expect(dialog.hasAttribute('open')).toBe(true)
+  expect(document.body.style.overflow).toBe('hidden')
+  await within(dialog).findByText('Email đang chờ xử lý, chưa có lần gửi.')
+  expect(requested).toContain('/email-logs/26')
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Đóng chi tiết email' }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(document.activeElement).toBe(trigger)
+  expect(document.body.style.overflow).toBe('')
+  await userEvent.click(screen.getByRole('button', { name: 'Xem lần gửi #25' }))
+  const nextDialog = screen.getByRole('dialog', { name: 'Lịch sử gửi email #25' })
+  await within(nextDialog).findByText('Email đang chờ xử lý, chưa có lần gửi.')
+  expect(requested).toContain('/email-logs/25')
+  fireEvent(nextDialog, new Event('cancel', { cancelable: true }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+})
 it('phân trang lịch sử email tại server không làm mất cấu hình đang sửa', async () => {
   const row = {
     id: 1,

@@ -9,6 +9,7 @@ import { useRemoteData } from '../hooks/useRemoteData'
 import { canManageDepartment } from '../utils/managementAccess'
 import type { FacultyResponse, DepartmentResponse } from '../types/domain'
 import { formatDate } from '../utils/dateTime'
+import { DateTimeInput } from '../components/DateTimeInput'
 
 type CatalogKind = 'faculty' | 'department' | 'semester'
 export function AcademicCatalogPage() {
@@ -325,23 +326,23 @@ function CatalogEditor({
               </label>
               <label>
                 Ngày bắt đầu
-                <input
+                <DateTimeInput
                   type="date"
                   className="form-input"
                   required
                   value={startsOn}
-                  onChange={(event) => setStartsOn(event.target.value)}
+                  onValueChange={setStartsOn}
                 />
               </label>
               <label>
                 Ngày kết thúc
-                <input
+                <DateTimeInput
                   type="date"
                   className="form-input"
                   required
                   min={startsOn}
                   value={endsOn}
-                  onChange={(event) => setEndsOn(event.target.value)}
+                  onValueChange={setEndsOn}
                 />
               </label>
             </>
@@ -389,13 +390,13 @@ function CatalogEditor({
                 />
               </label>
               {item && (
-                <label>
+                <label className="catalog-active-control">
                   <input
                     type="checkbox"
                     checked={active}
                     onChange={(event) => setActive(event.target.checked)}
-                  />{' '}
-                  Đang hoạt động
+                  />
+                  <span>{active ? 'Đang hoạt động' : 'Ngừng hoạt động'}</span>
                 </label>
               )}
             </>

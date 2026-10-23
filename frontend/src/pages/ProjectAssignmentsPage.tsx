@@ -10,17 +10,54 @@ import { useToast } from '../context/ToastContext'
 import { useRemoteData } from '../hooks/useRemoteData'
 import { canManageDepartment } from '../utils/managementAccess'
 import { statusLabel } from '../utils/displayLabels'
+import type { PageResponse } from '../types/api'
+import type { ProjectAssignmentResponse, SupervisedStudentResponse } from '../types/domain'
+
+type ProjectWithStudents = ProjectAssignmentResponse & { students?: SupervisedStudentResponse[] }
 
 export function ProjectAssignmentsPage() {
+  const { user } = useAuth()
+  const lecturer = !!user?.roles.includes('LECTURER')
+  const [view, setView] = useState<'supervised' | 'all'>(lecturer ? 'supervised' : 'all')
+  const supervised = lecturer && view === 'supervised'
   const [page, setPage] = useState(0)
   const [revision, setRevision] = useState(0)
   const [selected, setSelected] = useState<number | null>(null)
-  const load = useCallback(() => academicApi.getProjectAssignments(undefined, page, 10), [page])
+  const load = useCallback(async (): Promise<PageResponse<ProjectWithStudents>> => {
+    if (!supervised) return academicApi.getProjectAssignments(undefined, page, 10)
+    const result = await academicApi.getSupervisedProjects(page, 10)
+    return {
+      ...result,
+      content: result.content.map((item) => ({ ...item.project, students: item.students })),
+    }
+  }, [page, supervised])
   const { data, loading, error } = useRemoteData(load, revision)
   return (
     <>
-      <PageHeader title="Theo dõi đề tài được giao" />
+      <PageHeader title="Đề tài được giao" />
       <section className="page-card">
+        {lecturer && (
+          <div className="project-assignment-views" aria-label="Phạm vi đề tài">
+            {(['supervised', 'all'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={`btn ${view === value ? 'btn-primary' : 'btn-secondary'}`}
+                aria-pressed={view === value}
+                onClick={() => {
+                  setView(value)
+                  setPage(0)
+                  setSelected(null)
+                }}
+              >
+                {value === 'supervised' ? 'Sinh viên đang hướng dẫn' : 'Tất cả đề tài'}
+              </button>
+            ))}
+          </div>
+        )}
+        {supervised && (
+          <p>Danh sách sinh viên thuộc các nhóm được giao đề tài mà bạn đang hướng dẫn.</p>
+        )}
         <RemoteState
           loading={loading}
           error={error}
@@ -28,13 +65,21 @@ export function ProjectAssignmentsPage() {
         />
         {data && (
           <>
-            {!data.content.length && <p>Chưa có đề tài được giao.</p>}
+            {supervised && <p>{data.totalElements} nhóm đang hướng dẫn.</p>}
+            {!data.content.length && (
+              <p>
+                {supervised
+                  ? 'Bạn chưa có sinh viên đang hướng dẫn trong đề tài được giao.'
+                  : 'Chưa có đề tài được giao.'}
+              </p>
+            )}
             <div className="table-container">
               <table className="data-table">
                 <thead>
                   <tr>
                     <th>Đề tài</th>
                     <th>Nhóm</th>
+                    {supervised && <th>Sinh viên</th>}
                     <th>Đợt</th>
                     <th>Trạng thái</th>
                     <th>Thao tác</th>
@@ -47,6 +92,24 @@ export function ProjectAssignmentsPage() {
                         {project.topicCode} · {project.topicTitle}
                       </td>
                       <td>{project.groupName}</td>
+                      {supervised && (
+                        <td>
+                          {project.students?.length ? (
+                            <ul className="supervised-students">
+                              {project.students.map((student) => (
+                                <li key={student.studentId}>
+                                  <strong>{student.fullName}</strong>
+                                  <span>
+                                    {student.studentCode} · {student.className}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            'Chưa có thành viên trong nhóm.'
+                          )}
+                        </td>
+                      )}
                       <td>{project.periodName}</td>
                       <td>{statusLabel(project.status)}</td>
                       <td>

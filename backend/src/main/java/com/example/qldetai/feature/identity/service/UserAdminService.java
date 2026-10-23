@@ -17,6 +17,7 @@ import com.example.qldetai.feature.identity.dto.IdentityDtos.CreateUserRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.LecturerProfileInput;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.StudentProfileInput;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserRequest;
+import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserAccessRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserRolesRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserStatusRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UserResponse;
@@ -64,6 +65,22 @@ public class UserAdminService {
     @Transactional(readOnly = true)
     public UserResponse get(Long id) {
         return userProfileService.toUser(requireUser(id));
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse lookup(String identifier) {
+        String query = identifier == null ? "" : identifier.trim().toLowerCase(Locale.ROOT);
+        if (query.isEmpty()) {
+            throw new BusinessRuleException("Vui lòng nhập email, mã sinh viên hoặc mã giảng viên.");
+        }
+        var matches = userRepository.findForAdminLookup(query);
+        if (matches.isEmpty()) {
+            throw new ResourceNotFoundException("Không tìm thấy tài khoản khớp với thông tin đã nhập.");
+        }
+        if (matches.size() > 1) {
+            throw new ConflictException("Mã này trùng giữa nhiều tài khoản. Vui lòng tra cứu bằng email.");
+        }
+        return userProfileService.toUser(matches.getFirst());
     }
 
     @Transactional
@@ -158,28 +175,49 @@ public class UserAdminService {
         lockAdministratorChanges();
         User user = requireUser(id);
         if (!request.roles().contains(RoleCode.ADMIN)) requireAdministratorRemains(user);
+        validateRoleChange(id, request.roles());
+        LocalDateTime now = LocalDateTime.now(clock);
+        user.replaceRoles(requireRoles(request.roles()), now);
+        return userProfileService.toUser(user);
+    }
+
+    @Transactional
+    @BusinessAudit(action = "USER_ACCESS_UPDATE", entityType = "USER", entityIdArgument = 0)
+    public UserResponse updateAccess(Long id, UpdateUserAccessRequest request) {
+        lockAdministratorChanges();
+        User user = requireUser(id);
+        if (request.status() != UserStatus.ACTIVE || !request.roles().contains(RoleCode.ADMIN)) {
+            requireAdministratorRemains(user);
+        }
+        validateRoleChange(id, request.roles());
+        Set<Role> roles = requireRoles(request.roles());
+        LocalDateTime now = LocalDateTime.now(clock);
+        user.replaceRoles(roles, now);
+        user.setStatus(request.status());
+        user.setUpdatedAt(now);
+        return userProfileService.toUser(userRepository.saveAndFlush(user));
+    }
+
+    private void validateRoleChange(Long id, Set<RoleCode> roles) {
         if (studentRepository.findByUserId(id).isPresent()
-                && !request.roles().contains(RoleCode.STUDENT)) {
+                && !roles.contains(RoleCode.STUDENT)) {
             throw new BusinessRuleException(
                     "Remove the student profile before removing the STUDENT role.");
         }
         if (lecturerRepository.findByUserId(id).isPresent()
-                && !request.roles().contains(RoleCode.LECTURER)) {
+                && !roles.contains(RoleCode.LECTURER)) {
             throw new BusinessRuleException(
                     "Remove the lecturer profile before removing the LECTURER role.");
         }
-        if (request.roles().contains(RoleCode.STUDENT)
+        if (roles.contains(RoleCode.STUDENT)
                 && studentRepository.findByUserId(id).isEmpty()) {
             throw new BusinessRuleException("A student profile is required for the STUDENT role.");
         }
-        if (request.roles().contains(RoleCode.LECTURER)
+        if (roles.contains(RoleCode.LECTURER)
                 && lecturerRepository.findByUserId(id).isEmpty()) {
             throw new BusinessRuleException(
                     "A lecturer profile is required for the LECTURER role.");
         }
-        LocalDateTime now = LocalDateTime.now(clock);
-        user.replaceRoles(requireRoles(request.roles()), now);
-        return userProfileService.toUser(user);
     }
 
     private void lockAdministratorChanges() {

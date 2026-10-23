@@ -39,29 +39,29 @@ export function EmailScopePicker({
     ) ?? []
   return (
     <section className="page-card">
-      <label>
-        Phạm vi cấu hình email
-        <select
-          className="form-select"
-          disabled={disabled || loading}
-          value={`${value.scopeType}:${value.scopeId}`}
-          onChange={(event) => {
-            const [scopeType, scopeId] = event.target.value.split(':')
-            onChange({ scopeType: scopeType as NotificationScopeType, scopeId: Number(scopeId) })
-          }}
-        >
-          {admin ? (
-            <option value="SYSTEM:0">Toàn hệ thống</option>
-          ) : (
-            <option value={`LECTURER:${user?.id}`}>Cá nhân tôi</option>
-          )}
-          {faculties.map((faculty) => (
-            <option key={faculty.id} value={`FACULTY:${faculty.id}`}>
-              Khoa {faculty.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <select
+        aria-label="Phạm vi cấu hình email"
+        className="form-select"
+        disabled={disabled || loading}
+        value={`${value.scopeType}:${value.scopeId}`}
+        onChange={(event) => {
+          const [scopeType, scopeId] = event.target.value.split(':')
+          onChange({ scopeType: scopeType as NotificationScopeType, scopeId: Number(scopeId) })
+        }}
+      >
+        {admin ? (
+          <option value="SYSTEM:0">Toàn hệ thống</option>
+        ) : (
+          <option value={`LECTURER:${user?.id}`}>Cá nhân tôi</option>
+        )}
+        {faculties.map((faculty) => (
+          <option key={faculty.id} value={`FACULTY:${faculty.id}`}>
+            {/^khoa\s/iu.test(faculty.name.trim())
+              ? faculty.name.trim()
+              : `Khoa ${faculty.name.trim()}`}
+          </option>
+        ))}
+      </select>
       <RemoteState
         loading={loading}
         error={error}

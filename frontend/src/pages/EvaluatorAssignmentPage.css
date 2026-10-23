@@ -67,6 +67,24 @@
   padding-top: 20px;
   border-top: 1px solid var(--ea-border);
 }
+.ea-card.ea-schedule-card {
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+}
+.portal-shell .data-table.ea-scheduled-table {
+  min-width: 1020px;
+}
+.portal-shell .data-table.ea-scheduled-table :is(th, td) {
+  padding: 16px 20px;
+  vertical-align: middle;
+}
+.ea-scheduled-table td:nth-child(1),
+.ea-scheduled-table td:nth-child(2) {
+  min-width: 160px;
+}
+.ea-scheduled-table td:nth-child(n + 3) {
+  white-space: nowrap;
+}
 .ea-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -263,6 +281,9 @@
   border: 1px solid #dbe9fc;
   border-radius: 7px;
 }
+.ea-rubric > .ea-hint + .ea-rubric-bar {
+  margin-top: 16px;
+}
 .ea-rubric-name {
   color: #000;
   font-size: 14px;
@@ -352,6 +373,15 @@
 .ea-topic-options {
   max-height: 240px;
   overflow: auto;
+}
+.ea-topic-unavailable {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: 14px;
+}
+.ea-topic-unavailable p {
+  margin: 0;
 }
 .ea-topic-options > label {
   display: flex;

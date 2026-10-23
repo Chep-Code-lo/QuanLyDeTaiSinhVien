@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { CalendarDays } from 'lucide-react'
 import { formatDateInput, parseDateInput } from '../utils/dateTime'
+import { DateCalendar } from './DateCalendar'
 import './DateTimeInput.css'
 
 type DateTimeInputProps = Omit<
@@ -63,7 +64,8 @@ export function DateTimeInput({
   const [draft, setDraft] = useState(() => formatDateInput(canonical, withTime))
   const lastEmitted = useRef(canonical)
   const textInput = useRef<HTMLInputElement>(null)
-  const picker = useRef<HTMLInputElement>(null)
+  const anchor = useRef<HTMLDivElement>(null)
+  const [calendarOpen, setCalendarOpen] = useState(false)
   const pendingSelection = useRef<number | null>(null)
   const digitBuffer = useRef({ index: -1, text: '' })
   const justAdvanced = useRef(false)
@@ -163,7 +165,7 @@ export function DateTimeInput({
   }
 
   return (
-    <div className="date-time-input">
+    <div ref={anchor} className="date-time-input">
       <input
         {...props}
         ref={textInput}
@@ -282,35 +284,37 @@ export function DateTimeInput({
         type="button"
         className="date-time-input__calendar"
         aria-label="Mở lịch chọn ngày"
+        aria-expanded={calendarOpen}
+        aria-haspopup="dialog"
         disabled={disabled || readOnly}
         onClick={() => {
-          if (picker.current?.showPicker) picker.current.showPicker()
-          else picker.current?.click()
+          setCalendarOpen((open) => !open)
         }}
       >
         <CalendarDays size={16} aria-hidden="true" />
       </button>
-      <input
-        ref={picker}
-        type="date"
-        className="date-time-input__native"
-        lang="vi"
-        aria-hidden="true"
-        tabIndex={-1}
-        disabled={disabled || readOnly}
-        min={min?.slice(0, 10)}
-        max={max?.slice(0, 10)}
-        value={canonical.slice(0, 10)}
-        onChange={(event) => {
-          const day = event.target.value
-          const next = day
-            ? `${day}${withTime ? `T${canonical.split('T')[1]?.slice(0, 5) || '00:00'}` : ''}`
-            : ''
-          setDraft(formatDateInput(next, withTime))
-          emit(next)
-          textInput.current?.focus()
-        }}
-      />
+      {calendarOpen && !disabled && !readOnly && (
+        <DateCalendar
+          anchor={anchor}
+          value={canonical.slice(0, 10)}
+          min={min?.slice(0, 10)}
+          max={max?.slice(0, 10)}
+          required={props.required}
+          onClose={() => {
+            setCalendarOpen(false)
+            textInput.current?.focus()
+          }}
+          onSelect={(day) => {
+            const next = day
+              ? `${day}${withTime ? `T${canonical.split('T')[1]?.slice(0, 5) || '00:00'}` : ''}`
+              : ''
+            setDraft(formatDateInput(next, withTime))
+            emit(next)
+            setCalendarOpen(false)
+            textInput.current?.focus()
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -83,17 +83,16 @@ const MilestoneManagementPage = lazy(() =>
 const NotFoundPage = lazy(() =>
   import('../pages/NotFoundPage').then((module) => ({ default: module.NotFoundPage })),
 )
-const TopicsPage = lazy(() =>
-  import('../pages/TopicsPage').then((module) => ({ default: module.TopicsPage })),
+const TopicRegistrationPage = lazy(() =>
+  import('../pages/TopicRegistrationPage').then((module) => ({
+    default: module.TopicRegistrationPage,
+  })),
 )
 const AnnouncementsPage = lazy(() =>
   import('../pages/AnnouncementsPage').then((module) => ({ default: module.AnnouncementsPage })),
 )
 const GroupsPage = lazy(() =>
   import('../pages/GroupsPage').then((module) => ({ default: module.GroupsPage })),
-)
-const RegistrationsPage = lazy(() =>
-  import('../pages/RegistrationsPage').then((module) => ({ default: module.RegistrationsPage })),
 )
 
 function PublicHomeRoute() {
@@ -127,11 +126,14 @@ export function AppRoutes() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="topics" element={<TopicsPage />} />
+            <Route path="topics" element={<TopicRegistrationPage />} />
             <Route path="topics/:id" element={<TopicWorkflowPage />} />
             <Route path="topic-workflow" element={<TopicWorkflowPage />} />
             <Route path="groups" element={<GroupsPage />} />
-            <Route path="registrations" element={<RegistrationsPage />} />
+            <Route
+              path="registrations"
+              element={<Navigate to="/topics?tab=registrations" replace />}
+            />
 
             {/* Progress based on user role */}
             <Route

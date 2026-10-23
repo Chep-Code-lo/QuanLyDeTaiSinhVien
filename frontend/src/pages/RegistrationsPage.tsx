@@ -7,7 +7,6 @@ import { groupApi } from '../api/groups'
 import { registrationApi } from '../api/registrations'
 import { topicApi } from '../api/topics'
 import { PageHeader } from '../components/PageHeader'
-import { RegistrationTopicForm } from '../components/RegistrationTopicForm'
 import { StatusBadge } from '../components/StatusBadge'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -42,13 +41,11 @@ const messageOf = (error: any) => {
     registrationMessages[message] || message || 'Không thể thực hiện thao tác. Vui lòng thử lại.'
   )
 }
-export function RegistrationsPage() {
-  const { user, hasAnyRole, hasRole, hasAppointment } = useAuth()
+export function RegistrationsPage({ embedded = false }: { embedded?: boolean }) {
+  const { user, hasAnyRole, hasRole } = useAuth()
   const { showError, showSuccess } = useToast()
   const student = Boolean(hasRole('STUDENT'))
   const reviewer = hasAnyRole(['LECTURER', 'ADMIN'])
-  const canCreateTopic =
-    hasRole('ADMIN') || hasAppointment('DEAN') || hasAppointment('DEPARTMENT_HEAD')
   const [items, setItems] = useState<TopicRegistrationResponse[]>([])
   const [groups, setGroups] = useState<StudentGroupResponse[]>([])
   const [topics, setTopics] = useState<TopicResponse[]>([])
@@ -210,10 +207,7 @@ export function RegistrationsPage() {
   }
   return (
     <>
-      <PageHeader title="Đăng ký đề tài" />
-      {canCreateTopic && (
-        <RegistrationTopicForm onCreated={(topic) => setTopics((current) => [topic, ...current])} />
-      )}
+      {!embedded && <PageHeader title="Đăng ký đề tài" />}
       {student && (
         <section className="page-card">
           <h2 className="section-title">Gửi đăng ký đề tài</h2>

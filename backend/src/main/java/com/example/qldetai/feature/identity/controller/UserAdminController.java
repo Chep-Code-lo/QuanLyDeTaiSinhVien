@@ -4,6 +4,7 @@ import com.example.qldetai.common.api.ApiResponse;
 import com.example.qldetai.common.api.PageResponse;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.CreateUserRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserRequest;
+import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserAccessRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserRolesRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UpdateUserStatusRequest;
 import com.example.qldetai.feature.identity.dto.IdentityDtos.UserResponse;
@@ -13,6 +14,8 @@ import com.example.qldetai.security.UserPrincipal;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import lombok.RequiredArgsConstructor;
 
@@ -50,6 +53,12 @@ public class UserAdminController {
         return ApiResponse.success(userAdminService.list(search, page, size));
     }
 
+    @GetMapping("/lookup")
+    public ApiResponse<UserResponse> lookup(
+            @RequestParam @NotBlank @Size(max = 255) String identifier) {
+        return ApiResponse.success(userAdminService.lookup(identifier));
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<UserResponse> get(@PathVariable Long id) {
         return ApiResponse.success(userAdminService.get(id));
@@ -82,6 +91,13 @@ public class UserAdminController {
             @PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
         userAdminService.delete(id, principal.id());
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/access")
+    public ApiResponse<UserResponse> updateAccess(
+            @PathVariable Long id, @Valid @RequestBody UpdateUserAccessRequest request) {
+        return ApiResponse.success(
+                "Đã cập nhật quyền truy cập.", userAdminService.updateAccess(id, request));
     }
 
     @PutMapping("/{id}/roles")

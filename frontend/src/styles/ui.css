@@ -167,17 +167,47 @@ div.member-list {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
+  padding: 14px 0;
+  margin: 0;
 }
 .group-invitation-row__student {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.group-invitation-row__actions {
+.portal-shell .group-invitation-row__actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 24px;
+  flex-wrap: wrap;
   white-space: nowrap;
+}
+.grade-change-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.grade-change-filters__status {
+  flex: 0 1 260px;
+  min-width: 0;
+}
+.grade-change-filters > .inline-form {
+  gap: 12px;
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .portal-shell .member-list.group-invitation-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .portal-shell .group-invitation-row__actions {
+    justify-content: flex-start;
+  }
+  .grade-change-filters__status,
+  .grade-change-filters > .inline-form {
+    flex-basis: 100%;
+  }
 }
 .autocomplete-selected .selected-info {
   min-width: 0;
@@ -666,6 +696,19 @@ div.member-list {
   gap: 16px 24px;
   margin-bottom: 24px;
 }
+
+.portal-shell .topic-registration-tabs {
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.topic-registration-tabs .announcement-tabs__tab {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.portal-shell .topic-registration-panel > .page-card:first-child {
+  border-top-left-radius: 0;
+}
 .topic-workflow-toolbar > .btn {
   flex-shrink: 0;
 }
@@ -679,6 +722,29 @@ div.member-list {
 
 .academic-catalog-section > .btn + .table-container {
   margin-top: 16px;
+}
+
+.portal-shell .academic-catalog-section .data-table :is(th, td) {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.portal-shell .data-table.topic-workflow-table :is(th, td) {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.catalog-editor-dialog .catalog-active-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.catalog-active-control > input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 .audit-logs-toolbar {
@@ -715,4 +781,83 @@ div.member-list {
 }
 .catalog-editor-dialog::backdrop {
   background: rgb(15 30 55 / 45%);
+}
+
+.email-delivery-dialog {
+  width: min(900px, calc(100vw - 32px));
+}
+.portal-shell .email-delivery-dialog .data-table :is(th, td) {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.project-results-dialog {
+  width: min(1000px, calc(100vw - 32px));
+}
+.project-results-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.account-access-dialog__form {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+}
+.project-assignment-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.supervised-students {
+  display: grid;
+  gap: 14px;
+  min-width: 200px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.supervised-students strong,
+.supervised-students span {
+  display: block;
+}
+.supervised-students span {
+  margin-top: 4px;
+}
+.account-access-dialog__form > label:first-child {
+  display: grid;
+  width: 100%;
+  gap: 8px;
+}
+.account-access-dialog__admin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.account-access-dialog__admin > input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+.account-access-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.topic-workflow-dialog {
+  width: min(900px, calc(100vw - 32px));
+}
+.topic-workflow-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
 }

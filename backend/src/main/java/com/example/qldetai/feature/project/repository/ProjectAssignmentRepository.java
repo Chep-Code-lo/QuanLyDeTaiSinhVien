@@ -34,6 +34,15 @@ public interface ProjectAssignmentRepository extends JpaRepository<ProjectAssign
 
     long countByStatus(AssignmentStatus status);
 
+    @EntityGraph(attributePaths = {"period", "group", "topic", "assignedBy"})
+    @Query("""
+            select a from ProjectAssignment a
+            where a.status = com.example.qldetai.feature.project.domain.AssignmentStatus.IN_PROGRESS
+              and exists (select s.id from TopicSupervisor s
+                          where s.topic = a.topic and s.lecturer.user.id = :userId)
+            """)
+    Page<ProjectAssignment> findSupervisedByUserId(@Param("userId") Long userId, Pageable pageable);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select assignment from ProjectAssignment assignment where assignment.id = :id")
     Optional<ProjectAssignment> findByIdForUpdate(@Param("id") Long id);
