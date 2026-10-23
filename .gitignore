@@ -22,6 +22,10 @@ frontend/.vite/
 # Generated deployment packages
 artifacts/
 
+# Python data-generation tools
+__pycache__/
+*.pyc
+
 # IDE and OS files
 .idea/
 .vscode/

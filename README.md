@@ -198,6 +198,10 @@ trong `vite.config.ts`; nếu tạo `frontend/.env`, giữ `VITE_API_BASE_URL=/a
 
 ## Kiểm thử và build
 
+Để tạo nhanh tài khoản, nhóm, đề tài, phân công chấm và kết quả tổng hợp phục
+vụ kiểm thử, xem [hướng dẫn tạo dữ liệu hàng loạt](scripts/BULK_DATA.md).
+Công cụ chạy thủ công, không tự nạp dữ liệu khi khởi động ứng dụng.
+
 Backend, chạy trong `backend/`:
 
 ```powershell

@@ -483,7 +483,10 @@ export function AssessmentSetupWizardPage() {
     return (
       <div className="assessment-setup-page">
         <PageHeader title="Tiêu chuẩn đánh giá" />
-        <section className="page-card">
+        <section
+                className="page-card"
+                style={{ display: 'grid', gap: '16px' }}
+        >
           <AnimatedSelect
             id="assessment-period"
             aria-label="Đợt đăng ký"
@@ -500,9 +503,9 @@ export function AssessmentSetupWizardPage() {
               </option>
             ))}
           </AnimatedSelect>
-          <label htmlFor="assessment-existing">Thành phần đánh giá</label>
           <AnimatedSelect
             id="assessment-existing"
+            aria-label="Thành phần đánh giá"
             value={component?.id ?? ''}
             onChange={(event) => {
               const saved = components.find((item) => item.id === Number(event.target.value))
