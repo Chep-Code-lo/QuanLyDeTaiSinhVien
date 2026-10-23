@@ -193,6 +193,9 @@ public class EvaluationResultService {
     @Transactional(readOnly = true)
     public ResultActionsResponse actions(Long assignmentId, Long actorId) {
         actorAccess.manager(actorId);
+        if (!projectAuthorization.canReadAssignment(assignmentId, actorId)) {
+            throw new AccessDeniedException("You cannot view this project's result actions.");
+        }
         ProjectAssignment assignment =
                 assignments
                         .findById(assignmentId)
@@ -205,8 +208,7 @@ public class EvaluationResultService {
                 new UsernamePasswordAuthenticationToken(
                         principal, null, principal.getAuthorities());
         boolean canPublish =
-                principal.roles().contains(RoleCode.ADMIN)
-                        || projectAuthorization.canManageAssignment(assignmentId, authentication);
+                projectAuthorization.canManageAssignment(assignmentId, authentication);
         boolean canFinalize;
         try {
             requireFinalizer(
@@ -361,8 +363,7 @@ public class EvaluationResultService {
         var authentication =
                 new UsernamePasswordAuthenticationToken(
                         principal, null, principal.getAuthorities());
-        if (!principal.roles().contains(RoleCode.ADMIN)
-                && !projectAuthorization.canManageAssignment(assignment.getId(), authentication)) {
+        if (!projectAuthorization.canManageAssignment(assignment.getId(), authentication)) {
             throw new AccessDeniedException(
                     "Only this project's academic manager can finalize a result without a committee.");
         }
@@ -405,6 +406,9 @@ public class EvaluationResultService {
         ResultVersion resultVersion =
                 results.findByIdForUpdate(resultId)
                         .orElseThrow(() -> new ResourceNotFoundException("Result was not found."));
+        if (!projectAuthorization.canManageAssignment(resultVersion.getAssignment().getId(), actorId)) {
+            throw new AccessDeniedException("You cannot publish this result.");
+        }
         if (resultVersion.getStatus() != ResultStatus.FINALIZED) {
             throw new BusinessRuleException("Only a finalized result can be published.");
         }

@@ -128,7 +128,9 @@ export function AppRoutes() {
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="topics" element={<TopicRegistrationPage />} />
             <Route path="topics/:id" element={<TopicWorkflowPage />} />
-            <Route path="topic-workflow" element={<TopicWorkflowPage />} />
+            <Route element={<ProtectedRoute roles={['LECTURER', 'STUDENT']} />}>
+              <Route path="topic-workflow" element={<TopicWorkflowPage />} />
+            </Route>
             <Route path="groups" element={<GroupsPage />} />
             <Route
               path="registrations"
@@ -153,14 +155,15 @@ export function AppRoutes() {
             {/* Lecturer & Admin Routes */}
             <Route element={<ProtectedRoute roles={['LECTURER']} />}>
               <Route path="score-sheets" element={<EvaluationsPage />} />
+              <Route path="project-assignments" element={<ProjectAssignmentsPage />} />
+            </Route>
+            <Route element={<ProtectedRoute requireAcademicLeadership />}>
+              <Route path="evaluator-assignment" element={<EvaluatorAssignmentPage />} />
             </Route>
             <Route element={<ProtectedRoute roles={['LECTURER', 'ADMIN']} />}>
-              <Route path="email-settings" element={<EmailSettingsPage />} />
               <Route path="evaluations" element={<AssessmentSetupWizardPage />} />
-              <Route path="evaluator-assignment" element={<EvaluatorAssignmentPage />} />
               <Route path="evaluation-results" element={<EvaluationResultsPage />} />
               <Route path="grade-change-requests" element={<GradeChangesPage />} />
-              <Route path="project-assignments" element={<ProjectAssignmentsPage />} />
             </Route>
 
             {/* Academic Management Routes */}
@@ -171,6 +174,7 @@ export function AppRoutes() {
 
             {/* Admin Only Routes */}
             <Route element={<ProtectedRoute roles={['ADMIN']} />}>
+              <Route path="email-settings" element={<EmailSettingsPage />} />
               <Route path="admin-users" element={<UserManagementPage />} />
               <Route path="audit-logs" element={<AuditLogsPage />} />
               <Route path="admin-users/new" element={<Navigate to="/admin-users" replace />} />

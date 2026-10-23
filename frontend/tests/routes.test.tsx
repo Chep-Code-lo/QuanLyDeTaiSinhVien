@@ -270,7 +270,7 @@ const common = [
 const management = [
   ['/progress', 'Tiến độ & Mốc báo cáo'],
   ['/evaluations', 'Tiêu chuẩn đánh giá'],
-  ['/evaluator-assignment', 'Phân công hội đồng'],
+  ['/evaluator-assignment', 'Phân công giảng viên'],
   ['/evaluation-results', 'Tổng hợp & Công bố điểm'],
   ['/grade-change-requests', 'Yêu cầu đổi điểm'],
   ['/project-assignments', 'Đề tài được giao'],
@@ -288,15 +288,12 @@ describe.each(['STUDENT', 'LECTURER', 'ADMIN'] as RoleCode[])('Trang dành cho %
           ['/results/7', 'Lịch bảo vệ & kết quả'],
         ]
       : role === 'LECTURER'
-        ? [
-            ...common,
-            ...management,
-            ['/score-sheets', 'Chấm điểm đề tài'],
-            ['/email-settings', 'Cấu hình email'],
-          ]
+        ? [...common, ...management, ['/score-sheets', 'Chấm điểm đề tài']]
         : [
-            ...common,
-            ...management,
+            ...common.filter(([path]) => path !== '/topic-workflow'),
+            ...management.filter(
+              ([path]) => !['/project-assignments', '/evaluator-assignment'].includes(path),
+            ),
             ['/admin-users', 'Quản lý tài khoản'],
             ['/email-settings', 'Cấu hình email'],
             ['/admin-appointments', 'Bổ nhiệm chức vụ'],
@@ -311,7 +308,14 @@ describe.each(['STUDENT', 'LECTURER', 'ADMIN'] as RoleCode[])('Trang dành cho %
       </MemoryRouter>,
     )
     expect(
-      await screen.findByRole('heading', { level: 1, name: heading }, { timeout: 5000 }),
+      await screen.findByRole(
+        'heading',
+        {
+          level: 1,
+          name: role === 'ADMIN' && path === '/evaluation-results' ? 'Tổng hợp kết quả' : heading,
+        },
+        { timeout: 5000 },
+      ),
     ).toBeTruthy()
     await waitFor(() =>
       expect(
@@ -362,7 +366,7 @@ describe('Đề tài và hồ sơ đăng ký', () => {
       expect(screen.queryByRole('button', { name: 'Đăng ký đề tài', exact: true })).toBeNull()
       expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
       expect(screen.queryAllByRole('button', { name: '+ Tạo đề tài', exact: true })).toHaveLength(
-        role === 'STUDENT' ? 0 : 1,
+        role === 'LECTURER' ? 1 : 0,
       )
       await userEvent.click(screen.getByRole('tab', { name: 'Hồ sơ đăng ký' }))
       await screen.findByText('Chưa có hồ sơ đăng ký')
@@ -413,19 +417,16 @@ describe('Quản lý tài khoản', () => {
 })
 
 describe('Cấu hình email', () => {
-  it('giảng viên có menu email và sử dụng phạm vi cá nhân', async () => {
+  it('ordinary lecturers and deans cannot open email configuration', async () => {
     currentUser = user('LECTURER')
     render(
       <MemoryRouter initialEntries={['/email-settings']}>
         <App />
       </MemoryRouter>,
     )
-    expect(await screen.findByLabelText('Nội dung thư')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Cấu hình email' })).toBeTruthy()
-    expect(settingScopes).toContainEqual({ scopeType: 'LECTURER', scopeId: 1 })
-    await userEvent.selectOptions(screen.getByLabelText('Gửi đến'), 'STUDENT')
-    expect(await screen.findByText(/sinh viên đang hướng dẫn/)).toBeTruthy()
-    expect(screen.queryByRole('option', { name: 'Giảng viên', exact: true })).toBeNull()
+    await screen.findByRole('heading', { name: 'Không có quyền truy cập' })
+    expect(screen.queryByRole('button', { name: 'Cấu hình email' })).toBeNull()
+    expect(settingScopes).toEqual([])
   })
 
   it('mẫu công bố điểm chỉ cấu hình gửi tự động cho sinh viên của kết quả', async () => {
@@ -449,54 +450,51 @@ describe('Cấu hình email', () => {
     expect(sentEmails).toHaveLength(0)
   })
 
-  it.each(['ADMIN', 'LECTURER'] as RoleCode[])(
-    '%s tạo, mở lại, sửa và gửi mẫu email riêng',
-    async (role) => {
-      const actor = userEvent.setup()
-      currentUser = user(role)
-      const firstRender = render(
-        <MemoryRouter initialEntries={['/email-settings']}>
-          <App />
-        </MemoryRouter>,
-      )
-      await screen.findByLabelText('Nội dung thư')
-      await userEvent.click(screen.getByRole('button', { name: 'Tạo mẫu mới' }))
-      // This workflow checks persistence and recipients; pasting avoids a timer and
-      // a full editor render for every character on slower CI runners.
-      await actor.click(screen.getByLabelText('Tên mẫu email'))
-      await actor.paste('Nhắc lịch họp')
-      await actor.click(screen.getByLabelText('Tiêu đề thư'))
-      await actor.paste('Lịch họp tuần này')
-      await actor.click(screen.getByLabelText('Nội dung thư'))
-      await actor.paste('Mời tham gia họp lúc 8 giờ.')
-      await userEvent.click(screen.getByRole('button', { name: 'Tạo mẫu', exact: true }))
-      await waitFor(() => expect(savedTemplates).toHaveLength(1))
-      await screen.findByRole('button', { name: 'Lưu mẫu' })
-      expect(savedTemplates[0].bodyTemplate).toBe('Mời tham gia họp lúc 8 giờ.')
-      firstRender.unmount()
-      render(
-        <MemoryRouter initialEntries={['/email-settings']}>
-          <App />
-        </MemoryRouter>,
-      )
-      await userEvent.click(await screen.findByRole('button', { name: /Nhắc lịch họp/ }))
-      expect((screen.getByLabelText('Nội dung thư') as HTMLTextAreaElement).value).toBe(
-        'Mời tham gia họp lúc 8 giờ.',
-      )
-      await actor.click(screen.getByLabelText('Tiêu đề thư'))
-      await actor.paste(' - cập nhật')
-      await userEvent.click(screen.getByRole('button', { name: 'Lưu mẫu' }))
-      await waitFor(() => expect(savedTemplates[0].version).toBe(1))
-      expect(savedTemplates[0].subjectTemplate).toBe('Lịch họp tuần này - cập nhật')
-      await userEvent.selectOptions(screen.getByLabelText('Gửi đến'), 'STUDENT')
-      const sendButton = screen.getByRole<HTMLButtonElement>('button', { name: 'Gửi email' })
-      await waitFor(() => expect(sendButton.disabled).toBe(false))
-      await userEvent.click(sendButton)
-      await waitFor(() => expect(requested).toContain('/email-templates/100/send'))
-      expect(sentEmails).toEqual([{ recipientRoles: ['STUDENT'], recipientUserIds: [] }])
-      expect(requested.some((url) => url.endsWith('/test'))).toBe(false)
-    },
-  )
+  it.each(['ADMIN'] as RoleCode[])('%s tạo, mở lại, sửa và gửi mẫu email riêng', async (role) => {
+    const actor = userEvent.setup()
+    currentUser = user(role)
+    const firstRender = render(
+      <MemoryRouter initialEntries={['/email-settings']}>
+        <App />
+      </MemoryRouter>,
+    )
+    await screen.findByLabelText('Nội dung thư')
+    await userEvent.click(screen.getByRole('button', { name: 'Tạo mẫu mới' }))
+    // This workflow checks persistence and recipients; pasting avoids a timer and
+    // a full editor render for every character on slower CI runners.
+    await actor.click(screen.getByLabelText('Tên mẫu email'))
+    await actor.paste('Nhắc lịch họp')
+    await actor.click(screen.getByLabelText('Tiêu đề thư'))
+    await actor.paste('Lịch họp tuần này')
+    await actor.click(screen.getByLabelText('Nội dung thư'))
+    await actor.paste('Mời tham gia họp lúc 8 giờ.')
+    await userEvent.click(screen.getByRole('button', { name: 'Tạo mẫu', exact: true }))
+    await waitFor(() => expect(savedTemplates).toHaveLength(1))
+    await screen.findByRole('button', { name: 'Lưu mẫu' })
+    expect(savedTemplates[0].bodyTemplate).toBe('Mời tham gia họp lúc 8 giờ.')
+    firstRender.unmount()
+    render(
+      <MemoryRouter initialEntries={['/email-settings']}>
+        <App />
+      </MemoryRouter>,
+    )
+    await userEvent.click(await screen.findByRole('button', { name: /Nhắc lịch họp/ }))
+    expect((screen.getByLabelText('Nội dung thư') as HTMLTextAreaElement).value).toBe(
+      'Mời tham gia họp lúc 8 giờ.',
+    )
+    await actor.click(screen.getByLabelText('Tiêu đề thư'))
+    await actor.paste(' - cập nhật')
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu mẫu' }))
+    await waitFor(() => expect(savedTemplates[0].version).toBe(1))
+    expect(savedTemplates[0].subjectTemplate).toBe('Lịch họp tuần này - cập nhật')
+    await userEvent.selectOptions(screen.getByLabelText('Gửi đến'), 'STUDENT')
+    const sendButton = screen.getByRole<HTMLButtonElement>('button', { name: 'Gửi email' })
+    await waitFor(() => expect(sendButton.disabled).toBe(false))
+    await userEvent.click(sendButton)
+    await waitFor(() => expect(requested).toContain('/email-templates/100/send'))
+    expect(sentEmails).toEqual([{ recipientRoles: ['STUDENT'], recipientUserIds: [] }])
+    expect(requested.some((url) => url.endsWith('/test'))).toBe(false)
+  })
 
   it('bỏ hướng dẫn SMTP, cách sử dụng, biến mẫu và gửi thử tài khoản hiện tại', async () => {
     currentUser = user('ADMIN')
@@ -599,7 +597,14 @@ describe('Trang công khai', () => {
       </MemoryRouter>,
     )
     expect(
-      await screen.findByRole('heading', { level: 1, name: heading }, { timeout: 5000 }),
+      await screen.findByRole(
+        'heading',
+        {
+          level: 1,
+          name: heading,
+        },
+        { timeout: 5000 },
+      ),
     ).toBeTruthy()
     expect(document.querySelector('.management-shell')).toBeNull()
   })
@@ -664,7 +669,7 @@ it.each(['/grade-change-requests', '/project-assignments', '/audit-logs', '/acad
   },
 )
 
-it.each(['ADMIN', 'LECTURER'] as RoleCode[])(
+it.each(['ADMIN'] as RoleCode[])(
   '%s gửi thử email đến chính tài khoản với đúng scope sau xác nhận',
   async (role) => {
     currentUser = user(role)
@@ -684,8 +689,8 @@ it.each(['ADMIN', 'LECTURER'] as RoleCode[])(
     )
   },
 )
-it('Trưởng khoa chuyển phạm vi email khoa, không gửi thủ công nhầm cấu hình cá nhân', async () => {
-  currentUser = user('LECTURER')
+it('Admin chuyển phạm vi email khoa, không gửi thủ công nhầm cấu hình cá nhân', async () => {
+  currentUser = user('ADMIN')
   render(
     <MemoryRouter initialEntries={['/email-settings']}>
       <App />
@@ -704,7 +709,7 @@ it('phản hồi cấu hình scope cũ đến muộn không ghi đè scope khoa 
   delayedSettings = new Promise((resolve) => {
     release = resolve
   })
-  currentUser = user('LECTURER')
+  currentUser = user('ADMIN')
   render(
     <StrictMode>
       <MemoryRouter initialEntries={['/email-settings']}>
@@ -787,4 +792,59 @@ it('phân trang lịch sử email tại server không làm mất cấu hình đa
   expect(logRequests).toEqual([0, 1])
   expect((screen.getByLabelText('Tiêu đề thư') as HTMLInputElement).value).toBe('Bản nháp chưa lưu')
   expect(settingScopes.length).toBe(settingCount)
+})
+
+it.each([
+  ['ADMIN', '/project-assignments'],
+  ['ADMIN', '/topic-workflow'],
+  ['ADMIN', '/evaluator-assignment'],
+  ['ADMIN', '/score-sheets'],
+  ['LECTURER', '/email-settings'],
+  ['LECTURER', '/admin-users'],
+  ['LECTURER', '/evaluator-assignment'],
+] as const)('%s cannot bypass the route guard at %s', async (role, path) => {
+  currentUser = { ...user(role), activeAppointments: [] }
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <App />
+    </MemoryRouter>,
+  )
+  await screen.findByRole('heading', { name: 'Không có quyền truy cập' })
+  expect(requested).not.toContain('/email-templates')
+  expect(requested).not.toContain('/evaluation-committees')
+  if (role === 'ADMIN') {
+    const academic = screen.getByRole('group', { name: 'Giám sát học thuật' })
+    expect(within(academic).getByRole('button', { name: 'Tiêu chuẩn đánh giá' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Phân công giảng viên' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Đề tài được giao' })).toBeNull()
+  }
+})
+
+it('expired dean and ADMIN plus LECTURER without appointment cannot assign evaluators', async () => {
+  currentUser = {
+    ...user('LECTURER'),
+    roles: ['ADMIN', 'LECTURER'],
+    activeAppointments: [
+      { ...user('LECTURER').activeAppointments[0], endsAt: '2020-02-01T00:00:00Z' },
+    ],
+  }
+  render(
+    <MemoryRouter initialEntries={['/evaluator-assignment']}>
+      <App />
+    </MemoryRouter>,
+  )
+  await screen.findByRole('heading', { name: 'Không có quyền truy cập' })
+  expect(screen.queryByRole('button', { name: 'Phân công giảng viên' })).toBeNull()
+})
+
+it('ordinary lecturers can read locked catalogs but cannot configure assessment', async () => {
+  currentUser = { ...user('LECTURER'), activeAppointments: [] }
+  render(
+    <MemoryRouter initialEntries={['/evaluations']}>
+      <App />
+    </MemoryRouter>,
+  )
+  await screen.findByText('Bộ tiêu chí đã khóa dùng cho các nhiệm vụ chấm điểm được phân công.')
+  expect(screen.queryByRole('button', { name: /Tiếp tục: Tạo/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Phân công giảng viên' })).toBeNull()
 })

@@ -2,17 +2,20 @@ import React from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import type { PositionCode, RoleCode } from '../types/domain'
+import { hasAcademicLeadership } from '../utils/managementAccess'
 
 interface ProtectedRouteProps {
   roles?: RoleCode[]
   appointments?: PositionCode[]
   requireAcademicManagement?: boolean
+  requireAcademicLeadership?: boolean
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   roles,
   appointments,
   requireAcademicManagement,
+  requireAcademicLeadership,
 }) => {
   const {
     user,
@@ -36,7 +39,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/" replace />
   }
 
-  if (requireAcademicManagement && !canAccessAcademicManagement()) {
+  if (
+    (requireAcademicManagement && !canAccessAcademicManagement()) ||
+    (requireAcademicLeadership && !hasAcademicLeadership(user))
+  ) {
     return (
       <div className="page-card error-container text-center py-12">
         <h2>Không có quyền truy cập</h2>

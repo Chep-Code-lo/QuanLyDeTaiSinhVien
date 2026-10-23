@@ -1,4 +1,4 @@
-import { formatDateTime, toLocalDateTimeInput } from '../utils/dateTime'
+import { formatDateTime, parseUtcDateTime, toLocalDateTimeInput } from '../utils/dateTime'
 import { DateTimeInput } from '../components/DateTimeInput'
 import { AnimatedSelect } from '../components/AnimatedSelect'
 import React, { useCallback, useEffect, useState } from 'react'
@@ -20,6 +20,12 @@ export const AcademicAppointmentsPage: React.FC = () => {
 
   const [appointments, setAppointments] = useState<AppointmentResponse[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentTime, setCurrentTime] = useState(() => Date.now())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(Date.now()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const [faculties, setFaculties] = useState<FacultyResponse[]>([])
   const [departments, setDepartments] = useState<DepartmentResponse[]>([])
@@ -201,7 +207,13 @@ export const AcademicAppointmentsPage: React.FC = () => {
                       )}
                     </td>
                     <td>
-                      {!item.endsAt && (
+                      {item.endsAt ? (
+                        <span className="badge badge-info">
+                          {parseUtcDateTime(item.endsAt).getTime() <= currentTime
+                            ? 'Đã kết thúc'
+                            : 'Đã đặt ngày kết thúc'}
+                        </span>
+                      ) : (
                         <button
                           type="button"
                           className="btn btn-outline btn-sm"

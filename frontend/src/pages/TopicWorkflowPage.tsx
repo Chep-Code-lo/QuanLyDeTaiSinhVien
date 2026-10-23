@@ -1,3 +1,4 @@
+import { hasAcademicLeadership } from '../utils/managementAccess'
 import { isAxiosError } from 'axios'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
@@ -31,7 +32,13 @@ export function TopicWorkflowPage() {
   const refresh = () => setRevision((value) => value + 1)
   return (
     <>
-      <PageHeader title="Đề xuất & Xét duyệt đề tài" />
+      <PageHeader
+        title={
+          user?.roles.includes('LECTURER') && !hasAcademicLeadership(user)
+            ? 'Đề xuất đề tài'
+            : 'Đề xuất & Xét duyệt đề tài'
+        }
+      />
       <section className="page-card">
         <div className="topic-workflow-toolbar">
           {(user?.student || user?.lecturer) && (
@@ -262,7 +269,9 @@ function TopicActions({
   const { user } = useAuth()
   const { showSuccess, showError } = useToast()
   const manager = canManageDepartment(user, topic.departmentId, topic.facultyId)
-  const owner = user?.id === topic.proposedBy || !!user?.roles.includes('ADMIN')
+  const owner =
+    !!user?.roles.some((role) => role === 'LECTURER' || role === 'STUDENT') &&
+    user.id === topic.proposedBy
   const [action, setAction] = useState<'review' | 'supervisors' | 'withdraw' | 'publish' | ''>('')
   const [decision, setDecision] = useState<TopicReviewDecision>('APPROVED')
   const [comment, setComment] = useState('')

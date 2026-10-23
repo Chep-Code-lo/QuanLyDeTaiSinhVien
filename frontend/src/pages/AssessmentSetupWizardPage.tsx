@@ -17,6 +17,8 @@ import { allPages } from '../api/student'
 import { AnimatedSelect } from '../components/AnimatedSelect'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { PageHeader } from '../components/PageHeader'
+import { useAuth } from '../context/AuthContext'
+import { canManageFaculty } from '../utils/managementAccess'
 import { useToast } from '../context/ToastContext'
 import { useRequestLoading } from '../hooks/useRequestLoading'
 import { componentTypeLabel } from '../utils/displayLabels'
@@ -44,6 +46,7 @@ const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Vui lòng thử lại.'
 
 export function AssessmentSetupWizardPage() {
+  const { user } = useAuth()
   const { showSuccess, showError } = useToast()
   const [step, setStep] = useState(1)
   const [periods, setPeriods] = useState<RegistrationPeriodResponse[]>([])
@@ -473,6 +476,66 @@ export function AssessmentSetupWizardPage() {
       </table>
     </div>
   )
+
+  const canConfigure =
+    !!user?.roles.includes('ADMIN') ||
+    canManageFaculty(user, periods.find((period) => period.id === periodId)?.facultyId ?? 0)
+
+  if (!canConfigure)
+    return (
+      <div className="assessment-setup-page">
+        <PageHeader title="Tiêu chuẩn đánh giá" />
+        <section className="page-card">
+          <p>Bộ tiêu chí đã khóa dùng cho các nhiệm vụ chấm điểm được phân công.</p>
+          <label htmlFor="assessment-period">Đợt đăng ký</label>
+          <AnimatedSelect
+            id="assessment-period"
+            value={periodId ?? ''}
+            onChange={(event) => {
+              setPeriodId(Number(event.target.value) || null)
+              resetSelection()
+            }}
+          >
+            {periods.map((period) => (
+              <option key={period.id} value={period.id}>
+                {period.name}
+              </option>
+            ))}
+          </AnimatedSelect>
+          <label htmlFor="assessment-existing">Thành phần đánh giá</label>
+          <AnimatedSelect
+            id="assessment-existing"
+            value={component?.id ?? ''}
+            onChange={(event) => {
+              const saved = components.find((item) => item.id === Number(event.target.value))
+              setComponent(saved ?? null)
+              setRubric(null)
+              setLoadingRubric(!!saved)
+            }}
+          >
+            <option value="">Chọn thành phần đánh giá</option>
+            {components.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </AnimatedSelect>
+          {loadError && <p role="alert">{loadError}</p>}
+          {(loadingPeriods || loadingRubric || loadingComponents) && (
+            <p role="status">Đang tải cấu hình đánh giá…</p>
+          )}
+          {rubric && (
+            <>
+              <h2>{rubric.name}</h2>
+              {criteriaTable(false, true)}
+            </>
+          )}
+          {!loadingComponents && components.length === 0 && (
+            <p>Chưa có thành phần đánh giá đã khóa.</p>
+          )}
+        </section>
+      </div>
+    )
 
   return (
     <div className="assessment-setup-page">

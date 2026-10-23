@@ -66,6 +66,7 @@ public class DefenseSessionService {
     private final RubricCriterionRepository criteria;
     private final EvaluationAssignmentRepository evaluations;
     private final EvaluationActorAccess actorAccess;
+    private final com.example.qldetai.feature.academic.service.AcademicAuthorization academicAuthorization;
     private final GroupMemberRepository groupMembers;
     private final NotificationService notifications;
 
@@ -127,6 +128,7 @@ public class DefenseSessionService {
                                         "Defense scheduling migration has not been applied."));
 
         ProjectAssignment assignment = assignment(request.assignmentId());
+        academicAuthorization.requireDepartmentManagement(assignment.getTopic().getDepartment().getId(), actorId);
         EvaluationCommittee committee = committee(request.committeeId());
         if (committee.getStatus() == CommitteeStatus.COMPLETED) {
             throw new BusinessRuleException(

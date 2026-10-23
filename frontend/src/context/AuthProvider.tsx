@@ -1,3 +1,4 @@
+import { academicAppointments, hasAcademicLeadership } from '../utils/managementAccess'
 import React, { useCallback, useEffect, useState } from 'react'
 import { authApi } from '../api/auth'
 import type { CurrentUser, PositionCode, RoleCode } from '../types/domain'
@@ -56,15 +57,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hasAppointment = useCallback(
     (position: PositionCode): boolean => {
-      return user?.activeAppointments?.some((apt) => apt.positionCode === position) ?? false
+      return academicAppointments(user).some((apt) => apt.positionCode === position)
     },
-    [user?.activeAppointments],
+    [user],
   )
 
   const canAccessAcademicManagement = (): boolean => {
     if (!user) return false
     if (hasRole('ADMIN')) return true
-    return hasAppointment('DEAN') || hasAppointment('DEPARTMENT_HEAD')
+    return hasAcademicLeadership(user)
   }
 
   return (

@@ -131,6 +131,9 @@ import java.util.Set;
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @Transactional
 class ProjectLifecycleIntegrationTests {
+    @org.springframework.beans.factory.annotation.Autowired
+    private jakarta.persistence.EntityManager academicFixtureEntityManager;
+
 
     @DynamicPropertySource
     static void isolatedResultEmailMysql(DynamicPropertyRegistry properties) {
@@ -820,6 +823,7 @@ class ProjectLifecycleIntegrationTests {
         department = createDepartment(faculty, "KTPM");
         semester = createSemester();
         admin = createUser("admin", "Backend 2 Admin", Set.of(RoleCode.ADMIN));
+        com.example.qldetai.support.AcademicManagerFixture.appointDean(academicFixtureEntityManager, admin, department, nowUtc());
         lecturerOne = createLecturer("GV01", "Giảng viên 1");
         lecturerTwo = createLecturer("GV02", "Giảng viên 2");
         lecturerThree = createLecturer("GV03", "Giảng viên 3");
@@ -1711,6 +1715,114 @@ class ProjectLifecycleIntegrationTests {
                         project.version(), status), admin.getId());
         assertThat(projectAssignmentService.listSupervised(lecturerOne.getUser().getId(), 0, 10).content())
                 .isEmpty();
+    }
+
+    @Test
+    void pureAdminAndOrdinaryLecturerCannotMakeAcademicDecisions(@Autowired MockMvc mvc) throws Exception {
+        var project = createAssignedProject("permission-matrix", leaderStudent, secondStudent);
+        var catalog = createLockedCatalog("permission-matrix", "Evaluation", AssessmentComponentType.OTHER);
+        Long evaluationId = evaluationService.assign(new CreateEvaluationRequest(project.id(),
+                catalog.rubric().id(), lecturerFour.getId(), null, nowUtc().plusDays(1)), admin.getId());
+        evaluationService.saveSheet(evaluationId, new SaveSheetRequest(0, "Complete",
+                scoreRequests(catalog.rubric(), new BigDecimal("6"), new BigDecimal("4")), true),
+                lecturerFour.getUser().getId());
+        var result = evaluationResultService.finalizeResult(project.id(), admin.getId());
+        User pureAdmin = createUser("observer-admin", "Observer Admin", Set.of(RoleCode.ADMIN));
+        for (User actor : List.of(pureAdmin, lecturerThree.getUser())) {
+            var principal = UserPrincipal.from(actor);
+            String assignmentPayload = "{\"assignmentId\":%d,\"rubricId\":%d,\"lecturerId\":%d,\"deadlineAt\":\"2099-01-01T00:00:00\"}"
+                    .formatted(project.id(), catalog.rubric().id(), lecturerFive.getId());
+            mvc.perform(post("/api/v1/evaluation-assignments")
+                            .with(user(principal)).with(csrf()).contentType("application/json")
+                            .content(assignmentPayload))
+                    .andExpect(status().isForbidden());
+            mvc.perform(post("/api/v1/evaluation-assignments/batch")
+                            .with(user(principal)).with(csrf()).contentType("application/json")
+                            .content("{\"assignments\":[" + assignmentPayload + "]}"))
+                    .andExpect(status().isForbidden());
+            mvc.perform(patch("/api/v1/topics/{id}/review", project.topicId())
+                            .with(user(principal)).with(csrf()).contentType("application/json")
+                            .content("{\"version\":0,\"decision\":\"APPROVED\",\"comment\":\"Approved\"}"))
+                    .andExpect(status().isForbidden());
+            mvc.perform(post("/api/v1/project-assignments/{id}/results/finalize", project.id())
+                            .with(user(principal)).with(csrf()))
+                    .andExpect(status().isForbidden());
+            mvc.perform(post("/api/v1/results/{id}/publish", result.id())
+                            .with(user(principal)).with(csrf()))
+                    .andExpect(status().isForbidden());
+            mvc.perform(post("/api/v1/evaluation-committees")
+                            .with(user(principal)).with(csrf()).contentType("application/json")
+                            .content("{\"periodId\":%d,\"name\":\"Forbidden\"}".formatted(period.getId())))
+                    .andExpect(status().isForbidden());
+            mvc.perform(put("/api/v1/evaluation-assignments/{id}/score-sheet", evaluationId)
+                            .with(user(principal)).with(csrf()).contentType("application/json")
+                            .content("{\"version\":0,\"submit\":false,\"scores\":[{\"criterionId\":1,\"score\":0}]}"))
+                    .andExpect(status().isForbidden());
+        }
+        mvc.perform(get("/api/v1/project-assignments/{id}", project.id())
+                        .with(user(UserPrincipal.from(pureAdmin))))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/project-assignments/{id}", project.id())
+                        .with(user(UserPrincipal.from(lecturerThree.getUser()))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/project-assignments/{id}/results/actions", project.id())
+                        .with(user(UserPrincipal.from(lecturerThree.getUser()))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/groups/{id}", project.groupId())
+                        .with(user(UserPrincipal.from(lecturerThree.getUser()))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/topic-registrations/{id}", project.registrationId())
+                        .with(user(UserPrincipal.from(lecturerThree.getUser()))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/project-assignments").with(user(UserPrincipal.from(lecturerThree.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        mvc.perform(get("/api/v1/groups").with(user(UserPrincipal.from(lecturerOne.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1));
+        mvc.perform(get("/api/v1/topic-registrations").with(user(UserPrincipal.from(lecturerThree.getUser()))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        for (User actor : List.of(lecturerOne.getUser(), lecturerThree.getUser())) {
+            for (String path : List.of("/notification-settings", "/email-templates", "/email-recipients", "/email-logs")) {
+                mvc.perform(get("/api/v1" + path).with(user(UserPrincipal.from(actor))))
+                        .andExpect(status().isForbidden());
+            }
+        }
+    }
+
+    @Test
+    void deanAuthorityExpiresAndDoesNotCrossFacultyBoundaries(@Autowired MockMvc mvc) throws Exception {
+        TopicResponse topic = topicService.create(new CreateTopicRequest(period.getId(), "SCOPED",
+                "Scoped proposal", "Description", "Objectives", "Outcomes", null, VisibilityType.OPEN, null),
+                lecturerOne.getUser().getId());
+        var appointment = new AcademicAppointment();
+        appointment.setLecturer(lecturerFive);
+        appointment.setFaculty(faculty);
+        appointment.setPositionCode(PositionCode.DEAN);
+        appointment.setStartsAt(nowUtc().minusDays(1));
+        appointment.setEndsAt(nowUtc().plusDays(1));
+        appointment.setAssignedBy(admin);
+        academicFixtureEntityManager.persist(appointment);
+        academicFixtureEntityManager.flush();
+        var principal = UserPrincipal.from(lecturerFive.getUser());
+        mvc.perform(get("/api/v1/notification-settings").with(user(principal)))
+                .andExpect(status().isForbidden());
+        mvc.perform(patch("/api/v1/topics/{id}/review", topic.id())
+                        .with(user(principal)).with(csrf()).contentType("application/json")
+                        .content("{\"version\":%d,\"decision\":\"APPROVED\",\"comment\":\"Approved\"}".formatted(topic.version())))
+                .andExpect(status().isOk());
+        appointment.setEndsAt(nowUtc().minusMinutes(1));
+        academicFixtureEntityManager.flush();
+        var current = topicService.get(topic.id(), admin.getId());
+        mvc.perform(patch("/api/v1/topics/{id}/publish", topic.id())
+                        .with(user(principal)).with(csrf()).contentType("application/json")
+                        .content("{\"version\":%d}".formatted(current.version())))
+                .andExpect(status().isForbidden());
+        appointment.setEndsAt(nowUtc().plusDays(1));
+        appointment.setFaculty(createFaculty("OTHER"));
+        academicFixtureEntityManager.flush();
+        mvc.perform(patch("/api/v1/topics/{id}/review", topic.id())
+                        .with(user(principal)).with(csrf()).contentType("application/json")
+                        .content("{\"version\":%d,\"decision\":\"APPROVED\",\"comment\":\"Approved\"}".formatted(current.version())))
+                .andExpect(status().isForbidden());
     }
 
     private TopicResponse createPublishedTopic(String code) {

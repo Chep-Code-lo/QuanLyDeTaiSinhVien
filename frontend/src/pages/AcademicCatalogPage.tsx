@@ -122,7 +122,7 @@ export function AcademicCatalogPage() {
                       <td>{item.facultyName}</td>
                       <td>{item.active === false ? 'Ngừng hoạt động' : 'Hoạt động'}</td>
                       <td>
-                        {canManageDepartment(user, item.id, item.facultyId) && (
+                        {(admin || canManageDepartment(user, item.id, item.facultyId)) && (
                           <button
                             type="button"
                             className="btn btn-secondary"

@@ -48,6 +48,9 @@ import java.time.LocalDateTime;
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @Transactional
 class RegistrationTopicCreationServiceTests {
+    @org.springframework.beans.factory.annotation.Autowired
+    private jakarta.persistence.EntityManager academicFixtureEntityManager;
+
 
     private final TopicService topicService;
     private final FacultyRepository facultyRepository;
@@ -116,6 +119,7 @@ class RegistrationTopicCreationServiceTests {
 
         manager = createUser("manager-" + suffix, "Quản lý bộ môn", now);
         primaryLecturer = createLecturer("primary-" + suffix, "GV hướng dẫn chính", now);
+        com.example.qldetai.support.AcademicManagerFixture.appointDean(academicFixtureEntityManager, manager, department, now);
         secondaryLecturer = createLecturer("secondary-" + suffix, "GV đồng hướng dẫn", now);
 
         period = new RegistrationPeriod();
@@ -174,7 +178,7 @@ class RegistrationTopicCreationServiceTests {
                 registrationTopicRequest("API-" + Long.toUnsignedString(System.nanoTime(), 36));
         mockMvc.perform(
                         post("/api/v1/topics/for-registration")
-                                .with(user(UserPrincipal.from(manager)))
+                                .with(user(UserPrincipal.from(secondaryLecturer.getUser())))
                                 .with(csrf())
                                 .contentType("application/json")
                                 .content(request))
@@ -223,6 +227,9 @@ class RegistrationTopicCreationServiceTests {
         user.setStatus(UserStatus.ACTIVE);
         user.setCreatedAt(now);
         user.setUpdatedAt(now);
+        user.replaceRoles(java.util.Set.of(academicFixtureEntityManager.createQuery(
+                "select r from Role r where r.code = :code", com.example.qldetai.feature.identity.domain.Role.class)
+                .setParameter("code", com.example.qldetai.feature.identity.domain.RoleCode.LECTURER).getSingleResult()), now);
         return userRepository.save(user);
     }
 

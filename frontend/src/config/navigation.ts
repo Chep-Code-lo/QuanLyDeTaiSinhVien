@@ -31,20 +31,27 @@ export type NavigationItem = {
   roles?: RoleCode[]
   appointments?: PositionCode[]
   requireAcademicManagement?: boolean
+  requireAcademicLeadership?: boolean
   adminOnly?: boolean
 }
 
 export const navigationItems: NavigationItem[] = [
   { group: 'general', icon: Home, label: 'Tổng quan', to: '/dashboard' },
   { group: 'projects', icon: BookOpen, label: 'Đề tài & đăng ký', to: '/topics' },
-  { group: 'projects', icon: BookOpen, label: 'Đề xuất & Xét duyệt', to: '/topic-workflow' },
+  {
+    group: 'projects',
+    icon: BookOpen,
+    label: 'Đề xuất & Xét duyệt',
+    to: '/topic-workflow',
+    roles: ['LECTURER', 'STUDENT'],
+  },
   { group: 'projects', icon: UsersRound, label: 'Nhóm đề tài', to: '/groups' },
   {
     group: 'projects',
     icon: ClipboardCheck,
     label: 'Đề tài được giao',
     to: '/project-assignments',
-    roles: ['LECTURER', 'ADMIN'],
+    roles: ['LECTURER'],
   },
   { group: 'projects', icon: ListChecks, label: 'Tiến độ & Mốc báo cáo', to: '/progress' },
   {
@@ -60,6 +67,7 @@ export const navigationItems: NavigationItem[] = [
     label: 'Phân công giảng viên',
     to: '/evaluator-assignment',
     roles: ['LECTURER', 'ADMIN'],
+    requireAcademicLeadership: true,
   },
   {
     group: 'evaluation',
@@ -122,7 +130,7 @@ export const navigationItems: NavigationItem[] = [
     icon: Mail,
     label: 'Cấu hình email',
     to: '/email-settings',
-    roles: ['ADMIN', 'LECTURER'],
+    adminOnly: true,
   },
   {
     group: 'management',

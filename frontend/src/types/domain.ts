@@ -628,6 +628,8 @@ export interface GroupInvitationResponse {
 }
 
 export interface TopicRegistrationResponse {
+  departmentId?: number
+  facultyId?: number
   id: number
   periodId: number
   periodName: string

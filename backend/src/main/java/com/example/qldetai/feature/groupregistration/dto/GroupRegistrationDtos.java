@@ -92,5 +92,5 @@ public final class GroupRegistrationDtos {
             String reviewedByName,
             LocalDateTime reviewedAt,
             String decisionReason,
-            int version) {}
+            int version, Long departmentId, Long facultyId) {}
 }

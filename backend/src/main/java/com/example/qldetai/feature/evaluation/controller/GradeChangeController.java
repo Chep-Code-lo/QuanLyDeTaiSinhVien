@@ -70,7 +70,7 @@ public class GradeChangeController {
 
     @PatchMapping("/grade-change-requests/{id}/review")
     @PreAuthorize(
-            "hasRole('ADMIN') or @evaluationAuthorization.canManageGradeChange(#id,"
+            "@evaluationAuthorization.canManageGradeChange(#id,"
                     + " authentication)")
     public ApiResponse<Void> review(
             @PathVariable Long id,

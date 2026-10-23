@@ -42,8 +42,9 @@ public class GroupController {
     public ApiResponse<PageResponse<StudentGroupResponse>> list(
             @RequestParam(required = false) Long periodId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(groupService.list(periodId, page, size));
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(groupService.list(periodId, page, size, principal.id()));
     }
 
     @GetMapping("/mine")
@@ -55,7 +56,8 @@ public class GroupController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
-    public ApiResponse<StudentGroupResponse> get(@PathVariable Long id) {
+    public ApiResponse<StudentGroupResponse> get(@PathVariable Long id, @AuthenticationPrincipal UserPrincipal principal) {
+        if (!groupService.canRead(id, principal.id())) throw new org.springframework.security.access.AccessDeniedException("You cannot view this record.");
         return ApiResponse.success(groupService.get(id));
     }
 

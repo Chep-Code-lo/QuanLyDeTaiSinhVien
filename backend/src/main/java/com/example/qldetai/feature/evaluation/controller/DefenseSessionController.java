@@ -40,7 +40,7 @@ public class DefenseSessionController {
 
     @GetMapping("/defense-sessions/eligibility")
     @PreAuthorize(
-            "hasRole('ADMIN') or (@projectAuthorization.canManageAssignment(#assignmentId, authentication) and @evaluationAuthorization.canManageCommittee(#committeeId, authentication))")
+            "(@projectAuthorization.canManageAssignment(#assignmentId, authentication) and @evaluationAuthorization.canManageCommittee(#committeeId, authentication))")
     public ApiResponse<
                     com.example.qldetai.feature.evaluation.dto.EvaluationAdminDtos
                             .DefenseEligibilityResponse>
@@ -96,7 +96,7 @@ public class DefenseSessionController {
 
     @PostMapping("/defense-sessions")
     @PreAuthorize(
-            "hasRole('ADMIN') or (@projectAuthorization.canManageAssignment(#request.assignmentId,"
+            "(@projectAuthorization.canManageAssignment(#request.assignmentId,"
                     + " authentication) and"
                     + " @evaluationAuthorization.canManageCommittee(#request.committeeId,"
                     + " authentication))")

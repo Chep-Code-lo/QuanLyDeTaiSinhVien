@@ -105,6 +105,11 @@ vi.mock('../src/api/evaluation', () => ({
   },
 }))
 vi.mock('../src/api/lecturers', () => ({ lecturerApi: { list: async () => page([]) } }))
+const academicManager = vi.hoisted(() => ({
+  roles: ['LECTURER'],
+  activeAppointments: [{ positionCode: 'DEAN', facultyId: 1, startsAt: '2020-01-01T00:00:00Z' }],
+}))
+vi.mock('../src/context/AuthContext', () => ({ useAuth: () => ({ user: academicManager }) }))
 vi.mock('../src/context/ToastContext', () => ({
   useToast: () => ({ showSuccess: mocks.success, showError: mocks.error }),
 }))
@@ -129,7 +134,7 @@ beforeEach(() => {
   mocks.assignments.mockResolvedValue(page([]))
   mocks.periods.mockReset()
   mocks.periods.mockResolvedValue(
-    page([{ id: 1, name: 'Đợt A', minCommitteeMembers: 3, maxCommitteeMembers: 5 }]),
+    page([{ id: 1, facultyId: 1, name: 'Đợt A', minCommitteeMembers: 3, maxCommitteeMembers: 5 }]),
   )
   mocks.saveCommittee.mockReset()
   mocks.saveCommittee.mockResolvedValue(committee)
@@ -140,9 +145,27 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
+it('dean sees only registration periods within the appointed faculty', async () => {
+  mocks.periods.mockResolvedValue(page([
+    { id: 1, facultyId: 1, name: 'Managed period' },
+    { id: 2, facultyId: 2, name: 'Other faculty period' },
+  ]))
+  render(<EvaluatorAssignmentPage />)
+  await screen.findByRole('option', { name: 'Managed period' })
+  expect(screen.queryByRole('option', { name: 'Other faculty period' })).toBeNull()
+})
+
 it('truyền defenseDate từ API đợt vào form lịch của hội đồng KLTN', async () => {
   mocks.periods.mockResolvedValue(
-    page([{ id: 1, name: 'Đợt KLTN', projectType: 'GRADUATION', defenseDate: '2027-05-01' }]),
+    page([
+      {
+        id: 1,
+        facultyId: 1,
+        name: 'Đợt KLTN',
+        projectType: 'GRADUATION',
+        defenseDate: '2027-05-01',
+      },
+    ]),
   )
   render(<EvaluatorAssignmentPage />)
   await screen.findByRole('option', { name: 'Đợt KLTN' })

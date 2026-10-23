@@ -1,3 +1,4 @@
+import { hasAcademicLeadership } from '../utils/managementAccess'
 import { DateTimeInput } from '../components/DateTimeInput'
 import { AnimatedSelect } from '../components/AnimatedSelect'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -270,7 +271,13 @@ export function GroupsPage() {
 
   return (
     <>
-      <PageHeader title="Nhóm đề tài" />
+      <PageHeader
+        title={
+          user?.roles?.includes('LECTURER') && !hasAcademicLeadership(user)
+            ? 'Nhóm hướng dẫn'
+            : 'Nhóm đề tài'
+        }
+      />
 
       {student && incoming.some((invitation) => invitation.status === 'PENDING') && (
         <section className="page-card">

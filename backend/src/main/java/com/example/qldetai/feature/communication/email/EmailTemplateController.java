@@ -25,7 +25,7 @@ import java.net.URI;
 @Validated
 @RestController
 @RequestMapping("/api/v1/email-templates")
-@PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+@PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 public class EmailTemplateController {
     private final EmailTemplateService templates;

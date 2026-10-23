@@ -63,6 +63,8 @@ public class ProjectAssignmentService {
     private final NotificationService notificationService;
     private final EmailNotificationEventService emailNotificationEventService;
     private final Clock clock;
+    private final com.example.qldetai.feature.academic.service.AcademicAuthorization academicAuthorization;
+    private final com.example.qldetai.feature.academic.service.AcademicReadScope readScope;
 
     @Transactional(readOnly = true)
     public PageResponse<ProjectAssignmentResponse> list(
@@ -80,6 +82,20 @@ public class ProjectAssignmentService {
             assignments = projectAssignmentRepository.findAll(pageable);
         }
         return PageResponse.from(assignments.map(this::toResponse));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<ProjectAssignmentResponse> list(Long periodId, AssignmentStatus status, int page, int size, Long actorId) {
+        var scope = readScope.projects(actorId);
+        if (periodId != null) scope = scope.and((r, q, cb) -> cb.equal(r.get("period").get("id"), periodId));
+        if (status != null) scope = scope.and((r, q, cb) -> cb.equal(r.get("status"), status));
+        return PageResponse.from(projectAssignmentRepository.findAll(scope,
+                PageRequest.of(page, size, Sort.by("assignedAt").descending())).map(this::toResponse));
+    }
+
+    @Transactional(readOnly = true)
+    public boolean canRead(Long id, Long actorId) {
+        return projectAssignmentRepository.exists(readScope.projects(actorId).and((r, q, cb) -> cb.equal(r.get("id"), id)));
     }
 
     @Transactional(readOnly = true)
@@ -125,6 +141,7 @@ public class ProjectAssignmentService {
     public ProjectAssignmentResponse create(CreateAssignmentRequest request, Long actorId) {
         User actor = requireManager(actorId);
         TopicRegistration registration = requireRegistration(request.registrationId());
+        academicAuthorization.requireDepartmentManagement(registration.getTopic().getDepartment().getId(), actorId);
         return createForApprovedRegistration(registration, actor);
     }
 
@@ -202,6 +219,7 @@ public class ProjectAssignmentService {
             Long id, UpdateAssignmentStatusRequest request, Long actorId) {
         ProjectAssignment assignment = requireAssignment(id);
         requireManager(actorId);
+        academicAuthorization.requireDepartmentManagement(assignment.getTopic().getDepartment().getId(), actorId);
         verifyVersion(assignment, request.version());
         if (!TRANSITIONS.get(assignment.getStatus()).contains(request.status())) {
             throw new BusinessRuleException(
