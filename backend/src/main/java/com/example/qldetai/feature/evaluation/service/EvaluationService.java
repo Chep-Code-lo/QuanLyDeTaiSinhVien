@@ -403,6 +403,9 @@ public class EvaluationService {
                 throw new BusinessRuleException(
                         "The defense session does not belong to the selected project assignment.");
             }
+            if (defense.getStatus() == com.example.qldetai.feature.evaluation.domain.DefenseStatus.CANCELLED) {
+                throw new BusinessRuleException("Không thể phân công chấm cho phiên bảo vệ đã hủy.");
+            }
             boolean memberOfCommittee =
                     committeeMembers.findByCommitteeId(defense.getCommittee().getId()).stream()
                             .anyMatch(
@@ -501,6 +504,11 @@ public class EvaluationService {
         if (evaluation.getStatus() != EvaluationStatus.ACTIVE) {
             throw new BusinessRuleException(
                     "Only an active evaluation assignment can receive scores.");
+        }
+        if (evaluation.getDefense() != null
+                && evaluation.getDefense().getStatus()
+                        == com.example.qldetai.feature.evaluation.domain.DefenseStatus.CANCELLED) {
+            throw new BusinessRuleException("Không thể chấm điểm cho phiên bảo vệ đã hủy.");
         }
         LocalDateTime now = LocalDateTime.now(clock);
         if (now.isAfter(evaluation.getDeadlineAt())) {

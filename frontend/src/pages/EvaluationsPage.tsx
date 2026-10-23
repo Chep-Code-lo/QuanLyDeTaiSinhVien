@@ -219,9 +219,19 @@ function ScoreSheetEditor({ assignment }: { assignment: EvaluationAssignmentResp
           </div>
           <p>Hạn chấm: {formatDateTime(assignment.deadlineAt)}</p>
           {!editable && (
-            <p className="student-notice">
-              Phiếu đã nộp, đã khóa hoặc phân công đã hủy. Bạn có thể xem lại điểm và nhận xét.
-            </p>
+            <div className="mb-6">
+              <p className="student-notice">
+                Phiếu đã nộp, đã khóa hoặc phân công đã hủy. Bạn có thể xem lại điểm và nhận xét.
+                Nếu yêu cầu đổi điểm vừa được duyệt, hãy làm mới phiếu để cập nhật trạng thái.
+              </p>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setRevision((value) => value + 1)}
+              >
+                Làm mới phiếu
+              </button>
+            </div>
           )}
           {sheet.id &&
             assignment.status === 'ACTIVE' &&

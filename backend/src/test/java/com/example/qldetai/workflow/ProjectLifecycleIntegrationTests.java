@@ -929,6 +929,13 @@ class ProjectLifecycleIntegrationTests {
     @Test
     void topicRegistrationCanBeSubmittedAndApproved() {
         TopicResponse topic = createPublishedTopic("dt-reg-01");
+        if (System.getProperty("result.email.mysql.url") != null) {
+            // Keep the non-overlapping SQL windows and advance to the registration phase.
+            period.setProposalEndAt(nowUtc().minusDays(1));
+            period.setRegistrationStartAt(nowUtc().minusHours(1));
+            period.setRegistrationEndAt(nowUtc().plusDays(2));
+            registrationPeriodRepository.flush();
+        }
         StudentGroupResponse group =
                 createActiveGroup("Nhóm đăng ký", leaderStudent, secondStudent);
 
@@ -2259,7 +2266,8 @@ class ProjectLifecycleIntegrationTests {
     }
 
     @Test
-    void departmentHeadDoesNotGainDeanSchedulingAuthorityOrManageAnotherDepartment() {
+    void departmentHeadDoesNotGainDeanSchedulingAuthorityOrManageAnotherDepartment(
+            @Autowired MockMvc mvc) throws Exception {
         var fixture = configuredCouncilFixture("head-scope");
         var appointment = new AcademicAppointment();
         appointment.setLecturer(lecturerFour);
@@ -2281,6 +2289,19 @@ class ProjectLifecycleIntegrationTests {
         assertThatThrownBy(() -> defenseSessionService.schedule(new CreateDefenseRequest(fixture.project().id(), committeeId,
                 "A102", nowUtc().plusDays(3), nowUtc().plusDays(3).plusHours(1)), lecturerFour.getUser().getId()))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        mvc.perform(get("/api/v1/defense-sessions/eligibility")
+                        .param("assignmentId", fixture.project().id().toString())
+                        .param("committeeId", committeeId.toString())
+                        .with(user(UserPrincipal.from(lecturerFour.getUser()))))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/defense-sessions")
+                        .with(user(UserPrincipal.from(lecturerFour.getUser()))).with(csrf())
+                        .contentType("application/json")
+                        .content("""
+                                {"assignmentId":%d,"committeeId":%d,"location":"A102",
+                                 "startsAt":"2099-01-01T08:00:00","endsAt":"2099-01-01T09:00:00"}
+                                """.formatted(fixture.project().id(), committeeId)))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -2330,6 +2351,42 @@ class ProjectLifecycleIntegrationTests {
                 .extracting(role -> role.getRole().getCode()).containsExactly(RoleCode.STUDENT);
         assertThat(evaluationService.listComponents(period.getId(), lecturerFive.getUser().getId()))
                 .extracting(item -> item.id()).doesNotContain(draft.id());
+    }
+
+    @Test
+    void cancelledDefenseCannotReceiveNewCommitteeEvaluators() {
+        var fixture = configuredCouncilFixture("cancelled-defense-assign");
+        academicFixtureEntityManager.find(
+                com.example.qldetai.feature.evaluation.domain.DefenseSession.class,
+                fixture.defenseId()).setStatus(
+                        com.example.qldetai.feature.evaluation.domain.DefenseStatus.CANCELLED);
+        assertThatThrownBy(() -> evaluationService.assign(new CreateEvaluationRequest(
+                fixture.project().id(), fixture.catalog().rubric().id(), lecturerFour.getId(),
+                fixture.defenseId(), nowUtc().plusDays(1)), admin.getId()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("đã hủy");
+    }
+
+    @Test
+    void cancelledDefenseCannotReceiveDraftOrSubmittedCommitteeScores() {
+        var fixture = configuredCouncilFixture("cancelled-defense-score");
+        Long evaluationId = evaluationService.assign(new CreateEvaluationRequest(
+                fixture.project().id(), fixture.catalog().rubric().id(), lecturerFour.getId(),
+                fixture.defenseId(), nowUtc().plusDays(1)), admin.getId());
+        academicFixtureEntityManager.find(
+                com.example.qldetai.feature.evaluation.domain.DefenseSession.class,
+                fixture.defenseId()).setStatus(
+                        com.example.qldetai.feature.evaluation.domain.DefenseStatus.CANCELLED);
+        for (boolean submit : List.of(false, true)) {
+            assertThatThrownBy(() -> evaluationService.saveSheet(evaluationId,
+                    new SaveSheetRequest(0, "Cancelled defense", scoreRequests(
+                            fixture.catalog().rubric(), new BigDecimal("6"), new BigDecimal("4")),
+                            submit), lecturerFour.getUser().getId()))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("đã hủy");
+        }
+        assertThat(evaluationService.mySheet(evaluationId, lecturerFour.getUser().getId()).id())
+                .isNull();
     }
 
     private ConfiguredCouncilFixture configuredCouncilFixture(String code) {
@@ -2951,6 +3008,8 @@ class ProjectLifecycleIntegrationTests {
     }
 
     private Semester createSemester() {
+        var existing = semesterRepository.findByAcademicYearIgnoreCaseAndSemesterNo("2026-2027", 1);
+        if (existing.isPresent()) return existing.get();
         Semester entity = new Semester();
         entity.setAcademicYear("2026-2027");
         entity.setSemesterNo(1);

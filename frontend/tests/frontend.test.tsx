@@ -533,6 +533,25 @@ describe('Hồi quy frontend', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Nộp phiếu chấm' })).toBeNull())
   })
 
+  it('tải lại phiếu đã nộp sau khi yêu cầu đổi điểm được duyệt mà không phải rời trang', async () => {
+    mocks.sheet.mockResolvedValueOnce({ ...draft, id: 6, status: 'SUBMITTED', version: 1 })
+    mount(<EvaluationsPage />)
+    const input = await screen.findByLabelText('Chất lượng sản phẩm (tối đa 10 điểm)')
+    expect(input.closest('fieldset')?.disabled).toBe(true)
+    mocks.sheet.mockResolvedValue({
+      ...draft, id: 6, version: 2,
+      scores: [{ criterionId: 12, score: 8, comment: 'Điểm cũ' }],
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Làm mới phiếu' }))
+    await waitFor(() => {
+      const refreshed = screen.getByLabelText('Chất lượng sản phẩm (tối đa 10 điểm)')
+      expect(refreshed.closest('fieldset')?.disabled).toBe(false)
+      expect((refreshed as HTMLInputElement).value).toBe('8')
+    })
+    expect(screen.queryByRole('button', { name: 'Làm mới phiếu' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Nộp phiếu chấm' })).toBeTruthy()
+  })
+
   it('nộp phản biện xác nhận đã thông báo quản lý và chuyển phiếu sang chỉ xem', async () => {
     mocks.assignments.mockResolvedValue(page([{ ...assignment, evaluatorRole: 'REVIEWER' }]))
     mount(<EvaluationsPage />)
