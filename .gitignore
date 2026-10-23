@@ -13,9 +13,14 @@ backend/.project
 backend/.settings/
 
 # Node / Vite
-frontend/node_modules/
+node_modules/
 frontend/dist/
 frontend/.vite/
+*.tsbuildinfo
+*.log
+
+# Generated deployment packages
+artifacts/
 
 # IDE and OS files
 .idea/
