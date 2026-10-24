@@ -2,6 +2,21 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { localizeApiError, vietnameseErrorMessage } from '../src/utils/errorMessages.ts'
 
+test('group errors retain their specific reason through the shared Axios interceptor', () => {
+  for (const [message, expected] of [
+    ['Student already belongs to an active group.', /đã thuộc một nhóm/],
+    ['Student must belong to the same faculty as the registration period.', /cùng khoa/],
+    ['Student groups can only be created in an active registration period.', /chưa hoạt động hoặc đã đóng/],
+    ['Student groups can only be managed during the registration window.', /thời gian mở đăng ký/],
+    ['The group has reached its configured maximum number of members.', /tối đa/],
+    ['Invitation expiry must be in the future.', /sau thời điểm hiện tại/],
+  ]) {
+    const error = localizeApiError({ response: { status: 400, data: { message } } })
+    assert.match(error.message, expected)
+    assert.equal(error.response.data.message, error.message)
+  }
+})
+
 test('permission and legacy mixed-language toast messages are Vietnamese', () => {
   assert.equal(
     vietnameseErrorMessage('You do not have permission to perform this action.'),

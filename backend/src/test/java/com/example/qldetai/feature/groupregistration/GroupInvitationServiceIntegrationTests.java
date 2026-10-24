@@ -170,6 +170,25 @@ class GroupInvitationServiceIntegrationTests {
         period = periodRepository.save(period);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"CLOSED,đã đóng", "CANCELLED,đã bị hủy", "DRAFT,chưa được mở"})
+    void creatingGroupReportsTheSpecificPeriodStatus(RegistrationPeriodStatus status, String reason) {
+        period.setStatus(status);
+        periodRepository.saveAndFlush(period);
+        assertThatThrownBy(this::createGroup)
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining(reason);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void creatingGroupDistinguishesFutureAndExpiredRegistrationWindows(boolean future) {
+        if (future) period.setRegistrationStartAt(now().plusHours(1));
+        else period.setRegistrationEndAt(now().minusMinutes(1));
+        periodRepository.saveAndFlush(period);
+        assertThatThrownBy(this::createGroup).isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining(future ? "Chưa đến thời gian" : "Đã hết thời gian");
+    }
+
     @Test
     void rubricGroupRemainsFormingUntilThreeAndRejectsSixthStudent() {
         period.setMinGroupMembers(3);

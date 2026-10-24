@@ -277,13 +277,18 @@ public class GroupService {
                                                 "Registration period was not found."));
         if (period.getStatus() != RegistrationPeriodStatus.ACTIVE) {
             throw new BusinessRuleException(
-                    "Student groups can only be created in an active registration period.");
+                    switch (period.getStatus()) {
+                        case CLOSED -> "Đợt đăng ký đã đóng, không thể tạo nhóm mới.";
+                        case CANCELLED -> "Đợt đăng ký đã bị hủy, không thể tạo nhóm mới.";
+                        default -> "Đợt đăng ký chưa được mở, không thể tạo nhóm mới.";
+                    });
         }
         LocalDateTime now = LocalDateTime.now(clock);
-        if (now.isBefore(period.getRegistrationStartAt())
-                || now.isAfter(period.getRegistrationEndAt())) {
-            throw new BusinessRuleException(
-                    "Student groups can only be managed during the registration window.");
+        if (now.isBefore(period.getRegistrationStartAt())) {
+            throw new BusinessRuleException("Chưa đến thời gian đăng ký của sinh viên, không thể tạo nhóm mới.");
+        }
+        if (now.isAfter(period.getRegistrationEndAt())) {
+            throw new BusinessRuleException("Đã hết thời gian đăng ký của sinh viên, không thể tạo nhóm mới.");
         }
         return period;
     }

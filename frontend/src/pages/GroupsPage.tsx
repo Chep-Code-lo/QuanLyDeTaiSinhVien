@@ -11,6 +11,7 @@ import { PageHeader } from '../components/PageHeader'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { SelectionPanel } from '../components/SelectionPanel'
 import { StatusBadge } from '../components/StatusBadge'
+import { vietnameseErrorMessage } from '../utils/errorMessages'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { parseUtcDateTime, toLocalDateTimeInput, formatDateTime } from '../utils/dateTime'
@@ -19,34 +20,6 @@ import type {
   RegistrationPeriodResponse,
   StudentGroupResponse,
 } from '../types/domain'
-
-const invitationMessages: Record<string, string> = {
-  'Invitation expiry must be in the future.': 'Hạn lời mời phải sau thời điểm hiện tại.',
-  'Invitation expiry must be within the configured invitation lifetime and registration window.':
-    'Hạn lời mời vượt quá số giờ cho phép hoặc thời điểm đóng đăng ký. Hãy chọn lại hạn lời mời.',
-  'Student was not found.':
-    'Không tìm thấy sinh viên có mã số này. Hãy kiểm tra lại mã số sinh viên.',
-  'This student already has a pending invitation to the group.':
-    'Sinh viên này đã có lời mời vào nhóm đang chờ phản hồi.',
-  'Student already belongs to an active group in this registration period.':
-    'Sinh viên này đã tham gia một nhóm trong đợt đăng ký này.',
-  'All group members must belong to the same faculty as the registration period.':
-    'Sinh viên được mời phải thuộc cùng khoa với đợt đăng ký.',
-  'The group has reached its configured maximum number of members.':
-    'Nhóm đã đủ số thành viên tối đa của đợt đăng ký.',
-  'Group invitations are only available in an active registration period.':
-    'Chỉ có thể mời sinh viên khi đợt đăng ký đang hoạt động.',
-  'Group invitations are only available during the registration window.':
-    'Chỉ có thể mời sinh viên trong thời gian mở đăng ký.',
-  'Student already belongs to an active group.':
-    'Bạn đã thuộc một nhóm đang hoạt động trong đợt đăng ký này.',
-  'Student groups can only be created in an active registration period.':
-    'Chỉ có thể tạo nhóm trong đợt đăng ký đang hoạt động.',
-  'Student groups can only be managed during the registration window.':
-    'Chỉ có thể tạo nhóm trong thời gian mở đăng ký.',
-  'Student must belong to the same faculty as the registration period.':
-    'Bạn cần thuộc cùng khoa với đợt đăng ký để tạo nhóm.',
-}
 
 const messageOf = (error: unknown) => {
   if (!isAxiosError(error)) return 'Không thể thực hiện thao tác. Vui lòng thử lại.'
@@ -58,8 +31,18 @@ const messageOf = (error: unknown) => {
     }
     return 'Không kết nối được máy chủ. Hãy kiểm tra mạng rồi thử lại.'
   }
-  const message = error.response.data?.message
-  return invitationMessages[message] || message || 'Không thể thực hiện thao tác. Vui lòng thử lại.'
+  return vietnameseErrorMessage(error.response.data?.message, error.response.status)
+}
+
+function createPeriodError(period: RegistrationPeriodResponse, now: number) {
+  if (period.status === 'CLOSED') return 'Đợt đăng ký đã đóng, không thể tạo nhóm mới.'
+  if (period.status === 'CANCELLED') return 'Đợt đăng ký đã bị hủy, không thể tạo nhóm mới.'
+  if (period.status !== 'ACTIVE') return 'Đợt đăng ký chưa được mở, không thể tạo nhóm mới.'
+  if (now < parseUtcDateTime(period.registrationStartAt).getTime())
+    return 'Chưa đến thời gian đăng ký của sinh viên, không thể tạo nhóm mới.'
+  if (now > parseUtcDateTime(period.registrationEndAt).getTime())
+    return 'Đã hết thời gian đăng ký của sinh viên, không thể tạo nhóm mới.'
+  return ''
 }
 
 function latestInvitationExpiry(period: RegistrationPeriodResponse, now: number) {
@@ -94,6 +77,7 @@ export function GroupsPage() {
   const [actionBusy, setActionBusy] = useState(false)
   const [currentTime, setCurrentTime] = useState(() => new Date().getTime())
   const student = hasRole('STUDENT')
+  const creationPeriods = periods.filter((period) => !createPeriodError(period, currentTime))
   const [loading, setLoading] = useRequestLoading(
     JSON.stringify([periodId, student, user?.id, page]),
   )
@@ -183,6 +167,10 @@ export function GroupsPage() {
     event.preventDefault()
     if (creating) return
     if (!periodId || !name.trim()) return showError('Hãy chọn đợt đăng ký và nhập tên nhóm.')
+    const selectedPeriod = periods.find((period) => period.id === periodId)
+    if (!selectedPeriod) return showError('Không tìm thấy đợt đăng ký. Vui lòng tải lại trang.')
+    const periodError = createPeriodError(selectedPeriod, Date.now())
+    if (periodError) return showError(periodError)
     setCreating(true)
     try {
       await groupApi.create({ periodId, name: name.trim() })
@@ -323,8 +311,9 @@ export function GroupsPage() {
           <h2 className="section-title">Tạo nhóm mới</h2>
           <form className="inline-form" onSubmit={create}>
             <AnimatedSelect
+              aria-label="Đợt đăng ký tạo nhóm"
               className="form-select"
-              value={periodId ?? ''}
+              value={creationPeriods.some((period) => period.id === periodId) ? periodId : ''}
               onChange={(event) => {
                 setPage(0)
                 setPeriodId(Number(event.target.value) || undefined)
@@ -332,7 +321,7 @@ export function GroupsPage() {
               required
             >
               <option value="">Chọn đợt đăng ký</option>
-              {periods.map((period) => (
+              {creationPeriods.map((period) => (
                 <option key={period.id} value={period.id}>
                   {period.name} - {period.projectType}
                 </option>
@@ -343,12 +332,16 @@ export function GroupsPage() {
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Tên nhóm"
+              maxLength={150}
               required
             />
-            <button className="btn btn-primary" type="submit" disabled={creating}>
+            <button className="btn btn-primary" type="submit" disabled={creating || !creationPeriods.length}>
               {creating ? 'Đang tạo...' : 'Tạo nhóm'}
             </button>
           </form>
+          {!creationPeriods.length && (
+            <p role="status">Hiện không có đợt đang mở đăng ký cho sinh viên để tạo nhóm.</p>
+          )}
         </section>
       ) : (
         <SelectionPanel id="group-period-filter" label="Lọc theo đợt đăng ký">

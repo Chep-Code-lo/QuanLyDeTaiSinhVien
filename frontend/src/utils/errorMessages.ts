@@ -1,4 +1,28 @@
 const messages: Record<string, string> = {
+  'Invitation expiry must be in the future.': 'Hạn lời mời phải sau thời điểm hiện tại.',
+  'Invitation expiry must be within the configured invitation lifetime and registration window.':
+    'Hạn lời mời vượt quá số giờ cho phép hoặc thời điểm đóng đăng ký. Hãy chọn lại hạn lời mời.',
+  'Student was not found.': 'Không tìm thấy sinh viên có mã số này. Hãy kiểm tra lại mã số sinh viên.',
+  'This student already has a pending invitation to the group.':
+    'Sinh viên này đã có lời mời vào nhóm đang chờ phản hồi.',
+  'Student already belongs to an active group in this registration period.':
+    'Sinh viên này đã tham gia một nhóm trong đợt đăng ký này.',
+  'Student already belongs to an active group.':
+    'Bạn đã thuộc một nhóm trong đợt đăng ký này, không thể tạo hoặc tham gia nhóm khác.',
+  'All group members must belong to the same faculty as the registration period.':
+    'Sinh viên được mời phải thuộc cùng khoa với đợt đăng ký.',
+  'The group has reached its configured maximum number of members.':
+    'Nhóm đã đủ số thành viên tối đa của đợt đăng ký.',
+  'Group invitations are only available in an active registration period.':
+    'Chỉ có thể mời sinh viên khi đợt đăng ký đang hoạt động.',
+  'Group invitations are only available during the registration window.':
+    'Chỉ có thể mời sinh viên trong thời gian mở đăng ký.',
+  'Student groups can only be created in an active registration period.':
+    'Đợt đăng ký chưa hoạt động hoặc đã đóng, không thể tạo nhóm mới.',
+  'Student groups can only be managed during the registration window.':
+    'Chỉ có thể tạo nhóm trong thời gian mở đăng ký.',
+  'Student must belong to the same faculty as the registration period.':
+    'Bạn cần thuộc cùng khoa với đợt đăng ký để tạo nhóm.',
   'Group size limits must be between 3 and 5.':
     'Giới hạn số thành viên nhóm phải nằm trong khoảng 3–5 sinh viên.',
   'A group must have 3 to 5 active students to register a topic.':
