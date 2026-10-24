@@ -172,16 +172,6 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
 
   return (
     <form className="create-account-form" onSubmit={submit}>
-      {role !== 'ADMIN' && (
-        <button
-          type="button"
-          className="btn btn-secondary"
-          disabled={submitting}
-          onClick={() => setRole('ADMIN')}
-        >
-          Tạo tài khoản quản trị viên
-        </button>
-      )}
       {loading && role !== 'ADMIN' && (
         <div className="content-state" role="status">
           <span className="spinner" />
@@ -215,9 +205,7 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
 
       <fieldset
         className="create-account-form__fields"
-        disabled={
-          submitting || (role !== 'ADMIN' && (loading || loadError || departments.length === 0))
-        }
+        disabled={submitting}
       >
         <h2 className="section-title">Thông tin tài khoản</h2>
         <div className="create-account-form__grid">
@@ -470,7 +458,11 @@ export function CreateAccountForm({ onCancel, onCreated }: CreateAccountFormProp
           >
             Hủy
           </button>
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={submitting || (role !== 'ADMIN' && (loading || loadError || departments.length === 0))}
+          >
             {submitting ? 'Đang tạo tài khoản...' : 'Tạo tài khoản'}
           </button>
         </div>

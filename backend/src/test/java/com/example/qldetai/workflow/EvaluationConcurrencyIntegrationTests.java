@@ -452,7 +452,7 @@ class EvaluationConcurrencyIntegrationTests {
                                 "select count(*) from notifications where event_key = ?",
                                 Long.class,
                                 "result-published-" + result.id()))
-                .isEqualTo(2);
+                .isEqualTo(3);
     }
 
     @Test

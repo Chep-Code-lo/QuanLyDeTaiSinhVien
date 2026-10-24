@@ -190,7 +190,7 @@ class BackendConsistencyIntegrationTests {
                     period.setRegistrationStartAt(now().minusDays(3));
                     period.setRegistrationEndAt(now().plusDays(3));
                     period.setStatus(RegistrationPeriodStatus.ACTIVE);
-                    period.setMinGroupMembers(2);
+                    period.setMinGroupMembers(3);
                     period.setMaxGroupMembers(3);
                     periods.save(period);
                 });
@@ -248,7 +248,8 @@ class BackendConsistencyIntegrationTests {
 
     @Test
     void concurrentAddsRespectGroupCapacity() throws Exception {
-        Long group = activeGroup(leaderA, member).id();
+        // Start with two members so the concurrent requests compete for the last slot.
+        Long group = add(createGroup(leaderA).id(), leaderA, member).id();
         assertOneSuccess(
                 race(() -> add(group, leaderA, leaderB), () -> add(group, leaderA, extra)));
         assertThat(members.countByGroupIdAndLeftAtIsNull(group)).isEqualTo(3);
@@ -307,7 +308,7 @@ class BackendConsistencyIntegrationTests {
                             registrationRepository.existsByGroupIdAndStatusIn(
                                     group, List.of(RegistrationStatus.PENDING));
                     if (pending) {
-                        assertThat(members.countByGroupIdAndLeftAtIsNull(group)).isEqualTo(2);
+                        assertThat(members.countByGroupIdAndLeftAtIsNull(group)).isEqualTo(3);
                     } else {
                         assertThat(groupRepository.findById(group).orElseThrow().getStatus())
                                 .isEqualTo(GroupStatus.FORMING);
@@ -1253,7 +1254,7 @@ class BackendConsistencyIntegrationTests {
                                     other.setProposalEndAt(period.getProposalEndAt());
                                     other.setRegistrationStartAt(period.getRegistrationStartAt());
                                     other.setRegistrationEndAt(period.getRegistrationEndAt());
-                                    other.setMinGroupMembers(2);
+                                    other.setMinGroupMembers(3);
                                     other.setMaxGroupMembers(3);
                                     return periods.save(other);
                                 });
@@ -1483,7 +1484,9 @@ class BackendConsistencyIntegrationTests {
     }
 
     private StudentGroupResponse activeGroup(Student leader, Student student) {
-        return add(createGroup(leader).id(), leader, student);
+        var group = add(createGroup(leader).id(), leader, student);
+        var thirdMember = tx.execute(status -> student());
+        return add(group.id(), leader, thirdMember);
     }
 
     private TopicRegistrationResponse register(Long group, Long topic, Student leader) {

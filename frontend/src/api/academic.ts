@@ -12,6 +12,12 @@ import type {
 } from '../types/domain'
 
 export const academicApi = {
+  deleteFaculty: async (id: number) => {
+    await apiClient.delete(`/faculties/${id}`)
+  },
+  deleteDepartment: async (id: number) => {
+    await apiClient.delete(`/departments/${id}`)
+  },
   getFaculties: async () => {
     const response = await apiClient.get<ApiResponse<FacultyResponse[]>>('/faculties')
     return response.data.data

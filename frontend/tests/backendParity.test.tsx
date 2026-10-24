@@ -28,6 +28,8 @@ const mocks = vi.hoisted(() => ({
   createFaculty: vi.fn(),
   updateFaculty: vi.fn(),
   updateDepartment: vi.fn(),
+  deleteFaculty: vi.fn(),
+  deleteDepartment: vi.fn(),
   periods: vi.fn(),
   projects: vi.fn(),
   supervisedProjects: vi.fn(),
@@ -64,6 +66,8 @@ vi.mock('../src/api/academic', () => ({
     createFaculty: mocks.createFaculty,
     updateFaculty: mocks.updateFaculty,
     updateDepartment: mocks.updateDepartment,
+    deleteFaculty: mocks.deleteFaculty,
+    deleteDepartment: mocks.deleteDepartment,
     getRegistrationPeriods: mocks.periods,
     getProjectAssignments: mocks.projects,
     getSupervisedProjects: mocks.supervisedProjects,
@@ -1052,7 +1056,8 @@ it('tạo Admin thuần không yêu cầu hồ sơ học vụ hoặc danh mục 
       <CreateAccountForm onCancel={vi.fn()} onCreated={vi.fn()} />
     </MemoryRouter>,
   )
-  await userEvent.click(screen.getByRole('button', { name: 'Tạo tài khoản quản trị viên' }))
+  expect(screen.queryByRole('button', { name: 'Tạo tài khoản quản trị viên' })).toBeNull()
+  await userEvent.selectOptions(screen.getByLabelText(/Vai trò/), 'ADMIN')
   expect(screen.queryByLabelText(/Mã giảng viên/)).toBeNull()
   expect(screen.queryByLabelText(/Bộ môn/)).toBeNull()
   fireEvent.change(screen.getByLabelText(/Họ và tên/), { target: { value: 'Admin kiểm thử' } })
@@ -1100,12 +1105,60 @@ it.each([
     expect(dialog.hasAttribute('open')).toBe(true)
     expect(document.activeElement).toBe(within(dialog).getByLabelText(field))
     expect(document.body.style.overflow).toBe('hidden')
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Hủy danh mục' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Đóng biểu mẫu danh mục' }))
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(document.activeElement).toBe(button)
     expect(document.body.style.overflow).not.toBe('hidden')
   },
 )
+it.each([
+  ['Sửa khoa CNTT', 'faculty', 1],
+  ['Sửa bộ môn PM', 'department', 2],
+] as const)('hủy danh mục %s gọi API sau xác nhận và cập nhật danh sách', async (button, kind, id) => {
+  const remove = kind === 'faculty' ? mocks.deleteFaculty : mocks.deleteDepartment
+  const list = kind === 'faculty' ? mocks.faculties : mocks.departments
+  remove.mockImplementation(async () => { list.mockResolvedValue([]) })
+  render(<AcademicCatalogPage />)
+  await userEvent.click(await screen.findByRole('button', { name: button }))
+  await userEvent.click(screen.getByRole('button', { name: 'Hủy danh mục' }))
+  expect(remove).not.toHaveBeenCalled()
+  await userEvent.click(screen.getByRole('button', { name: 'Xác nhận hủy danh mục' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(remove).toHaveBeenCalledExactlyOnceWith(id)
+  await waitFor(() => expect(screen.queryByRole('button', { name: button })).toBeNull())
+})
+it('giữ danh mục không gọi API xóa và vẫn cho sửa tiếp', async () => {
+  render(<AcademicCatalogPage />)
+  await userEvent.click(await screen.findByRole('button', { name: 'Sửa khoa CNTT' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Hủy danh mục' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Giữ danh mục' }))
+  expect(screen.getByLabelText('Tên danh mục')).toBeTruthy()
+  expect(mocks.deleteFaculty).not.toHaveBeenCalled()
+})
+it('hủy danh mục có dữ liệu liên kết báo lỗi và giữ nguyên tên đang sửa', async () => {
+  mocks.deleteFaculty.mockRejectedValue({ response: { data: { message: 'Không thể hủy khoa đang được bộ môn sử dụng.' } } })
+  render(<AcademicCatalogPage />)
+  await userEvent.click(await screen.findByRole('button', { name: 'Sửa khoa CNTT' }))
+  fireEvent.change(screen.getByLabelText('Tên danh mục'), { target: { value: 'Tên đang sửa' } })
+  await userEvent.click(screen.getByRole('button', { name: 'Hủy danh mục' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Xác nhận hủy danh mục' }))
+  await waitFor(() => expect(mocks.error).toHaveBeenCalledWith('Không thể hủy khoa đang được bộ môn sử dụng.'))
+  expect((screen.getByLabelText('Tên danh mục') as HTMLInputElement).value).toBe('Tên đang sửa')
+  expect(screen.getByRole('dialog')).toBeTruthy()
+})
+it('đang hủy không gửi lặp và không cho đóng hộp thoại', async () => {
+  let resolve!: () => void
+  mocks.deleteFaculty.mockImplementation(() => new Promise<void>((done) => { resolve = done }))
+  render(<AcademicCatalogPage />)
+  await userEvent.click(await screen.findByRole('button', { name: 'Sửa khoa CNTT' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Hủy danh mục' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Xác nhận hủy danh mục' }))
+  expect((screen.getByRole('button', { name: 'Đang hủy...' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
+  expect(screen.getByRole('dialog')).toBeTruthy()
+  expect(mocks.deleteFaculty).toHaveBeenCalledTimes(1)
+  await act(async () => resolve())
+})
 it('Escape đóng biểu mẫu mà không gửi dữ liệu', async () => {
   render(<AcademicCatalogPage />)
   await userEvent.click(await screen.findByRole('button', { name: 'Thêm khoa' }))

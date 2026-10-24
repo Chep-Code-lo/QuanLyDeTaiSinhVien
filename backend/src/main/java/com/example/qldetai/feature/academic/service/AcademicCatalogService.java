@@ -21,6 +21,7 @@ import com.example.qldetai.feature.academic.repository.SemesterRepository;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -62,6 +63,18 @@ public class AcademicCatalogService {
         return toFaculty(faculty);
     }
 
+    @Transactional
+    @BusinessAudit(action = "FACULTY_DELETE", entityType = "FACULTY", entityIdArgument = 0)
+    public void deleteFaculty(Long id) {
+        Faculty faculty = requireFaculty(id);
+        try {
+            facultyRepository.delete(faculty);
+            facultyRepository.flush();
+        } catch (DataIntegrityViolationException exception) {
+            throw new ConflictException("Không thể hủy khoa đang được bộ môn hoặc dữ liệu học thuật sử dụng. Có thể chuyển khoa sang ngừng hoạt động.");
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<DepartmentResponse> departments(Long facultyId) {
         List<Department> departments =
@@ -97,6 +110,18 @@ public class AcademicCatalogService {
         department.setName(request.name().trim());
         department.setActive(request.active());
         return toDepartment(department);
+    }
+
+    @Transactional
+    @BusinessAudit(action = "DEPARTMENT_DELETE", entityType = "DEPARTMENT", entityIdArgument = 0)
+    public void deleteDepartment(Long id) {
+        Department department = requireDepartment(id);
+        try {
+            departmentRepository.delete(department);
+            departmentRepository.flush();
+        } catch (DataIntegrityViolationException exception) {
+            throw new ConflictException("Không thể hủy bộ môn đang được sinh viên, giảng viên hoặc dữ liệu học thuật sử dụng. Có thể chuyển bộ môn sang ngừng hoạt động.");
+        }
     }
 
     @Transactional(readOnly = true)

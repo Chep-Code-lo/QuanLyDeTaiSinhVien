@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -55,6 +56,21 @@ public class AcademicController {
             @PathVariable Long id, @Valid @RequestBody UpdateCatalogRequest request) {
         return ApiResponse.success(
                 "Đã cập nhật khoa.", academicCatalogService.updateFaculty(id, request));
+    }
+
+    @DeleteMapping("/faculties/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> deleteFaculty(@PathVariable Long id) {
+        academicCatalogService.deleteFaculty(id);
+        return ApiResponse.success("Đã hủy khoa.", null);
+    }
+
+    @DeleteMapping("/departments/{id}")
+    @PreAuthorize(
+            "hasRole('ADMIN') or @academicAuthorization.canManageDepartment(#id, authentication)")
+    public ApiResponse<Void> deleteDepartment(@PathVariable Long id) {
+        academicCatalogService.deleteDepartment(id);
+        return ApiResponse.success("Đã hủy bộ môn.", null);
     }
 
     @GetMapping("/departments")

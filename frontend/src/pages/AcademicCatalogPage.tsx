@@ -213,6 +213,7 @@ function CatalogEditor({
   const [startsOn, setStartsOn] = useState('')
   const [endsOn, setEndsOn] = useState('')
   const [busy, setBusy] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const sending = useRef(false)
   const dialog = useRef<HTMLDialogElement>(null)
   const titleId = useId()
@@ -230,6 +231,31 @@ function CatalogEditor({
       if (trigger?.isConnected) trigger.focus()
     }
   }, [])
+  useEffect(() => {
+    if (confirmingDelete) {
+      dialog.current?.querySelector<HTMLButtonElement>('[data-keep-catalog]')?.focus()
+    } else {
+      dialog.current?.querySelector<HTMLInputElement>('input:not([disabled])')?.focus()
+    }
+  }, [confirmingDelete])
+
+  const deleteCatalog = async () => {
+    if (!item || sending.current || kind === 'semester') return
+    sending.current = true
+    setBusy(true)
+    try {
+      if (kind === 'faculty') await academicApi.deleteFaculty(item.id)
+      else await academicApi.deleteDepartment(item.id)
+      showSuccess(`Đã hủy ${catalogName} ${item.code}.`)
+      onSaved()
+    } catch (error) {
+      showError(errorMessage(error))
+      setConfirmingDelete(false)
+    } finally {
+      sending.current = false
+      setBusy(false)
+    }
+  }
   return (
     <dialog
       ref={dialog}
@@ -237,7 +263,10 @@ function CatalogEditor({
       aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault()
-        if (!sending.current) onClose()
+        if (!sending.current) {
+          if (confirmingDelete) setConfirmingDelete(false)
+          else onClose()
+        }
       }}
     >
       <div className="catalog-editor-dialog__heading">
@@ -254,161 +283,188 @@ function CatalogEditor({
           Đóng
         </button>
       </div>
-      <form
-        className="stack-form"
-        onSubmit={async (event) => {
-          event.preventDefault()
-          if (
-            sending.current ||
-            (kind === 'semester'
-              ? !academicYear.trim() || !startsOn || !endsOn || endsOn < startsOn
-              : !name.trim() || (!item && !code.trim()))
-          )
-            return
-          sending.current = true
-          setBusy(true)
-          try {
-            if (kind === 'faculty') {
-              if (item) await academicApi.updateFaculty(item.id, { name: name.trim(), active })
-              else await academicApi.createFaculty({ code: code.trim(), name: name.trim() })
-            }
-            if (kind === 'department') {
-              if (item) await academicApi.updateDepartment(item.id, { name: name.trim(), active })
-              else
-                await academicApi.createDepartment({
-                  facultyId,
-                  code: code.trim(),
-                  name: name.trim(),
-                })
-            }
-            if (kind === 'semester')
-              await academicApi.createSemester({
-                academicYear: academicYear.trim(),
-                semesterNo,
-                startsOn,
-                endsOn,
-              })
-            showSuccess('Đã lưu danh mục học thuật.')
-            onSaved()
-          } catch (error) {
-            showError(errorMessage(error))
-          } finally {
-            sending.current = false
-            setBusy(false)
-          }
-        }}
-      >
-        <fieldset className="student-fieldset" disabled={busy}>
-          {kind === 'semester' ? (
-            <>
-              <label>
-                Năm học
-                <input
-                  className="form-input"
-                  required
-                  maxLength={20}
-                  value={academicYear}
-                  onChange={(event) => setAcademicYear(event.target.value)}
-                  placeholder="2026-2027"
-                />
-              </label>
-              <label>
-                Số học kỳ
-                <select
-                  className="form-select"
-                  value={semesterNo}
-                  onChange={(event) => setSemesterNo(Number(event.target.value))}
-                >
-                  {[1, 2, 3].map((value) => (
-                    <option key={value}>{value}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Ngày bắt đầu
-                <DateTimeInput
-                  type="date"
-                  className="form-input"
-                  required
-                  value={startsOn}
-                  onValueChange={setStartsOn}
-                />
-              </label>
-              <label>
-                Ngày kết thúc
-                <DateTimeInput
-                  type="date"
-                  className="form-input"
-                  required
-                  min={startsOn}
-                  value={endsOn}
-                  onValueChange={setEndsOn}
-                />
-              </label>
-            </>
-          ) : (
-            <>
-              {!item && (
-                <>
-                  <label>
-                    Mã danh mục
-                    <input
-                      className="form-input"
-                      required
-                      maxLength={20}
-                      value={code}
-                      onChange={(event) => setCode(event.target.value)}
-                    />
-                  </label>
-                  {kind === 'department' && (
-                    <label>
-                      Khoa quản lý
-                      <select
-                        className="form-select"
-                        required
-                        value={facultyId}
-                        onChange={(event) => setFacultyId(Number(event.target.value))}
-                      >
-                        {faculties.map((faculty) => (
-                          <option key={faculty.id} value={faculty.id}>
-                            {faculty.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                </>
-              )}
-              <label>
-                Tên danh mục
-                <input
-                  className="form-input"
-                  required
-                  maxLength={150}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                />
-              </label>
-              {item && (
-                <label className="catalog-active-control">
-                  <input
-                    type="checkbox"
-                    checked={active}
-                    onChange={(event) => setActive(event.target.checked)}
-                  />
-                  <span>{active ? 'Đang hoạt động' : 'Ngừng hoạt động'}</span>
-                </label>
-              )}
-            </>
-          )}
+      {confirmingDelete && item ? (
+        <div className="stack-form">
+          <p role="alert">
+            Bạn có chắc muốn hủy {catalogName} <strong>{item.name} ({item.code})</strong>?
+            {' '}Danh mục sẽ bị xóa khỏi hệ thống. Thao tác này không thể hoàn tác.
+          </p>
           <div className="inline-form">
-            <button className="btn btn-primary">{busy ? 'Đang lưu...' : 'Lưu danh mục'}</button>
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
-              Hủy danh mục
+            <button
+              type="button"
+              className="btn btn-secondary"
+              data-keep-catalog
+              disabled={busy}
+              onClick={() => setConfirmingDelete(false)}
+            >
+              Giữ danh mục
+            </button>
+            <button type="button" className="btn btn-danger" disabled={busy} onClick={deleteCatalog}>
+              {busy ? 'Đang hủy...' : 'Xác nhận hủy danh mục'}
             </button>
           </div>
-        </fieldset>
-      </form>
+        </div>
+      ) : (
+        <form
+          className="stack-form"
+          onSubmit={async (event) => {
+            event.preventDefault()
+            if (
+              sending.current ||
+              (kind === 'semester'
+                ? !academicYear.trim() || !startsOn || !endsOn || endsOn < startsOn
+                : !name.trim() || (!item && !code.trim()))
+            )
+              return
+            sending.current = true
+            setBusy(true)
+            try {
+              if (kind === 'faculty') {
+                if (item) await academicApi.updateFaculty(item.id, { name: name.trim(), active })
+                else await academicApi.createFaculty({ code: code.trim(), name: name.trim() })
+              }
+              if (kind === 'department') {
+                if (item) await academicApi.updateDepartment(item.id, { name: name.trim(), active })
+                else
+                  await academicApi.createDepartment({
+                    facultyId,
+                    code: code.trim(),
+                    name: name.trim(),
+                  })
+              }
+              if (kind === 'semester')
+                await academicApi.createSemester({
+                  academicYear: academicYear.trim(),
+                  semesterNo,
+                  startsOn,
+                  endsOn,
+                })
+              showSuccess('Đã lưu danh mục học thuật.')
+              onSaved()
+            } catch (error) {
+              showError(errorMessage(error))
+            } finally {
+              sending.current = false
+              setBusy(false)
+            }
+          }}
+        >
+          <fieldset className="student-fieldset" disabled={busy}>
+            {kind === 'semester' ? (
+              <>
+                <label>
+                  Năm học
+                  <input
+                    className="form-input"
+                    required
+                    maxLength={20}
+                    value={academicYear}
+                    onChange={(event) => setAcademicYear(event.target.value)}
+                    placeholder="2026-2027"
+                  />
+                </label>
+                <label>
+                  Số học kỳ
+                  <select
+                    className="form-select"
+                    value={semesterNo}
+                    onChange={(event) => setSemesterNo(Number(event.target.value))}
+                  >
+                    {[1, 2, 3].map((value) => (
+                      <option key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Ngày bắt đầu
+                  <DateTimeInput
+                    type="date"
+                    className="form-input"
+                    required
+                    value={startsOn}
+                    onValueChange={setStartsOn}
+                  />
+                </label>
+                <label>
+                  Ngày kết thúc
+                  <DateTimeInput
+                    type="date"
+                    className="form-input"
+                    required
+                    min={startsOn}
+                    value={endsOn}
+                    onValueChange={setEndsOn}
+                  />
+                </label>
+              </>
+            ) : (
+              <>
+                {!item && (
+                  <>
+                    <label>
+                      Mã danh mục
+                      <input
+                        className="form-input"
+                        required
+                        maxLength={20}
+                        value={code}
+                        onChange={(event) => setCode(event.target.value)}
+                      />
+                    </label>
+                    {kind === 'department' && (
+                      <label>
+                        Khoa quản lý
+                        <select
+                          className="form-select"
+                          required
+                          value={facultyId}
+                          onChange={(event) => setFacultyId(Number(event.target.value))}
+                        >
+                          {faculties.map((faculty) => (
+                            <option key={faculty.id} value={faculty.id}>
+                              {faculty.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </>
+                )}
+                <label>
+                  Tên danh mục
+                  <input
+                    className="form-input"
+                    required
+                    maxLength={150}
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                </label>
+                {item && (
+                  <label className="catalog-active-control">
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={(event) => setActive(event.target.checked)}
+                    />
+                    <span>{active ? 'Đang hoạt động' : 'Ngừng hoạt động'}</span>
+                  </label>
+                )}
+              </>
+            )}
+            <div className="inline-form">
+              <button className="btn btn-primary">{busy ? 'Đang lưu...' : 'Lưu danh mục'}</button>
+              <button
+                type="button"
+                className={item ? 'btn btn-danger' : 'btn btn-secondary'}
+                onClick={() => item ? setConfirmingDelete(true) : onClose()}
+              >
+                {item ? 'Hủy danh mục' : 'Hủy thêm mới'}
+              </button>
+            </div>
+          </fieldset>
+        </form>
+      )}
     </dialog>
   )
 }
