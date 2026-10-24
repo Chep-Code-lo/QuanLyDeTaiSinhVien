@@ -57,8 +57,8 @@ public final class AcademicDtos {
             @NotNull LocalDateTime registrationEndAt,
             LocalDateTime reviewDeadlineAt,
             LocalDate defenseDate,
-            @Min(1) @Max(10) Integer minGroupMembers,
-            @Min(1) @Max(10) Integer maxGroupMembers,
+            @Min(3) @Max(5) Integer minGroupMembers,
+            @Min(3) @Max(5) Integer maxGroupMembers,
             @Min(1) @Max(720) Integer invitationExpiryHours,
             @Min(3) @Max(5) Integer minCommitteeMembers,
             @Min(3) @Max(5) Integer maxCommitteeMembers) {
@@ -105,8 +105,8 @@ public final class AcademicDtos {
             @NotNull LocalDateTime registrationEndAt,
             LocalDateTime reviewDeadlineAt,
             LocalDate defenseDate,
-            @Min(1) @Max(10) Integer minGroupMembers,
-            @Min(1) @Max(10) Integer maxGroupMembers,
+            @Min(3) @Max(5) Integer minGroupMembers,
+            @Min(3) @Max(5) Integer maxGroupMembers,
             @Min(1) @Max(720) Integer invitationExpiryHours,
             @Min(3) @Max(5) Integer minCommitteeMembers,
             @Min(3) @Max(5) Integer maxCommitteeMembers) {

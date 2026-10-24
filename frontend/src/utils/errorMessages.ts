@@ -1,4 +1,10 @@
 const messages: Record<string, string> = {
+  'Group size limits must be between 3 and 5.':
+    'Giới hạn số thành viên nhóm phải nằm trong khoảng 3–5 sinh viên.',
+  'A group must have 3 to 5 active students to register a topic.':
+    'Nhóm phải có đủ 3–5 thành viên đang tham gia và đáp ứng giới hạn của đợt để đăng ký đề tài.',
+  'A group must have 3 to 5 active students before project assignment.':
+    'Nhóm phải có đủ 3–5 thành viên đang tham gia và đáp ứng giới hạn của đợt trước khi được giao đề tài.',
   'This score sheet cannot receive another change request.':
     'Phiếu đã có yêu cầu đang chờ xử lý hoặc chưa đủ điều kiện xin đổi điểm.',
   'Only a pending request may be reviewed.':

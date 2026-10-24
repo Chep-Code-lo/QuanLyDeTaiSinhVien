@@ -225,6 +225,11 @@ public class RegistrationService {
             throw new BusinessRuleException(
                     "Topics can only be registered in an active registration period.");
         }
+        int memberCount = groupMemberRepository.findActiveByGroupIdForUpdate(group.getId()).size();
+        if (memberCount < Math.max(3, group.getPeriod().getMinGroupMembers())
+                || memberCount > Math.min(5, group.getPeriod().getMaxGroupMembers())) {
+            throw new BusinessRuleException("A group must have 3 to 5 active students to register a topic.");
+        }
         if (group.getStatus() != GroupStatus.ACTIVE) {
             throw new BusinessRuleException("Only active student groups can register a topic.");
         }

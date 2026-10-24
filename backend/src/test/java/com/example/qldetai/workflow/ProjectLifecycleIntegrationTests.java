@@ -651,7 +651,7 @@ class ProjectLifecycleIntegrationTests {
                 .isInstanceOf(BusinessRuleException.class);
         evaluationResultService.publish(finalized.id(), admin.getId());
         assertThat(emailOutbox.findAll())
-                .hasSize(2)
+                .hasSize(3)
                 .allSatisfy(
                         message -> {
                             assertThat(message.getEventType())
@@ -665,12 +665,12 @@ class ProjectLifecycleIntegrationTests {
         assertThat(emailOutbox.findAll())
                 .extracting(EmailOutbox::getRecipientEmail)
                 .containsExactlyInAnyOrder(
-                        leaderStudent.getUser().getEmail(), secondStudent.getUser().getEmail());
+                        leaderStudent.getUser().getEmail(), secondStudent.getUser().getEmail(), rubricMember.getUser().getEmail());
         emailEvents.resultPublished(resultRepository.findById(finalized.id()).orElseThrow());
-        assertThat(emailOutbox.count()).isEqualTo(2);
+        assertThat(emailOutbox.count()).isEqualTo(3);
         assertThatThrownBy(() -> evaluationResultService.publish(finalized.id(), admin.getId()))
                 .isInstanceOf(BusinessRuleException.class);
-        assertThat(emailOutbox.count()).isEqualTo(2);
+        assertThat(emailOutbox.count()).isEqualTo(3);
     }
 
     @Test
@@ -703,7 +703,7 @@ class ProjectLifecycleIntegrationTests {
         assertThat(emailOutbox.findAll())
                 .extracting(EmailOutbox::getRecipientEmail)
                 .containsExactlyInAnyOrder(
-                        leaderStudent.getUser().getEmail(), secondStudent.getUser().getEmail());
+                        leaderStudent.getUser().getEmail(), secondStudent.getUser().getEmail(), rubricMember.getUser().getEmail());
     }
 
     private void configureResultEmail(boolean enabled) {
@@ -816,6 +816,7 @@ class ProjectLifecycleIntegrationTests {
     private Student secondStudent;
     private Student thirdStudent;
     private Student fourthStudent;
+    private Student rubricMember;
 
     @BeforeEach
     void setUp() {
@@ -924,6 +925,23 @@ class ProjectLifecycleIntegrationTests {
                         leaderStudent.getStudentCode(),
                         fourthStudent.getStudentCode(),
                         thirdStudent.getStudentCode());
+    }
+
+    @Test
+    void topicRegistrationRejectsUndersizedGroupEvenWhenStatusIsStaleActive() {
+        var topic = createPublishedTopic("rubric-min");
+        var group = groupService.create(new CreateGroupRequest(period.getId(), "Rubric group"),
+                leaderStudent.getUser().getId());
+        groupService.addMember(group.id(), new AddGroupMemberRequest(secondStudent.getStudentCode()),
+                leaderStudent.getUser().getId());
+        var entity = studentGroupRepository.findById(group.id()).orElseThrow();
+        entity.setStatus(GroupStatus.ACTIVE);
+        studentGroupRepository.saveAndFlush(entity);
+        assertThatThrownBy(() -> registrationService.create(
+                new CreateTopicRegistrationRequest(group.id(), topic.id(), "Rubric boundary"),
+                leaderStudent.getUser().getId()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("3 to 5 active students");
     }
 
     @Test
@@ -1656,7 +1674,7 @@ class ProjectLifecycleIntegrationTests {
                         });
         assertThat(detail.members())
                 .extracting(member -> member.studentId())
-                .containsExactlyInAnyOrder(leaderStudent.getId(), secondStudent.getId());
+                .containsExactlyInAnyOrder(leaderStudent.getId(), secondStudent.getId(), rubricMember.getId());
         assertThat(
                         evaluationService
                                 .mySheet(singleEvaluator, lecturerThree.getUser().getId())
@@ -1790,7 +1808,7 @@ class ProjectLifecycleIntegrationTests {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.totalElements").value(1))
                     .andExpect(jsonPath("$.data.content[0].project.id").value(project.id()))
-                    .andExpect(jsonPath("$.data.content[0].students.length()").value(2))
+                    .andExpect(jsonPath("$.data.content[0].students.length()").value(3))
                     .andExpect(jsonPath("$.data.content[0].students[0].studentCode")
                             .value(leaderStudent.getStudentCode()));
         }
@@ -1807,7 +1825,7 @@ class ProjectLifecycleIntegrationTests {
         member.setLeftAt(nowUtc());
         groupMemberRepository.saveAndFlush(member);
         var remaining = projectAssignmentService.listSupervised(lecturerOne.getUser().getId(), 0, 10);
-        assertThat(remaining.content().getFirst().students()).hasSize(1);
+        assertThat(remaining.content().getFirst().students()).hasSize(2);
         assertThat(remaining.content().getFirst().students().getFirst().studentId())
                 .isEqualTo(leaderStudent.getId());
     }
@@ -2915,9 +2933,12 @@ class ProjectLifecycleIntegrationTests {
         StudentGroupResponse group =
                 groupService.create(
                         new CreateGroupRequest(period.getId(), name), leader.getUser().getId());
-        return groupService.addMember(
+        groupService.addMember(
                 group.id(),
                 new AddGroupMemberRequest(member.getStudentCode()),
+                leader.getUser().getId());
+        rubricMember = createStudent("SVR", "Rubric member");
+        return groupService.addMember(group.id(), new AddGroupMemberRequest(rubricMember.getStudentCode()),
                 leader.getUser().getId());
     }
 

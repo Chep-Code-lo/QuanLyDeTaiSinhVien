@@ -73,6 +73,8 @@ export const AcademicManagementPage: React.FC = () => {
     registrationEndAt: '',
     reviewDeadlineAt: null,
     defenseDate: null,
+    minGroupMembers: 3,
+    maxGroupMembers: 5,
   })
   const requiresReview =
     newPeriod.projectType === 'SPECIALIZED' || newPeriod.projectType === 'GRADUATION'
@@ -200,6 +202,14 @@ export const AcademicManagementPage: React.FC = () => {
       showError('Số thành viên tối thiểu của nhóm không được lớn hơn số tối đa.')
       return
     }
+    if (
+      [newPeriod.minGroupMembers, newPeriod.maxGroupMembers].some(
+        (value) => value !== undefined && (!Number.isInteger(value) || value < 3 || value > 5),
+      )
+    ) {
+      showError('Số thành viên nhóm phải nằm trong khoảng 3–5 sinh viên.')
+      return
+    }
     const hasCustomCommitteeSize =
       newPeriod.minCommitteeMembers !== undefined || newPeriod.maxCommitteeMembers !== undefined
     if (
@@ -250,6 +260,8 @@ export const AcademicManagementPage: React.FC = () => {
         registrationEndAt: '',
         reviewDeadlineAt: null,
         defenseDate: null,
+        minGroupMembers: 3,
+        maxGroupMembers: 5,
       })
     } catch (err: any) {
       showError('Lỗi tạo đợt đăng ký: ' + (err.response?.data?.message || err.message))
@@ -767,8 +779,8 @@ export const AcademicManagementPage: React.FC = () => {
                       </label>
                       <input
                         type="number"
-                        min="1"
-                        max="10"
+                        min="3"
+                        max="5"
                         step="1"
                         className="form-input"
                         value={newPeriod.minGroupMembers ?? ''}
@@ -786,8 +798,8 @@ export const AcademicManagementPage: React.FC = () => {
                       </label>
                       <input
                         type="number"
-                        min="1"
-                        max="10"
+                        min="3"
+                        max="5"
                         step="1"
                         className="form-input"
                         value={newPeriod.maxGroupMembers ?? ''}

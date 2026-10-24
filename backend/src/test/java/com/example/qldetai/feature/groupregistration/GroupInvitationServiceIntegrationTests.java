@@ -171,6 +171,29 @@ class GroupInvitationServiceIntegrationTests {
     }
 
     @Test
+    void rubricGroupRemainsFormingUntilThreeAndRejectsSixthStudent() {
+        period.setMinGroupMembers(3);
+        period.setMaxGroupMembers(5);
+        periodRepository.saveAndFlush(period);
+        var group = createGroup();
+        assertThat(groupService.get(group.id()).status()).isEqualTo(GroupStatus.FORMING);
+        for (int count = 2; count <= 5; count++) {
+            var student = createStudent("r" + count + Long.toUnsignedString(System.nanoTime(), 36), "Rubric student");
+            var invitation = invitationService.create(
+                    new CreateGroupInvitationRequest(group.id(), student.getStudentCode(), now().plusMinutes(30)),
+                    leader.getUser().getId());
+            invitationService.accept(invitation.id(), student.getUser().getId());
+            assertThat(groupService.get(group.id()).status())
+                    .isEqualTo(count < 3 ? GroupStatus.FORMING : GroupStatus.ACTIVE);
+        }
+        var sixth = createStudent("r6" + Long.toUnsignedString(System.nanoTime(), 36), "Sixth student");
+        assertThatThrownBy(() -> invitationService.create(
+                new CreateGroupInvitationRequest(group.id(), sixth.getStudentCode(), now().plusMinutes(30)),
+                leader.getUser().getId())).isInstanceOf(BusinessRuleException.class);
+        assertThat(groupMemberRepository.findActiveByGroupIdForUpdate(group.id())).hasSize(5);
+    }
+
+    @Test
     void acceptingInvitationCreatesMembershipAndActivatesGroupInTheSameWorkflow() {
         StudentGroupResponse group = createGroup();
         GroupInvitationResponse invitation = createInvitation(group, now().plusMinutes(30));

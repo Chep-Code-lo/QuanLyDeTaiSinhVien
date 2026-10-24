@@ -18,6 +18,14 @@ tiến độ của từng nhóm sinh viên trên cùng một nền tảng.
 
 ## Người dùng và phân quyền
 
+Nhóm sinh viên mặc định có từ **3 đến 5 thành viên** theo rubric. Nhóm mới tạo
+có thể dưới 3 người để tiếp tục mời thành viên, nhưng chỉ được đăng ký và nhận
+giao đề tài khi đủ số thành viên theo cấu hình đợt (trong khoảng 3–5).
+Migration `V010__rubric_group_size.sql` cập nhật cấu hình đợt cũ ngoài giới hạn
+về 3–5 và tính lại trạng thái nhóm đang thành lập/hoạt động; không xóa thành viên
+hay thay đổi các đề tài đã giao. Nhóm cũ thiếu/thừa người cần được điều chỉnh
+trước lần đăng ký tiếp theo. Chạy migration qua dịch vụ `db-migrate` khi triển khai.
+
 | Đối tượng | Phạm vi sử dụng |
 |---|---|
 | Quản trị viên | Quản trị tài khoản, bổ nhiệm, cấu hình hệ thống và giám sát thông tin học thuật. |

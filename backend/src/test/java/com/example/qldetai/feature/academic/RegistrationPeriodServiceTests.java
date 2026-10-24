@@ -350,11 +350,38 @@ class RegistrationPeriodServiceTests {
                 LocalDateTime.of(2027, 2, 20, 0, 0),
                 null,
                 null,
-                1,
                 3,
+                5,
                 72,
                 minimum,
                 maximum);
+    }
+
+    @Test
+    void groupRulesDefaultToThreeToFiveStudents() {
+        var created = registrationPeriodService.create(
+                graduationPeriod(LocalDateTime.of(2027, 4, 30, 10, 0)), admin.getId());
+        assertThat(created.minGroupMembers()).isEqualTo(3);
+        assertThat(created.maxGroupMembers()).isEqualTo(5);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"2,5", "3,6", "1,10", "5,3"})
+    void groupRulesRejectLimitsOutsideRubricOnCreateAndUpdate(int minimum, int maximum) {
+        var base = committeePeriod(3, 5);
+        var request = new CreateRegistrationPeriodRequest(base.facultyId(), base.semesterId(), base.name(),
+                base.projectType(), base.proposalStartAt(), base.proposalEndAt(), base.registrationStartAt(),
+                base.registrationEndAt(), base.reviewDeadlineAt(), base.defenseDate(), minimum, maximum,
+                base.invitationExpiryHours(), base.minCommitteeMembers(), base.maxCommitteeMembers());
+        assertThatThrownBy(() -> registrationPeriodService.create(request, admin.getId()))
+                .isInstanceOf(BusinessRuleException.class);
+        var created = registrationPeriodService.create(base, admin.getId());
+        var update = new UpdateRegistrationPeriodRequest(created.version(), base.semesterId(), base.name(),
+                base.projectType(), base.proposalStartAt(), base.proposalEndAt(), base.registrationStartAt(),
+                base.registrationEndAt(), base.reviewDeadlineAt(), base.defenseDate(), minimum, maximum,
+                base.invitationExpiryHours(), base.minCommitteeMembers(), base.maxCommitteeMembers());
+        assertThatThrownBy(() -> registrationPeriodService.update(created.id(), update, admin.getId()))
+                .isInstanceOf(BusinessRuleException.class);
     }
 
     @Test

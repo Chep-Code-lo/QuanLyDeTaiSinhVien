@@ -69,10 +69,10 @@ public class RegistrationPeriod extends CreatedAtEntity {
 
     /** Rules which vary by registration period rather than being global constants. */
     @Column(name = "min_group_members", nullable = false)
-    private int minGroupMembers = 1;
+    private int minGroupMembers = 3;
 
     @Column(name = "max_group_members", nullable = false)
-    private int maxGroupMembers = 3;
+    private int maxGroupMembers = 5;
 
     @Column(name = "invitation_expiry_hours", nullable = false)
     private int invitationExpiryHours = 72;

@@ -180,6 +180,12 @@ public class ProjectAssignmentService {
             throw new ConflictException("This topic already has a project assignment.");
         }
 
+        int memberCount = groupMemberRepository
+                .findActiveByGroupIdForUpdate(registration.getGroup().getId()).size();
+        if (memberCount < Math.max(3, registration.getPeriod().getMinGroupMembers())
+                || memberCount > Math.min(5, registration.getPeriod().getMaxGroupMembers())) {
+            throw new BusinessRuleException("A group must have 3 to 5 active students before project assignment.");
+        }
         LocalDateTime now = LocalDateTime.now(clock);
         ProjectAssignment assignment = new ProjectAssignment();
         assignment.setRegistration(registration);
@@ -241,6 +247,7 @@ public class ProjectAssignmentService {
                     .getGroup()
                     .setStatus(
                             activeMembers >= assignment.getPeriod().getMinGroupMembers()
+                                    && activeMembers <= assignment.getPeriod().getMaxGroupMembers()
                                     ? GroupStatus.ACTIVE
                                     : GroupStatus.FORMING);
         }

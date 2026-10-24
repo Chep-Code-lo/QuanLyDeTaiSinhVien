@@ -22,6 +22,9 @@ frontend/.vite/
 # Generated deployment packages
 artifacts/
 
+# Local reports and project documents (do not publish to GitHub)
+/docs/
+
 # Python data-generation tools
 __pycache__/
 *.pyc

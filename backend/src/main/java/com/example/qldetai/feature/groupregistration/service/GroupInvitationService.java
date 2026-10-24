@@ -373,6 +373,7 @@ public class GroupInvitationService {
                 groupMemberRepository.findActiveByGroupIdForUpdate(group.getId()).size();
         group.setStatus(
                 activeMembers >= group.getPeriod().getMinGroupMembers()
+                        && activeMembers <= group.getPeriod().getMaxGroupMembers()
                         ? GroupStatus.ACTIVE
                         : GroupStatus.FORMING);
     }

@@ -40,8 +40,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RegistrationPeriodService {
 
-    private static final int DEFAULT_MIN_GROUP_MEMBERS = 1;
-    private static final int DEFAULT_MAX_GROUP_MEMBERS = 3;
+    private static final int DEFAULT_MIN_GROUP_MEMBERS = 3;
+    private static final int DEFAULT_MAX_GROUP_MEMBERS = 5;
     private static final int DEFAULT_INVITATION_EXPIRY_HOURS = 72;
     private static final int DEFAULT_MIN_COMMITTEE_MEMBERS = 3;
     private static final int DEFAULT_MAX_COMMITTEE_MEMBERS = 5;
@@ -354,11 +354,11 @@ public class RegistrationPeriodService {
     }
 
     private void validateRules(PeriodRules rules) {
-        if (rules.minGroupMembers() < 1
-                || rules.minGroupMembers() > 10
-                || rules.maxGroupMembers() < 1
-                || rules.maxGroupMembers() > 10) {
-            throw new BusinessRuleException("Group size limits must be between 1 and 10.");
+        if (rules.minGroupMembers() < 3
+                || rules.minGroupMembers() > 5
+                || rules.maxGroupMembers() < 3
+                || rules.maxGroupMembers() > 5) {
+            throw new BusinessRuleException("Group size limits must be between 3 and 5.");
         }
         if (rules.invitationExpiryHours() < 1 || rules.invitationExpiryHours() > 720) {
             throw new BusinessRuleException("Invitation expiry must be between 1 and 720 hours.");

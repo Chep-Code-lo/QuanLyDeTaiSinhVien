@@ -864,9 +864,12 @@ class EvaluationConcurrencyIntegrationTests {
         StudentGroupResponse group =
                 groupService.create(
                         new CreateGroupRequest(period.getId(), name), leader.getUser().getId());
-        return groupService.addMember(
+        groupService.addMember(
                 group.id(),
                 new AddGroupMemberRequest(member.getStudentCode()),
+                leader.getUser().getId());
+        var rubricMember = createStudent("SVR", "Rubric member");
+        return groupService.addMember(group.id(), new AddGroupMemberRequest(rubricMember.getStudentCode()),
                 leader.getUser().getId());
     }
 

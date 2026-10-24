@@ -109,8 +109,8 @@ function registrationPeriod(
     proposalEndAt: '2099-02-10T08:00:00.000Z',
     registrationStartAt: '2099-02-10T08:00:00.000Z',
     registrationEndAt: '2099-02-20T08:00:00.000Z',
-    minGroupMembers: 1,
-    maxGroupMembers: 3,
+    minGroupMembers: 3,
+    maxGroupMembers: 5,
     invitationExpiryHours: 72,
     minCommitteeMembers: 3,
     maxCommitteeMembers: 5,
@@ -148,8 +148,8 @@ describe('Trưởng khoa tạo đợt đăng ký', () => {
         ),
       )
       const [payload] = mocks.create.mock.calls.at(-1)!
-      expect(payload).not.toHaveProperty('minGroupMembers')
-      expect(payload).not.toHaveProperty('maxGroupMembers')
+      expect(payload.minGroupMembers).toBe(3)
+      expect(payload.maxGroupMembers).toBe(5)
       expect(payload).not.toHaveProperty('invitationExpiryHours')
       expect(payload).not.toHaveProperty('minCommitteeMembers')
       expect(payload).not.toHaveProperty('maxCommitteeMembers')
