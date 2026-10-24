@@ -98,7 +98,7 @@ export function GradeChangesPage() {
           <>
             {!data.content.length && <p>Không có yêu cầu đổi điểm trong phạm vi của bạn.</p>}
             <div className="table-container">
-              <table className="data-table">
+              <table className="data-table grade-change-table">
                 <thead>
                   <tr>
                     <th>Phiếu</th>

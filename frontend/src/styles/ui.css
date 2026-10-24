@@ -182,6 +182,11 @@ div.member-list {
   flex-wrap: wrap;
   white-space: nowrap;
 }
+.portal-shell .data-table.grade-change-table :is(th, td) {
+  text-align: center;
+  vertical-align: middle;
+}
+
 .grade-change-filters {
   display: flex;
   flex-wrap: wrap;
