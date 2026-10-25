@@ -204,38 +204,6 @@ Truy cập `http://localhost:5173`. Vite proxy `/api` đến backend theo cấu 
 trong `vite.config.ts`; nếu tạo `frontend/.env`, giữ `VITE_API_BASE_URL=/api/v1`
 để sử dụng proxy này.
 
-## Kiểm thử và build
-
-Để tạo nhanh tài khoản, nhóm, đề tài, phân công chấm và kết quả tổng hợp phục
-vụ kiểm thử, xem [hướng dẫn tạo dữ liệu hàng loạt](scripts/BULK_DATA.md).
-Công cụ chạy thủ công, không tự nạp dữ liệu khi khởi động ứng dụng.
-
-Backend, chạy trong `backend/`:
-
-```powershell
-# Windows
-.\mvnw.cmd clean verify
-```
-
-```sh
-# Linux/macOS
-bash ./mvnw clean verify
-```
-
-Frontend, chạy trong `frontend/`:
-
-```sh
-npm ci
-npm run typecheck
-npm run lint
-npm test -- --maxWorkers=2
-npm run test:utils
-npm run build
-```
-
-Bộ test backend mặc định dùng H2. Kiểm thử bổ sung với MySQL cần database
-kiểm thử riêng. GitHub Actions cấu hình các bước kiểm tra trong
-`.github/workflows/ci.yml`.
 
 ## Chạy trên máy chủ
 
