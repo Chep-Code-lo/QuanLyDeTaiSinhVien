@@ -213,7 +213,3 @@ trong `vite.config.ts`; nếu tạo `frontend/.env`, giữ `VITE_API_BASE_URL=/a
    `CSRF_COOKIE_SECURE=true`. Nếu proxy chạy trên cùng máy, có thể đặt
    `FRONTEND_BIND_ADDRESS=127.0.0.1` để chỉ mở frontend qua proxy.
 4. Chạy `docker compose config --quiet`, sau đó `docker compose up -d --build`.
-
-Nếu chuyển một hệ thống đã có dữ liệu, chuyển riêng database và volume file
-upload. Mã nguồn không chứa các dữ liệu này. Các file demo đã được loại bỏ;
-giữ nguyên thư mục `database/` để bootstrap và migration hoạt động.
